@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="phantom_arm_robot">
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
-    <include filename="$(find hdt_description)/urdf/null_platform.xacro"/>
-    <include filename="$(find hdt_description)/urdf/hdt.xacro"/>
-    <include filename="$(find hdt_description)/urdf/fake_gripper.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/null_platform.xacro"/>
+    <include filename="$(find hdt)/config/urdf/hdt.xacro"/>
+    <include filename="$(find hdt)/config/urdf/fake_gripper.xacro"/>
 
     <xacro:hdt_arm mounting_link="base_link" mounting_origin="0.0 0.0 0.0"/>
     <xacro:fake_gripper mounting_link="arm_7_gripper_lift_link" mounting_origin="${length7+0.075} 0.0 0.0"/>

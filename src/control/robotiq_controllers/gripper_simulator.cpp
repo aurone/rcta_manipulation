@@ -28,11 +28,11 @@ GripperSimulator::GripperSimulator(boost::asio::io_service& io_service) :
     activating_(false),
     releasing_(false),
     // LEDs initialized to their powered-on and done-booting state
-    controller_power_led_({ LED::Blue, LED::Continuous }), 
+    controller_power_led_({ LED::Blue, LED::Continuous }),
     gripper_power_led_({ LED::Blue, LED::Continuous }),
     comms_led_({ LED::Green, LED::Blinking }),
     fault_led_({ LED::Red, LED::Off }),
-    last_update_() 
+    last_update_()
 {
 }
 
@@ -57,7 +57,7 @@ void GripperSimulator::update()
 
     static double last_position = position_;
     if (last_position != position_) {
-        printf("new gripper position: %0.3f\n", position_);
+//        printf("new gripper position: %0.3f\n", position_);
         last_position = position_;
     }
 
@@ -248,7 +248,7 @@ void GripperSimulator::handle_state_transitions()
         break;
     case Reset:
         //> Activating, Releasing, MajorFault
-        // todo: check for overcurrent 
+        // todo: check for overcurrent
         if (overcurrent()) {
             status_ = MajorFault;
         }
@@ -306,7 +306,7 @@ void GripperSimulator::handle_state_transitions()
         if (!rACT()) {
             // note: blindly reset without overcurrent check; will be
             // checked on next Reset iteration and moved back into MajorFault
-            status_ = Reset; 
+            status_ = Reset;
         }
         break;
     }

@@ -1,10 +1,10 @@
 <launch>
     <arg name="sim" default="false"/>
-    <node name="hdt_arm_driver" pkg="hdt_arm_driver" type="hdt_arm_driver" output="screen">
+    <node name="hdt_arm_driver" pkg="hdt" type="hdt_arm_driver" output="screen">
         <param name="sim" value="$(arg sim)"/>
-        <param name="hdt_manipulator_config" value="$(find hdt_arm_driver)/config/HDTManipulatorParameters.lua"/>
-        <param name="hdt_manipulator_params" value="$(find hdt_arm_driver)/config/HDTManipulatorParameters.txt"/>
+        <param name="hdt_manipulator_config" value="$(find hdt)/config/HDTManipulatorParameters.lua"/>
+        <param name="hdt_manipulator_params" value="$(find hdt)/config/HDTManipulatorParameters.txt"/>
     </node>
 
-    <node name="joint_states_filter" pkg="hdt_arm_driver" type="joint_states_filter"/>
+    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter"/>
 </launch>

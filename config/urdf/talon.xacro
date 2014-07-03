@@ -6,8 +6,8 @@
     <xacro:property name="base_width" value="0.272" />
     <xacro:property name="base_height" value="0.2" />
 
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
-    <include filename="$(find hdt_description)/urdf/hdt_gazebo_urdf.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/hdt_gazebo_urdf.xacro"/>
 
     <!-- macro to instantiate a wheel on the talon -->
     <xacro:macro name="talon_wheel" params="suffix parent *origin">

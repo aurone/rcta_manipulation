@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
 
     <xacro:property name="min_tilt_angle" value="${-27 * degrees}"/>
     <xacro:property name="max_tilt_angle" value="${ 27 * degrees}"/>

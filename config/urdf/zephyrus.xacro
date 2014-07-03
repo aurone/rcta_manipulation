@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zephyrus">
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
     <include filename="$(find husky_description)/urdf/base.urdf.xacro"/>
-    <include filename="$(find hdt_description)/urdf/hdt.xacro"/>
+    <include filename="$(find hdt)/config/urdf/hdt.xacro"/>
     <include filename="$(find robotiq_s_model_visualization)/cfg/s-model_articulated.xacro"/>
 
     <xacro:hdt_arm mounting_link="base_link" mounting_origin="-0.16 0.0 0.209"/>

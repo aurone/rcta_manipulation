@@ -1,6 +1,6 @@
 <launch>
-    <param name="robot_description" command="$(find xacro)/xacro.py '$(find hdt_description)/urdf/zephyrus.xacro'"/>
-    <param name="robot_description_semantic" textfile="$(find hdt_moveit_config)/config/zephyrus.srdf"/>
-    <rosparam command="load" file="$(find hdt_moveit_config)/config/kinematics.yaml"/>
+    <param name="robot_description" command="$(find xacro)/xacro.py '$(find hdt)/config/urdf/zephyrus.xacro'"/>
+    <param name="robot_description_semantic" textfile="$(find hdt)/config/moveit/zephyrus.srdf"/>
+    <rosparam command="load" file="$(find hdt)/config/moveit/kinematics.yaml"/>
 </launch>
 

@@ -21,7 +21,7 @@
     <xacro:property name="length7" value="0.01905" />
     <xacro:property name="radius7" value="0.0127" />
 
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
 
     <!-- macro to instantiate the hdt arm -->
     <xacro:macro name="hdt_arm" params="mounting_link mounting_origin">
@@ -250,7 +250,7 @@
             </inertial>
         </link>
 
-        <include filename="$(find hdt_description)/urdf/hdt_transmission.xacro"/>
+        <include filename="$(find hdt)/config/urdf/hdt_transmission.xacro"/>
     </xacro:macro>
 </robot>
 

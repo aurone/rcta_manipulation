@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="fister_roboto">
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
-    <include filename="$(find hdt_description)/urdf/talon.xacro"/>
-    <include filename="$(find hdt_description)/urdf/hdt.xacro"/>
-    <include filename="$(find hdt_description)/urdf/fake_gripper.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/talon.xacro"/>
+    <include filename="$(find hdt)/config/urdf/hdt.xacro"/>
+    <include filename="$(find hdt)/config/urdf/fake_gripper.xacro"/>
 
     <xacro:talon />
     <xacro:hdt_arm mounting_link="base_link" mounting_origin="${base_length/2-0.1} 0.0 ${wheel_radius}"/>

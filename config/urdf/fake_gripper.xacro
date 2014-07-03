@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
 
     <!-- macro to instantiate the fake gripper -->
     <xacro:macro name="fake_gripper" params="mounting_link mounting_origin">
