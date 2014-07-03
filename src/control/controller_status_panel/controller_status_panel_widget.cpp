@@ -45,7 +45,7 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     rospack_.crawl(search_path, false);
 
     std::string path;
-    const std::string package_name = "hdt_controller_plugins";
+    const std::string package_name = "hdt";
     ROS_INFO("Searching for '%s' package", package_name.c_str());
     if (!rospack_.find(package_name, path)) {
         ROS_ERROR("Failed to find package '%s'", package_name.c_str());
