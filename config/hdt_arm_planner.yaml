@@ -17,8 +17,8 @@ planning:
 debug:
   print_out_path: false
   logging:
-    expands: debug
-    expands2: debug
+    expands: info
+    expands2: info
     ik: debug
     robot_model: debug
     collisions: debug
