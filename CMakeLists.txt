@@ -58,7 +58,7 @@ add_definitions(-DQT_NO_KEYWORDS)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) 
 
 add_message_files(FILES
-    DiagnosticStatus.msg 
+    ControllerDiagnosticStatus.msg 
     JointDiagnosticStatus.msg 
     EmergencyStop.msg 
     ClearEmergencyStop.msg

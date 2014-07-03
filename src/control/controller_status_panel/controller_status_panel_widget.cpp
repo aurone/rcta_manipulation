@@ -65,7 +65,7 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
         }
     }
 
-    hdt_diagnostics_sub_ = nh_.subscribe<hdt::DiagnosticStatus>("hdt_diagnostics", 5, &ControllerStatusPanelWidget::diagnostics_callback, this);
+    hdt_diagnostics_sub_ = nh_.subscribe<hdt::ControllerDiagnosticStatus>("hdt_diagnostics", 5, &ControllerStatusPanelWidget::diagnostics_callback, this);
     staleness_pub_ = nh_.advertise<std_msgs::Empty>("controller_staleness", 1);
     estop_pub_ = nh_.advertise<hdt::EmergencyStop>("hdt_estop", 1);
     clear_estop_pub_ = nh_.advertise<hdt::ClearEmergencyStop>("clear_hdt_estop", 1);
@@ -91,7 +91,7 @@ bool ControllerStatusPanelWidget::load_resources()
     return false;
 }
 
-void ControllerStatusPanelWidget::diagnostics_callback(const hdt::DiagnosticStatus::ConstPtr& msg)
+void ControllerStatusPanelWidget::diagnostics_callback(const hdt::ControllerDiagnosticStatus::ConstPtr& msg)
 {
     std::unique_lock<std::mutex> lock(msg_mutex_);
 
@@ -183,7 +183,7 @@ QPushButton* ControllerStatusPanelWidget::find_button(const std::string& button_
     return button;
 }
 
-void ControllerStatusPanelWidget::refresh_icons(const hdt::DiagnosticStatus& msg)
+void ControllerStatusPanelWidget::refresh_icons(const hdt::ControllerDiagnosticStatus& msg)
 {
     // NOTE: reset_occured boolean condition has different semantics from the other status flags
     if (msg.reset_occurred) {

@@ -12,7 +12,7 @@
 #include <rospack/rospack.h>
 #include <rviz/panel.h>
 #include <std_msgs/Empty.h>
-#include <hdt/DiagnosticStatus.h>
+#include <hdt/ControllerDiagnosticStatus.h>
 
 namespace Ui {
 class ControllerStatusPanelWidget;
@@ -49,7 +49,7 @@ private:
     rospack::Rospack rospack_;
 
     std::mutex msg_mutex_;
-    hdt::DiagnosticStatus::ConstPtr last_msg_;
+    hdt::ControllerDiagnosticStatus::ConstPtr last_msg_;
 
     std::thread watchdog_;
     ros::Publisher staleness_pub_;
@@ -59,7 +59,7 @@ private:
 
     bool load_resources();
 
-    void diagnostics_callback(const hdt::DiagnosticStatus::ConstPtr& msg);
+    void diagnostics_callback(const hdt::ControllerDiagnosticStatus::ConstPtr& msg);
     void staleness_callback(const std_msgs::Empty::ConstPtr& msg);
 
     QPixmap get_active_icon() const;
@@ -75,7 +75,7 @@ private:
 
     QPushButton* find_button(const std::string& button_name);
 
-    void refresh_icons(const hdt::DiagnosticStatus& msg);
+    void refresh_icons(const hdt::ControllerDiagnosticStatus& msg);
 
     void watchdog_thread();
 };

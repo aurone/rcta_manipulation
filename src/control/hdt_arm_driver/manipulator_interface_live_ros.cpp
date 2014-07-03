@@ -6,7 +6,7 @@
 #include <RADMessages.h>
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 #include <sensor_msgs/JointState.h>
-#include <hdt/DiagnosticStatus.h>
+#include <hdt/ControllerDiagnosticStatus.h>
 #include "manipulator_interface_live_ros.h"
 
 template <typename T, typename S>
@@ -84,11 +84,11 @@ ManipulatorInterfaceROS::RunResult ManipulatorInterfaceLiveROS::run()
         ros::Time now = ros::Time::now();
 
         ////////////////////////////////////////////////////////////////////////
-        // Publish hdt/DiagnosticStatus to "hdt_diagnostics"
+        // Publish hdt/ControllerDiagnosticStatus to "hdt_diagnostics"
         ////////////////////////////////////////////////////////////////////////
 
         static int seqno = 0;
-        hdt::DiagnosticStatus status;
+        hdt::ControllerDiagnosticStatus status;
         status.header.stamp = now;
         status.header.seq = seqno++;
         status.header.frame_id = "";
@@ -256,7 +256,7 @@ bool ManipulatorInterfaceLiveROS::init()
 
     follow_joint_traj_feedback_pub_ = nh_.advertise<control_msgs::FollowJointTrajectoryFeedback>("feedback_states", 1);
     joint_states_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_states_raw", 1);
-    diagnostic_status_pub_ = nh_.advertise<hdt::DiagnosticStatus>("hdt_diagnostics", 1);
+    diagnostic_status_pub_ = nh_.advertise<hdt::ControllerDiagnosticStatus>("hdt_diagnostics", 1);
     joint_traj_sub_ = nh_.subscribe("command", 5, &ManipulatorInterfaceLiveROS::joint_trajectory_callback, this);
     estop_sub_ = nh_.subscribe("hdt_estop", 1, &ManipulatorInterfaceLiveROS::emergency_stop_callback, this);
     clear_estop_sub_ = nh_.subscribe("clear_hdt_estop", 1, &ManipulatorInterfaceLiveROS::clear_emergency_stop_callback, this);
