@@ -379,7 +379,7 @@ bool ManipulatorInterfaceLiveROS::assert_joint_limits(const ManipulatorParameter
         return false;
     }
 
-    auto almost_equals = [](double u, double v, double eps) { return fabs(u - v) <= eps; };
+    auto almost_equals = [](double u, double v, double eps) { return fabs(u - v) <= fabs(eps); };
 
     for (std::size_t i = 0; i < robot_model_.min_limits().size(); ++i) {
         double urdf_min_limit = robot_model_.min_limits()[i];
@@ -393,7 +393,7 @@ bool ManipulatorInterfaceLiveROS::assert_joint_limits(const ManipulatorParameter
             return false;
         }
 
-        if (!almost_equals(urdf_min_limit, (double)hdt_min_limit, 1e-4)) {
+        if (!almost_equals(urdf_min_limit, (double)hdt_min_limit, 0.5 * M_PI / 180.0)) {
             ROS_ERROR("Min Limit does not match for joint %zd (urdf: %0.3f, hdt: %0.3f)", i, urdf_min_limit, (double)hdt_min_limit);
             return false;
         }
@@ -406,7 +406,7 @@ bool ManipulatorInterfaceLiveROS::assert_joint_limits(const ManipulatorParameter
             return false;
         }
 
-        if (!almost_equals(urdf_max_limit, (double)hdt_max_limit, 1e-4)) {
+        if (!almost_equals(urdf_max_limit, (double)hdt_max_limit, 0.5 * M_PI / 180.0)) {
             ROS_ERROR("Max Limit does not match for joint %zd (urdf: %0.3f, hdt: %0.3f)", i, urdf_max_limit, (double)hdt_max_limit);
             return false;
         }
