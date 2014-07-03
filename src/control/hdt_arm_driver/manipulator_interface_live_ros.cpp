@@ -374,7 +374,7 @@ void ManipulatorInterfaceLiveROS::acknowledge_reset_callback(const hdt::Acknowle
 
 bool ManipulatorInterfaceLiveROS::assert_joint_limits(const ManipulatorParameters& manip_params)
 {
-    if (robot_model_.joint_names().size() != manip_.getNumJoints()) {
+    if (robot_model_.joint_names().size() != manip_params.getNumJoints()) {
         ROS_ERROR("Robot Model and HDT Manipulator Interface have different number of joints");
         return false;
     }
