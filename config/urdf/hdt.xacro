@@ -28,7 +28,8 @@
         <joint name="arm_1_shoulder_twist" type="revolute">
             <parent link="${mounting_link}"/>
             <child link="arm_1_shoulder_twist_link"/>
-            <limit lower="${-175*degrees}" upper="${175*degrees}" effort="10" velocity="0.38"/> 
+            <!-- <limit lower="${-175*degrees}" upper="${175*degrees}" effort="10" velocity="0.38"/>  -->
+            <limit lower="${-120*degrees}" upper="${120*degrees}" effort="10" velocity="0.38"/> 
             <axis xyz="0 0 1"/>
             <origin xyz="${mounting_origin}"/>
             <dynamics damping="10" friction="0.1"/>
@@ -60,9 +61,8 @@
         <joint name="arm_2_shoulder_lift" type="revolute">
             <parent link="arm_1_shoulder_twist_link"/>
             <child link="arm_2_shoulder_lift_link"/>
-            <limit lower="${-125*degrees}" upper="${125*degrees}" effort="10" velocity="0.38"/> 
-            <!-- safety controller not working... makes the arm very weak!! -->
-            <!-- <safety_controller k_position="2000" k_velocity="1.5" soft_lower_limit="${-125*degrees}" soft_upper_limit="${125*degrees}"/> -->
+            <!-- <limit lower="${-125*degrees}" upper="${125*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-110*degrees}" upper="${110*degrees}" effort="10" velocity="0.38"/> 
             <axis xyz="0 0 -1"/>
             <origin xyz="0.0 0.0 ${length1}" rpy="${pi/2} 0 0"/>
             <dynamics damping="10" friction="0.1"/>
@@ -94,7 +94,8 @@
         <joint name="arm_3_elbow_twist" type="revolute">
             <parent link="arm_2_shoulder_lift_link"/>
             <child link="arm_3_elbow_twist_link"/>
-            <limit lower="${-175*degrees}" upper="${175*degrees}" effort="10" velocity="0.38"/>
+            <!-- <limit lower="${-175*degrees}" upper="${175*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-150*degrees}" upper="${150*degrees}" effort="10" velocity="0.38"/>
             <axis xyz="0 0 1" />
             <origin xyz="0.0 0.0 0.0" rpy="${-pi/2} 0 0" />
             <dynamics damping="10" friction="0.1"/>
@@ -126,9 +127,9 @@
         <joint name="arm_4_elbow_lift" type="revolute">
             <parent link="arm_3_elbow_twist_link"/>
             <child link="arm_4_elbow_lift_link"/>
-            <limit lower="${-125*degrees}" upper="${125*degrees}" effort="10" velocity="0.38"/>
+            <!-- <limit lower="${-125*degrees}" upper="${125*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-110*degrees}" upper="${110*degrees}" effort="10" velocity="0.38"/>
             <axis xyz="0 0 -1"/>
-            <!-- <origin xyz="0.0 0.0 ${length3}" rpy="${pi/2} ${pi/2} 0"/> -->
             <origin xyz="0.0 0.0 ${length3}" rpy="${pi/2} ${pi/2} 0"/> 
             <dynamics damping="10" friction="0.1"/>
         </joint>
@@ -157,7 +158,8 @@
         <joint name="arm_5_wrist_twist" type="revolute">
             <parent link="arm_4_elbow_lift_link"/>
             <child link="arm_5_wrist_twist_link"/>
-            <limit lower="${-90*degrees}" upper="${90*degrees}" effort="10" velocity="0.38"/>
+            <!-- <limit lower="${-90*degrees}" upper="${90*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-85*degrees}" upper="${85*degrees}" effort="10" velocity="0.38"/>
             <axis xyz="0 0 1"/>
             <origin xyz="0.0 0.0 ${length4}" rpy="${-pi/2} 0 0"/>
             <dynamics damping="10" friction="0.1"/>
@@ -189,9 +191,8 @@
         <joint name="arm_6_wrist_lift" type="revolute">
             <parent link="arm_5_wrist_twist_link"/>
             <child link="arm_6_wrist_lift_link"/>
-            <limit lower="${-60*degrees}" upper="${60*degrees}" effort="10" velocity="0.38"/>
-            <!--   <safety_controller k_position="100" k_velocity="1.5" soft_lower_limit="${-59*degrees}" soft_upper_limit="${59*degrees}"/> -->
-
+            <!-- <limit lower="${-60*degrees}" upper="${60*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-40*degrees}" upper="${40*degrees}" effort="10" velocity="0.38"/>
             <axis xyz="0 0 -1"/>
             <origin xyz="0.0 0.0 ${length5}" rpy="${pi/2} -${pi/2} 0"/>
             <dynamics damping="10" friction="0.1"/>
@@ -222,7 +223,8 @@
         <joint name="arm_7_gripper_lift" type="revolute">
             <parent link="arm_6_wrist_lift_link"/>
             <child link="arm_7_gripper_lift_link"/>
-            <limit lower="${-60*degrees}" upper="${60*degrees}" effort="10" velocity="0.38"/>
+            <!-- <limit lower="${-60*degrees}" upper="${60*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-55*degrees}" upper="${55*degrees}" effort="10" velocity="0.38"/>
             <axis xyz="0 0 1"/>
             <origin xyz="${length6} 0 0" rpy="${-pi/2} 0 0"/>
             <dynamics damping="10" friction="0.1"/>
@@ -253,4 +255,3 @@
         <include filename="$(find hdt)/config/urdf/hdt_transmission.xacro"/>
     </xacro:macro>
 </robot>
-
