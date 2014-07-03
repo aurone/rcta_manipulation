@@ -2,6 +2,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${Eigen_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${lua_INCLUDE_DIRS})
+include_directories("/usr/include/qwt")
 
 link_directories(${catkin_LIBRARY_DIRS})
 link_directories(${lua_LIBRARY_DIRS})

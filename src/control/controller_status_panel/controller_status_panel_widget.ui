@@ -115,12 +115,22 @@
          </item>
         </layout>
        </item>
+       <item row="2" column="0">
+        <widget class="QwtPlot" name="raw_joint_states_plot"/>
+       </item>
       </layout>
      </widget>
     </widget>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QwtPlot</class>
+   <extends>QFrame</extends>
+   <header>qwt_plot.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
