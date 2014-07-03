@@ -6,7 +6,7 @@
 #include <sbpl_geometry_utils/interpolation.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <trajectory_msgs/JointTrajectory.h>
-#include <hdt_arm_planning/HDTRobotModel.h>
+#include "HDTRobotModel.h"
 
 namespace hdt
 {
@@ -293,7 +293,7 @@ bool ArmPlanningNode::init_sbpl()
     return true;
 }
 
-bool ArmPlanningNode::move_arm(hdt_arm_planning::MoveArmCommand::Request& request, hdt_arm_planning::MoveArmCommand::Response& response)
+bool ArmPlanningNode::move_arm(hdt::MoveArmCommand::Request& request, hdt::MoveArmCommand::Response& response)
 {
     tf::Quaternion goal_quat(request.goal_pose.orientation.x, request.goal_pose.orientation.y, request.goal_pose.orientation.z, request.goal_pose.orientation.w);
     tf::Matrix3x3 goal_rotation_matrix(goal_quat);
@@ -772,7 +772,7 @@ void ArmPlanningNode::apply_shortcutting(moveit_msgs::GetMotionPlan::Response& r
         ROS_ERROR("Failed to initialize Joint Interpolation Path Generator");
         return;
     }
-    
+
     std::vector<JointInterpolationPathGenerator> generators;
     generators.push_back(generator);
 

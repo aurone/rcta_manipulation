@@ -17,7 +17,7 @@
 #include <sbpl_manipulation_components/collision_checker.h>
 #include <sbpl_manipulation_components/occupancy_grid.h>
 #include <sbpl_manipulation_components/kdl_robot_model.h>
-#include <hdt_arm_planning/MoveArmCommand.h>
+#include <hdt/MoveArmCommand.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <actionlib/client/simple_action_client.h>
 #include <urdf_model/model.h>
@@ -137,8 +137,8 @@ private:
     bool init_collision_model();
     bool init_sbpl();
 
-    bool move_arm(hdt_arm_planning::MoveArmCommand::Request& request,
-                  hdt_arm_planning::MoveArmCommand::Response& response);
+    bool move_arm(hdt::MoveArmCommand::Request& request,
+                  hdt::MoveArmCommand::Response& response);
 
     void fill_constraint(const std::vector<double>& pose,
                          const std::string& frame_id,

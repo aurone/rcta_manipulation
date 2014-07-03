@@ -1,4 +1,4 @@
-#include <hdt_arm_planning/HDTRobotModel.h>
+#include "HDTRobotModel.h"
 #include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <sbpl_geometry_utils/utils.h>

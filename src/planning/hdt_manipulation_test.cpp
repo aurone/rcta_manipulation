@@ -3,10 +3,10 @@
 #include <ros/ros.h>
 #include <sbpl_manipulation_components/occupancy_grid.h>
 #include <sbpl_collision_checking/sbpl_collision_space.h>
-#include <hdt_arm_planning/HDTRobotModel.h>
 #include <sbpl_arm_planner/action_set.h>
 #include <sbpl_arm_planner/sbpl_arm_planner_interface.h>
 #include <sbpl_manipulation_components/kdl_robot_model.h>
+#include "HDTRobotModel.h"
 
 std::vector<std::string> ReadPlanningJointsParam()
 {
