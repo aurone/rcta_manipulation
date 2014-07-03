@@ -4,9 +4,10 @@
 #include <vector>
 #include <HDTManipulatorInterface.h>
 #include <ros/ros.h>
-#include <hdt/EmergencyStop.h>
-#include <hdt/ClearEmergencyStop.h>
 #include <hdt/AcknowledgeReset.h>
+#include <hdt/ClearEmergencyStop.h>
+#include <hdt/EmergencyStop.h>
+#include <hdt_description/RobotModel.h>
 #include "manipulator_interface_ros.h"
 
 namespace hdt
@@ -46,6 +47,8 @@ private:
 
     boost::shared_ptr<const trajectory_msgs::JointTrajectory> last_command_;
 
+    RobotModel robot_model_;
+
     bool init();
 
     void joint_trajectory_callback(const trajectory_msgs::JointTrajectory::ConstPtr& msg);
@@ -57,6 +60,8 @@ private:
     void halt();
 
     std::vector<double> extract_target_command(const trajectory_msgs::JointTrajectory& command_msg) const;
+
+    bool assert_joint_limits(const ManipulatorParameters& manip_params);
 };
 
 } // namespace hdt

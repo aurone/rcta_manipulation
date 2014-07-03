@@ -51,5 +51,5 @@ add_executable(hdt_arm_driver
                manipulator_interface_ros.cpp
                manipulator_interface_live_ros.cpp
                manipulator_interface_sim_ros.cpp)
-target_link_libraries(hdt_arm_driver ${catkin_LIBRARIES} ${lua_LIBRARIES} ${hdt_LIBRARIES} config_block)
+target_link_libraries(hdt_arm_driver ${catkin_LIBRARIES} ${lua_LIBRARIES} ${hdt_LIBRARIES} config_block hdt_robot_model)
 # add_dependencies(hdt_arm_driver hdt_arm_driver_gencpp)

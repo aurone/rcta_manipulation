@@ -42,7 +42,8 @@ ManipulatorInterfaceLiveROS::ManipulatorInterfaceLiveROS() :
     joint_states_pub_(),
     joint_traj_sub_(),
     initialized_(false),
-    estopped_(false)
+    estopped_(false),
+    robot_model_()
 {
 }
 
@@ -205,23 +206,30 @@ ManipulatorInterfaceROS::RunResult ManipulatorInterfaceLiveROS::run()
 
 bool ManipulatorInterfaceLiveROS::init()
 {
-    std::string manip_config_fname;
-    if (!ph_.getParam("hdt_manipulator_config", manip_config_fname)) {
-        ROS_ERROR("Failed to retrieve '~hdt_manipulator_config'");
+    std::string urdf_string;
+    if (!nh_.getParam("robot_description", urdf_string)) {
+        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
         return false;
     }
 
-    // ManipulatorParameters manip_params;
-    // if (!read_manip_params(manip_config_fname, manip_params)) {
-    //     ROS_ERROR("Failed to parse '%s' for manipulator config", manip_config_fname.c_str());
-    //     return false;
-    // }
+    if (!robot_model_.load(urdf_string)) {
+        ROS_ERROR("Failed to load Robot Model from URDF");
+        return false;
+    }
 
     ROS_INFO("Removing esd_usb2 kernel module");
-    system("modprobe -r esd_usb2");
+    int ret = system("modprobe -r esd_usb2");
+    if (ret) {
+        ROS_ERROR("'modprobe -r esd_usb2' exited with return code %d", ret);
+        return false;
+    }
     ros::Duration(1.0).sleep();
     ROS_INFO("Reinserting esd_usb2 kernel module");
-    system("modprobe -i esd_usb2");
+    ret = system("modprobe -i esd_usb2");
+    if (ret) {
+        ROS_ERROR("'modprobe -i esd_usb2' exited with return code %d", ret);
+        return false;
+    }
 
     std::string params_fname;
     if (!ph_.getParam("hdt_manipulator_params", params_fname)) {
@@ -233,6 +241,12 @@ bool ManipulatorInterfaceLiveROS::init()
     ManipulatorError error = manip_params.initialize(params_fname);
     if (error != ManipulatorError::NO_ERROR() || !manip_params.isInitialized()) {
         ROS_ERROR("Failed to parse '%s' for manipulator config (%s)", params_fname.c_str(), to_string(error).c_str());
+        return false;
+    }
+
+    // cross-check the joint limits from file with the joint limits from the urdf
+    if (!assert_joint_limits(manip_params)) {
+        ROS_ERROR("Joint limits disagreement between URDF and HDT Parameters file");
         return false;
     }
 
@@ -353,6 +367,49 @@ void ManipulatorInterfaceLiveROS::acknowledge_reset_callback(const hdt::Acknowle
 {
     ManipulatorError error = manip_.acknowledgeReset();
     ROS_INFO("Acknowledge reset responded with %s", to_string(error).c_str());
+}
+
+bool ManipulatorInterfaceLiveROS::assert_joint_limits(const ManipulatorParameters& manip_params)
+{
+    if (robot_model_.joint_names().size() != manip_.getNumJoints()) {
+        ROS_ERROR("Robot Model and HDT Manipulator Interface have different number of joints");
+        return false;
+    }
+
+    auto almost_equals = [](double u, double v, double eps) { return fabs(u - v) <= eps; };
+
+    for (std::size_t i = 0; i < robot_model_.min_limits().size(); ++i) {
+        double urdf_min_limit = robot_model_.min_limits()[i];
+        double urdf_max_limit = robot_model_.max_limits()[i];
+
+        float hdt_min_limit;
+        ManipulatorError error = manip_params.getMinPosition(i, &hdt_min_limit);
+
+        if (error != ManipulatorError::NO_ERROR()) {
+            ROS_ERROR("Failed to get min limit for joint %zd", i);
+            return false;
+        }
+
+        if (!almost_equals(urdf_min_limit, (double)hdt_min_limit, 1e-4)) {
+            ROS_ERROR("Min Limit does not match for joint %zd (urdf: %0.3f, hdt: %0.3f)", i, urdf_min_limit, (double)hdt_min_limit);
+            return false;
+        }
+
+        float hdt_max_limit;
+        error = manip_params.getMaxPosition(i, &hdt_max_limit);
+
+        if (error != ManipulatorError::NO_ERROR()) {
+            ROS_ERROR("Failed to get max limit for joint %zd", i);
+            return false;
+        }
+
+        if (!almost_equals(urdf_max_limit, (double)hdt_max_limit, 1e-4)) {
+            ROS_ERROR("Max Limit does not match for joint %zd (urdf: %0.3f, hdt: %0.3f)", i, urdf_max_limit, (double)hdt_max_limit);
+            return false;
+        }
+    }
+
+    return true;
 }
 
 } // namespace hdt
