@@ -72,5 +72,6 @@
     <rviz plugin="${prefix}/config/plugin_description.xml"/>
     <rviz plugin="${prefix}/config/hdt_command_plugin_description.xml"/>
     <rviz plugin="${prefix}/config/controller_status_panel_plugin_description.xml"/>
+    <rviz plugin="${prefix}/config/pick_and_place_plugin_description.xml"/>
   </export>
 </package>
