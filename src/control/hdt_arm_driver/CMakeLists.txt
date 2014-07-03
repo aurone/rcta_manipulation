@@ -53,11 +53,3 @@ add_executable(hdt_arm_driver
                manipulator_interface_sim_ros.cpp)
 target_link_libraries(hdt_arm_driver ${catkin_LIBRARIES} ${lua_LIBRARIES} ${hdt_LIBRARIES} config_block)
 # add_dependencies(hdt_arm_driver hdt_arm_driver_gencpp)
-
-################################################################################
-# Build joint_states_filter Executable
-################################################################################
-
-add_executable(joint_states_filter joint_states_filter.cpp)
-target_link_libraries(joint_states_filter ${catkin_LIBRARIES})
-

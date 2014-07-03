@@ -1,5 +1,6 @@
 add_subdirectory(controller_status_panel)
 add_subdirectory(hdt_arm_driver)
+add_subdirectory(joint_states_filter)
 add_subdirectory(kinect_tilt_control)
 add_subdirectory(robotiq_controllers)
 add_subdirectory(teleop_node)
