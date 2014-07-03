@@ -1,0 +1,7 @@
+<library path="lib/libhdt_command_plugins">
+    <class name="hdt_command_plugins/ManipulatorCommandPanel" type="hdt::ManipulatorCommandPanel" base_class_type="rviz::Panel">
+           <description>
+               A panel widget for sending out joint trajectories for the HDT Manipulator
+           </description>
+     </class>
+</library>

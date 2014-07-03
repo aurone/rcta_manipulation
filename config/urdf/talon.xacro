@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="talon">
+    <xacro:property name="base_length" value="0.864" />
+    <xacro:property name="wheel_radius" value="0.14" />
+    <xacro:property name="track_width" value="0.15" />
+    <xacro:property name="base_width" value="0.272" />
+    <xacro:property name="base_height" value="0.2" />
+
+    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find hdt_description)/urdf/hdt_gazebo_urdf.xacro"/>
+
+    <!-- macro to instantiate a wheel on the talon -->
+    <xacro:macro name="talon_wheel" params="suffix parent *origin">
+        <joint name="wheel_${suffix}_enc" type="continuous">
+            <parent link="base_link"/>
+            <child link="wheel_${suffix}"/>
+            <!-- Why were the limits previously set to +/- 175 degrees - Andrew -->
+            <limit lower="${-180*degrees}" upper="${180*degrees}" effort="45" velocity="0.38"/>
+            <axis xyz="0 1 0"/>
+            <xacro:insert_block name="origin"/>
+            <dynamics damping="10" friction="1.0"/>
+        </joint>
+
+        <link name="wheel_${suffix}">
+            <visual>
+                <geometry>
+                    <cylinder length="${track_width}" radius="${wheel_radius}"/>
+                </geometry>
+                <origin rpy="${pi/2} 0 0" xyz="0.0 0.0 0.0"/>
+                <material name="black">
+                    <color rgba="0.1 0.1 0.1 1"/>
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${track_width}" radius="${wheel_radius}"/>
+                </geometry>
+                <origin rpy="${pi/2} 0 0" xyz="0.0 0.0 0.0"/>
+            </collision>
+            <inertial>
+                <mass value="5"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+    </xacro:macro>
+
+    <!-- macro to instantiate the talon -->
+    <xacro:macro name="talon">
+        <link name="base_link">
+            <visual> 
+                <geometry>
+                    <box size="${base_length} ${base_width} ${base_height}"/> 
+                </geometry>
+                <!-- This value puts the robot on the ground, but has origin outside of the base -->
+                <!-- <origin rpy="0 0 0" xyz="0.0 0.0 ${2*wheel_radius - base_height/2}"/> -->
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${wheel_radius - base_height/2}"/>    
+                <material name="black">
+                    <color rgba="0.1 0.1 0.1 1"/>
+                </material>
+
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${base_length} ${base_width} ${base_height}"/>
+                </geometry>
+                <!-- This value puts the robot on the ground, but has origin outside of the base -->
+                <!-- <origin rpy="0 0 0" xyz="0.0 0.0 ${2*wheel_radius - base_height/2}"/> -->
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${wheel_radius - base_height/2}"/>    
+            </collision>	
+            <inertial>
+                <mass value="40"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+
+        <xacro:talon_wheel suffix="front_left" parent="base_link" >
+            <origin rpy="0 0 0" xyz="${base_length/2 - wheel_radius} ${base_width/2 + track_width/2} 0"/>
+        </xacro:talon_wheel>
+        <xacro:talon_wheel suffix="front_right" parent="base_link" >
+            <origin rpy="0 0 0" xyz="${base_length/2 - wheel_radius} -${base_width/2 + track_width/2} 0"/>
+        </xacro:talon_wheel>
+        <xacro:talon_wheel suffix="rear_left" parent="base_link" >
+            <origin rpy="0 0 0" xyz="-${base_length/2 - wheel_radius} ${base_width/2 + track_width/2} 0"/>
+        </xacro:talon_wheel>
+        <xacro:talon_wheel suffix="rear_right" parent="base_link" >
+            <origin rpy="0 0 0" xyz="-${base_length/2 - wheel_radius} -${base_width/2 + track_width/2} 0"/>
+        </xacro:talon_wheel>
+    </xacro:macro>
+</robot>
+

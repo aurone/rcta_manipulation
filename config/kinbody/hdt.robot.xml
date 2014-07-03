@@ -1,0 +1,176 @@
+<robot name="phantom_arm_robot">
+    <kinbody>
+        <body name="base_link" type="dynamic">
+            <translation>0 0 0</translation>
+            <quat>1 0 0 0</quat>
+        </body>
+        <body name="arm_1_shoulder_twist_link" type="dynamic">
+            <offsetfrom>base_link</offsetfrom>
+            <translation>0 0 0</translation>
+            <quat>1 0 0 0</quat>
+            <geom type="cylinder">
+                <translation>0 0 0.0762</translation>
+                <quat>0.707107 0.707107 0 0</quat>
+                <height>0.1143</height>
+                <radius>0.0381</radius>
+            </geom>
+        </body>
+        <body name="arm_2_shoulder_lift_link" type="dynamic">
+            <offsetfrom>arm_1_shoulder_twist_link</offsetfrom>
+            <translation>0 0 0.1524</translation>
+            <quat>0.707107 0.707107 0 0</quat>
+            <geom type="cylinder">
+                <translation>0 0 0</translation>
+                <quat>0.707107 0.707107 0 0</quat>
+                <height>0.0381</height>
+                <radius>0.0381</radius>
+            </geom>
+        </body>
+        <body name="arm_3_elbow_twist_link" type="dynamic">
+            <offsetfrom>arm_2_shoulder_lift_link</offsetfrom>
+            <translation>0 0 0</translation>
+            <quat>0.707107 -0.707107 0 0</quat>
+            <geom type="box">
+                <translation>0 0 0.27305</translation>
+                <quat>1 0 0 0</quat>
+                <extents>0.0381 0.0381 0.254</extents>
+            </geom>
+        </body>
+        <body name="arm_4_elbow_lift_link" type="dynamic">
+            <offsetfrom>arm_3_elbow_twist_link</offsetfrom>
+            <translation>0 0 0.5461</translation>
+            <quat>0.5 0.5 0.5 -0.5</quat>
+            <geom type="cylinder">
+                <translation>0 0 0.034925</translation>
+                <quat>0.707107 0.707107 0 0</quat>
+                <height>0.06985</height>
+                <radius>0.0381</radius>
+            </geom>
+        </body>
+        <body name="arm_5_wrist_twist_link" type="dynamic">
+            <offsetfrom>arm_4_elbow_lift_link</offsetfrom>
+            <translation>0 0 0.06985</translation>
+            <quat>0.707107 -0.707107 0 0</quat>
+            <geom type="box">
+                <translation>0 0 0.31115</translation>
+                <quat>1 0 0 0</quat>
+                <extents>0.0254 0.0254 0.28575</extents>
+            </geom>
+        </body>
+        <body name="arm_6_wrist_lift_link" type="dynamic">
+            <offsetfrom>arm_5_wrist_twist_link</offsetfrom>
+            <translation>0 0 0.6223</translation>
+            <quat>0.5 0.5 -0.5 0.5</quat>
+            <geom type="cylinder">
+                <translation>0 0 0</translation>
+                <quat>0.707107 0.707107 0 0</quat>
+                <height>0.03175</height>
+                <radius>0.0127</radius>
+            </geom>
+        </body>
+        <body name="arm_7_gripper_lift_link" type="dynamic">
+            <offsetfrom>arm_6_wrist_lift_link</offsetfrom>
+            <translation>0.03175 0 0</translation>
+            <quat>0.707107 -0.707107 0 0</quat>
+            <geom type="cylinder">
+                <translation>0 0 0</translation>
+                <quat>0.707107 0.707107 0 0</quat>
+                <height>0.01905</height>
+                <radius>0.0127</radius>
+            </geom>
+        </body>
+        <body name="gripper_base" type="dynamic">
+            <offsetfrom>arm_7_gripper_lift_link</offsetfrom>
+            <translation>0.09405 0 0</translation>
+            <quat>1 0 0 0</quat>
+            <geom type="box">
+                <translation>-0.0675 0 0</translation>
+                <quat>0.5 0.5 0.5 0.5</quat>
+                <extents>0.011 0.07 0.0375</extents>
+            </geom>
+        </body>
+        <body name="finger_link2" type="dynamic">
+            <offsetfrom>gripper_base</offsetfrom>
+            <translation>0 0 -0.011</translation>
+            <quat>1 0 0 0</quat>
+            <geom type="box">
+                <translation>0 0 0</translation>
+                <quat>0.707107 0 0.707107 0</quat>
+                <extents>0.011 0.011 0.03</extents>
+            </geom>
+        </body>
+        <body name="finger_link1" type="dynamic">
+            <offsetfrom>gripper_base</offsetfrom>
+            <translation>0 0 0.011</translation>
+            <quat>1 0 0 0</quat>
+            <geom type="box">
+                <translation>0 0 0</translation>
+                <quat>0.707107 0 0.707107 0</quat>
+                <extents>0.011 0.011 0.03</extents>
+            </geom>
+        </body>
+        <joint name="arm_1_shoulder_twist" type="hinge">
+            <offsetfrom>arm_1_shoulder_twist_link</offsetfrom>
+            <axis>0 0 1</axis>
+            <body>base_link</body>
+            <body>arm_1_shoulder_twist_link</body>
+        </joint>
+        <joint name="arm_2_shoulder_lift" type="hinge">
+            <offsetfrom>arm_2_shoulder_lift_link</offsetfrom>
+            <axis>0 0 -1</axis>
+            <body>arm_1_shoulder_twist_link</body>
+            <body>arm_2_shoulder_lift_link</body>
+        </joint>
+        <joint name="arm_3_elbow_twist" type="hinge">
+            <offsetfrom>arm_3_elbow_twist_link</offsetfrom>
+            <axis>0 0 1</axis>
+            <body>arm_2_shoulder_lift_link</body>
+            <body>arm_3_elbow_twist_link</body>
+        </joint>
+        <joint name="arm_4_elbow_lift" type="hinge">
+            <offsetfrom>arm_4_elbow_lift_link</offsetfrom>
+            <axis>0 0 -1</axis>
+            <body>arm_3_elbow_twist_link</body>
+            <body>arm_4_elbow_lift_link</body>
+        </joint>
+        <joint name="arm_5_wrist_twist" type="hinge">
+            <offsetfrom>arm_5_wrist_twist_link</offsetfrom>
+            <axis>0 0 1</axis>
+            <body>arm_4_elbow_lift_link</body>
+            <body>arm_5_wrist_twist_link</body>
+        </joint>
+        <joint name="arm_6_wrist_lift" type="hinge">
+            <offsetfrom>arm_6_wrist_lift_link</offsetfrom>
+            <axis>0 0 -1</axis>
+            <body>arm_5_wrist_twist_link</body>
+            <body>arm_6_wrist_lift_link</body>
+        </joint>
+        <joint name="arm_7_gripper_lift" type="hinge">
+            <offsetfrom>arm_7_gripper_lift_link</offsetfrom>
+            <axis>0 0 1</axis>
+            <body>arm_6_wrist_lift_link</body>
+            <body>arm_7_gripper_lift_link</body>
+        </joint>
+        <joint name="joint_gripper_base" type="hinge" enable="false">
+            <offsetfrom>gripper_base</offsetfrom>
+            <body>arm_7_gripper_lift_link</body>
+            <body>gripper_base</body>
+        </joint>
+        <joint name="finger2" type="slider">
+            <offsetfrom>finger_link2</offsetfrom>
+            <axis>0 0 -1</axis>
+            <body>gripper_base</body>
+            <body>finger_link2</body>
+        </joint>
+        <joint name="finger1" type="slider">
+            <offsetfrom>finger_link1</offsetfrom>
+            <axis>0 0 1</axis>
+            <body>gripper_base</body>
+            <body>finger_link1</body>
+        </joint>
+    </kinbody>
+    <manipulator name="hdt_arm">
+        <base>base_link</base>
+        <effector>arm_7_gripper_lift_link</effector>
+    </manipulator>
+</robot>

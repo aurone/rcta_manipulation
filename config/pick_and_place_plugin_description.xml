@@ -1,0 +1,7 @@
+<library path="lib/libhdt_pick_and_place_plugin">
+    <class name="hdt_pick_and_place/PickAndPlacePanel" type="hdt::PickAndPlacePanel" base_class_type="rviz::Panel">
+        <description>
+            A panel widget for assisted autonomy in grasping known objects
+        </description>
+    </class>
+</library>

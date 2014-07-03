@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+
+    <!-- macro to instantiate the fake gripper -->
+    <xacro:macro name="fake_gripper" params="mounting_link mounting_origin">
+        <joint name="joint_gripper_base" type="fixed">
+            <parent link="${mounting_link}"/>
+            <child link="gripper_base"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="${mounting_origin}" rpy="0 0 0"/>
+        </joint>
+
+        <link name="gripper_base">
+            <visual>
+                <geometry>
+                    <box size="0.022 0.140 0.075"/>
+                </geometry>
+                <origin rpy="${pi/2} 0 ${pi/2}" xyz="${-0.075/2 - 0.03} 0 0"/>
+                <material name="black">
+                    <color rgba="1 1 1 1"/>
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="0.022 0.140 0.075"/>
+                </geometry>
+                <origin rpy="${pi/2} 0 ${pi/2}" xyz="${-0.075/2 - 0.03} 0 0"/>
+            </collision>
+            <inertial>
+                <mass value="0.690"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+
+        <joint name="finger1" type="prismatic">
+            <parent link="gripper_base"/>
+            <child link="finger_link1"/>
+            <limit lower="0.001" upper="0.042" effort="45" velocity="0.38"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="0.0 0.0 0.011"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="finger_link1">
+            <visual>
+                <geometry>
+                    <box size="0.022 0.022 0.06"/>
+                </geometry>
+                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="0.022 0.022 0.06"/>
+                </geometry>
+                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
+            </collision>
+            <inertial>
+                <mass value="0.1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+
+        <joint name="finger2" type="prismatic">
+            <parent link="gripper_base"/>
+            <child link="finger_link2"/>
+            <limit lower="0.001" upper="0.042" effort="45" velocity="0.38"/>
+            <axis xyz="0 0 -1"/>
+            <origin xyz="0.0 0.0 -0.011"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="finger_link2">
+            <visual>
+                <geometry>
+                    <box size="0.022 0.022 0.06"/>
+                </geometry>
+                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="0.022 0.022 0.06"/>
+                </geometry>
+                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
+            </collision>
+            <inertial>
+                <mass value="0.1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+    </xacro:macro>
+</robot>
+

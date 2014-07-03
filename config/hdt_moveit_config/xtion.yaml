@@ -1,0 +1,19 @@
+sensors:
+    - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+      point_cloud_topic: /camera/depth/point_subsample  # This specifies the topic to listen on for a point cloud
+      max_range: 3.5                                    # from www.asus.com/Multimedia/Xtion_PRO/#specifications
+      point_subsample: 1                                # Choose one of every point_subsample points.
+      padding_offset: 0.1                               # The size of the padding (in cm).
+      padding_scale: 1.0
+      #filtered_cloud_topic:                            # The topic on which the filtered cloud will be published (mainly for debugigng). The filtering cloud is the resultant cloud after self-filtering has been performed.
+
+    - sensor_plugin occupancy_map_monitor/DepthimageOctomapUpdater
+      image_topic: /camera/depth/image_raw              # This specifies the topic to listen on for a depth image
+      queue_size: 5                                     # The number of images to queue up
+      near_clipping_plane_distance: 0.8
+      far_clipping_plane_distance: 3.5
+      shadow_threshold: 0.2
+      padding_offset: 0.03                              # The size of the padding (in cm)
+      padding_scale: 4.0
+      #filtered_cloud_topic                             # The topic on which the filtered cloud will be published (mainly for debugging). The filtering cloud is the resultant cloud after self-filtering has been performed.
+

@@ -1,0 +1,7 @@
+<library path="lib/libhdt_arm_teleop_plugin">
+    <class name="hdt_arm_teleop/TeleopStatusPanel" type="hdt::TeleopStatusPanel" base_class_type="rviz::Panel">
+        <description>
+            A panel widget for viewing diagnostic information from the HDT teleop
+        </description>
+    </class>
+</library>

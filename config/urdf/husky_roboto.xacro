@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="husky_roboto">
+    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find husky_description)/urdf/base.urdf.xacro"/>
+    <include filename="$(find hdt_description)/urdf/hdt.xacro"/>
+    <include filename="$(find hdt_description)/urdf/fake_gripper.xacro"/>
+
+    <xacro:hdt_arm mounting_link="base_link" mounting_origin="-0.16 0.0 0.209"/>
+    <xacro:fake_gripper mounting_link="arm_7_gripper_lift_link" mounting_origin="${length7+0.075} 0.0 0.0"/>
+</robot>
+

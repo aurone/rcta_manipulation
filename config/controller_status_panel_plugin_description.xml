@@ -1,0 +1,7 @@
+<library path="lib/libhdt_controller_plugins">
+    <class name="hdt_controller_plugins/ControllerStatusPanelWidget" type="hdt::ControllerStatusPanelWidget" base_class_type="rviz::Panel">
+           <description>
+               A panel widget for monitoring the status of the HDT Controller
+           </description>
+     </class>
+</library>

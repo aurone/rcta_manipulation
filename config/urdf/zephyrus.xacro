@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zephyrus">
+    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find husky_description)/urdf/base.urdf.xacro"/>
+    <include filename="$(find hdt_description)/urdf/hdt.xacro"/>
+    <include filename="$(find robotiq_s_model_visualization)/cfg/s-model_articulated.xacro"/>
+
+    <xacro:hdt_arm mounting_link="base_link" mounting_origin="-0.16 0.0 0.209"/>
+
+    <!-- fixed link connecting palm and arm_7_gripper -->
+    <joint name="joint_gripper_base" type="fixed">
+        <parent link="arm_7_gripper_lift_link"/>
+        <child link="palm"/>
+        <axis xyz="0 0 1"/>
+        <origin xyz="0.075 0 0" rpy="${pi/2} ${pi/2} 0"/>
+    </joint>
+</robot>

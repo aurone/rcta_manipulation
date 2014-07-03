@@ -1,0 +1,6 @@
+<launch>
+    <node pkg="hdt_pick_and_place" name="hdt_train_object_pose_estimation" type="hdt_train_object_pose_estimation"
+          output="screen">
+        <param name="database_filename" value="$(find hdt_pick_and_place)/data/pr2_graspDB.db"/>
+    </node>
+</launch>

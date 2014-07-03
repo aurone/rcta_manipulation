@@ -1,0 +1,45 @@
+planning:
+  epsilon: 100
+  verbose: false
+  use_bfs_heuristic: true
+  group_name: right_arm
+  reference_frame: base_link 
+  planning_joints:
+    arm_1_shoulder_twist
+    arm_2_shoulder_lift
+    arm_3_elbow_twist
+    arm_4_elbow_lift
+    arm_5_wrist_twist
+    arm_6_wrist_lift
+    arm_7_gripper_lift
+  discretization: 360 360 360 360 360 360 360
+
+debug:
+  print_out_path: false
+  logging:
+    expands: debug
+    expands2: debug
+    ik: debug
+    robot_model: debug
+    collisions: debug
+    solution: debug
+
+visualizations:
+  heuristic: false
+  goal: true
+  expanded_states: true
+  trajectory: false
+  collision_model_trajectory: false
+  trajectory_throttle: 1
+
+occupancy_grid:
+  origin_x: -0.75
+  origin_y: -1.25
+  origin_z: -0.05
+  size_x: 2.0
+  size_y: 2.0
+  size_z: 2.0
+
+# true: use the action server on arm_controller/joint_trajectory
+# false: publish to the topic command
+use_action_server: true 

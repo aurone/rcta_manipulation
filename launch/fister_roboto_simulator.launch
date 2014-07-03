@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find hdt_simulator)/launch/talon_simulator.launch"/>
+    <include file="$(find hdt_simulator)/launch/hdt_simulator.launch"/>
+    <include file="$(find hdt_simulator)/launch/gripper_simulator.launch"/>
+</launch>
+

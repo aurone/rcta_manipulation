@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="andalite">
+    <include filename="$(find hdt_description)/urdf/common.xacro"/>
+    <include filename="$(find husky_description)/urdf/base.urdf.xacro"/>
+    <include filename="$(find hdt_description)/urdf/hdt.xacro"/>
+    <include filename="$(find hdt_description)/urdf/fake_gripper.xacro"/>
+    <include filename="$(find hdt_description)/urdf/shelf.xacro"/>
+    <include filename="$(find hdt_description)/urdf/kinect.xacro"/>
+
+    <xacro:property name="shelf_dist_from_bumper_m" value="0.10795" />
+    <xacro:property name="bumper_to_rail_bottom_offset_z" value="0.132" />
+    <!-- <xacro:property name="rail_width" value="0.421" />  -->    <!-- values computed from diagrams -->
+    <xacro:property name="rail_width" value="0.418" />              <!-- values measured from husky at lab -->
+
+    <!-- describe the fixed top_shelf to camera_link transform -->
+    <xacro:property name="kinect_side_edge_depth_offset_m" value="0.132"/>  <!-- depth lens measured from left edge of top shelf -->
+    <xacro:property name="kinect_front_edge_offset_m" value=".01097"/>      <!-- depth lens measured from front edge of top shelf -->
+    <!-- <xacro:property name="kinect_height_offset_m" value="0.04967"/> -->         <!-- depth lens measured from top edge of top shelf -->
+    <xacro:property name="kinect_height_offset_m" value="0.01"/>         <!-- depth lens measured from top edge of top shelf -->
+    <xacro:property name="kinect_depth_to_camera_offset_ym" value="-0.02"/> <!-- offset from depth lens to camera_link in y -->
+
+    <!-- Build the robot -->
+
+    <xacro:husky_shelf
+        bumper_frame="base_link_front_bumper_part"
+        bumper_to_shelf_x="${shelf_dist_from_bumper_m}"
+        bumper_to_shelf_z="${bumper_to_rail_bottom_offset_z}"
+        rail_width="${rail_width}"/>
+
+    <xacro:kinect
+        mounting_link="top_shelf"
+        mounting_origin="${0.5 * shelf_length_m - kinect_front_edge_offset_m}
+                         ${0.5 * rail_width + shelf_width_m - kinect_side_edge_depth_offset_m + kinect_depth_to_camera_offset_ym}
+                         ${0.5 * shelf_width_m}"/>
+
+    <xacro:hdt_arm mounting_link="arm_mount_panel_dummy" mounting_origin="0 0 0" />
+
+    <xacro:fake_gripper mounting_link="arm_7_gripper_lift_link" mounting_origin="${length7+0.075} 0.0 0.0" />
+</robot>

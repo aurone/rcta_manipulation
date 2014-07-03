@@ -1,0 +1,6 @@
+<launch>
+    <node pkg="hdt_arm_driver" name="joint_trajectory_action" type="joint_trajectory_action_HDT" output="screen">
+	    <remap from="joint_path_command" to="command"/>
+        <rosparam command="load" file="$(find hdt_arm_driver)/config/joint_trajectory_action.yaml"/>
+    </node>
+</launch>

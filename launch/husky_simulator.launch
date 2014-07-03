@@ -1,0 +1,14 @@
+<launch>
+    <rosparam> 
+        /husky_controller_joint_names: [ "joint_front_right_wheel",
+                                         "joint_front_left_wheel",
+                                         "joint_back_right_wheel",
+                                         "joint_back_left_wheel" ]
+    </rosparam>  
+
+    <!-- industrial_robot_simulator: accepts robot commands and reports status -->
+    <node pkg="industrial_robot_simulator" type="industrial_robot_simulator" name="husky_industrial_robot_simulator">
+        <remap from="/controller_joint_names" to="/husky_controller_joint_names"/>
+    </node>
+</launch>
+

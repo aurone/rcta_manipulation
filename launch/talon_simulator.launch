@@ -1,0 +1,14 @@
+<launch>
+    <rosparam> 
+        /talon_controller_joint_names: [ "wheel_front_left_enc",
+                                         "wheel_front_right_enc",
+                                         "wheel_rear_left_enc",
+                                         "wheel_rear_right_enc" ]
+    </rosparam> 
+
+    <!-- industrial_robot_simulator: accepts robot commands and reports status -->
+    <node pkg="industrial_robot_simulator" type="industrial_robot_simulator" name="talon_industrial_robot_simulator">
+        <remap from="/controller_joint_names" to="/talon_controller_joint_names"/>
+    </node>
+</launch>
+

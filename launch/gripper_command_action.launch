@@ -1,0 +1,14 @@
+<launch>
+    <arg name="sim" default="false"/>
+    <group if="$(arg sim)">
+        <node pkg="robotiq_controllers" name="gripper_command_action" type="gripper_command_action" output="screen">
+                <rosparam command="load" file="$(find robotiq_controllers)/config/gripper_command_action_sim.yaml"/>
+        </node>
+    </group>
+
+    <group unless="$(arg sim)">
+        <node pkg="robotiq_controllers" name="gripper_command_action" type="gripper_command_action" output="screen">
+            <rosparam command="load" file="$(find robotiq_controllers)/config/gripper_command_action_live.yaml"/>
+        </node>
+    </group>
+</launch>

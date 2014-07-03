@@ -1,0 +1,80 @@
+<launch>
+    <!-- This launch file provides a simulated industrial robot
+
+        Several nodes are started, to simulate low-level robot communication
+        and higher-level actionlib support:
+            - industrial_robot simulator : accepts motion commands and publishes robot state
+
+        Usage:
+            hdt_simulator.launch
+    -->
+
+    <rosparam> 
+        <!--
+        /simulator_joint_names: [ "arm_1_shoulder_twist",
+                                  "arm_2_shoulder_lift", 
+                                  "arm_3_elbow_twist",
+                                  "arm_4_elbow_lift",
+                                  "arm_5_wrist_twist",
+                                  "arm_6_wrist_lift",
+                                  "arm_7_gripper_lift",
+                                  "finger1",
+                                  "finger2",
+                                  "wheel_front_left_enc",
+                                  "wheel_front_right_enc",
+                                  "wheel_rear_left_enc",
+                                  "wheel_rear_right_enc" ]
+        -->
+
+        <!--
+        /controller_joint_names: [ "arm_1_shoulder_twist",
+                                   "arm_2_shoulder_lift",
+                                   "arm_3_elbow_twist",
+                                   "arm_4_elbow_lift",
+                                   "arm_5_wrist_twist",
+                                   "arm_6_wrist_lift",
+                                   "arm_7_gripper_lift" ] 
+        -->
+
+        <!--
+        /controller_joint_names: [ "arm_1_shoulder_twist",
+                                   "arm_2_shoulder_lift", 
+                                   "arm_3_elbow_twist",
+                                   "arm_4_elbow_lift",
+                                   "arm_5_wrist_twist",
+                                   "arm_6_wrist_lift",
+                                   "arm_7_gripper_lift",
+                                   "finger1",
+                                   "finger2",
+                                   "wheel_front_left_enc",
+                                   "wheel_front_right_enc",
+                                   "wheel_rear_left_enc",
+                                   "wheel_rear_right_enc" ]
+        -->
+        /controller_joint_names: [ "arm_1_shoulder_twist",
+                                   "arm_2_shoulder_lift", 
+                                   "arm_3_elbow_twist",
+                                   "arm_4_elbow_lift",
+                                   "arm_5_wrist_twist",
+                                   "arm_6_wrist_lift",
+                                   "arm_7_gripper_lift",
+                                   "finger1",
+                                   "finger2",
+                                   "joint_front_right_wheel",
+                                   "joint_front_left_wheel",
+                                   "joint_back_right_wheel",
+                                   "joint_back_left_wheel" ]
+<!--
+        /controller_joint_names: [ "finger1",
+                                   "finger2",
+                                   "wheel_front_left_enc",
+                                   "wheel_front_right_enc",
+                                   "wheel_rear_left_enc",
+                                   "wheel_rear_right_enc" ]
+-->
+    </rosparam> 
+
+    <!-- industrial_robot_simulator: accepts robot commands and reports status -->
+    <node pkg="industrial_robot_simulator" type="industrial_robot_simulator" name="industrial_robot_simulator"/>
+</launch>
+

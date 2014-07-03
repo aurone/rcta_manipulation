@@ -1,0 +1,3 @@
+<launch>
+    <rosparam command="load" file="$(find hdt_sbpl_manipulation_components)/config/hdt_arm.yaml"/>
+</launch>

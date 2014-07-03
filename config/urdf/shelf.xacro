@@ -1,0 +1,168 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Because I'm lazy, all frames for the shelving unit are currently       -->
+    <!-- orientation-aligned with the base_link_front_bumper_part frame and so  -->
+    <!-- length, width, and height correspond to measurements along the x, y,   -->
+    <!-- and z axes respectively                                                -->
+
+    <!-- values computed from diagrams -->
+    <!-- <xacro:property name="shelf_length_m" value="0.1524" /> -->
+    <!-- <xacro:property name="shelf_width_m" value="0.0127" /> -->
+    <!-- <xacro:property name="shelf_height_m" value="0.267208" /> -->
+    <!-- <xacro:property name="arm_mount_panel_height_m" value="0.1778" /> -->
+    <!-- <xacro:property name="arm_mount_panel_edge_offset_m" value="0.14605" /> -->
+
+    <!-- values measured from husky at lab -->
+    <xacro:property name="shelf_length_m" value="0.126" />
+    <xacro:property name="shelf_width_m" value="0.00700" />
+    <xacro:property name="shelf_height_m" value="0.24324" />
+    <xacro:property name="arm_mount_panel_height_m" value="0.171" />
+    <xacro:property name="arm_mount_panel_edge_offset_m" value="0.098322" />
+    <!-- arm mount panel currently inherits thickness from the shelving unit -->
+
+    <xacro:property name="bottom_shelf_height_offset" value="0.05"/>
+
+    <!-- bumper_frame: the name of the frame of the front bumper -->
+    <!-- bumper_to_shelf_x: the distance between the bumper frame and the front of the right shelf support -->
+    <!-- bumper_to_shelf_z: the distance between the bumper frame and the bottom of the right shelf support -->
+    <!-- rail_width: the width of the rail that the shelf is attached to -->
+    <xacro:macro name="husky_shelf" params="bumper_frame bumper_to_shelf_x bumper_to_shelf_z rail_width">
+        <!-- fixed transform from the bumper to the right shelf support -->
+        <joint name="right_shelf_support_mount" type="fixed">
+            <parent link="${bumper_frame}" />
+            <child link="right_shelf_support" />
+            <origin xyz="${-bumper_to_shelf_x - 0.5 * shelf_length_m} ${-0.5 * rail_width - 0.5 * shelf_width_m} ${bumper_to_shelf_z + 0.5 * shelf_height_m}"
+                    rpy="0 0 0" />
+        </joint>
+
+        <!-- fixed transform from the bumper to the left shelf support -->
+        <joint name="left_shelf_support_mount" type="fixed">
+            <parent link="${bumper_frame}" />
+            <child link="left_shelf_support" />
+            <origin xyz="${-bumper_to_shelf_x - 0.5 * shelf_length_m} ${0.5 * rail_width + 0.5 * shelf_width_m} ${bumper_to_shelf_z + 0.5 * shelf_height_m}"
+                    rpy="0 0 0" />
+        </joint>
+
+        <!-- fixed transform from the bumper to the bottom shelf -->
+        <joint name="bottom_shelf_mount" type="fixed">
+            <parent link="${bumper_frame}"/>
+            <child link="bottom_shelf"/>
+            <origin xyz="${-bumper_to_shelf_x - 0.5 * shelf_length_m} 0.0 ${bumper_to_shelf_z - 0.5 * shelf_width_m + bottom_shelf_height_offset}"
+                    rpy="0 0 0" />
+        </joint>
+
+        <!-- fixed transform from the bumper to the top shelf -->
+        <joint name="top_shelf_mount" type="fixed">
+            <parent link="${bumper_frame}" />
+            <child link="top_shelf" />
+            <origin xyz="${-bumper_to_shelf_x - 0.5 * shelf_length_m} 0.0 ${bumper_to_shelf_z + shelf_height_m - 0.5 * shelf_width_m}"
+                    rpy="0 0 0" />
+        </joint>
+
+        <!-- right shelf support -->
+        <link name="right_shelf_support">
+            <visual>
+                <geometry>
+                    <box size="${shelf_length_m} ${shelf_width_m} ${shelf_height_m}" />
+                </geometry>
+                <material name="gray">
+                    <color rgba="0.5 0.5 0.5 1" />
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${shelf_length_m} ${shelf_width_m} ${shelf_height_m}" />
+                </geometry>
+            </collision>
+        </link>
+
+        <!-- left shelf support -->
+        <link name="left_shelf_support">
+            <visual>
+                <geometry>
+                    <box size="${shelf_length_m} ${shelf_width_m} ${shelf_height_m}" />
+                </geometry>
+                <material name="gray">
+                    <color rgba="0.5 0.5 0.5 1" />
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${shelf_length_m} ${shelf_width_m} ${shelf_height_m}" />
+                </geometry>
+            </collision>
+        </link>
+
+        <!-- bottom shelf -->
+        <link name="bottom_shelf">
+            <visual>
+                <geometry>
+                    <box size="${shelf_length_m} ${rail_width} ${shelf_width_m}" />
+                </geometry>
+                <material name="gray">
+                    <color rgba="0.5 0.5 0.5 1" />
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${shelf_length_m} ${rail_width} ${shelf_width_m}" />
+                </geometry>
+            </collision>
+        </link>
+
+        <!-- top shelf -->
+        <link name="top_shelf">
+            <visual>
+                <geometry>
+                    <box size="${shelf_length_m} ${rail_width + 2 * shelf_width_m} ${shelf_width_m}" />
+                </geometry>
+                <material name="gray">
+                    <color rgba="0.5 0.5 0.5 1" />
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${shelf_length_m} ${rail_width} ${shelf_width_m}" />
+                </geometry>
+            </collision>
+        </link>
+
+        <!-- fixed transform from the top shelf to the arm mount panel -->
+        <joint name="arm_mount_panel_mount" type="fixed">
+            <parent link="top_shelf" />
+            <child link="arm_mount_panel" />
+            <origin xyz="0
+                         ${-0.5 * (rail_width) - shelf_width_m + arm_mount_panel_edge_offset_m}
+                         ${0.5 * shelf_width_m + 0.5 * arm_mount_panel_height_m}"
+                    rpy="0 0 0" />
+        </joint>
+
+        <!-- arm mount panel -->
+        <link name="arm_mount_panel">
+            <visual>
+                <geometry>
+                    <box size="${shelf_length_m} ${shelf_width_m} ${arm_mount_panel_height_m}" />
+                </geometry>
+                <material name="gray">
+                    <color rgba="0.5 0.5 0.5 1" />
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${shelf_length_m} ${shelf_width_m} ${arm_mount_panel_height_m}" />
+                </geometry>
+            </collision>
+        </link>
+
+        <!-- fixed transform to a dummy link to make expressing the origin of the first joint of the arm easier -->
+        <joint name="arm_mount_panel_corrected_mount" type="fixed">
+            <parent link="arm_mount_panel" />
+            <child link="arm_mount_panel_dummy" />
+            <!-- <origin xyz="0 0 0" rpy="${pi / 2} 0 0" /> -->
+            <origin xyz="0 0 0" rpy="${pi / 2} ${-pi / 2} 0" />
+        </joint>
+
+        <!-- arm mount panel dummy link -->
+        <link name="arm_mount_panel_dummy"></link>
+    </xacro:macro>
+</robot>

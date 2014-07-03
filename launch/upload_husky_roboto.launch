@@ -1,0 +1,6 @@
+<launch>
+    <param name="robot_description" command="$(find xacro)/xacro.py '$(find hdt_description)/urdf/husky_roboto.xacro'"/>
+    <param name="robot_description_semantic" textfile="$(find hdt_moveit_config)/config/husky_roboto.srdf"/>
+    <rosparam command="load" file="$(find hdt_moveit_config)/config/kinematics.yaml"/>
+</launch>
+

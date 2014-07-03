@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<package>
+  <name>hdt</name>
+  <version>0.0.0</version>
+  <description>The HDT package</description>
+
+  <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+  <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>actionlib</build_depend>
+  <build_depend>actionlib_msgs</build_depend>
+  <build_depend>control_msgs</build_depend>
+  <build_depend>eigen_conversions</build_depend>
+  <build_depend>geometric_shapes</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>interactive_markers</build_depend>
+  <build_depend>industrial_msgs</build_depend>
+  <build_depend>industrial_robot_client</build_depend>
+  <build_depend>leatherman</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>moveit_ros_planning</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>pr2_vfh_database</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospack</build_depend>
+  <build_depend>rviz</build_depend>
+  <build_depend>sbpl_geometry_utils</build_depend>
+  <build_depend>sbpl_manipulation</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>simple_message</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>trajectory_msgs</build_depend>
+  <build_depend>urdf</build_depend>
+  <build_depend>urdf_parser</build_depend>
+  <build_depend>visualization_msgs</build_depend>
+
+  <run_depend>actionlib</run_depend>
+  <run_depend>actionlib_msgs</run_depend>
+  <run_depend>control_msgs</run_depend>
+  <run_depend>eigen_conversions</run_depend>
+  <run_depend>geometric_shapes</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>interactive_markers</run_depend>
+  <run_depend>industrial_msgs</run_depend>
+  <run_depend>industrial_robot_client</run_depend>
+  <run_depend>leatherman</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>moveit_ros_planning</run_depend>
+  <run_depend>pluginlib</run_depend>
+  <run_depend>pr2_vfh_database</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>rospack</run_depend>
+  <run_depend>rviz</run_depend>
+  <run_depend>sbpl_geometry_utils</run_depend>
+  <run_depend>sbpl_manipulation</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>simple_message</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>trajectory_msgs</run_depend>
+  <run_depend>urdf</run_depend>
+  <run_depend>urdf_parser</run_depend>
+  <run_depend>visualization_msgs</run_depend>
+  <run_depend>xacro</run_depend>
+
+  <export>
+    <rviz plugin="${prefix}/config/plugin_description.xml"/>
+    <rviz plugin="${prefix}/config/hdt_command_plugin_description.xml"/>
+    <rviz plugin="${prefix}/config/controller_status_panel_plugin_description.xml"/>
+  </export>
+</package>

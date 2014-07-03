@@ -1,0 +1,11 @@
+<launch>
+    <node pkg="hdt_pick_and_place" name="hdt_pick_and_place" type="hdt_pick_and_place" output="screen">
+        <param name="database_filename" value="$(find hdt_pick_and_place)/data/pr2_graspDB.db"/>
+        <param name="features_filename" value="$(find hdt_pick_and_place)/config/training_features.h5"/>
+        <param name="kdtree_index_filename" value="$(find hdt_pick_and_place)/config/training_kdtree.idx"/>
+        <param name="point_cloud_topic" value="/camera/depth_registered/points"/>
+        <param name="camera_frame" value="/camera_rgb_optical_frame"/>
+        <!-- <param name="camera_frame" value="/camera_depth_optical_frame"/> -->
+        <param name="root_frame" value="/base_link"/>
+    </node>
+</launch>
