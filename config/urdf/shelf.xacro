@@ -18,9 +18,11 @@
     <xacro:property name="shelf_height_m" value="0.24324" />
     <xacro:property name="arm_mount_panel_height_m" value="0.171" />
     <xacro:property name="arm_mount_panel_edge_offset_m" value="0.098322" />
+    <xacro:property name="bottom_shelf_height_offset" value="0.05"/>
     <!-- arm mount panel currently inherits thickness from the shelving unit -->
 
-    <xacro:property name="bottom_shelf_height_offset" value="0.05"/>
+
+    <xacro:property name="top_shelf_length_m" value="0.151"/>
 
     <!-- bumper_frame: the name of the frame of the front bumper -->
     <!-- bumper_to_shelf_x: the distance between the bumper frame and the front of the right shelf support -->
@@ -55,7 +57,7 @@
         <joint name="top_shelf_mount" type="fixed">
             <parent link="${bumper_frame}" />
             <child link="top_shelf" />
-            <origin xyz="${-bumper_to_shelf_x - 0.5 * shelf_length_m} 0.0 ${bumper_to_shelf_z + shelf_height_m - 0.5 * shelf_width_m}"
+            <origin xyz="${-bumper_to_shelf_x - shelf_length_m + 0.5 * top_shelf_length_m} 0.0 ${bumper_to_shelf_z + shelf_height_m + 0.5 * shelf_width_m}"
                     rpy="0 0 0" />
         </joint>
 
@@ -114,7 +116,7 @@
         <link name="top_shelf">
             <visual>
                 <geometry>
-                    <box size="${shelf_length_m} ${rail_width + 2 * shelf_width_m} ${shelf_width_m}" />
+                    <box size="${top_shelf_length_m} ${rail_width + 2 * shelf_width_m} ${shelf_width_m}" />
                 </geometry>
                 <material name="gray">
                     <color rgba="0.5 0.5 0.5 1" />
@@ -122,7 +124,7 @@
             </visual>
             <collision>
                 <geometry>
-                    <box size="${shelf_length_m} ${rail_width} ${shelf_width_m}" />
+                    <box size="${top_shelf_length_m} ${rail_width + 2 * shelf_width_m} ${shelf_width_m}" />
                 </geometry>
             </collision>
         </link>
