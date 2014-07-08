@@ -6,6 +6,7 @@
     <include filename="$(find hdt)/config/urdf/fake_gripper.xacro"/>
     <include filename="$(find hdt)/config/urdf/shelf.xacro"/>
     <include filename="$(find hdt)/config/urdf/kinect.xacro"/>
+    <include filename="$(find hdt)/config/urdf/kinect_camera.urdf.xacro"/>
 
     <!-- describe the fixed front bumper to shelf transforms -->
 
@@ -43,11 +44,18 @@
         bumper_to_shelf_z="${bumper_to_rail_bottom_offset_z}"
         rail_width="${rail_width}"/>
 
-    <xacro:kinect
-        mounting_link="top_shelf"
-        mounting_origin="${0.5 * top_shelf_length_m - kinect_front_edge_offset_m}
+    <property name="cal_kinect_x" value="0.0"/>
+    <property name="cal_kinect_y" value="0.0"/>
+    <property name="cal_kinect_z" value="0.0"/>
+    <property name="cal_kinect_roll" value="0.0"/>
+    <property name="cal_kinect_pitch" value="0.0"/>
+    <property name="cal_kinect_yaw" value="0.0"/>
+
+    <xacro:kinect_camera_v0 name="kinect" parent="top_shelf">
+        <origin xyz="${0.5 * top_shelf_length_m - kinect_front_edge_offset_m}
                          ${0.5 * rail_width + shelf_width_m - kinect_side_edge_depth_offset_m}
                          ${0.5 * shelf_width_m}"/>
+    </xacro:kinect_camera_v0>
 
     <xacro:hdt_arm mounting_link="arm_mount_panel_dummy" mounting_origin="0 0 0" />
 
