@@ -1,0 +1,5 @@
+<launch>
+	<include file="$(find openni_launch)/launch/openni.launch">
+		<arg name="camera" value="kinect"/>
+	</include>
+</launch>
