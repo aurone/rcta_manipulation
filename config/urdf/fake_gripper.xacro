@@ -2,6 +2,17 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <include filename="$(find hdt)/config/urdf/common.xacro"/>
 
+    <xacro:property name="gripper_base_length" value="0.084" />
+    <xacro:property name="gripper_base_width" value="0.05" />
+    <xacro:property name="gripper_base_height" value="0.14" />
+
+    <xacro:property name="finger_span" value="0.0845" />
+
+    <xacro:property name="finger_length" value="0.07" />
+    <xacro:property name="finger_width" value="${gripper_base_width}" />
+    <!-- <xacro:property name="finger_height" value="${0.5 * (gripper_base_height - finger_span)}" /> -->
+    <xacro:property name="finger_height" value="0.02775" />
+
     <!-- macro to instantiate the fake gripper -->
     <xacro:macro name="fake_gripper" params="mounting_link mounting_origin">
         <joint name="joint_gripper_base" type="fixed">
@@ -14,18 +25,17 @@
         <link name="gripper_base">
             <visual>
                 <geometry>
-                    <box size="0.022 0.140 0.075"/>
+                    <box size="${gripper_base_length} ${gripper_base_width} ${gripper_base_height}"/>
                 </geometry>
-                <origin rpy="${pi/2} 0 ${pi/2}" xyz="${-0.075/2 - 0.03} 0 0"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
                 <material name="black">
                     <color rgba="1 1 1 1"/>
                 </material>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.022 0.140 0.075"/>
+                    <box size="${gripper_base_length} ${gripper_base_width} ${gripper_base_height}"/>
                 </geometry>
-                <origin rpy="${pi/2} 0 ${pi/2}" xyz="${-0.075/2 - 0.03} 0 0"/>
             </collision>
             <inertial>
                 <mass value="0.690"/>
@@ -38,23 +48,21 @@
             <child link="finger_link1"/>
             <limit lower="0.001" upper="0.042" effort="45" velocity="0.38"/>
             <axis xyz="0 0 1"/>
-            <origin xyz="0.0 0.0 0.011"/>
+            <origin xyz="${0.5 * (gripper_base_length + finger_length)} 0 ${0.5 * (gripper_base_height - finger_height)}"/>
             <dynamics damping="10" friction="0.1"/>
         </joint>
 
         <link name="finger_link1">
             <visual>
                 <geometry>
-                    <box size="0.022 0.022 0.06"/>
+                    <box size="${finger_length} ${finger_width} ${finger_height}"/>
                 </geometry>
-                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
                 <material name="black"/>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.022 0.022 0.06"/>
+                    <box size="${finger_length} ${finger_width} ${finger_height}"/>
                 </geometry>
-                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
             </collision>
             <inertial>
                 <mass value="0.1"/>
@@ -67,23 +75,21 @@
             <child link="finger_link2"/>
             <limit lower="0.001" upper="0.042" effort="45" velocity="0.38"/>
             <axis xyz="0 0 -1"/>
-            <origin xyz="0.0 0.0 -0.011"/>
+            <origin xyz="${0.5 * (gripper_base_length + finger_length)} 0 ${-0.5 * (gripper_base_height - finger_height)}"/>
             <dynamics damping="10" friction="0.1"/>
         </joint>
 
         <link name="finger_link2">
             <visual>
                 <geometry>
-                    <box size="0.022 0.022 0.06"/>
+                    <box size="${finger_length} ${finger_width} ${finger_height}"/>
                 </geometry>
-                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
                 <material name="black"/>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.022 0.022 0.06"/>
+                    <box size="${finger_length} ${finger_width} ${finger_height}"/>
                 </geometry>
-                <origin rpy="0 ${pi/2} 0" xyz="0.0 0.0 0.00"/>
             </collision>
             <inertial>
                 <mass value="0.1"/>
