@@ -57,6 +57,7 @@ add_definitions(-DQT_NO_KEYWORDS)
 # required to locate compiled headers for designer forms
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) 
 
+add_action_files(DIRECTORY action FILES ObjectDetection.action)
 add_message_files(FILES
     ControllerDiagnosticStatus.msg 
     JointDiagnosticStatus.msg 
@@ -65,7 +66,7 @@ add_message_files(FILES
     AcknowledgeReset.msg
     TeleopDiagnosticStatus.msg)
 add_service_files(FILES MoveArmCommand.srv)
-generate_messages(DEPENDENCIES std_msgs geometry_msgs trajectory_msgs)
+generate_messages(DEPENDENCIES actionlib_msgs sensor_msgs std_msgs geometry_msgs trajectory_msgs)
 
 catkin_package(CATKIN_DEPENDS message_runtime)
 

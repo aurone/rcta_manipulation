@@ -1,0 +1,18 @@
+std_msgs/Header header
+string object_database
+string training_features
+string training_kdtree
+string camera_frame
+string root_frame
+bool cull_snapshot
+geometry_msgs/Point cull_from
+geometry_msgs/Point cull_to
+bool request_snapshot
+---
+sensor_msgs/PointCloud2 snapshot_cloud
+sensor_msgs/PointCloud2 best_cluster
+geometry_msgs/PoseStamped[] pregrasps
+geometry_msgs/PoseStamped[] grasps
+---
+float64 elapsed_time
+
