@@ -92,8 +92,10 @@ void PickAndPlacePanel::save(rviz::Config config) const
 void PickAndPlacePanel::choose_database()
 {
     QString database_fname = QFileDialog::getOpenFileName(this, tr("Choose Object Database"), QString(), tr("Object Databases (*.db)"));
+
     if (!database_fname.isEmpty()) {
-        database_fname_label_->setText(database_fname);
+        QFileInfo database_file_info(database_fname);
+        database_fname_label_->setText(database_file_info.fileName());
     }
     update_gui();
 }
@@ -102,7 +104,8 @@ void PickAndPlacePanel::choose_features()
 {
     QString features_fname = QFileDialog::getOpenFileName(this, tr("Choose Training Features"), QString(), tr("Training Features (*.h5)"));
     if (!features_fname.isEmpty()) {
-        features_fname_label_->setText(features_fname);
+        QFileInfo features_file_info(features_fname);
+        features_fname_label_->setText(features_file_info.fileName());
     }
     update_gui();
 }
@@ -111,7 +114,8 @@ void PickAndPlacePanel::choose_kdtree_indices()
 {
     QString kdtree_indices_fname = QFileDialog::getOpenFileName(this, tr("Choose KD-Tree Indices"), QString(), tr("KD-Tree Indices (*.idx)"));
     if (!kdtree_indices_fname.isEmpty()) {
-        kdtree_indices_fname_label_->setText(kdtree_indices_fname);
+        QFileInfo indices_file_info(kdtree_indices_fname);
+        kdtree_indices_fname_label_->setText(indices_file_info.fileName());
     }
     update_gui();
 }

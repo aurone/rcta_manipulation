@@ -44,6 +44,8 @@ private:
     sensor_msgs::PointCloud2::ConstPtr last_point_cloud_;
     tf::TransformListener listener_;
 
+    std::string database_directory_;
+
     std::string last_database_filename_;
     std::string last_features_filename_;
     std::string last_kdtree_indices_filename_;

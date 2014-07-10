@@ -12,6 +12,7 @@ PickAndPlaceNode::PickAndPlaceNode() :
     object_detector_(),
     last_point_cloud_(),
     listener_(ros::Duration(tf::Transformer::DEFAULT_CACHE_TIME), false),
+    database_directory_(),
     last_database_filename_(),
     last_features_filename_(),
     last_kdtree_indices_filename_(),
@@ -24,7 +25,12 @@ PickAndPlaceNode::PickAndPlaceNode() :
 bool PickAndPlaceNode::initialize()
 {
     if (!ph_.getParam("point_cloud_topic", point_cloud_topic_)) {
-        ROS_ERROR("Failed to extract 'point_cloud_topic_' from the param server");
+        ROS_ERROR("Failed to extract 'point_cloud_topic' from the param server");
+        return false;
+    }
+
+    if (!ph_.getParam("database_directory", database_directory_)) {
+        ROS_ERROR("Failed to extract 'database-directoy' from the param server");
         return false;
     }
 
@@ -90,9 +96,9 @@ void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal:
     }
 
     // lazily (re)initialize object detector
-    const std::string& database_filename = goal->object_database;
-    const std::string& features_filename = goal->training_features;
-    const std::string& kdtree_indices_filename = goal->training_kdtree;
+    const std::string database_filename = database_directory_ + '/' + goal->object_database;
+    const std::string features_filename = database_directory_ + '/' + goal->training_features;
+    const std::string kdtree_indices_filename = database_directory_ + '/' + goal->training_kdtree;
     if (database_filename != last_database_filename_ ||
         features_filename != last_features_filename_ ||
         kdtree_indices_filename != last_kdtree_indices_filename_)
