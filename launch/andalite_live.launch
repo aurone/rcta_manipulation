@@ -16,6 +16,8 @@
     	<!-- launch nodes that provide /joint_states -->
     	<include file="$(find hdt)/launch/husky_simulator.launch"/>
 
+	<include file="$(find hdt)/launch/gripper_simulator.launch"/>
+
     	<node name="kinect_simulator" pkg="hdt" type="kinect_simulator" args="--mode=static -31"/>
 
     	<!-- launch robot_state_publisher to translate urdf + /joint_states to /tf -->
