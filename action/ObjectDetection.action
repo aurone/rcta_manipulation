@@ -14,6 +14,7 @@ bool request_snapshot
 bool success
 sensor_msgs/PointCloud2 snapshot_cloud
 sensor_msgs/PointCloud2 best_cluster
+float64 match_score
 geometry_msgs/PoseArray pregrasps
 geometry_msgs/PoseArray grasps
 ---
