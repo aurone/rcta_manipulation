@@ -21,6 +21,7 @@
 #include <tf/tfMessage.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
+#include <hdt/ObjectDetectionAction.h>
 
 namespace hdt
 {
@@ -74,8 +75,6 @@ private:
 
     ros::NodeHandle nh_;
 
-    tf::TransformListener listener_;
-
     // Training data selection tools
     QPushButton* open_database_button_;
     QPushButton* open_features_button_;
@@ -96,44 +95,37 @@ private:
     QPushButton* send_open_gripper_command_button_;
     QPushButton* send_close_gripper_command_button_;
 
-    sensor_msgs::PointCloud2::ConstPtr last_cloud_msg_;
-    sensor_msgs::PointCloud2::ConstPtr snapshot_cloud_;
+    // For transforming pre-grasp/grasp goals into the root frame of the arm
+    tf::TransformListener listener_;
 
-    std::string point_cloud_topic_;
-    ros::Subscriber point_cloud_sub_;
-    // message_filters::Subscriber<sensor_msgs::PointCloud2> point_cloud_sub_;
-    // std::shared_ptr<tf::MessageFilter<sensor_msgs::PointCloud2>> tf_filter_;
-
-    std::string last_snapshot_database_;
-    std::string last_snapshot_features_;
-    std::string last_snapshot_kdtree_indices_;
-    std::unique_ptr<ObjectFinder> object_detector_;
-
-    ros::Publisher snapshot_cloud_pub_;
-
+    // for choosing available frames to send to pick and place node
+    ros::Subscriber tf_sub_;
     double frame_timeout_;
     std::map<std::string, ros::Time> seen_frames_;
 
-    ros::Subscriber tf_sub_;
+    // results of the last snapshot
+    hdt::ObjectDetectionGoal last_detection_request_;
+    hdt::ObjectDetectionResult::ConstPtr last_detection_result_;
+    ros::Publisher snapshot_cloud_pub_;
 
-    ObjectFinder::MatchResult last_match_;
-
+    // for visualizing and selecting available pre-grasps
     interactive_markers::InteractiveMarkerServer grasp_markers_server_;
-
-    ObjectDetectionQuery last_detection_query_;
-
     typedef std::string InteractiveMarkerHandle;
     InteractiveMarkerHandle selected_marker_;
 
     ros::ServiceClient move_arm_client_;
+
+    typedef actionlib::SimpleActionClient<hdt::ObjectDetectionAction> ObjectDetectionActionClient;
+    std::unique_ptr<ObjectDetectionActionClient> object_detection_client_;
 
     typedef control_msgs::GripperCommandGoal GripperCommandGoal;
     typedef control_msgs::GripperCommandFeedback GripperCommandFeedback;
     typedef control_msgs::GripperCommandResult GripperCommandResult;
     typedef actionlib::ActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
     typedef GripperCommandActionClient::GoalHandle GoalHandle;
-
     std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
+
+    void setup_gui();
 
     void point_cloud_callback(const sensor_msgs::PointCloud2::ConstPtr& msg);
     void tf_callback(const tf::tfMessage::ConstPtr& msg);
@@ -152,6 +144,14 @@ private:
 
     void gripper_command_action_feedback(GoalHandle goalHandle, const GripperCommandFeedback::ConstPtr& msg);
     void gripper_command_action_transition(GoalHandle goalHandle);
+
+    void object_detection_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const hdt::ObjectDetectionResult::ConstPtr& result);
+
+    void object_detection_active_cb();
+
+    void object_detection_feedback_cb(const hdt::ObjectDetectionFeedback::ConstPtr& feedback);
 };
 
 } // namespace hdt
