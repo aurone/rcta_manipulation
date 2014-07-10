@@ -50,15 +50,11 @@ private Q_SLOTS:
     void send_open_gripper_command();
     void send_close_gripper_command();
 
-    void camera_frame_box_activated(int index);
-    void camera_frame_box_activated(const QString& text);
     void camera_frame_box_current_index_changed(int index);
-    void camera_frame_box_current_index_changed(const QString& text);
     void camera_frame_box_edit_text_changed(const QString& text);
-    void camera_frame_box_highlighted(int index);
-    void camera_frame_box_highlighted(const QString& text);
 
-    void root_frame_box_activated(int index);
+    void root_frame_box_current_index_changed(int index);
+    void root_frame_box_edit_text_changed(const QString& text);
 
 private:
 

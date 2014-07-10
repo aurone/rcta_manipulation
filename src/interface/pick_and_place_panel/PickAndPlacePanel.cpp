@@ -148,6 +148,7 @@ void PickAndPlacePanel::take_snapshot()
 
     last_detection_request_.request_snapshot = true;
 
+    ROS_INFO("Sent goal to action server object_detection_action");
     object_detection_client_->sendGoal(last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
 }
 
@@ -267,44 +268,28 @@ void PickAndPlacePanel::send_close_gripper_command()
     }
 }
 
-void PickAndPlacePanel::camera_frame_box_activated(int index)
-{
-    ROS_INFO("Camera Frame Box Activated!");
-}
-
-void PickAndPlacePanel::camera_frame_box_activated(const QString& text)
-{
-    ROS_INFO("Camera Frame Box Activated!");
-}
-
 void PickAndPlacePanel::camera_frame_box_current_index_changed(int index)
 {
-    // ROS_INFO("Camera Frame Box Current Index Changed to %d!", index);
+    ROS_INFO("Camera Frame Box Current Index Changed!");
     update_gui();
-}
-
-void PickAndPlacePanel::camera_frame_box_current_index_changed(const QString& text)
-{
-    // ROS_INFO("Camera Frame Box Current Index Changed to %s!", text.toStdString().c_str());
 }
 
 void PickAndPlacePanel::camera_frame_box_edit_text_changed(const QString& text)
 {
     ROS_INFO("Camera Frame Box Edit Text Changed!");
+    update_gui();
 }
 
-void PickAndPlacePanel::camera_frame_box_highlighted(int index)
+void PickAndPlacePanel::root_frame_box_current_index_changed(int index)
 {
-    ROS_INFO("Camera Frame Box Highlighted!");
+    ROS_INFO("Root Frame Box Current Index Changed!");
+    update_gui();
 }
 
-void PickAndPlacePanel::camera_frame_box_highlighted(const QString& text)
+void PickAndPlacePanel::root_frame_box_edit_text_changed(const QString& text)
 {
-    ROS_INFO("Camera Frame Box Highlighted!");
-}
-
-void PickAndPlacePanel::root_frame_box_activated(int index)
-{
+    ROS_INFO("Root Frame Box Edit Text Changed!");
+    update_gui();
 }
 
 void PickAndPlacePanel::tf_callback(const tf::tfMessage::ConstPtr& msg)
@@ -365,7 +350,7 @@ void PickAndPlacePanel::update_gui()
                                          !kdtree_indices_fname_label_->text().isEmpty() &&
                                          !camera_frame_selection_->currentText().isEmpty() &&
                                          !root_frame_selection_->currentText().isEmpty());
-    update_grasps_button_->setEnabled(last_detection_result_->success);
+    update_grasps_button_->setEnabled(last_detection_result_ && last_detection_result_->success);
     send_move_to_pregrasp_button_->setEnabled(!selected_marker_.empty());
 }
 
@@ -507,6 +492,12 @@ void PickAndPlacePanel::object_detection_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::ObjectDetectionResult::ConstPtr& result)
 {
+    ROS_INFO("Received object detection result");
+    if (!result) {
+        ROS_WARN("Object Detection Result is null");
+        return;
+    }
+
     if (result->success) {
         ROS_INFO("A successful match was found");
         if (result->match_score != result->match_score) {
@@ -594,11 +585,10 @@ void PickAndPlacePanel::setup_gui()
 
    // connect(camera_frame_selection_, SIGNAL(activated(int)),                        this, SLOT(camera_frame_box_activated(int)));
 //    connect(camera_frame_selection_, SIGNAL(activated(const QString&)),             this, SLOT(camera_frame_box_activated(const QString&)));
-   connect(camera_frame_selection_, SIGNAL(currentIndexChanged(int)),              this, SLOT(camera_frame_box_current_index_changed(int)));
-//    connect(camera_frame_selection_, SIGNAL(currentIndexChanged(const QString&)),   this, SLOT(camera_frame_box_current_index_changed(const QString&)));
-//    connect(camera_frame_selection_, SIGNAL(editTextChanged(const QString&)),       this, SLOT(camera_frame_box_edit_text_changed(const QString&)));
-//    connect(camera_frame_selection_, SIGNAL(highlighted(int)),                      this, SLOT(camera_frame_box_highlighted(int)));
-//    connect(camera_frame_selection_, SIGNAL(highlighted(const QString&)),           this, SLOT(camera_frame_box_highlighted(const QString&)));
+    connect(camera_frame_selection_,    SIGNAL(currentIndexChanged(int)),           this, SLOT(camera_frame_box_current_index_changed(int)));
+    connect(root_frame_selection_,      SIGNAL(currentIndexChanged(int)),           this, SLOT(root_frame_box_current_index_changed(int)));
+    connect(camera_frame_selection_,    SIGNAL(editTextChanged(const QString&)),    this, SLOT(camera_frame_box_edit_text_changed(const QString&)));
+    connect(root_frame_selection_,      SIGNAL(editTextChanged(const QString&)),    this, SLOT(camera_frame_box_edit_text_changed(const QString&)));
 
     connect(snap_point_cloud_button_, SIGNAL(clicked()), this, SLOT(take_snapshot()));
     connect(update_grasps_button_, SIGNAL(clicked()), this, SLOT(update_grasps()));

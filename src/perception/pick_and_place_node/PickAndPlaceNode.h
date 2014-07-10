@@ -34,6 +34,7 @@ private:
     typedef actionlib::SimpleActionServer<hdt::ObjectDetectionAction> ObjectDetectionActionServer;
     std::unique_ptr<ObjectDetectionActionServer> action_server_;
 
+    std::string point_cloud_topic_;
     message_filters::Subscriber<sensor_msgs::PointCloud2> point_cloud_sub_;
     std::shared_ptr<tf::MessageFilter<sensor_msgs::PointCloud2>> tf_filter_;
 
