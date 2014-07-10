@@ -1,3 +1,4 @@
+# Goal
 std_msgs/Header header
 string object_database
 string training_features
@@ -9,10 +10,13 @@ geometry_msgs/Point cull_from
 geometry_msgs/Point cull_to
 bool request_snapshot
 ---
+# Result
+bool success
 sensor_msgs/PointCloud2 snapshot_cloud
 sensor_msgs/PointCloud2 best_cluster
-geometry_msgs/PoseStamped[] pregrasps
-geometry_msgs/PoseStamped[] grasps
+geometry_msgs/PoseArray pregrasps
+geometry_msgs/PoseArray grasps
 ---
+# Feedback
 float64 elapsed_time
 
