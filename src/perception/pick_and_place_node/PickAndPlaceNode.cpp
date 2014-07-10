@@ -155,6 +155,8 @@ void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal:
     if (success) {
         ROS_INFO("Match succeeded");
 
+        result_.match_score = object_detector_->score_match(match_result, camera_frame);
+
         geometry_msgs::PoseArray grasps_out, pregrasps_out;
         object_detector_->get_grasps(match_result, camera_frame_, root_frame, grasps_out, pregrasps_out, listener_);
         ROS_INFO("Retrieved %zd grasps and %zd pre-grasps!", grasps_out.poses.size(), pregrasps_out.poses.size());
