@@ -148,6 +148,8 @@ void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal:
         ROS_ERROR("    Root Frame: %s", root_frame.c_str());
         ROS_ERROR("    Camera Frame: %s", camera_frame.c_str());
         ROS_ERROR("    Point Cloud Frame: %s", last_point_cloud_->header.frame_id.c_str());
+        result_.success = false;
+        action_server_->setAborted(result_);
         return;
     }
 
