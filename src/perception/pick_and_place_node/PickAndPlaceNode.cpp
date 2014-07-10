@@ -12,8 +12,6 @@ PickAndPlaceNode::PickAndPlaceNode() :
     object_detector_(),
     last_point_cloud_(),
     listener_(ros::Duration(tf::Transformer::DEFAULT_CACHE_TIME), false),
-    camera_frame_(),
-    root_frame_(),
     last_database_filename_(),
     last_features_filename_(),
     last_kdtree_indices_filename_(),
@@ -131,18 +129,18 @@ void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal:
     }
 
     const std::string& camera_frame = goal->camera_frame;
-    const std::string& root_frame = goal->camera_frame;
+    const std::string& root_frame = goal->root_frame;
 
     bool have_transforms = true;
     const std::string& point_cloud_frame = last_point_cloud_->header.frame_id;
     have_transforms &= listener_.canTransform(root_frame, point_cloud_frame, last_point_cloud_->header.stamp);
-    have_transforms &= listener_.canTransform(point_cloud_frame, camera_frame_, last_point_cloud_->header.stamp);
-    have_transforms &= listener_.canTransform(camera_frame_, root_frame, last_point_cloud_->header.stamp);
+    have_transforms &= listener_.canTransform(point_cloud_frame, camera_frame, last_point_cloud_->header.stamp);
+    have_transforms &= listener_.canTransform(camera_frame, root_frame, last_point_cloud_->header.stamp);
 
     if (!have_transforms) {
         ROS_ERROR("Transforms not available between all relevant frames");
         ROS_ERROR("    Root Frame: %s", root_frame.c_str());
-        ROS_ERROR("    Camera Frame: %s", camera_frame_.c_str());
+        ROS_ERROR("    Camera Frame: %s", camera_frame.c_str());
         ROS_ERROR("    Point Cloud Frame: %s", last_point_cloud_->header.frame_id.c_str());
         return;
     }
@@ -167,7 +165,7 @@ void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal:
         result_.match_score = object_detector_->score_match(match_result, camera_frame);
 
         geometry_msgs::PoseArray grasps_out, pregrasps_out;
-        object_detector_->get_grasps(match_result, camera_frame_, root_frame, grasps_out, pregrasps_out, listener_);
+        object_detector_->get_grasps(match_result, camera_frame, root_frame, grasps_out, pregrasps_out, listener_);
         ROS_INFO("Retrieved %zd grasps and %zd pre-grasps!", grasps_out.poses.size(), pregrasps_out.poses.size());
 
         publish_grasp_markers(grasps_out, pregrasps_out);
