@@ -6,6 +6,7 @@ PickAndPlaceNode::PickAndPlaceNode() :
     nh_(),
     ph_("~"),
     action_server_(),
+    point_cloud_topic_(),
     point_cloud_sub_(),
     tf_filter_(),
     object_detector_(),
@@ -24,14 +25,13 @@ PickAndPlaceNode::PickAndPlaceNode() :
 
 bool PickAndPlaceNode::initialize()
 {
-    std::string point_cloud_topic;
-    if (!ph_.getParam("point_cloud_topic", point_cloud_topic)) {
-        ROS_ERROR("Failed to extract 'point_cloud_topic' from the param server");
+    if (!ph_.getParam("point_cloud_topic", point_cloud_topic_)) {
+        ROS_ERROR("Failed to extract 'point_cloud_topic_' from the param server");
         return false;
     }
 
     // subscribe to point cloud topic
-    point_cloud_sub_.subscribe(nh_, point_cloud_topic, 1);
+    point_cloud_sub_.subscribe(nh_, point_cloud_topic_, 1);
     tf_filter_.reset(new tf::MessageFilter<sensor_msgs::PointCloud2>(point_cloud_sub_, listener_, root_frame_, 2));
     tf_filter_->registerCallback(std::bind(&PickAndPlaceNode::point_cloud_callback, this, std::placeholders::_1));
 
@@ -81,6 +81,13 @@ void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal:
     ROS_INFO("Received an object detection goal request at %s from %s",
             boost::posix_time::to_simple_string(ros::Time::now().toBoost()).c_str(),
             boost::posix_time::to_simple_string(goal->header.stamp.toBoost()).c_str());
+
+    if (!last_point_cloud_) {
+        ROS_WARN("Haven't received a point cloud on %s yet", point_cloud_topic_.c_str());
+        // TODO: alert higher ups to null point cloud
+        action_server_->setAborted(result_);
+        return;
+    }
 
     // lazily (re)initialize object detector
     const std::string& database_filename = goal->object_database;

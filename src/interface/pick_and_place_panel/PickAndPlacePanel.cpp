@@ -148,6 +148,7 @@ void PickAndPlacePanel::take_snapshot()
 
     last_detection_request_.request_snapshot = true;
 
+    ROS_INFO("Sent goal to action server object_detection_action");
     object_detection_client_->sendGoal(last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
 }
 
@@ -491,6 +492,12 @@ void PickAndPlacePanel::object_detection_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::ObjectDetectionResult::ConstPtr& result)
 {
+    ROS_INFO("Received object detection result");
+    if (!result) {
+        ROS_WARN("Object Detection Result is null");
+        return;
+    }
+
     if (result->success) {
         ROS_INFO("A successful match was found");
         if (result->match_score != result->match_score) {
