@@ -35,8 +35,9 @@ private:
     std::unique_ptr<ObjectDetectionActionServer> action_server_;
 
     std::string point_cloud_topic_;
-    message_filters::Subscriber<sensor_msgs::PointCloud2> point_cloud_sub_;
-    std::shared_ptr<tf::MessageFilter<sensor_msgs::PointCloud2>> tf_filter_;
+    // message_filters::Subscriber<sensor_msgs::PointCloud2> point_cloud_sub_;
+    // std::shared_ptr<tf::MessageFilter<sensor_msgs::PointCloud2>> tf_filter_;
+    ros::Subscriber point_cloud_sub_;
 
     std::unique_ptr<ObjectFinder> object_detector_;
 
