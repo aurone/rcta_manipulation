@@ -1,5 +1,6 @@
 <launch>
     <node pkg="hdt" name="hdt_pick_and_place" type="hdt_pick_and_place" output="screen">
-        <param name="point_cloud_topic" value="/camera/depth_registered/points"/>
+        <param name="point_cloud_topic" value="/kinect/depth_registered/points"/>
+	<param name="database_directory" value="/home/andrew/.ros/grasp_databases"/>
     </node>
 </launch>
