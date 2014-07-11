@@ -25,6 +25,7 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
                       "User.png", "Users.png", "Web.png", "ZoomIn.png",
                       "ZoomOut.png" }),
     icon_colors_({ "blue", "green", "red", "smoke" }),
+    shutdown_watchdog_(false),
     watchdog_()
 {
     std::string ros_root(getenv("ROS_ROOT"));
@@ -83,6 +84,9 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
 
 ControllerStatusPanelWidget::~ControllerStatusPanelWidget()
 {
+    shutdown_watchdog_ = true;
+    if (watchdog_.joinable())
+        watchdog_.join();
     delete ui;
 }
 
@@ -219,7 +223,7 @@ void ControllerStatusPanelWidget::watchdog_thread()
 {
     double loop_rate_s = 1.0;
     ros::Rate watchdog_rate(loop_rate_s);
-    while (ros::ok()) {
+    while (ros::ok() && !shutdown_watchdog_) {
         ros::Time now = ros::Time::now();
         msg_mutex_.lock();
         if (last_msg_) {

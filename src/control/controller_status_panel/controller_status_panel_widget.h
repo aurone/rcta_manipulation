@@ -51,6 +51,7 @@ private:
     std::mutex msg_mutex_;
     hdt::ControllerDiagnosticStatus::ConstPtr last_msg_;
 
+    bool shutdown_watchdog_;
     std::thread watchdog_;
     ros::Publisher staleness_pub_;
     ros::Publisher estop_pub_;
