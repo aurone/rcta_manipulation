@@ -723,11 +723,7 @@ bool ManipulatorCommandPanel::reinit_robot()
         return false;
     }
 
-    if (rm_loader_) {
-        delete rm_loader_;
-    }
-
-    rm_loader_ = new robot_model_loader::RobotModelLoader;
+    rm_loader_.reset(new robot_model_loader::RobotModelLoader);
     if (!rm_loader_) {
         ROS_ERROR("Failed to instantiate Robot Model Loader");
         return false;

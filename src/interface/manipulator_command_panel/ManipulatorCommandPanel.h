@@ -67,7 +67,7 @@ private:
 
     hdt::RobotModel robot_model_;
 
-    robot_model_loader::RobotModelLoader *rm_loader_;
+    std::unique_ptr<robot_model_loader::RobotModelLoader> rm_loader_;
     robot_model::RobotModelPtr rm_;
     robot_state::RobotStatePtr rs_;
 
