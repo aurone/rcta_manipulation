@@ -1,6 +1,4 @@
 <launch>
-    <include file="$(find hdt)/launch/upload_andalite.launch"/>
-
     <arg name="sim" default="false"/>
     <node name="hdt_arm_driver" pkg="hdt" type="hdt_arm_driver" output="screen">
         <param name="sim" value="$(arg sim)"/>
