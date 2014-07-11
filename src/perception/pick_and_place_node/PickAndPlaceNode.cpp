@@ -59,7 +59,7 @@ int PickAndPlaceNode::run()
 
 void PickAndPlaceNode::point_cloud_callback(const sensor_msgs::PointCloud2::ConstPtr& msg)
 {
-    ROS_INFO("Received a point cloud at %s", boost::posix_time::to_simple_string(ros::Time::now().toBoost()).c_str());
+    ROS_INFO_ONCE("Received first point cloud at %s", boost::posix_time::to_simple_string(ros::Time::now().toBoost()).c_str());
     last_point_cloud_ = msg;
 }
 
