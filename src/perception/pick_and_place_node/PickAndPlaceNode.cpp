@@ -81,13 +81,15 @@ void PickAndPlaceNode::print_database_contents(const std::string& database_filen
 
 void PickAndPlaceNode::object_detection_callback(const hdt::ObjectDetectionGoal::ConstPtr& goal)
 {
+    action_server_->acceptNewGoal();
+
     ROS_INFO("Received an object detection goal request at %s from %s",
             boost::posix_time::to_simple_string(ros::Time::now().toBoost()).c_str(),
             boost::posix_time::to_simple_string(goal->header.stamp.toBoost()).c_str());
 
     if (!last_point_cloud_) {
         ROS_WARN("Haven't received a point cloud on %s yet", point_cloud_topic_.c_str());
-        // TODO: alert higher ups to null point cloud
+        // TODO: report reason for abortion; alert higher ups to null point cloud
         action_server_->setAborted(result_);
         return;
     }

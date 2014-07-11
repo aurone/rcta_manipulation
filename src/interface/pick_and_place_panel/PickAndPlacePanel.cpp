@@ -156,7 +156,8 @@ void PickAndPlacePanel::take_snapshot()
     last_detection_request_.request_snapshot = true;
 
     ROS_INFO("Sent goal to action server object_detection_action");
-    object_detection_client_->sendGoal(last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
+    object_detection_client_->sendGoal(
+            last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
     pending_detection_request_ = true;
 
     update_gui();

@@ -12,12 +12,10 @@
 #include <control_msgs/GripperCommandActionFeedback.h>
 #include <control_msgs/GripperCommandFeedback.h>
 #include <interactive_markers/interactive_marker_server.h>
-#include <message_filters/subscriber.h>
 #include <pr2_vfh_database/ObjectFinder.h>
 #include <rviz/panel.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_listener.h>
-#include <tf/message_filter.h>
 #include <tf/tfMessage.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
