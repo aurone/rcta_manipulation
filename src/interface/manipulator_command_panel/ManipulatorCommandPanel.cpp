@@ -7,8 +7,6 @@
 #include <queue>
 #include <sstream>
 #include <Eigen/Dense>
-#include <QPushButton>
-#include <QVBoxLayout>
 #include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <hdt/MoveArmCommand.h>
@@ -47,10 +45,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     nh_(),
     ph_("~"),
     move_arm_client_(),
-    send_move_command_(false),
-    move_arm_thread_(),
-    move_arm_mutex_(),
-    move_arm_condvar_(),
+    pending_move_arm_command_(false),
     rm_loader_(),
     rm_(),
     rs_(),
@@ -68,8 +63,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     joint_4_slider_(nullptr),
     joint_5_slider_(nullptr),
     joint_6_slider_(nullptr),
-    joint_7_slider_(nullptr),
-    critical_state_mutex_()
+    joint_7_slider_(nullptr)
 {
     ROS_INFO("Instantiating Manipulator Command Panel");
 
@@ -102,7 +96,6 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     layout->addWidget(joint_7_slider_);
     setLayout(layout);
 
-    move_arm_client_ = nh_.serviceClient<hdt::MoveArmCommand>("move_arm_command");
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
     trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1);
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("phantom_robot", 1);
@@ -133,21 +126,11 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
 
 ManipulatorCommandPanel::~ManipulatorCommandPanel()
 {
-    {
-        shutdown_ = true;
-        std::unique_lock<std::mutex> lock(move_arm_mutex_);
-        move_arm_condvar_.notify_one();
-    }
-
     // TODO: figure out why deleting rm_loader_ here causes a core dump
-    if (move_arm_thread_.joinable()) {
-        move_arm_thread_.join();
-    }
 }
 
 void ManipulatorCommandPanel::send_interp_command()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
 
     if (!initialized_) {
         return;
@@ -237,17 +220,6 @@ void ManipulatorCommandPanel::send_interp_command()
             else {
                 const std::vector<double>& last_point = traj.points.back().positions;
                 p.time_from_start = traj.points.back().time_from_start + ros::Duration(0.05);
-//                for (int i = 0; i < 7; ++i) {
-//                    if (sbpl::utils::ShortestAngleDiff(p.positions[i], last_point[i]) < 0) {
-//                        p.velocities.push_back(-joint_vel);
-//                    }
-//                    else if (sbpl::utils::ShortestAngleDiff(p.positions[i], last_point[i]) > 0) {
-//                        p.velocities.push_back(joint_vel);
-//                    }
-//                    else {
-//                        p.velocities.push_back(0.0);
-//                    }
-//                }
             }
             traj.points.push_back(p);
         }
@@ -262,8 +234,6 @@ void ManipulatorCommandPanel::send_interp_command()
 
 void ManipulatorCommandPanel::copy_current_state()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     std::array<double, 7> curr_joint_angles;
     get_joint_value(last_joint_state_, "arm_1_shoulder_twist", curr_joint_angles[0]);
     get_joint_value(last_joint_state_, "arm_2_shoulder_lift", curr_joint_angles[1]);
@@ -300,8 +270,6 @@ void ManipulatorCommandPanel::copy_current_state()
 
 void ManipulatorCommandPanel::refresh_robot_description()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     if (!reinit_robot()){
         ROS_ERROR("Failed to refresh robot description");
     }
@@ -309,17 +277,37 @@ void ManipulatorCommandPanel::refresh_robot_description()
 
 void ManipulatorCommandPanel::send_move_arm_command()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
+    if (!move_arm_client_) {
+        ROS_WARN("Move Arm Client has not yet been instantiated");
+        return;
+    }
 
-    std::unique_lock<std::mutex> move_arm_lock(move_arm_mutex_);
-    send_move_command_ = true;
-    move_arm_condvar_.notify_one();
+    if (!move_arm_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
+        return;
+    }
+
+    hdt::MoveArmCommandGoal move_arm_goal;
+
+    // mounting frame -> eef = mounting_frame -> root * root -> eef
+    const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
+    tf::poseEigenToMsg(root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(), move_arm_goal.goal_pose);
+
+    // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
+    Eigen::Affine3d manipulator_frame_to_eef_frame = mount_frame_to_manipulator_frame_.inverse() * root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
+    geometry_msgs::Pose eef_in_manipulator_frame;
+    tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
+    ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
+
+    move_arm_client_->sendGoal(
+            move_arm_goal, boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2));
+
+    pending_move_arm_command_ = true;
+    update_gui();
 }
 
 void ManipulatorCommandPanel::cycle_ik_solutions()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     if (!initialized_) {
         return;
     }
@@ -493,33 +481,17 @@ bool ManipulatorCommandPanel::do_init()
         return false;
     }
 
-    move_arm_thread_ = std::thread(std::bind(&ManipulatorCommandPanel::monitor_move_command, this));
+    move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
+    if (!move_arm_client_) {
+        return false;
+    }
 
     initialized_ = true;
     return initialized_;
 }
 
-int ManipulatorCommandPanel::do_run()
-{
-    if (!initialized_) {
-        ROS_ERROR("Teleop Node was not initialized before run");
-        return 1;
-    }
-
-    ros::Rate loop_rate(60.0);
-    while (ros::ok()) {
-        // process interactive markers and update joint states from service call
-        ros::spinOnce();
-        publish_phantom_robot_visualizations();
-        loop_rate.sleep();
-    }
-    return 0;
-}
-
 void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback)
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     if (!initialized_) {
         return;
     }
@@ -706,8 +678,6 @@ bool ManipulatorCommandPanel::get_joint_value(const sensor_msgs::JointState& joi
 
 void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     const std::vector<std::string>& joint_names = rm_->getJointModelNames();
 
     sensor_msgs::JointState last_joint_state_copy = last_joint_state_;
@@ -859,7 +829,6 @@ bool ManipulatorCommandPanel::reinit_robot()
 
     update_sliders();
 
-//    root_to_first_link_ = rs_->getFrameTransform("arm_1_shoulder_twist_link");
     const Eigen::Affine3d& root_to_manipulator_frame = rs_->getFrameTransform("arm_1_shoulder_twist_link");
     const Eigen::Affine3d& root_to_base_frame = rs_->getFrameTransform(base_link_);
     mount_frame_to_manipulator_frame_ = root_to_base_frame.inverse() * root_to_manipulator_frame;
@@ -868,43 +837,22 @@ bool ManipulatorCommandPanel::reinit_robot()
     return initialized_;
 }
 
-void ManipulatorCommandPanel::monitor_move_command()
+void ManipulatorCommandPanel::move_arm_command_active_cb()
 {
-    while (ros::ok()) {
-        std::unique_lock<std::mutex> lock(move_arm_mutex_);
-        ROS_INFO("Suspending move command monitor...");
-        move_arm_condvar_.wait(lock, [&send_move_command_, &shutdown_](){ return shutdown_ || send_move_command_; });
-        if (shutdown_) {
-            ROS_INFO("Shutting down move_arm monitor");
-            return;
-        }
-        ROS_INFO("Awake the move command monitor!");
 
-        hdt::MoveArmCommand::Request req;
-        {
-            std::unique_lock<std::mutex> lock(critical_state_mutex_);
-            // mounting frame -> eef = mounting_frame -> root * root -> eef
-            const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
-            tf::poseEigenToMsg(root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(), req.goal_pose);
+}
 
-            // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
-            Eigen::Affine3d manipulator_frame_to_eef_frame = mount_frame_to_manipulator_frame_.inverse() * root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
-            geometry_msgs::Pose eef_in_manipulator_frame;
-            tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
-            ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
-        }
+void ManipulatorCommandPanel::move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback)
+{
 
-        hdt::MoveArmCommand::Response res;
+}
 
-        if (!move_arm_client_.call(req, res)) {
-            ROS_ERROR("Call to %s failed", move_arm_client_.getService().c_str());
-        }
-        else {
-            ROS_INFO("Call to %s finished", move_arm_client_.getService().c_str());
-        }
-
-        send_move_command_ = false;
-    }
+void ManipulatorCommandPanel::move_arm_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::MoveArmCommandResult::ConstPtr& result)
+{
+    pending_move_arm_command_ = false;
+    update_gui();
 }
 
 bool ManipulatorCommandPanel::gatherRobotMarkers(
@@ -1013,6 +961,11 @@ void ManipulatorCommandPanel::update_sliders()
     joint_5_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0])));
     joint_6_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0])));
     joint_7_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0])));
+}
+
+void ManipulatorCommandPanel::update_gui()
+{
+    send_move_arm_command_button_->setEnabled(!pending_move_arm_command_);
 }
 
 } // namespace hdt

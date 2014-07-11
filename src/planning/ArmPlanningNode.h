@@ -6,6 +6,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <actionlib/client/simple_action_client.h>
+#include <actionlib/server/simple_action_server.h>
 #include <moveit/distance_field/propagation_distance_field.h>
 #include <moveit_msgs/CollisionObject.h>
 #include <moveit_msgs/Constraints.h>
@@ -17,11 +19,10 @@
 #include <sbpl_manipulation_components/collision_checker.h>
 #include <sbpl_manipulation_components/occupancy_grid.h>
 #include <sbpl_manipulation_components/kdl_robot_model.h>
-#include <hdt/MoveArmCommand.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
-#include <actionlib/client/simple_action_client.h>
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
+#include <hdt/MoveArmCommandAction.h>
 
 namespace hdt
 {
@@ -100,7 +101,9 @@ private:
     ros::Publisher marker_array_pub_;
     ros::Publisher joint_trajectory_pub_;
     ros::Subscriber joint_states_sub_;
-    ros::ServiceServer move_command_server_;
+
+    typedef actionlib::SimpleActionServer<hdt::MoveArmCommandAction> MoveArmActionServer;
+    std::unique_ptr<MoveArmActionServer> move_command_server_;
 
     typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> JTAC;
     JTAC action_client_;
@@ -133,12 +136,13 @@ private:
 
     boost::shared_ptr<urdf::ModelInterface> urdf_model_;
 
+    std::vector<std::string> statistic_names_;
+
     bool init_robot();
     bool init_collision_model();
     bool init_sbpl();
 
-    bool move_arm(hdt::MoveArmCommand::Request& request,
-                  hdt::MoveArmCommand::Response& response);
+    void move_arm(const hdt::MoveArmCommandGoal::ConstPtr& goal);
 
     void fill_constraint(const std::vector<double>& pose,
                          const std::string& frame_id,

@@ -91,7 +91,16 @@ ArmPlanningNode::ArmPlanningNode() :
     planner_(),
     last_joint_state_(),
     use_action_server_(false),
-    urdf_model_()
+    urdf_model_(),
+    statistic_names_({
+        "initial solution planning time",
+        "initial epsilon",
+        "initial solution expansions",
+        "final epsilon planning time",
+        "final epsilon",
+        "solution epsilon",
+        "expansions",
+        "solution cost" })
 {
 }
 
@@ -123,7 +132,13 @@ bool ArmPlanningNode::init()
     marker_array_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 500);
     joint_trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ArmPlanningNode::joint_states_callback, this);
-    move_command_server_ = nh_.advertiseService("move_arm_command", &ArmPlanningNode::move_arm, this);
+
+    move_command_server_.reset(new MoveArmActionServer(
+            "move_arm_command", boost::bind(&ArmPlanningNode::move_arm, this, _1), true));
+    if (!move_command_server_) {
+        ROS_ERROR("Failed to instantiate Move Arm Action Server");
+        return false;
+    }
 
     ROS_INFO("Waiting for action client \"arm_controller/joint_trajectory_action\"");
     action_client_.waitForServer();
@@ -293,19 +308,18 @@ bool ArmPlanningNode::init_sbpl()
     return true;
 }
 
-bool ArmPlanningNode::move_arm(hdt::MoveArmCommand::Request& request, hdt::MoveArmCommand::Response& response)
+void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 {
-    tf::Quaternion goal_quat(request.goal_pose.orientation.x, request.goal_pose.orientation.y, request.goal_pose.orientation.z, request.goal_pose.orientation.w);
+    move_command_server_->acceptNewGoal();
+
+    tf::Quaternion goal_quat(request->goal_pose.orientation.x, request->goal_pose.orientation.y, request->goal_pose.orientation.z, request->goal_pose.orientation.w);
     tf::Matrix3x3 goal_rotation_matrix(goal_quat);
 
     double goal_roll, goal_pitch, goal_yaw;
     goal_rotation_matrix.getEulerYPR(goal_yaw, goal_pitch, goal_roll);
-    const std::vector<double> goal = { request.goal_pose.position.x,
-                                       request.goal_pose.position.y,
-                                       request.goal_pose.position.z,
-                                       goal_roll,
-                                       goal_pitch,
-                                       goal_yaw };
+    const std::vector<double> goal = {
+            request->goal_pose.position.x, request->goal_pose.position.y, request->goal_pose.position.z,
+            goal_roll, goal_pitch, goal_yaw };
 
     // collision objects
     moveit_msgs::PlanningScenePtr scene(new moveit_msgs::PlanningScene);
@@ -329,7 +343,8 @@ bool ArmPlanningNode::move_arm(hdt::MoveArmCommand::Request& request, hdt::MoveA
     // fill start state
     if (!get_initial_configuration(ph_, scene->robot_state)) {
         ROS_ERROR("Failed to get initial configuration.");
-        return false;
+        move_command_server_->setAborted();
+        return;
     }
 
     scene->robot_state.joint_state.header.frame_id = planning_frame_;
@@ -349,19 +364,10 @@ bool ArmPlanningNode::move_arm(hdt::MoveArmCommand::Request& request, hdt::MoveA
     }
 
     // print statistics
-    std::vector<std::string> statistic_names = { "initial solution planning time",
-                                                 "initial epsilon",
-                                                 "initial solution expansions",
-                                                 "final epsilon planning time",
-                                                 "final epsilon",
-                                                 "solution epsilon",
-                                                 "expansions",
-                                                 "solution cost" };
-
     std::map<std::string, double> planning_stats = planner_->getPlannerStats();
 
     ROS_INFO("Planning statistics");
-    for (const auto& statistic : statistic_names) {
+    for (const auto& statistic : statistic_names_) {
         auto it = planning_stats.find(statistic);
         if (it != planning_stats.end()) {
             ROS_INFO("    %s: %0.3f", statistic.c_str(), it->second);
@@ -399,13 +405,14 @@ bool ArmPlanningNode::move_arm(hdt::MoveArmCommand::Request& request, hdt::MoveA
         bool interp_res = add_interpolation_to_plan(res);
         if (!interp_res) {
             ROS_ERROR("Failed to interpolate joint trajectory");
-            return true;
+            move_command_server_->setAborted();
+            return;
         }
 
         publish_trajectory(res.motion_plan_response.trajectory);
     }
 
-    return true;
+    move_command_server_->setSucceeded();
 }
 
 void ArmPlanningNode::fill_constraint(const std::vector<double>& pose,

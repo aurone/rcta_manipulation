@@ -8,8 +8,8 @@
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <QWidget>
-#include <QSlider>
+#include <QtGui>
+#include <actionlib/client/simple_action_client.h>
 #include <hdt_description/RobotModel.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
@@ -20,6 +20,7 @@
 #include <tf/transform_broadcaster.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
+#include <hdt/MoveArmCommandAction.h>
 
 class QPushButton;
 
@@ -60,11 +61,9 @@ private:
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
-    ros::ServiceClient move_arm_client_;
-    bool send_move_command_;
-    std::thread move_arm_thread_;
-    std::mutex move_arm_mutex_;
-    std::condition_variable move_arm_condvar_;
+    typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
+    std::unique_ptr<MoveArmCommandActionClient> move_arm_client_;
+    bool pending_move_arm_command_;
 
     hdt::RobotModel robot_model_;
 
@@ -106,7 +105,6 @@ private:
     std::vector<double> max_limits_;
 
     bool do_init();
-    int do_run();
     void do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback);
 
     void publish_transform_network();
@@ -131,6 +129,12 @@ private:
 
     void monitor_move_command();
 
+    void move_arm_command_active_cb();
+    void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
+    void move_arm_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const hdt::MoveArmCommandResult::ConstPtr& result);
+
     bool gatherRobotMarkers(const robot_state::RobotState& robot_state,
                             const std::vector<std::string>& link_names,
                             const std_msgs::ColorRGBA& color,
@@ -142,6 +146,7 @@ private:
     std::string to_string(const Eigen::Affine3d& transform);
 
     void update_sliders();
+    void update_gui();
 };
 
 } // namespace hdt

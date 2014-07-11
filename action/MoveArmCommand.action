@@ -1,3 +1,9 @@
+# goal 
 geometry_msgs/Pose goal_pose
 ---
+# result
+bool success
 trajectory_msgs/JointTrajectory trajectory
+---
+# feedback
+float64 elapsed_time
