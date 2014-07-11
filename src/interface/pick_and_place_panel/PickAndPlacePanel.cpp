@@ -30,6 +30,7 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     tf_sub_(),
     frame_timeout_(10.0),
     seen_frames_(),
+    pending_detection_request_(false),
     last_detection_request_(),
     last_detection_result_(),
     snapshot_cloud_pub_(),
@@ -47,12 +48,12 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
 
     move_arm_client_ = nh_.serviceClient<hdt::MoveArmCommand>("move_arm_command");
 
-    object_detection_client_.reset(new ObjectDetectionActionClient("object_detection_action"));
+    object_detection_client_.reset(new ObjectDetectionActionClient("object_detection_action", false));
     if (!object_detection_client_) {
         ROS_ERROR("Failed to instantiate Object Detection Action Client");
     }
 
-    gripper_command_client_.reset(new GripperCommandActionClient("gripper_controller/gripper_command_action"));
+    gripper_command_client_.reset(new GripperCommandActionClient("gripper_controller/gripper_command_action", false));
     if (!gripper_command_client_) {
         ROS_ERROR("Failed to instantiate Gripper Command Action Client");
     }
@@ -156,8 +157,9 @@ void PickAndPlacePanel::take_snapshot()
 
     ROS_INFO("Sent goal to action server object_detection_action");
     object_detection_client_->sendGoal(last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
+    pending_detection_request_ = true;
 
-    // TODO: disable the take snapshot button and add/enable a cancel button
+    update_gui();
 }
 
 void PickAndPlacePanel::update_grasps()
@@ -279,9 +281,7 @@ void PickAndPlacePanel::send_open_gripper_command()
     if (gripper_command_client_->isServerConnected()) {
         GripperCommandGoal goal_msg;
         goal_msg.command.position = 0.0854;
-        GoalHandle goal = gripper_command_client_->sendGoal(goal_msg,
-                boost::bind(&PickAndPlacePanel::gripper_command_action_transition, this, _1),
-                boost::bind(&PickAndPlacePanel::gripper_command_action_feedback, this, _1, _2));
+        gripper_command_client_->sendGoal(goal_msg, boost::bind(&PickAndPlacePanel::gripper_command_result_cb, this, _1, _2));
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
@@ -294,9 +294,7 @@ void PickAndPlacePanel::send_close_gripper_command()
     if (gripper_command_client_->isServerConnected()) {
         GripperCommandGoal goal_msg;
         goal_msg.command.position = 0.0;
-        GoalHandle goal = gripper_command_client_->sendGoal(goal_msg,
-                boost::bind(&PickAndPlacePanel::gripper_command_action_transition, this, _1),
-                boost::bind(&PickAndPlacePanel::gripper_command_action_feedback, this, _1, _2));
+        gripper_command_client_->sendGoal(goal_msg, boost::bind(&PickAndPlacePanel::gripper_command_result_cb, this, _1, _2));
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
@@ -384,7 +382,8 @@ void PickAndPlacePanel::update_gui()
                                          !features_fname_label_->text().isEmpty() &&
                                          !kdtree_indices_fname_label_->text().isEmpty() &&
                                          !camera_frame_selection_->currentText().isEmpty() &&
-                                         !root_frame_selection_->currentText().isEmpty());
+                                         !root_frame_selection_->currentText().isEmpty() &&
+                                         !pending_detection_request_);
     update_grasps_button_->setEnabled(last_detection_result_ && last_detection_result_->success);
     send_move_to_pregrasp_button_->setEnabled(!selected_marker_.empty());
 }
@@ -553,14 +552,30 @@ visualization_msgs::MarkerArray PickAndPlacePanel::create_triad_markers(const ge
     return markers;
 }
 
-void PickAndPlacePanel::gripper_command_action_feedback(GoalHandle goalHandle, const GripperCommandFeedback::ConstPtr& msg)
+void PickAndPlacePanel::gripper_command_active_cb()
 {
-    ROS_INFO("Received feedback");
+
 }
 
-void PickAndPlacePanel::gripper_command_action_transition(GoalHandle goalHandle)
+void PickAndPlacePanel::gripper_command_feedback_cb(const GripperCommandFeedback::ConstPtr& feedback)
 {
-    ROS_INFO("Received transition!");
+
+}
+
+void PickAndPlacePanel::gripper_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const GripperCommandResult::ConstPtr& result)
+{
+    ROS_INFO("Gripper command completed");
+}
+
+void PickAndPlacePanel::object_detection_active_cb()
+{
+    update_gui();
+}
+
+void PickAndPlacePanel::object_detection_feedback_cb(const hdt::ObjectDetectionFeedback::ConstPtr& feedback)
+{
 }
 
 void PickAndPlacePanel::object_detection_result_cb(
@@ -580,10 +595,10 @@ void PickAndPlacePanel::object_detection_result_cb(
     if (result->success) {
         ROS_INFO("A successful match was found");
         if (result->match_score != result->match_score) {
-            // QMessageBox::warning(this, tr("Match Results"), tr("Match succeeded but detector was unable to score it"));
+             QMessageBox::warning(this, tr("Match Results"), tr("Match succeeded but detector was unable to score it"));
         }
-        else { 
-            // QMessageBox::information(this, tr("Match Results"), tr("Match succeeded with score %1").arg(result->match_score));
+        else {
+             QMessageBox::information(this, tr("Match Results"), tr("Match succeeded with score %1").arg(result->match_score));
         }
     }
     else {
@@ -591,6 +606,7 @@ void PickAndPlacePanel::object_detection_result_cb(
     }
 
     last_detection_result_ = result;
+    pending_detection_request_ = false;
 
     update_gui();
 }
@@ -662,8 +678,6 @@ void PickAndPlacePanel::setup_gui()
     connect(open_features_button_, SIGNAL(clicked()), this, SLOT(choose_features()));
     connect(open_kdtree_indices_button_, SIGNAL(clicked()), this, SLOT(choose_kdtree_indices()));
 
-   // connect(camera_frame_selection_, SIGNAL(activated(int)),                        this, SLOT(camera_frame_box_activated(int)));
-//    connect(camera_frame_selection_, SIGNAL(activated(const QString&)),             this, SLOT(camera_frame_box_activated(const QString&)));
     connect(camera_frame_selection_,    SIGNAL(currentIndexChanged(int)),           this, SLOT(camera_frame_box_current_index_changed(int)));
     connect(root_frame_selection_,      SIGNAL(currentIndexChanged(int)),           this, SLOT(root_frame_box_current_index_changed(int)));
     connect(camera_frame_selection_,    SIGNAL(editTextChanged(const QString&)),    this, SLOT(camera_frame_box_edit_text_changed(const QString&)));
@@ -679,21 +693,21 @@ void PickAndPlacePanel::setup_gui()
 tf::Transform PickAndPlacePanel::geomsgs_pose_to_tf_transform(const geometry_msgs::Pose& pose) const
 {
     return tf::Transform(
-    		tf::Quaternion(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w),
-    		tf::Vector3(pose.position.x, pose.position.y, pose.position.z));
+            tf::Quaternion(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w),
+            tf::Vector3(pose.position.x, pose.position.y, pose.position.z));
 }
 
 geometry_msgs::Pose PickAndPlacePanel::tf_transform_to_geomsgs_pose(const tf::Transform& transform) const
 {
-	geometry_msgs::Pose pose;
-	pose.position.x = transform.getOrigin().x();
-	pose.position.y = transform.getOrigin().y();
-	pose.position.z = transform.getOrigin().z();
-	pose.orientation.w = transform.getRotation().w();
-	pose.orientation.x = transform.getRotation().x();
-	pose.orientation.y = transform.getRotation().y();
-	pose.orientation.z = transform.getRotation().z();
-	return pose;
+    geometry_msgs::Pose pose;
+    pose.position.x = transform.getOrigin().x();
+    pose.position.y = transform.getOrigin().y();
+    pose.position.z = transform.getOrigin().z();
+    pose.orientation.w = transform.getRotation().w();
+    pose.orientation.x = transform.getRotation().x();
+    pose.orientation.y = transform.getRotation().y();
+    pose.orientation.z = transform.getRotation().z();
+    return pose;
 }
 
 } // namespace hdt

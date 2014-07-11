@@ -91,6 +91,7 @@ private:
     std::map<std::string, ros::Time> seen_frames_;
 
     // results of the last snapshot
+    bool pending_detection_request_;
     hdt::ObjectDetectionGoal last_detection_request_;
     hdt::ObjectDetectionResult::ConstPtr last_detection_result_;
     ros::Publisher snapshot_cloud_pub_;
@@ -108,8 +109,7 @@ private:
     typedef control_msgs::GripperCommandGoal GripperCommandGoal;
     typedef control_msgs::GripperCommandFeedback GripperCommandFeedback;
     typedef control_msgs::GripperCommandResult GripperCommandResult;
-    typedef actionlib::ActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
-    typedef GripperCommandActionClient::GoalHandle GoalHandle;
+    typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
     std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
 
     void setup_gui();
@@ -132,16 +132,21 @@ private:
 
     void print_interactive_marker_feedback(const visualization_msgs::InteractiveMarkerFeedback& feedback_msg) const;
 
-    void gripper_command_action_feedback(GoalHandle goalHandle, const GripperCommandFeedback::ConstPtr& msg);
-    void gripper_command_action_transition(GoalHandle goalHandle);
-
+    void object_detection_active_cb();
+    void object_detection_feedback_cb(const hdt::ObjectDetectionFeedback::ConstPtr& feedback);
     void object_detection_result_cb(
         const actionlib::SimpleClientGoalState& state,
         const hdt::ObjectDetectionResult::ConstPtr& result);
 
-    void object_detection_active_cb();
+    void gripper_command_active_cb();
+    void gripper_command_feedback_cb(const GripperCommandFeedback::ConstPtr& feedback);
+    void gripper_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const GripperCommandResult::ConstPtr& result);
 
-    void object_detection_feedback_cb(const hdt::ObjectDetectionFeedback::ConstPtr& feedback);
+//    void move_arm_active_cb();
+//    void move_arm_feedback_cb();
+//    void move_arm_result_cb();
 
     tf::Transform geomsgs_pose_to_tf_transform(const geometry_msgs::Pose& pose) const;
     geometry_msgs::Pose tf_transform_to_geomsgs_pose(const tf::Transform& transform) const;
