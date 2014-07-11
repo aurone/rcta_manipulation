@@ -30,16 +30,13 @@ bool PickAndPlaceNode::initialize()
     }
 
     if (!ph_.getParam("database_directory", database_directory_)) {
-        ROS_ERROR("Failed to extract 'database-directoy' from the param server");
+        ROS_ERROR("Failed to extract 'database-directory' from the param server");
         return false;
     }
 
     // subscribe to point cloud topic
-//    point_cloud_sub_.subscribe(nh_, point_cloud_topic_, 1);
-//    tf_filter_.reset(new tf::MessageFilter<sensor_msgs::PointCloud2>(point_cloud_sub_, listener_, root_frame_, 2));
-//    tf_filter_->registerCallback(std::bind(&PickAndPlaceNode::point_cloud_callback, this, std::placeholders::_1));
-
-    point_cloud_sub_ = nh_.subscribe<sensor_msgs::PointCloud2>(point_cloud_topic_, 1, &PickAndPlaceNode::point_cloud_callback, this);
+    point_cloud_sub_ = nh_.subscribe<sensor_msgs::PointCloud2>(
+            point_cloud_topic_, 1, &PickAndPlaceNode::point_cloud_callback, this);
 
     pregrasp_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("grasp_markers", 5);
 

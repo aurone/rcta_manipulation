@@ -826,7 +826,6 @@ bool ManipulatorCommandPanel::reinit_robot()
         }
     }
 
-
     server_.applyChanges();
 
     // cache limits for interpolation command
