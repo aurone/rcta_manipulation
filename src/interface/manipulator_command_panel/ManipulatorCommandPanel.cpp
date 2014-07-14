@@ -126,7 +126,6 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
 
 ManipulatorCommandPanel::~ManipulatorCommandPanel()
 {
-    // TODO: figure out why deleting rm_loader_ here causes a core dump
 }
 
 void ManipulatorCommandPanel::send_interp_command()

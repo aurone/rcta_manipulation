@@ -135,13 +135,14 @@ private:
         const actionlib::SimpleClientGoalState& state,
         const hdt::MoveArmCommandResult::ConstPtr& result);
 
-    bool gatherRobotMarkers(const robot_state::RobotState& robot_state,
-                            const std::vector<std::string>& link_names,
-                            const std_msgs::ColorRGBA& color,
-                            const std::string& ns,
-                            const ros::Duration& d,
-                            visualization_msgs::MarkerArray& markers,
-                            bool include_attached = false);
+    bool gatherRobotMarkers(
+        const robot_state::RobotState& robot_state,
+        const std::vector<std::string>& link_names,
+        const std_msgs::ColorRGBA& color,
+        const std::string& ns,
+        const ros::Duration& d,
+        visualization_msgs::MarkerArray& markers,
+        bool include_attached = false);
 
     std::string to_string(const Eigen::Affine3d& transform);
 
