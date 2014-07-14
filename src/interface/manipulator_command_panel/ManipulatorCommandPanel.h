@@ -8,8 +8,8 @@
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <QWidget>
-#include <QSlider>
+#include <QtGui>
+#include <actionlib/client/simple_action_client.h>
 #include <hdt_description/RobotModel.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
@@ -20,6 +20,7 @@
 #include <tf/transform_broadcaster.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
+#include <hdt/MoveArmCommandAction.h>
 
 class QPushButton;
 
@@ -37,7 +38,6 @@ public:
 
 public Q_SLOTS:
 
-    void send_interp_command();
     void copy_current_state();
     void refresh_robot_description();
     void send_move_arm_command();
@@ -55,20 +55,15 @@ private:
 
     bool initialized_;
 
-    std::atomic<bool> shutdown_;
-
     ros::NodeHandle nh_;
-    ros::NodeHandle ph_;
 
-    ros::ServiceClient move_arm_client_;
-    bool send_move_command_;
-    std::thread move_arm_thread_;
-    std::mutex move_arm_mutex_;
-    std::condition_variable move_arm_condvar_;
+    typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
+    std::unique_ptr<MoveArmCommandActionClient> move_arm_client_;
+    bool pending_move_arm_command_;
 
     hdt::RobotModel robot_model_;
 
-    robot_model_loader::RobotModelLoader *rm_loader_;
+    std::unique_ptr<robot_model_loader::RobotModelLoader> rm_loader_;
     robot_model::RobotModelPtr rm_;
     robot_state::RobotStatePtr rs_;
 
@@ -76,7 +71,6 @@ private:
 
     ros::Subscriber joint_states_sub_;
     ros::Publisher robot_markers_pub_;
-    ros::Publisher trajectory_pub_;
 
     sensor_msgs::JointState last_joint_state_;
 
@@ -84,7 +78,6 @@ private:
     std::string tip_link_;
     std::string base_link_;
 
-    QPushButton* send_interp_command_button_;
     QPushButton* copy_current_state_button_;
     QPushButton* refresh_robot_desc_button_;
     QPushButton* send_move_arm_command_button_;
@@ -97,16 +90,12 @@ private:
     QSlider* joint_6_slider_;
     QSlider* joint_7_slider_;
 
-    std::mutex critical_state_mutex_;
-
     Eigen::Affine3d root_to_first_link_;
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
 
-    std::vector<double> min_limits_;
-    std::vector<double> max_limits_;
-
     bool do_init();
-    int do_run();
+    bool check_robot_model_consistency();
+
     void do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback);
 
     void publish_transform_network();
@@ -123,7 +112,7 @@ private:
 
     /// @brief Get the value of a particular joint in a joint state.
     /// @return true if the joint was found; false otherwise
-    bool get_joint_value(const sensor_msgs::JointState& joint_state, const std::string& joint, double& joint_value);
+    bool get_joint_value(const sensor_msgs::JointState& joint_state, const std::string& joint, double& joint_value) const;
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
@@ -131,17 +120,30 @@ private:
 
     void monitor_move_command();
 
-    bool gatherRobotMarkers(const robot_state::RobotState& robot_state,
-                            const std::vector<std::string>& link_names,
-                            const std_msgs::ColorRGBA& color,
-                            const std::string& ns,
-                            const ros::Duration& d,
-                            visualization_msgs::MarkerArray& markers,
-                            bool include_attached = false);
+    void move_arm_command_active_cb();
+    void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
+    void move_arm_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const hdt::MoveArmCommandResult::ConstPtr& result);
 
-    std::string to_string(const Eigen::Affine3d& transform);
+    bool gatherRobotMarkers(
+        const robot_state::RobotState& robot_state,
+        const std::vector<std::string>& link_names,
+        const std_msgs::ColorRGBA& color,
+        const std::string& ns,
+        const ros::Duration& d,
+        visualization_msgs::MarkerArray& markers,
+        bool include_attached = false);
+
+    static void joint_state_to_joint_array(const sensor_msgs::JointState&);
+
+    std::vector<double> get_current_joint_angles() const;
+    std::vector<double> get_phantom_joint_angles() const;
+
+    bool set_phantom_joint_angles(const std::vector<double>& joint_angles);
 
     void update_sliders();
+    void update_gui();
 };
 
 } // namespace hdt

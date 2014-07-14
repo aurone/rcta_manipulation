@@ -12,18 +12,17 @@
 #include <control_msgs/GripperCommandActionFeedback.h>
 #include <control_msgs/GripperCommandFeedback.h>
 #include <interactive_markers/interactive_marker_server.h>
-#include <message_filters/subscriber.h>
 #include <pr2_vfh_database/ObjectFinder.h>
 #include <rviz/panel.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_listener.h>
-#include <tf/message_filter.h>
 #include <tf/tfMessage.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <hdt/ObjectDetectionAction.h>
+#include <hdt/MoveArmCommandAction.h>
 
 namespace hdt
 {
@@ -49,6 +48,7 @@ private Q_SLOTS:
     void take_snapshot();
     void update_grasps();
     void send_move_to_pregrasp_command();
+    void send_move_to_flipped_pregrasp_command();
     void send_open_gripper_command();
     void send_close_gripper_command();
 
@@ -79,6 +79,7 @@ private:
     QPushButton* snap_point_cloud_button_;
     QPushButton* update_grasps_button_;
     QPushButton* send_move_to_pregrasp_button_;
+    QPushButton* send_move_to_flipped_pregrasp_button_;
     QPushButton* send_open_gripper_command_button_;
     QPushButton* send_close_gripper_command_button_;
 
@@ -101,7 +102,9 @@ private:
     typedef std::string InteractiveMarkerHandle;
     InteractiveMarkerHandle selected_marker_;
 
-    ros::ServiceClient move_arm_client_;
+    typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
+    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
+    bool pending_move_arm_command_;
 
     typedef actionlib::SimpleActionClient<hdt::ObjectDetectionAction> ObjectDetectionActionClient;
     std::unique_ptr<ObjectDetectionActionClient> object_detection_client_;
@@ -144,12 +147,18 @@ private:
         const actionlib::SimpleClientGoalState& state,
         const GripperCommandResult::ConstPtr& result);
 
-//    void move_arm_active_cb();
-//    void move_arm_feedback_cb();
-//    void move_arm_result_cb();
+    void move_arm_command_active_cb();
+    void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
+    void move_arm_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const hdt::MoveArmCommandResult::ConstPtr& result);
 
     tf::Transform geomsgs_pose_to_tf_transform(const geometry_msgs::Pose& pose) const;
     geometry_msgs::Pose tf_transform_to_geomsgs_pose(const tf::Transform& transform) const;
+
+    bool wrist_pose_from_pregrasp_pose(
+        const geometry_msgs::PoseStamped& pregrasp_pose,
+        geometry_msgs::PoseStamped& out) const;
 };
 
 } // namespace hdt

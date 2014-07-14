@@ -25,6 +25,7 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
                       "User.png", "Users.png", "Web.png", "ZoomIn.png",
                       "ZoomOut.png" }),
     icon_colors_({ "blue", "green", "red", "smoke" }),
+    shutdown_watchdog_(false),
     watchdog_()
 {
     std::string ros_root(getenv("ROS_ROOT"));
@@ -66,6 +67,9 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     }
 
     hdt_diagnostics_sub_ = nh_.subscribe<hdt::ControllerDiagnosticStatus>("hdt_diagnostics", 5, &ControllerStatusPanelWidget::diagnostics_callback, this);
+    raw_joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("raw_joint_states", 1, &ControllerStatusPanelWidget::joint_states_callback, this);
+    joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("joint_states", 1, &ControllerStatusPanelWidget::raw_joint_states_callback, this);
+
     staleness_pub_ = nh_.advertise<std_msgs::Empty>("controller_staleness", 1);
     estop_pub_ = nh_.advertise<hdt::EmergencyStop>("hdt_estop", 1);
     clear_estop_pub_ = nh_.advertise<hdt::ClearEmergencyStop>("clear_hdt_estop", 1);
@@ -79,10 +83,31 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     set_inactive("have_comms_icon");
 
     watchdog_ = std::thread(std::bind(&ControllerStatusPanelWidget::watchdog_thread, this));
+
+    // initialize joint state plots
+
+    std::string urdf_string;
+    if (!nh_.getParam("robot_description", urdf_string)) {
+        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
+        return;
+    }
+
+    if (!robot_model_.load(urdf_string)) {
+        ROS_ERROR("Failed to initialize Robot Model from URDF string");
+        return;
+    }
+
+    for (const std::string& joint_name : robot_model_.joint_names()) {
+        joint_states_curves_[joint_name] = new QwtPlotCurve(QString("%1 Raw Joint State").arg(QString::fromStdString(joint_name)));
+        joint_states_curves_[joint_name]->attach(ui->raw_joint_states_plot);
+    }
 }
 
 ControllerStatusPanelWidget::~ControllerStatusPanelWidget()
 {
+    shutdown_watchdog_ = true;
+    if (watchdog_.joinable())
+        watchdog_.join();
     delete ui;
 }
 
@@ -117,6 +142,16 @@ void ControllerStatusPanelWidget::staleness_callback(const std_msgs::Empty::Cons
     set_stale("controllable_icon");
     set_stale("have_supply_icon");
     set_stale("have_comms_icon");
+}
+
+void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
+{
+//    for (const std::string& joint_name : msg->joint_name);
+}
+
+void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
+{
+
 }
 
 QPixmap ControllerStatusPanelWidget::get_active_icon() const
@@ -219,7 +254,7 @@ void ControllerStatusPanelWidget::watchdog_thread()
 {
     double loop_rate_s = 1.0;
     ros::Rate watchdog_rate(loop_rate_s);
-    while (ros::ok()) {
+    while (ros::ok() && !shutdown_watchdog_) {
         ros::Time now = ros::Time::now();
         msg_mutex_.lock();
         if (last_msg_) {

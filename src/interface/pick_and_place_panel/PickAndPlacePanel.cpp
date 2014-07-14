@@ -5,6 +5,7 @@
 #include <hdt/MoveArmCommand.h>
 #include <ros/ros.h>
 #include <pcl_ros/transforms.h>
+#include <tf/transform_broadcaster.h>
 #include "PickAndPlacePanel.h"
 
 namespace hdt
@@ -24,6 +25,7 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     snap_point_cloud_button_(nullptr),
     update_grasps_button_(nullptr),
     send_move_to_pregrasp_button_(nullptr),
+    send_move_to_flipped_pregrasp_button_(nullptr),
     send_open_gripper_command_button_(nullptr),
     send_close_gripper_command_button_(nullptr),
     listener_(ros::Duration(tf::Transformer::DEFAULT_CACHE_TIME), false),
@@ -36,7 +38,8 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     snapshot_cloud_pub_(),
     grasp_markers_server_("grasp_markers"),
     selected_marker_(),
-    move_arm_client_(),
+    move_arm_command_client_(),
+    pending_move_arm_command_(false),
     object_detection_client_(),
     gripper_command_client_()
 {
@@ -46,7 +49,10 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
 
     tf_sub_ = nh_.subscribe("tf", 10, &PickAndPlacePanel::tf_callback, this);
 
-    move_arm_client_ = nh_.serviceClient<hdt::MoveArmCommand>("move_arm_command");
+    move_arm_command_client_.reset(new MoveArmCommandActionClient("move_arm_command"));
+    if (!move_arm_command_client_) {
+        ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
+    }
 
     object_detection_client_.reset(new ObjectDetectionActionClient("object_detection_action", false));
     if (!object_detection_client_) {
@@ -156,7 +162,8 @@ void PickAndPlacePanel::take_snapshot()
     last_detection_request_.request_snapshot = true;
 
     ROS_INFO("Sent goal to action server object_detection_action");
-    object_detection_client_->sendGoal(last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
+    object_detection_client_->sendGoal(
+            last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
     pending_detection_request_ = true;
 
     update_gui();
@@ -211,7 +218,7 @@ void PickAndPlacePanel::update_grasps()
 void PickAndPlacePanel::send_move_to_pregrasp_command()
 {
     if (selected_marker_.empty()) {
-        ROS_WARN("Call to send_move_to_pregrasp_command without selection");
+        ROS_WARN("Attempt to move to pregrasp without a pregrasp marker selected");
         return;
     }
 
@@ -219,60 +226,60 @@ void PickAndPlacePanel::send_move_to_pregrasp_command()
     grasp_markers_server_.get(selected_marker_, selected_grasp_marker);
     grasp_markers_server_.applyChanges(); // who knows why this is here
 
-    // rotate the pregrasp pose to cooperate with the hdt gripper frame
-    Eigen::Affine3d pr2_pregrasp_pose;
-    tf::poseMsgToEigen(selected_grasp_marker.pose, pr2_pregrasp_pose);
-    Eigen::AngleAxisd pr2_to_hdt_gripper_correction(M_PI / 2.0, Eigen::Vector3d(1.0, 0.0, 0.0));
-    Eigen::Affine3d hdt_pregrasp_pose = pr2_pregrasp_pose * pr2_to_hdt_gripper_correction;
+    geometry_msgs::PoseStamped pregrasp_marker_pose;
+    pregrasp_marker_pose.header = selected_grasp_marker.header;
+    pregrasp_marker_pose.pose = selected_grasp_marker.pose;
 
-    if (!listener_.canTransform(selected_grasp_marker.header.frame_id, "arm_mount_panel_dummy", ros::Time(0))) {
-        QMessageBox::warning(this, tr("Transform Failure"), tr("Unable to transform from %1 to %2").arg("arm_mount_panel_dummy").arg(selected_grasp_marker.header.frame_id.c_str()));
+    geometry_msgs::PoseStamped goal_wrist_pose_mount_frame;
+    if (!wrist_pose_from_pregrasp_pose(pregrasp_marker_pose, goal_wrist_pose_mount_frame))
+    {
+        ROS_WARN("Failed to obtain goal wrist pose from pregrasp marker pose");
         return;
     }
 
-    // hdt grasp pose in the camera frame
-    geometry_msgs::PoseStamped pregrasp_pose;
-    pregrasp_pose.header = selected_grasp_marker.header;
-    tf::poseEigenToMsg(hdt_pregrasp_pose, pregrasp_pose.pose);
+    hdt::MoveArmCommandGoal goal;
+    goal.goal_pose = goal_wrist_pose_mount_frame.pose;
+    move_arm_command_client_->sendGoal(goal, boost::bind(&PickAndPlacePanel::move_arm_command_result_cb, this, _1, _2));
+    pending_move_arm_command_ = true;
+    update_gui();
+}
 
-    // mount -> gripper = mount -> camera * camera -> gripper
-    geometry_msgs::PoseStamped gripper_in_mount_frame;
-    try {
-        listener_.transformPose("arm_mount_panel_dummy", pregrasp_pose, gripper_in_mount_frame);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_WARN("Fuck tf");
+void PickAndPlacePanel::send_move_to_flipped_pregrasp_command()
+{
+    if (selected_marker_.empty()) {
+        ROS_WARN("Attempt to move to pregrasp without a pregrasp marker selected");
         return;
     }
 
-    tf::Transform mount_to_gripper = geomsgs_pose_to_tf_transform(gripper_in_mount_frame.pose);
+    visualization_msgs::InteractiveMarker selected_grasp_marker;
+    grasp_markers_server_.get(selected_marker_, selected_grasp_marker);
+    grasp_markers_server_.applyChanges(); // who knows why this is here
 
-    // gripper -> wrist
-    tf::StampedTransform gripper_to_wrist;
-    std::string wrist_frame = "arm_7_gripper_lift_link";
-    std::string gripper_frame = "gripper_base";
-    try {
-        listener_.lookupTransform(gripper_frame, wrist_frame, ros::Time(0), gripper_to_wrist);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_WARN("Fuck tf for not being able to find a fixed transform");
+    geometry_msgs::PoseStamped pregrasp_marker_pose;
+    pregrasp_marker_pose.header = selected_grasp_marker.header;
+    pregrasp_marker_pose.pose = selected_grasp_marker.pose;
+
+    geometry_msgs::PoseStamped goal_wrist_pose_mount_frame;
+    if (!wrist_pose_from_pregrasp_pose(pregrasp_marker_pose, goal_wrist_pose_mount_frame))
+    {
+        ROS_WARN("Failed to obtain goal wrist pose from pregrasp marker pose");
         return;
     }
 
-    // mount -> wrist = mount -> gripper * gripper -> wrist
-    tf::Transform mount_to_wrist = mount_to_gripper * gripper_to_wrist;
+    Eigen::Affine3d goal_wrist_transform_mount_frame;
+    tf::poseMsgToEigen(goal_wrist_pose_mount_frame.pose, goal_wrist_transform_mount_frame);
 
-    hdt::MoveArmCommand::Request req;
-    hdt::MoveArmCommand::Response res;
+    Eigen::Affine3d goal_wrist_transform_flipped =
+            goal_wrist_transform_mount_frame * Eigen::AngleAxisd(M_PI, Eigen::Vector3d(1.0, 0.0, 0.0));
 
-    req.goal_pose = tf_transform_to_geomsgs_pose(mount_to_wrist);
+    geometry_msgs::Pose goal_wrist_pose_flipped;
+    tf::poseEigenToMsg(goal_wrist_transform_flipped, goal_wrist_pose_flipped);
 
-    if (!move_arm_client_.call(req, res)) {
-        ROS_ERROR("Call to %s failed", move_arm_client_.getService().c_str());
-    }
-    else {
-        ROS_INFO("Call to %s finished", move_arm_client_.getService().c_str());
-    }
+    hdt::MoveArmCommandGoal goal;
+    goal.goal_pose = goal_wrist_pose_flipped;
+    move_arm_command_client_->sendGoal(goal, boost::bind(&PickAndPlacePanel::move_arm_command_result_cb, this, _1, _2));
+    pending_move_arm_command_ = true;
+    update_gui();
 }
 
 void PickAndPlacePanel::send_open_gripper_command()
@@ -378,14 +385,16 @@ void PickAndPlacePanel::tf_callback(const tf::tfMessage::ConstPtr& msg)
 
 void PickAndPlacePanel::update_gui()
 {
-    snap_point_cloud_button_->setEnabled(!database_fname_label_->text().isEmpty() &&
-                                         !features_fname_label_->text().isEmpty() &&
-                                         !kdtree_indices_fname_label_->text().isEmpty() &&
-                                         !camera_frame_selection_->currentText().isEmpty() &&
-                                         !root_frame_selection_->currentText().isEmpty() &&
-                                         !pending_detection_request_);
+    snap_point_cloud_button_->setEnabled(
+            !database_fname_label_->text().isEmpty() &&
+            !features_fname_label_->text().isEmpty() &&
+            !kdtree_indices_fname_label_->text().isEmpty() &&
+            !camera_frame_selection_->currentText().isEmpty() &&
+            !root_frame_selection_->currentText().isEmpty() &&
+            !pending_detection_request_);
     update_grasps_button_->setEnabled(last_detection_result_ && last_detection_result_->success);
-    send_move_to_pregrasp_button_->setEnabled(!selected_marker_.empty());
+    send_move_to_pregrasp_button_->setEnabled(!selected_marker_.empty() && !pending_move_arm_command_);
+    send_move_to_flipped_pregrasp_button_->setEnabled(!selected_marker_.empty() && !pending_move_arm_command_);
 }
 
 int PickAndPlacePanel::find_item(const QComboBox& combo_box, const std::string& item) const
@@ -569,6 +578,24 @@ void PickAndPlacePanel::gripper_command_result_cb(
     ROS_INFO("Gripper command completed");
 }
 
+void PickAndPlacePanel::move_arm_command_active_cb()
+{
+
+}
+
+void PickAndPlacePanel::move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback)
+{
+
+}
+
+void PickAndPlacePanel::move_arm_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::MoveArmCommandResult::ConstPtr& result)
+{
+    pending_move_arm_command_ = false;
+    update_gui();
+}
+
 void PickAndPlacePanel::object_detection_active_cb()
 {
     update_gui();
@@ -666,6 +693,9 @@ void PickAndPlacePanel::setup_gui()
     send_move_to_pregrasp_button_ = new QPushButton("Move to Pre-Grasp");
     main_layout->addWidget(send_move_to_pregrasp_button_);
 
+    send_move_to_flipped_pregrasp_button_ = new QPushButton("Move to Flipped Pre-Grasp");
+    main_layout->addWidget(send_move_to_flipped_pregrasp_button_);
+
     send_open_gripper_command_button_ = new QPushButton("Open Gripper");
     main_layout->addWidget(send_open_gripper_command_button_);
 
@@ -686,6 +716,7 @@ void PickAndPlacePanel::setup_gui()
     connect(snap_point_cloud_button_, SIGNAL(clicked()), this, SLOT(take_snapshot()));
     connect(update_grasps_button_, SIGNAL(clicked()), this, SLOT(update_grasps()));
     connect(send_move_to_pregrasp_button_, SIGNAL(clicked()), this, SLOT(send_move_to_pregrasp_command()));
+    connect(send_move_to_flipped_pregrasp_button_, SIGNAL(clicked()), this, SLOT(send_move_to_flipped_pregrasp_command()));
     connect(send_open_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_open_gripper_command()));
     connect(send_close_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_close_gripper_command()));
 }
@@ -708,6 +739,63 @@ geometry_msgs::Pose PickAndPlacePanel::tf_transform_to_geomsgs_pose(const tf::Tr
     pose.orientation.y = transform.getRotation().y();
     pose.orientation.z = transform.getRotation().z();
     return pose;
+}
+
+bool PickAndPlacePanel::wrist_pose_from_pregrasp_pose(
+    const geometry_msgs::PoseStamped& pregrasp_pose,
+    geometry_msgs::PoseStamped& out) const
+{
+    // transform the gripper pose to match the frame orientation of the hdt gripper
+    Eigen::Affine3d pr2_pregrasp_transform;
+    tf::poseMsgToEigen(pregrasp_pose.pose, pr2_pregrasp_transform);
+    Eigen::AngleAxisd pr2_to_hdt_gripper_correction(M_PI / 2.0, Eigen::Vector3d(1.0, 0.0, 0.0));
+    Eigen::Affine3d hdt_pregrasp_transform = pr2_pregrasp_transform * pr2_to_hdt_gripper_correction;
+
+    // transform the gripper in the camera frame into the mount frame
+    if (!listener_.canTransform(pregrasp_pose.header.frame_id, "arm_mount_panel_dummy", ros::Time(0))) {
+        ROS_WARN("Unable to transform from %s to %s", "arm_mount_panel_dummy", pregrasp_pose.header.frame_id.c_str());
+        return false;
+    }
+
+    // hdt grasp pose in the camera frame
+    geometry_msgs::PoseStamped hdt_pregrasp_pose;
+    hdt_pregrasp_pose.header = pregrasp_pose.header;
+    tf::poseEigenToMsg(hdt_pregrasp_transform, hdt_pregrasp_pose.pose);
+
+    // mount -> gripper = mount -> camera * camera -> gripper
+    geometry_msgs::PoseStamped gripper_in_mount_frame;
+    try {
+        listener_.transformPose("arm_mount_panel_dummy", hdt_pregrasp_pose, gripper_in_mount_frame);
+    }
+    catch (const tf::TransformException& ex) {
+        ROS_WARN("Unable to transform the gripper from '%s' to 'arm_mount_panel_dummy'", hdt_pregrasp_pose.header.frame_id.c_str());
+        return false;
+    }
+
+    tf::Transform mount_to_gripper = geomsgs_pose_to_tf_transform(gripper_in_mount_frame.pose);
+
+    // gripper -> wrist
+    tf::StampedTransform gripper_to_wrist;
+    const std::string wrist_frame = "arm_7_gripper_lift_link";
+    const std::string gripper_frame = "gripper_base";
+    try {
+        listener_.lookupTransform(gripper_frame, wrist_frame, ros::Time(0), gripper_to_wrist);
+    }
+    catch (const tf::TransformException& ex) {
+        ROS_WARN("Unable to lookup transform from '%s' to '%s'", wrist_frame.c_str(), gripper_frame.c_str());
+        return false;
+    }
+
+    // mount -> wrist = mount -> gripper * gripper -> wrist
+    tf::Transform mount_to_wrist = mount_to_gripper * gripper_to_wrist;
+
+    geometry_msgs::PoseStamped wrist_pose;
+    wrist_pose.header.seq = 0;
+    wrist_pose.header.stamp = ros::Time(0);
+    wrist_pose.header.frame_id = "arm_mount_panel_dummy";
+    wrist_pose.pose = tf_transform_to_geomsgs_pose(mount_to_wrist);
+    out = wrist_pose;
+    return true;
 }
 
 } // namespace hdt

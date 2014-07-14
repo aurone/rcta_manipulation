@@ -48,7 +48,8 @@
             <child link="finger_link1"/>
             <limit lower="0.001" upper="0.042" effort="45" velocity="0.38"/>
             <axis xyz="0 0 1"/>
-            <origin xyz="${0.5 * (gripper_base_length + finger_length)} 0 ${0.5 * (gripper_base_height - finger_height)}"/>
+            <origin xyz="${0.5 * (gripper_base_length + finger_length)} 0 ${-0.5 * (gripper_base_height - finger_height)}"
+                    rpy="0 0 0"/>
             <dynamics damping="10" friction="0.1"/>
         </joint>
 
@@ -74,8 +75,9 @@
             <parent link="gripper_base"/>
             <child link="finger_link2"/>
             <limit lower="0.001" upper="0.042" effort="45" velocity="0.38"/>
-            <axis xyz="0 0 -1"/>
-            <origin xyz="${0.5 * (gripper_base_length + finger_length)} 0 ${-0.5 * (gripper_base_height - finger_height)}"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="${0.5 * (gripper_base_length + finger_length)} 0 ${0.5 * (gripper_base_height - finger_height)}"
+                    rpy="${pi} 0 0"/>
             <dynamics damping="10" friction="0.1"/>
         </joint>
 

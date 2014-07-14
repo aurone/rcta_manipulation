@@ -7,8 +7,6 @@
 #include <queue>
 #include <sstream>
 #include <Eigen/Dense>
-#include <QPushButton>
-#include <QVBoxLayout>
 #include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <hdt/MoveArmCommand.h>
@@ -19,45 +17,25 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <geometric_shapes/shape_operations.h>
+#include <stringifier/stringifier.h>
 
 using namespace std;
 
 namespace hdt
 {
 
-std::string to_string(const geometry_msgs::Pose& pose)
-{
-    std::stringstream ss;
-    ss << "{ position: {";
-    ss << "x: " << pose.position.x << ", ";
-    ss << "y: " << pose.position.y << ", ";
-    ss << "z: " << pose.position.z << " } ";
-    ss << "orientation: {";
-    ss << "w: " << pose.orientation.w << ", ";
-    ss << "x: " << pose.orientation.x << ", ";
-    ss << "y: " << pose.orientation.y << ", ";
-    ss << "z: " << pose.orientation.z << "} }";
-    return ss.str();
-}
-
 ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
     initialized_(false),
-    shutdown_(false),
     nh_(),
-    ph_("~"),
     move_arm_client_(),
-    send_move_command_(false),
-    move_arm_thread_(),
-    move_arm_mutex_(),
-    move_arm_condvar_(),
+    pending_move_arm_command_(false),
     rm_loader_(),
     rm_(),
     rs_(),
     server_("hdt_control"),
     interactive_markers_(),
     tip_link_(),
-    send_interp_command_button_(nullptr),
     copy_current_state_button_(nullptr),
     refresh_robot_desc_button_(nullptr),
     send_move_arm_command_button_(nullptr),
@@ -68,12 +46,10 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     joint_4_slider_(nullptr),
     joint_5_slider_(nullptr),
     joint_6_slider_(nullptr),
-    joint_7_slider_(nullptr),
-    critical_state_mutex_()
+    joint_7_slider_(nullptr)
 {
     ROS_INFO("Instantiating Manipulator Command Panel");
 
-    send_interp_command_button_ = new QPushButton(tr("Send Interpolate Command"));
     copy_current_state_button_ = new QPushButton(tr("Copy Current State"));
     refresh_robot_desc_button_ = new QPushButton(tr("Refresh Robot Description"));
     send_move_arm_command_button_ = new QPushButton(tr("Send Move Arm Command"));
@@ -88,7 +64,6 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     joint_7_slider_ = new QSlider(Qt::Horizontal);
 
     QVBoxLayout* layout = new QVBoxLayout;
-    // layout->addWidget(send_interp_command_button_);
     layout->addWidget(copy_current_state_button_);
     layout->addWidget(refresh_robot_desc_button_);
     layout->addWidget(send_move_arm_command_button_);
@@ -102,12 +77,9 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     layout->addWidget(joint_7_slider_);
     setLayout(layout);
 
-    move_arm_client_ = nh_.serviceClient<hdt::MoveArmCommand>("move_arm_command");
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
-    trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1);
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("phantom_robot", 1);
 
-    connect(send_interp_command_button_, SIGNAL(clicked()), this, SLOT(send_interp_command()));
     connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
     connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
     connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
@@ -133,154 +105,15 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
 
 ManipulatorCommandPanel::~ManipulatorCommandPanel()
 {
-    {
-        shutdown_ = true;
-        std::unique_lock<std::mutex> lock(move_arm_mutex_);
-        move_arm_condvar_.notify_one();
-    }
-
-    // TODO: figure out why deleting rm_loader_ here causes a core dump
-    if (move_arm_thread_.joinable()) {
-        move_arm_thread_.join();
-    }
-}
-
-void ManipulatorCommandPanel::send_interp_command()
-{
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
-    if (!initialized_) {
-        return;
-    }
-
-    auto to_string = [](const std::array<double, 7>& joint_state)
-    {
-        std::stringstream ss;
-        ss << std::setprecision(3) << std::setw(8) << '(' << joint_state[0] << ' ' << joint_state[1] << ' ' << joint_state[2] << ' ' << joint_state[3] << ' ' << joint_state[4] << ' ' << joint_state[5] << ' ' << joint_state[6] << ')';
-        return ss.str();
-    };
-
-    std::array<double, 7> curr_joint_angles;
-    get_joint_value(last_joint_state_, "arm_1_shoulder_twist", curr_joint_angles[0]);
-    get_joint_value(last_joint_state_, "arm_2_shoulder_lift", curr_joint_angles[1]);
-    get_joint_value(last_joint_state_, "arm_3_elbow_twist", curr_joint_angles[2]);
-    get_joint_value(last_joint_state_, "arm_4_elbow_lift", curr_joint_angles[3]);
-    get_joint_value(last_joint_state_, "arm_5_wrist_twist", curr_joint_angles[4]);
-    get_joint_value(last_joint_state_, "arm_6_wrist_lift", curr_joint_angles[5]);
-    get_joint_value(last_joint_state_, "arm_7_gripper_lift", curr_joint_angles[6]);
-
-    std::array<double, 7> new_joint_angles;
-    new_joint_angles[0] = rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0];
-    new_joint_angles[1] = rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0];
-    new_joint_angles[2] = rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0];
-    new_joint_angles[3] = rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0];
-    new_joint_angles[4] = rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0];
-    new_joint_angles[5] = rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0];
-    new_joint_angles[6] = rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0];
-
-    ROS_INFO("Interpolating from %s to %s", to_string(curr_joint_angles).c_str(), to_string(new_joint_angles).c_str());
-
-    std::vector<double> start(curr_joint_angles.begin(), curr_joint_angles.end());
-    std::vector<double> end(new_joint_angles.begin(), new_joint_angles.end());
-    std::vector<double> inc(7, sbpl::utils::ToRadians(1.0));
-    std::vector<bool> continuous(7, false);
-    std::vector<std::vector<double>> path;
-
-    if (sbpl::interp::InterpolatePath(start, end, min_limits_, max_limits_, inc, continuous, path)) {
-        ROS_INFO("Interpolation succeeded with %lu points", path.size());
-        static ros::Publisher trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1);
-        trajectory_msgs::JointTrajectory traj;
-        traj.header.frame_id = "";
-        traj.header.seq = 0;
-        traj.header.stamp = ros::Time::now();
-
-        const std::vector<std::string>& joint_names = rm_->getJointModelNames();
-
-        const std::vector<std::string> manip_joint_names = { "arm_1_shoulder_twist",
-                                                             "arm_2_shoulder_lift",
-                                                             "arm_3_elbow_twist",
-                                                             "arm_4_elbow_lift",
-                                                             "arm_5_wrist_twist",
-                                                             "arm_6_wrist_lift",
-                                                             "arm_7_gripper_lift" };
-
-        auto manip_joint_index = [&manip_joint_names](const std::string& joint)
-        {
-            for (int i = 0; i < (int)manip_joint_names.size(); ++i) {
-                if (manip_joint_names[i] == joint) {
-                    return i;
-                }
-            }
-            return -1;
-        };
-
-        traj.joint_names = joint_names;
-        for (auto& point : path) {
-            trajectory_msgs::JointTrajectoryPoint p;
-            p.positions.resize(joint_names.size());
-            for (int jidx = 0; jidx < (int)joint_names.size(); ++jidx) {
-                int manip_jidx = manip_joint_index(joint_names[jidx]);
-                if (manip_jidx != -1) {
-                    p.positions[jidx] = point[manip_jidx];
-                }
-                else {
-                    p.positions[jidx] = 0.0;
-                }
-            }
-
-            const double joint_vel = 4.0 * M_PI / 180.0;
-            // create joint velocities and timings
-            if (traj.points.empty()) {
-                p.velocities = std::vector<double>(joint_names.size(), 0.0);
-                p.time_from_start = ros::Duration(0.0);
-            }
-            else {
-                const std::vector<double>& last_point = traj.points.back().positions;
-                p.time_from_start = traj.points.back().time_from_start + ros::Duration(0.05);
-//                for (int i = 0; i < 7; ++i) {
-//                    if (sbpl::utils::ShortestAngleDiff(p.positions[i], last_point[i]) < 0) {
-//                        p.velocities.push_back(-joint_vel);
-//                    }
-//                    else if (sbpl::utils::ShortestAngleDiff(p.positions[i], last_point[i]) > 0) {
-//                        p.velocities.push_back(joint_vel);
-//                    }
-//                    else {
-//                        p.velocities.push_back(0.0);
-//                    }
-//                }
-            }
-            traj.points.push_back(p);
-        }
-
-        trajectory_pub_.publish(traj);
-    }
-    else
-    {
-        ROS_WARN("Interpolation unsuccessful");
-    }
 }
 
 void ManipulatorCommandPanel::copy_current_state()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
-    std::array<double, 7> curr_joint_angles;
-    get_joint_value(last_joint_state_, "arm_1_shoulder_twist", curr_joint_angles[0]);
-    get_joint_value(last_joint_state_, "arm_2_shoulder_lift", curr_joint_angles[1]);
-    get_joint_value(last_joint_state_, "arm_3_elbow_twist", curr_joint_angles[2]);
-    get_joint_value(last_joint_state_, "arm_4_elbow_lift", curr_joint_angles[3]);
-    get_joint_value(last_joint_state_, "arm_5_wrist_twist", curr_joint_angles[4]);
-    get_joint_value(last_joint_state_, "arm_6_wrist_lift", curr_joint_angles[5]);
-    get_joint_value(last_joint_state_, "arm_7_gripper_lift", curr_joint_angles[6]);
-
-    // run ik to the pose of the marker
-    rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&curr_joint_angles[0]);
-    rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&curr_joint_angles[1]);
-    rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&curr_joint_angles[2]);
-    rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&curr_joint_angles[3]);
-    rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&curr_joint_angles[4]);
-    rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&curr_joint_angles[5]);
-    rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&curr_joint_angles[6]);
+    std::vector<double> curr_joint_angles = get_current_joint_angles();
+    if (!set_phantom_joint_angles(curr_joint_angles)) {
+        QMessageBox::warning(this, tr("Copy Current State"), tr("Failed to copy current state to phantom state"));
+        return;
+    }
 
     rs_->updateLinkTransforms();
 
@@ -300,8 +133,6 @@ void ManipulatorCommandPanel::copy_current_state()
 
 void ManipulatorCommandPanel::refresh_robot_description()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     if (!reinit_robot()){
         ROS_ERROR("Failed to refresh robot description");
     }
@@ -309,17 +140,37 @@ void ManipulatorCommandPanel::refresh_robot_description()
 
 void ManipulatorCommandPanel::send_move_arm_command()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
+    if (!move_arm_client_) {
+        ROS_WARN("Move Arm Client has not yet been instantiated");
+        return;
+    }
 
-    std::unique_lock<std::mutex> move_arm_lock(move_arm_mutex_);
-    send_move_command_ = true;
-    move_arm_condvar_.notify_one();
+    if (!move_arm_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
+        return;
+    }
+
+    hdt::MoveArmCommandGoal move_arm_goal;
+
+    // mounting frame -> eef = mounting_frame -> root * root -> eef
+    const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
+    tf::poseEigenToMsg(root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(), move_arm_goal.goal_pose);
+
+    // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
+    Eigen::Affine3d manipulator_frame_to_eef_frame = mount_frame_to_manipulator_frame_.inverse() * root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
+    geometry_msgs::Pose eef_in_manipulator_frame;
+    tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
+    ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
+
+    move_arm_client_->sendGoal(
+            move_arm_goal, boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2));
+
+    pending_move_arm_command_ = true;
+    update_gui();
 }
 
 void ManipulatorCommandPanel::cycle_ik_solutions()
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     if (!initialized_) {
         return;
     }
@@ -358,13 +209,10 @@ void ManipulatorCommandPanel::cycle_ik_solutions()
    if (ik_solutions.size() > 1) {
        ROS_INFO("BAM, %zd solutions", ik_solutions.size());
        std::vector<std::vector<double>>::const_iterator next = ++ik_solutions.cbegin();
-       rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&(*next)[0]);
-       rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&(*next)[1]);
-       rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&(*next)[2]);
-       rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&(*next)[3]);
-       rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&(*next)[4]);
-       rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&(*next)[5]);
-       rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&(*next)[6]);
+       if (!set_phantom_joint_angles(*next)) {
+           QMessageBox::warning(this, tr("Cycle IK Solutions"), tr("Failed to set phantom state from ik solution"));
+           return;
+       }
        rs_->updateLinkTransforms();
        publish_phantom_robot_visualizations();
    }
@@ -493,33 +341,46 @@ bool ManipulatorCommandPanel::do_init()
         return false;
     }
 
-    move_arm_thread_ = std::thread(std::bind(&ManipulatorCommandPanel::monitor_move_command, this));
+    move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
+    if (!move_arm_client_) {
+        return false;
+    }
 
     initialized_ = true;
     return initialized_;
 }
 
-int ManipulatorCommandPanel::do_run()
+bool ManipulatorCommandPanel::check_robot_model_consistency()
 {
-    if (!initialized_) {
-        ROS_ERROR("Teleop Node was not initialized before run");
-        return 1;
+    for (const std::string& joint_name : robot_model_.joint_names()) {
+        if (!rm_->hasJointModel(joint_name)) {
+            ROS_ERROR("MoveIt Robot Model does not contain joint %s", joint_name.c_str());
+            return false;
+        }
     }
 
-    ros::Rate loop_rate(60.0);
-    while (ros::ok()) {
-        // process interactive markers and update joint states from service call
-        ros::spinOnce();
-        publish_phantom_robot_visualizations();
-        loop_rate.sleep();
+    for (std::size_t i = 1; i < robot_model_.joint_names().size(); ++i) {
+        const std::string& parent_joint_name = robot_model_.joint_names()[i - 1];
+        const std::string& child_joint_name = robot_model_.joint_names()[i];
+
+        std::vector<robot_model::JointModel*> child_joints;
+        child_joints = rm_->getJointModel(parent_joint_name)->getChildLinkModel()->getChildJointModels();
+        if (child_joints.size() != 1) {
+            ROS_ERROR("Unexpected number of child joints (%zd)", child_joints.size());
+            return false;
+        }
+
+        if (child_joints.front()->getName() != child_joint_name) {
+            ROS_ERROR("Child of joint %s is not %s in the MoveIt model", parent_joint_name.c_str(), child_joint_name.c_str());
+            return false;
+        }
     }
-    return 0;
+
+    return true;
 }
 
 void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback)
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     if (!initialized_) {
         return;
     }
@@ -533,27 +394,17 @@ void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::Inte
     // ROS_INFO("Manipulator -> EndEffector: (%s)", to_string(new_eef_pose).c_str());
 
     // get the current joint configuration to use as a seed for picking a nearby ik solution
-    std::vector<double> curr_joint_angles(7);
-    curr_joint_angles[0] = rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0];
-    curr_joint_angles[1] = rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0];
-    curr_joint_angles[2] = rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0];
-    curr_joint_angles[3] = rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0];
-    curr_joint_angles[4] = rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0];
-    curr_joint_angles[5] = rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0];
-    curr_joint_angles[6] = rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0];
+    std::vector<double> curr_joint_angles = get_phantom_joint_angles();
 
     const double ik_search_res = sbpl::utils::ToRadians(1.0);
     std::vector<double> iksol;
 
     // run ik to the pose of the marker
     if (robot_model_.search_nearest_ik(new_eef_pose, curr_joint_angles, iksol, ik_search_res)) {
-        rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&iksol[0]);
-        rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&iksol[1]);
-        rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&iksol[2]);
-        rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&iksol[3]);
-        rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&iksol[4]);
-        rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&iksol[5]);
-        rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&iksol[6]);
+        if (!set_phantom_joint_angles(iksol)) {
+            QMessageBox::warning(this, tr("Interactive Marker Feedback"), tr("Failed to set phantom state from interactive marker-driven IK"));
+            return;
+        }
         rs_->updateLinkTransforms();
     }
 
@@ -687,7 +538,10 @@ ManipulatorCommandPanel::create_sixdof_controls() const
     return controls;
 }
 
-bool ManipulatorCommandPanel::get_joint_value(const sensor_msgs::JointState& joint_state, const std::string& joint, double& joint_value)
+bool ManipulatorCommandPanel::get_joint_value(
+    const sensor_msgs::JointState& joint_state,
+    const std::string& joint,
+    double& joint_value) const
 {
     if (joint_state.name.size() != joint_state.position.size()) {
         ROS_ERROR("Number of joint names and joint positions differ");
@@ -706,8 +560,6 @@ bool ManipulatorCommandPanel::get_joint_value(const sensor_msgs::JointState& joi
 
 void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
-    std::unique_lock<std::mutex> lock(critical_state_mutex_);
-
     const std::vector<std::string>& joint_names = rm_->getJointModelNames();
 
     sensor_msgs::JointState last_joint_state_copy = last_joint_state_;
@@ -753,11 +605,7 @@ bool ManipulatorCommandPanel::reinit_robot()
         return false;
     }
 
-    if (rm_loader_) {
-        delete rm_loader_;
-    }
-
-    rm_loader_ = new robot_model_loader::RobotModelLoader;
+    rm_loader_.reset(new robot_model_loader::RobotModelLoader);
     if (!rm_loader_) {
         ROS_ERROR("Failed to instantiate Robot Model Loader");
         return false;
@@ -768,6 +616,13 @@ bool ManipulatorCommandPanel::reinit_robot()
         ROS_ERROR("Robot Model Loader was unable to construct Robot Model");
         return false;
     }
+
+    if (!check_robot_model_consistency()) {
+        ROS_ERROR("Robot models are not consistent");
+        return false;
+    }
+
+    ROS_INFO("MoveIt model is consistent with HDT Robot Model");
 
     ROS_INFO("Root link name: %s", rm_->getRootLinkName().c_str());
     ROS_INFO("Robot Joints:");
@@ -828,38 +683,30 @@ bool ManipulatorCommandPanel::reinit_robot()
 
     server_.applyChanges();
 
-    // cache limits for interpolation command
-    min_limits_.clear();
-    min_limits_.reserve(7);
-    min_limits_.push_back(rm_->getJointModel("arm_1_shoulder_twist")->getVariableLimits()[0].min_position);
-    min_limits_.push_back(rm_->getJointModel("arm_2_shoulder_lift")->getVariableLimits()[0].min_position);
-    min_limits_.push_back(rm_->getJointModel("arm_3_elbow_twist")->getVariableLimits()[0].min_position);
-    min_limits_.push_back(rm_->getJointModel("arm_4_elbow_lift")->getVariableLimits()[0].min_position);
-    min_limits_.push_back(rm_->getJointModel("arm_5_wrist_twist")->getVariableLimits()[0].min_position);
-    min_limits_.push_back(rm_->getJointModel("arm_6_wrist_lift")->getVariableLimits()[0].min_position);
-    min_limits_.push_back(rm_->getJointModel("arm_7_gripper_lift")->getVariableLimits()[0].min_position);
-
-    max_limits_.clear();
-    max_limits_.reserve(7);
-    max_limits_.push_back(rm_->getJointModel("arm_1_shoulder_twist")->getVariableLimits()[0].max_position);
-    max_limits_.push_back(rm_->getJointModel("arm_2_shoulder_lift")->getVariableLimits()[0].max_position);
-    max_limits_.push_back(rm_->getJointModel("arm_3_elbow_twist")->getVariableLimits()[0].max_position);
-    max_limits_.push_back(rm_->getJointModel("arm_4_elbow_lift")->getVariableLimits()[0].max_position);
-    max_limits_.push_back(rm_->getJointModel("arm_5_wrist_twist")->getVariableLimits()[0].max_position);
-    max_limits_.push_back(rm_->getJointModel("arm_6_wrist_lift")->getVariableLimits()[0].max_position);
-    max_limits_.push_back(rm_->getJointModel("arm_7_gripper_lift")->getVariableLimits()[0].max_position);
-
-    joint_1_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[0])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
-    joint_2_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[1])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
-    joint_3_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[2])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
-    joint_4_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[3])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
-    joint_5_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[4])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
-    joint_6_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[5])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
-    joint_7_slider_->setRange((int)round(sbpl::utils::ToDegrees(min_limits_[6])), (int)round(sbpl::utils::ToDegrees(max_limits_[0])));
+    joint_1_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[0])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[0])));
+    joint_2_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[1])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[1])));
+    joint_3_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[2])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[2])));
+    joint_4_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[3])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[3])));
+    joint_5_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[4])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[4])));
+    joint_6_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[5])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[5])));
+    joint_7_slider_->setRange(
+            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[6])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[6])));
 
     update_sliders();
 
-//    root_to_first_link_ = rs_->getFrameTransform("arm_1_shoulder_twist_link");
     const Eigen::Affine3d& root_to_manipulator_frame = rs_->getFrameTransform("arm_1_shoulder_twist_link");
     const Eigen::Affine3d& root_to_base_frame = rs_->getFrameTransform(base_link_);
     mount_frame_to_manipulator_frame_ = root_to_base_frame.inverse() * root_to_manipulator_frame;
@@ -868,43 +715,22 @@ bool ManipulatorCommandPanel::reinit_robot()
     return initialized_;
 }
 
-void ManipulatorCommandPanel::monitor_move_command()
+void ManipulatorCommandPanel::move_arm_command_active_cb()
 {
-    while (ros::ok()) {
-        std::unique_lock<std::mutex> lock(move_arm_mutex_);
-        ROS_INFO("Suspending move command monitor...");
-        move_arm_condvar_.wait(lock, [&send_move_command_, &shutdown_](){ return shutdown_ || send_move_command_; });
-        if (shutdown_) {
-            ROS_INFO("Shutting down move_arm monitor");
-            return;
-        }
-        ROS_INFO("Awake the move command monitor!");
 
-        hdt::MoveArmCommand::Request req;
-        {
-            std::unique_lock<std::mutex> lock(critical_state_mutex_);
-            // mounting frame -> eef = mounting_frame -> root * root -> eef
-            const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
-            tf::poseEigenToMsg(root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(), req.goal_pose);
+}
 
-            // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
-            Eigen::Affine3d manipulator_frame_to_eef_frame = mount_frame_to_manipulator_frame_.inverse() * root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
-            geometry_msgs::Pose eef_in_manipulator_frame;
-            tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
-            ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
-        }
+void ManipulatorCommandPanel::move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback)
+{
 
-        hdt::MoveArmCommand::Response res;
+}
 
-        if (!move_arm_client_.call(req, res)) {
-            ROS_ERROR("Call to %s failed", move_arm_client_.getService().c_str());
-        }
-        else {
-            ROS_INFO("Call to %s finished", move_arm_client_.getService().c_str());
-        }
-
-        send_move_command_ = false;
-    }
+void ManipulatorCommandPanel::move_arm_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::MoveArmCommandResult::ConstPtr& result)
+{
+    pending_move_arm_command_ = false;
+    update_gui();
 }
 
 bool ManipulatorCommandPanel::gatherRobotMarkers(
@@ -993,17 +819,6 @@ bool ManipulatorCommandPanel::gatherRobotMarkers(
     return true;
 }
 
-std::string ManipulatorCommandPanel::to_string(const Eigen::Affine3d& transform)
-{
-    const Eigen::Vector3d translation(transform.translation());
-    const Eigen::Quaterniond rotation(transform.rotation());
-    std::stringstream ss;
-    ss << "translation(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
-    ss << " ";
-    ss << "rotation(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
-    return ss.str();
-}
-
 void ManipulatorCommandPanel::update_sliders()
 {
     joint_1_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0])));
@@ -1013,6 +828,49 @@ void ManipulatorCommandPanel::update_sliders()
     joint_5_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0])));
     joint_6_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0])));
     joint_7_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0])));
+}
+
+void ManipulatorCommandPanel::update_gui()
+{
+    send_move_arm_command_button_->setEnabled(!pending_move_arm_command_);
+}
+
+std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const
+{
+    std::vector<double> curr_joint_angles;
+    curr_joint_angles.resize(robot_model_.joint_names().size());
+    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_.joint_names()[i];
+        (void)get_joint_value(last_joint_state_, joint_name, curr_joint_angles[i]);
+    }
+    return curr_joint_angles;
+}
+
+std::vector<double> ManipulatorCommandPanel::get_phantom_joint_angles() const
+{
+    std::vector<double> curr_joint_angles;
+    curr_joint_angles.reserve(robot_model_.joint_names().size());
+
+    for (const std::string& joint_name : robot_model_.joint_names()) {
+        curr_joint_angles.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
+    }
+
+    return curr_joint_angles;
+}
+
+bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>& joint_angles)
+{
+    if (joint_angles.size() != robot_model_.joint_names().size()) {
+        return false;
+    }
+
+    std::size_t i = 0;
+    for (const std::string& joint_name : robot_model_.joint_names()) {
+        rs_->getJointState(joint_name)->setVariableValues(&joint_angles[i]);
+        ++i;
+    }
+
+    return true;
 }
 
 } // namespace hdt
