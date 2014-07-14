@@ -68,10 +68,15 @@ private:
     ros::Subscriber raw_joint_states_sub_;
     ros::Subscriber joint_states_sub_;
 
-    std::map<std::string, boost::circular_buffer<double>> past_joint_states;
-    std::map<std::string, boost::circular_buffer<double>> past_raw_joint_states;
-    std::map<std::string, QwtPlotCurve*> joint_states_curves_;
-    std::map<std::string, QwtPlotCurve*> raw_joint_states_curves_;
+    std::vector<boost::circular_buffer<double>> past_joint_states_;
+    std::vector<boost::circular_buffer<double>> past_raw_joint_states_;
+    std::vector<QwtPlotCurve*> joint_states_curves_;
+    std::vector<QwtPlotCurve*> raw_joint_states_curves_;
+
+//    std::map<std::string, boost::circular_buffer<double>> past_joint_states_; // circular buffer for each joint state
+//    std::map<std::string, boost::circular_buffer<double>> past_raw_joint_states_; // circular buffer for each raw joint state
+//    std::map<std::string, QwtPlotCurve*> joint_states_curves_;
+//    std::map<std::string, QwtPlotCurve*> raw_joint_states_curves_;
 
     bool load_resources();
 
@@ -96,6 +101,8 @@ private:
     void refresh_icons(const hdt::ControllerDiagnosticStatus& msg);
 
     void watchdog_thread();
+
+    int get_joint_index(const std::string& joint_name) const;
 };
 
 } // namespace hdt

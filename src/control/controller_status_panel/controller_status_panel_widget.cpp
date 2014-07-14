@@ -97,10 +97,31 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
         return;
     }
 
-    for (const std::string& joint_name : robot_model_.joint_names()) {
-        joint_states_curves_[joint_name] = new QwtPlotCurve(QString("%1 Raw Joint State").arg(QString::fromStdString(joint_name)));
-        joint_states_curves_[joint_name]->attach(ui->raw_joint_states_plot);
+    const int buffer_size = 1000;
+    past_joint_states_.resize(robot_model_.joint_names().size());
+    past_raw_joint_states_.resize(robot_model_.joint_names().size());
+    joint_states_curves_.resize(robot_model_.joint_names().size());
+    raw_joint_states_curves_.resize(robot_model_.joint_names().size());
+    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_.joint_names()[i];
+
+        // create a circular buffer of size
+        boost::circular_buffer<double>& past_joint_state = past_joint_states_[i];
+        boost::circular_buffer<double>& past_raw_joint_state = past_raw_joint_states_[i];
+
+        past_joint_state.resize(buffer_size, 0.0);
+        past_raw_joint_state.resize(buffer_size, 0.0);
+
+        // create curves for filtered joint states and raw joint states
+
+        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
+        joint_states_curves_[i]->attach(ui->raw_joint_states_plot);
+
+        raw_joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Raw Joint State").arg(QString::fromStdString(joint_name)));
+        raw_joint_states_curves_[i]->attach(ui->raw_joint_states_plot);
     }
+
+    // TODO: set background and curve colors (ROYGBIV on black)
 }
 
 ControllerStatusPanelWidget::~ControllerStatusPanelWidget()
@@ -146,12 +167,64 @@ void ControllerStatusPanelWidget::staleness_callback(const std_msgs::Empty::Cons
 
 void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
-//    for (const std::string& joint_name : msg->joint_name);
+    // update the buffers
+    for (std::size_t i = 0; i < msg->name.size(); ++i) {
+        const std::string& joint_name = msg->name[i];
+        double joint_val = msg->position[i];
+
+        int jidx = get_joint_index(joint_name);
+        if (jidx < 0) {
+            continue; // not an arm joint
+        }
+
+        past_joint_states_[jidx].push_back(joint_val);
+    }
+
+    // update the data associated with the curves and refresh the joint state plots
+    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+        // convert circular buffer to
+        QVector<QPointF> plot_data;
+        plot_data.reserve(past_joint_states_.size());
+        for (std::size_t j = 0; j < past_joint_states_[i].size(); ++j) {
+            plot_data.push_back(QPointF((float)j, past_joint_states_[i][j]));
+        }
+
+        joint_states_curves_[i]->setSamples(plot_data);
+    }
+
+    QwtPlot* raw_joint_states_plot = ui->raw_joint_states_plot;
+    raw_joint_states_plot->replot();
 }
 
 void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
+    // update the buffers
+    for (std::size_t i = 0; i < msg->name.size(); ++i) {
+        const std::string& joint_name = msg->name[i];
+        double joint_val = msg->position[i];
 
+        int jidx = get_joint_index(joint_name);
+        if (jidx < 0) {
+            continue; // not an arm joint
+        }
+
+        past_raw_joint_states_[jidx].push_back(joint_val);
+    }
+
+    // update the data associated with the curves and refresh the joint state plots
+    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+        // convert circular buffer to
+        QVector<QPointF> plot_data;
+        plot_data.reserve(past_raw_joint_states_.size());
+        for (std::size_t j = 0; j < past_raw_joint_states_[i].size(); ++j) {
+            plot_data.push_back(QPointF((float)j, past_raw_joint_states_[i][j]));
+        }
+
+        raw_joint_states_curves_[i]->setSamples(plot_data);
+    }
+
+    QwtPlot* raw_joint_states_plot = ui->raw_joint_states_plot;
+    raw_joint_states_plot->replot();
 }
 
 QPixmap ControllerStatusPanelWidget::get_active_icon() const
@@ -269,6 +342,16 @@ void ControllerStatusPanelWidget::watchdog_thread()
     }
 }
 
+int ControllerStatusPanelWidget::get_joint_index(const std::string& joint_name) const
+{
+    for (int i = 0; i < (int)robot_model_.joint_names().size(); ++i) {
+        if (robot_model_.joint_names()[i] == joint_name) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 } // namespace hdt
 
 #include <pluginlib/class_list_macros.h>
@@ -287,3 +370,4 @@ void hdt::ControllerStatusPanelWidget::on_clear_emergency_stop_button_clicked()
     hdt::ClearEmergencyStop clear_estop_msg;
     clear_estop_pub_.publish(clear_estop_msg);
 }
+
