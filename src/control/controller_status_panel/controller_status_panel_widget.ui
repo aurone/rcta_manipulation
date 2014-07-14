@@ -115,8 +115,11 @@
          </item>
         </layout>
        </item>
-       <item row="2" column="0">
+       <item row="3" column="0">
         <widget class="QwtPlot" name="raw_joint_states_plot"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QwtPlot" name="joint_states_plot"/>
        </item>
       </layout>
      </widget>

@@ -1,5 +1,6 @@
 #include <functional>
 #include <boost/algorithm/string.hpp>
+#include <sbpl_geometry_utils/utils.h>
 #include <hdt/ClearEmergencyStop.h>
 #include <hdt/EmergencyStop.h>
 #include "controller_status_panel_widget.h"
@@ -67,8 +68,8 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     }
 
     hdt_diagnostics_sub_ = nh_.subscribe<hdt::ControllerDiagnosticStatus>("hdt_diagnostics", 5, &ControllerStatusPanelWidget::diagnostics_callback, this);
-    raw_joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("raw_joint_states", 1, &ControllerStatusPanelWidget::joint_states_callback, this);
-    joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("joint_states", 1, &ControllerStatusPanelWidget::raw_joint_states_callback, this);
+    raw_joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("joint_states_raw", 1, &ControllerStatusPanelWidget::raw_joint_states_callback, this);
+    joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("joint_states", 1, &ControllerStatusPanelWidget::joint_states_callback, this);
 
     staleness_pub_ = nh_.advertise<std_msgs::Empty>("controller_staleness", 1);
     estop_pub_ = nh_.advertise<hdt::EmergencyStop>("hdt_estop", 1);
@@ -98,30 +99,69 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     }
 
     const int buffer_size = 1000;
-    past_joint_states_.resize(robot_model_.joint_names().size());
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Set up raw joint states visualization
+    ////////////////////////////////////////////////////////////////////////////////
+
+    std::vector<Qt::GlobalColor> brushes = { Qt::white, Qt::red, Qt::yellow, Qt::green, Qt::cyan, Qt::blue, Qt::magenta };
+
+    ui->raw_joint_states_plot->setTitle(tr("Raw Joint States"));
+
     past_raw_joint_states_.resize(robot_model_.joint_names().size());
-    joint_states_curves_.resize(robot_model_.joint_names().size());
     raw_joint_states_curves_.resize(robot_model_.joint_names().size());
     for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
         const std::string& joint_name = robot_model_.joint_names()[i];
 
         // create a circular buffer of size
-        boost::circular_buffer<double>& past_joint_state = past_joint_states_[i];
         boost::circular_buffer<double>& past_raw_joint_state = past_raw_joint_states_[i];
 
-        past_joint_state.resize(buffer_size, 0.0);
         past_raw_joint_state.resize(buffer_size, 0.0);
 
-        // create curves for filtered joint states and raw joint states
-
-        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
-        joint_states_curves_[i]->attach(ui->raw_joint_states_plot);
-
+        // create curves for raw joint states
         raw_joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Raw Joint State").arg(QString::fromStdString(joint_name)));
+        raw_joint_states_curves_[i]->setPen(QColor(brushes[i]));
         raw_joint_states_curves_[i]->attach(ui->raw_joint_states_plot);
     }
 
-    // TODO: set background and curve colors (ROYGBIV on black)
+    ui->raw_joint_states_plot->setCanvasBackground(QBrush(Qt::black));
+    ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::yLeft, false);
+    ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
+    ui->raw_joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
+    ui->raw_joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
+    ui->raw_joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Set up joint states visualization
+    ////////////////////////////////////////////////////////////////////////////////
+
+    ui->joint_states_plot->setTitle(tr("Joint States"));
+
+    past_joint_states_.resize(robot_model_.joint_names().size());
+    joint_states_curves_.resize(robot_model_.joint_names().size());
+    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_.joint_names()[i];
+
+        // create a circular buffer of size
+        boost::circular_buffer<double>& past_joint_state = past_joint_states_[i];
+
+        past_joint_state.resize(buffer_size, 0.0);
+
+        // create curves for filtered joint states
+        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
+        joint_states_curves_[i]->attach(ui->joint_states_plot);
+
+        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
+        joint_states_curves_[i]->setPen(QColor(brushes[i]));
+        joint_states_curves_[i]->attach(ui->joint_states_plot);
+    }
+
+    ui->joint_states_plot->setCanvasBackground(QBrush(Qt::black));
+    ui->joint_states_plot->setAxisAutoScale(QwtPlot::yLeft, false);
+    ui->joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
+    ui->joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
+    ui->joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
+    ui->joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
 }
 
 ControllerStatusPanelWidget::~ControllerStatusPanelWidget()
@@ -177,7 +217,7 @@ void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::Joint
             continue; // not an arm joint
         }
 
-        past_joint_states_[jidx].push_back(joint_val);
+        past_joint_states_[jidx].push_back(sbpl::utils::ToDegrees(joint_val));
     }
 
     // update the data associated with the curves and refresh the joint state plots
@@ -192,8 +232,8 @@ void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::Joint
         joint_states_curves_[i]->setSamples(plot_data);
     }
 
-    QwtPlot* raw_joint_states_plot = ui->raw_joint_states_plot;
-    raw_joint_states_plot->replot();
+    QwtPlot* joint_states_plot = ui->joint_states_plot;
+    joint_states_plot->replot();
 }
 
 void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
@@ -208,7 +248,7 @@ void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::J
             continue; // not an arm joint
         }
 
-        past_raw_joint_states_[jidx].push_back(joint_val);
+        past_raw_joint_states_[jidx].push_back(sbpl::utils::ToDegrees(joint_val));
     }
 
     // update the data associated with the curves and refresh the joint state plots
