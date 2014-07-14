@@ -38,7 +38,6 @@ public:
 
 public Q_SLOTS:
 
-    void send_interp_command();
     void copy_current_state();
     void refresh_robot_description();
     void send_move_arm_command();
@@ -72,7 +71,6 @@ private:
 
     ros::Subscriber joint_states_sub_;
     ros::Publisher robot_markers_pub_;
-    ros::Publisher trajectory_pub_;
 
     sensor_msgs::JointState last_joint_state_;
 
@@ -80,7 +78,6 @@ private:
     std::string tip_link_;
     std::string base_link_;
 
-    QPushButton* send_interp_command_button_;
     QPushButton* copy_current_state_button_;
     QPushButton* refresh_robot_desc_button_;
     QPushButton* send_move_arm_command_button_;
@@ -93,12 +90,8 @@ private:
     QSlider* joint_6_slider_;
     QSlider* joint_7_slider_;
 
-    std::mutex critical_state_mutex_;
-
     Eigen::Affine3d root_to_first_link_;
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
-
-    std::vector<double> max_limits_;
 
     bool do_init();
     bool check_robot_model_consistency();
@@ -119,7 +112,7 @@ private:
 
     /// @brief Get the value of a particular joint in a joint state.
     /// @return true if the joint was found; false otherwise
-    bool get_joint_value(const sensor_msgs::JointState& joint_state, const std::string& joint, double& joint_value);
+    bool get_joint_value(const sensor_msgs::JointState& joint_state, const std::string& joint, double& joint_value) const;
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
@@ -142,9 +135,12 @@ private:
         visualization_msgs::MarkerArray& markers,
         bool include_attached = false);
 
-    static std::string to_string(const Eigen::Affine3d& transform);
-    static std::string to_string(const std::array<double, 7>& joint_state);
-    static std::string to_string(const geometry_msgs::Pose& pose);
+    static void joint_state_to_joint_array(const sensor_msgs::JointState&);
+
+    std::vector<double> get_current_joint_angles() const;
+    std::vector<double> get_phantom_joint_angles() const;
+
+    bool set_phantom_joint_angles(const std::vector<double>& joint_angles);
 
     void update_sliders();
     void update_gui();
