@@ -209,13 +209,10 @@ void ManipulatorCommandPanel::cycle_ik_solutions()
    if (ik_solutions.size() > 1) {
        ROS_INFO("BAM, %zd solutions", ik_solutions.size());
        std::vector<std::vector<double>>::const_iterator next = ++ik_solutions.cbegin();
-       rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&(*next)[0]);
-       rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&(*next)[1]);
-       rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&(*next)[2]);
-       rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&(*next)[3]);
-       rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&(*next)[4]);
-       rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&(*next)[5]);
-       rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&(*next)[6]);
+       if (!set_phantom_joint_angles(*next)) {
+           QMessageBox::warning(this, tr("Cycle IK Solutions"), tr("Failed to set phantom state from ik solution"));
+           return;
+       }
        rs_->updateLinkTransforms();
        publish_phantom_robot_visualizations();
    }
