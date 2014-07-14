@@ -56,10 +56,7 @@ private:
 
     bool initialized_;
 
-    std::atomic<bool> shutdown_;
-
     ros::NodeHandle nh_;
-    ros::NodeHandle ph_;
 
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_client_;
@@ -101,10 +98,11 @@ private:
     Eigen::Affine3d root_to_first_link_;
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
 
-    std::vector<double> min_limits_;
     std::vector<double> max_limits_;
 
     bool do_init();
+    bool check_robot_model_consistency();
+
     void do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback);
 
     void publish_transform_network();
@@ -144,7 +142,9 @@ private:
         visualization_msgs::MarkerArray& markers,
         bool include_attached = false);
 
-    std::string to_string(const Eigen::Affine3d& transform);
+    static std::string to_string(const Eigen::Affine3d& transform);
+    static std::string to_string(const std::array<double, 7>& joint_state);
+    static std::string to_string(const geometry_msgs::Pose& pose);
 
     void update_sliders();
     void update_gui();
