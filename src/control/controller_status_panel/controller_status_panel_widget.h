@@ -8,11 +8,16 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QWidget>
+#include <boost/circular_buffer.hpp>
+#include <qwt_plot.h>
+#include <qwt_plot_curve.h>
 #include <ros/ros.h>
 #include <rospack/rospack.h>
 #include <rviz/panel.h>
+#include <sensor_msgs/JointState.h>
 #include <std_msgs/Empty.h>
 #include <hdt/ControllerDiagnosticStatus.h>
+#include <hdt_description/RobotModel.h>
 
 namespace Ui {
 class ControllerStatusPanelWidget;
@@ -48,6 +53,8 @@ private:
     ros::Subscriber hdt_diagnostics_sub_;
     rospack::Rospack rospack_;
 
+    hdt::RobotModel robot_model_;
+
     std::mutex msg_mutex_;
     hdt::ControllerDiagnosticStatus::ConstPtr last_msg_;
 
@@ -58,10 +65,20 @@ private:
     ros::Publisher clear_estop_pub_;
     ros::Subscriber staleness_sub_;
 
+    ros::Subscriber raw_joint_states_sub_;
+    ros::Subscriber joint_states_sub_;
+
+    std::map<std::string, boost::circular_buffer<double>> past_joint_states;
+    std::map<std::string, boost::circular_buffer<double>> past_raw_joint_states;
+    std::map<std::string, QwtPlotCurve*> joint_states_curves_;
+    std::map<std::string, QwtPlotCurve*> raw_joint_states_curves_;
+
     bool load_resources();
 
     void diagnostics_callback(const hdt::ControllerDiagnosticStatus::ConstPtr& msg);
     void staleness_callback(const std_msgs::Empty::ConstPtr& msg);
+    void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
+    void raw_joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
     QPixmap get_active_icon() const;
     QPixmap get_inactive_icon() const;
