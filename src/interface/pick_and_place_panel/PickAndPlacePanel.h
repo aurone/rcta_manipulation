@@ -49,6 +49,8 @@ private Q_SLOTS:
     void update_grasps();
     void send_move_to_pregrasp_command();
     void send_move_to_flipped_pregrasp_command();
+    void send_move_to_grasp_command();
+    void send_move_to_flipped_grasp_command();
     void send_open_gripper_command();
     void send_close_gripper_command();
 
@@ -80,6 +82,8 @@ private:
     QPushButton* update_grasps_button_;
     QPushButton* send_move_to_pregrasp_button_;
     QPushButton* send_move_to_flipped_pregrasp_button_;
+    QPushButton* send_move_to_grasp_button_;
+    QPushButton* send_move_to_flipped_grasp_button_;
     QPushButton* send_open_gripper_command_button_;
     QPushButton* send_close_gripper_command_button_;
 
@@ -101,6 +105,7 @@ private:
     interactive_markers::InteractiveMarkerServer grasp_markers_server_;
     typedef std::string InteractiveMarkerHandle;
     InteractiveMarkerHandle selected_marker_;
+    InteractiveMarkerHandle selected_grasp_marker_;
 
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
@@ -159,6 +164,12 @@ private:
     bool wrist_pose_from_pregrasp_pose(
         const geometry_msgs::PoseStamped& pregrasp_pose,
         geometry_msgs::PoseStamped& out) const;
+
+    void insert_grasp_marker(const std::string& name, const geometry_msgs::Pose& pose, const ros::Time& now);
+
+    // return true is the marker name denotes a grasp marker or false if it denotes a pregrasp marker
+    // assumes that names of either grasp_* or pregrasp_* are given as input
+    bool is_grasp_marker(const std::string& marker_name) const;
 };
 
 } // namespace hdt
