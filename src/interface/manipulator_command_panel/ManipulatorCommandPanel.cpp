@@ -394,27 +394,17 @@ void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::Inte
     // ROS_INFO("Manipulator -> EndEffector: (%s)", to_string(new_eef_pose).c_str());
 
     // get the current joint configuration to use as a seed for picking a nearby ik solution
-    std::vector<double> curr_joint_angles(7);
-    curr_joint_angles[0] = rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0];
-    curr_joint_angles[1] = rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0];
-    curr_joint_angles[2] = rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0];
-    curr_joint_angles[3] = rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0];
-    curr_joint_angles[4] = rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0];
-    curr_joint_angles[5] = rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0];
-    curr_joint_angles[6] = rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0];
+    std::vector<double> curr_joint_angles = get_phantom_joint_angles();
 
     const double ik_search_res = sbpl::utils::ToRadians(1.0);
     std::vector<double> iksol;
 
     // run ik to the pose of the marker
     if (robot_model_.search_nearest_ik(new_eef_pose, curr_joint_angles, iksol, ik_search_res)) {
-        rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&iksol[0]);
-        rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&iksol[1]);
-        rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&iksol[2]);
-        rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&iksol[3]);
-        rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&iksol[4]);
-        rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&iksol[5]);
-        rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&iksol[6]);
+        if (!set_phantom_joint_angles(iksol)) {
+            QMessageBox::warning(this, tr("Interactive Marker Feedback"), tr("Failed to set phantom state from interactive marker-driven IK"));
+            return;
+        }
         rs_->updateLinkTransforms();
     }
 
