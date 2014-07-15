@@ -1,11 +1,12 @@
 #include <unordered_set>
 #include <Eigen/Dense>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
 #include <pcl_ros/transforms.h>
 #include <tf/transform_broadcaster.h>
 #include "PickAndPlacePanel.h"
+#include "SimpleInteractiveMarker.h"
+#include "GraspMarkerSelectionMarker.h"
 
 namespace hdt
 {
@@ -38,8 +39,7 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     last_detection_result_(),
     snapshot_cloud_pub_(),
     grasp_markers_server_("grasp_markers"),
-    selected_marker_(),
-    selected_grasp_marker_(),
+    selection_(),
     move_arm_command_client_(),
     pending_move_arm_command_(false),
     object_detection_client_(),
@@ -50,6 +50,11 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     snapshot_cloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("snapshot_cloud", 1, true);
 
     tf_sub_ = nh_.subscribe("tf", 10, &PickAndPlacePanel::tf_callback, this);
+
+    selection_.reset(new GraspMarkerSelection);
+    if (!selection_) {
+        ROS_ERROR("Failed to instantiate Grasp Marker Selection");
+    }
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient("move_arm_command"));
     if (!move_arm_command_client_) {
@@ -66,6 +71,7 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
         ROS_ERROR("Failed to instantiate Gripper Command Action Client");
     }
 
+    grasp_markers_server_.set_feedback_callback([this]() { return this->update_gui(); });
     update_gui();
 }
 
@@ -174,17 +180,15 @@ void PickAndPlacePanel::take_snapshot()
 void PickAndPlacePanel::update_grasps()
 {
     // clear the selected pregrasp/grasp
-    selected_marker_ = std::string();
-    selected_grasp_marker_ = std::string();
+    selection_->clear();
 
     if (last_detection_result_->success) {
         grasp_markers_server_.clear();
-        grasp_markers_server_.applyChanges(); // todo: holdoff possible?
 
-        int pregrasp_num = 1;
         ros::Time now = ros::Time::now();
 
         // add pregrasp markers
+        int pregrasp_num = 1;
         for (const geometry_msgs::Pose pregrasp : last_detection_result_->pregrasps.poses) {
             insert_grasp_marker(std::string("pregrasp_") + std::to_string(pregrasp_num++), pregrasp, now);
         }
@@ -195,28 +199,30 @@ void PickAndPlacePanel::update_grasps()
             insert_grasp_marker(std::string("grasp_") + std::to_string(grasp_num++), grasp, now);
         }
 
-        grasp_markers_server_.applyChanges();
+        grasp_markers_server_.flush();
     }
+
+    update_gui();
 }
 
 void PickAndPlacePanel::send_move_to_pregrasp_command()
 {
-    move_arm_to_marker_pose(selected_marker_, false);
+    move_arm_to_marker_pose(selection_->get_pregrasp(), false);
 }
 
 void PickAndPlacePanel::send_move_to_flipped_pregrasp_command()
 {
-    move_arm_to_marker_pose(selected_marker_, true);
+    move_arm_to_marker_pose(selection_->get_pregrasp(), true);
 }
 
 void PickAndPlacePanel::send_move_to_grasp_command()
 {
-    move_arm_to_marker_pose(selected_grasp_marker_, false);
+    move_arm_to_marker_pose(selection_->get_grasp(), false);
 }
 
 void PickAndPlacePanel::send_move_to_flipped_grasp_command()
 {
-    move_arm_to_marker_pose(selected_grasp_marker_, true);
+    move_arm_to_marker_pose(selection_->get_grasp(), true);
 }
 
 void PickAndPlacePanel::move_arm_to_marker_pose(const std::string& marker_name, bool flipped)
@@ -226,13 +232,15 @@ void PickAndPlacePanel::move_arm_to_marker_pose(const std::string& marker_name, 
         return;
     }
 
-    visualization_msgs::InteractiveMarker selected_grasp_marker;
-    grasp_markers_server_.get(marker_name, selected_grasp_marker);
-    grasp_markers_server_.applyChanges(); // who knows why this is here
+    SimpleInteractiveMarkerPtr selected_grasp_marker = grasp_markers_server_.get(marker_name);
+    if (!selected_grasp_marker) {
+        QMessageBox::warning(this, tr("Move Arm To Marker Pose"), tr("No interactive marker named '%1'").arg(QString::fromStdString(marker_name)));
+        return;
+    }
 
     geometry_msgs::PoseStamped pregrasp_marker_pose;
-    pregrasp_marker_pose.header = selected_grasp_marker.header;
-    pregrasp_marker_pose.pose = selected_grasp_marker.pose;
+    pregrasp_marker_pose.header = selected_grasp_marker->interactive_marker().header;
+    pregrasp_marker_pose.pose = selected_grasp_marker->interactive_marker().pose;
 
     geometry_msgs::PoseStamped goal_wrist_pose_mount_frame;
     if (!wrist_pose_from_pregrasp_pose(pregrasp_marker_pose, goal_wrist_pose_mount_frame))
@@ -369,10 +377,10 @@ void PickAndPlacePanel::update_gui()
             !root_frame_selection_->currentText().isEmpty() &&
             !pending_detection_request_);
     update_grasps_button_->setEnabled(last_detection_result_ && last_detection_result_->success);
-    send_move_to_pregrasp_button_->setEnabled(!selected_marker_.empty() && !pending_move_arm_command_);
-    send_move_to_flipped_pregrasp_button_->setEnabled(!selected_marker_.empty() && !pending_move_arm_command_);
-    send_move_to_grasp_button_->setEnabled(!selected_grasp_marker_.empty() && !pending_move_arm_command_);
-    send_move_to_flipped_grasp_button_->setEnabled(!selected_grasp_marker_.empty() && !pending_move_arm_command_);
+    send_move_to_pregrasp_button_->setEnabled(selection_->pregrasp_selected() && !pending_move_arm_command_);
+    send_move_to_flipped_pregrasp_button_->setEnabled(selection_->pregrasp_selected() && !pending_move_arm_command_);
+    send_move_to_grasp_button_->setEnabled(selection_->grasp_selected() && !pending_move_arm_command_);
+    send_move_to_flipped_grasp_button_->setEnabled(selection_->grasp_selected() && !pending_move_arm_command_);
 }
 
 int PickAndPlacePanel::find_item(const QComboBox& combo_box, const std::string& item) const
@@ -406,72 +414,6 @@ void PickAndPlacePanel::update_combo_box(QComboBox& combo_box, const std::map<st
             combo_box.addItem(QString::fromStdString(entry.first));
         }
     }
-}
-
-void PickAndPlacePanel::process_feedback(const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback_msg)
-{
-//    print_interactive_marker_feedback(*feedback_msg);
-
-    if (feedback_msg->event_type == visualization_msgs::InteractiveMarkerFeedback::MOUSE_DOWN &&
-        selected_marker_ != feedback_msg->marker_name && selected_grasp_marker_ != feedback_msg->marker_name)
-    {
-        grasp_markers_server_.applyChanges();
-
-        std::string& marker_handle = is_grasp_marker(feedback_msg->marker_name) ? selected_grasp_marker_ : selected_marker_;
-
-        // update the selected pregrasp marker
-        if (!marker_handle.empty()) {
-            // unselect marker
-            visualization_msgs::InteractiveMarker previous_selection;
-            grasp_markers_server_.get(marker_handle, previous_selection);
-            ROS_INFO("Previous selection was in frame %s", previous_selection.header.frame_id.c_str());
-            ROS_INFO("Previous selection was at pose: x: %0.3f, y: %0.3f, z: %0.3f", previous_selection.pose.position.x, previous_selection.pose.position.y, previous_selection.pose.position.z);
-            previous_selection.controls.front().markers.front().color.r = 0.0;
-            grasp_markers_server_.insert(previous_selection);
-            grasp_markers_server_.applyChanges();
-        }
-
-        // select this marker
-        marker_handle = feedback_msg->marker_name;
-        visualization_msgs::InteractiveMarker new_selection;
-        grasp_markers_server_.get(marker_handle, new_selection);
-        ROS_INFO("New selection was in frame %s", new_selection.header.frame_id.c_str());
-        ROS_INFO("New selection was at pose: x: %0.3f, y: %0.3f, z: %0.3f", new_selection.pose.position.x, new_selection.pose.position.y, new_selection.pose.position.z);
-        new_selection.controls.front().markers.front().color.r = 1.0;
-        grasp_markers_server_.insert(new_selection);
-        grasp_markers_server_.applyChanges();
-    }
-
-    update_gui();
-}
-
-void PickAndPlacePanel::print_interactive_marker_feedback(const visualization_msgs::InteractiveMarkerFeedback& feedback_msg) const
-{
-    ROS_INFO("Processing feedback for interactive marker %s", feedback_msg.marker_name.c_str());
-    ROS_INFO("  header:");
-    ROS_INFO("    seq: %u", feedback_msg.header.seq);
-    ROS_INFO("    stamp: %s", boost::posix_time::to_simple_string(feedback_msg.header.stamp.toBoost()).c_str());
-    ROS_INFO("    frame_id: %s", feedback_msg.header.frame_id.c_str());
-    ROS_INFO("  client_id: %s", feedback_msg.client_id.c_str());
-    ROS_INFO("  marker_name: %s", feedback_msg.marker_name.c_str());
-    ROS_INFO("  control_name: %s", feedback_msg.control_name.c_str());
-    ROS_INFO("  event_type: %d", (int)feedback_msg.event_type);
-    ROS_INFO("  pose:");
-    ROS_INFO("    position:");
-    ROS_INFO("      x: %0.3f", feedback_msg.pose.position.x);
-    ROS_INFO("      y: %0.3f", feedback_msg.pose.position.y);
-    ROS_INFO("      z: %0.3f", feedback_msg.pose.position.z);
-    ROS_INFO("    orientation:");
-    ROS_INFO("      w: %0.3f", feedback_msg.pose.orientation.w);
-    ROS_INFO("      x: %0.3f", feedback_msg.pose.orientation.x);
-    ROS_INFO("      y: %0.3f", feedback_msg.pose.orientation.y);
-    ROS_INFO("      z: %0.3f", feedback_msg.pose.orientation.z);
-    ROS_INFO("  menu_entry_id: %u", feedback_msg.menu_entry_id);
-    ROS_INFO("  mouse_point:");
-    ROS_INFO("    x:", feedback_msg.mouse_point.x);
-    ROS_INFO("    y:", feedback_msg.mouse_point.y);
-    ROS_INFO("    z:", feedback_msg.mouse_point.z);
-    ROS_INFO("  mouse_point_valid: %s", feedback_msg.mouse_point_valid ? "true" : "false");
 }
 
 visualization_msgs::Marker PickAndPlacePanel::create_arrow_marker(const geometry_msgs::Vector3 &scale)
@@ -803,7 +745,10 @@ bool PickAndPlacePanel::wrist_pose_from_pregrasp_pose(
     return true;
 }
 
-void PickAndPlacePanel::insert_grasp_marker(const std::string& name, const geometry_msgs::Pose& grasp_pose, const ros::Time& time)
+void PickAndPlacePanel::insert_grasp_marker(
+    const std::string& name,
+    const geometry_msgs::Pose& grasp_pose,
+    const ros::Time& time)
 {
     visualization_msgs::InteractiveMarker grasp_marker;
     grasp_marker.header.seq = 0;
@@ -822,17 +767,17 @@ void PickAndPlacePanel::insert_grasp_marker(const std::string& name, const geome
 
     geometry_msgs::Vector3 arrow_scale;
     arrow_scale.x = 0.1;
-    arrow_scale.y = 0.02;
-    arrow_scale.z = 0.02;
+    arrow_scale.y = 0.01;
+    arrow_scale.z = 0.01;
 
     for (const visualization_msgs::Marker& marker : create_triad_markers(arrow_scale).markers) {
         select_control.markers.push_back(marker);
     }
-    // select_control.markers.push_back(create_arrow_marker(arrow_scale));
     grasp_marker.controls.push_back(select_control);
 
-    ROS_INFO("Inserting marker %s", grasp_marker.name.c_str());
-    grasp_markers_server_.insert(grasp_marker, std::bind(&PickAndPlacePanel::process_feedback, this, std::placeholders::_1));
+    SimpleInteractiveMarkerPtr interactive_marker(
+            new GraspMarkerSelectionMarker(grasp_markers_server_, grasp_marker, selection_));
+    grasp_markers_server_.insert(interactive_marker);
 }
 
 bool PickAndPlacePanel::is_grasp_marker(const std::string& marker_name) const

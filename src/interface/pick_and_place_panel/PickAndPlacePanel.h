@@ -23,6 +23,8 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <hdt/ObjectDetectionAction.h>
 #include <hdt/MoveArmCommandAction.h>
+#include "SimpleInteractiveMarkerServer.h"
+#include "GraspMarkerSelection.h"
 
 namespace hdt
 {
@@ -102,10 +104,9 @@ private:
     ros::Publisher snapshot_cloud_pub_;
 
     // for visualizing and selecting available pre-grasps
-    interactive_markers::InteractiveMarkerServer grasp_markers_server_;
-    typedef std::string InteractiveMarkerHandle;
-    InteractiveMarkerHandle selected_marker_;
-    InteractiveMarkerHandle selected_grasp_marker_;
+    SimpleInteractiveMarkerServer grasp_markers_server_;
+
+    std::shared_ptr<GraspMarkerSelection> selection_;
 
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
@@ -130,15 +131,12 @@ private:
     int find_item(const QComboBox& combo_box, const std::string& item) const;
     void update_combo_box(QComboBox& combo_box, const std::map<std::string, ros::Time>& entries);
 
-    void process_feedback(const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback_msg);
-
     static visualization_msgs::Marker
     create_arrow_marker(const geometry_msgs::Vector3& scale);
 
     static visualization_msgs::MarkerArray
-    create_triad_markers(const geometry_msgs::Vector3& scale);
 
-    void print_interactive_marker_feedback(const visualization_msgs::InteractiveMarkerFeedback& feedback_msg) const;
+    create_triad_markers(const geometry_msgs::Vector3& scale);
 
     void move_arm_to_marker_pose(const std::string& marker_name, bool flipped = false);
 
