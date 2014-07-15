@@ -1,0 +1,7 @@
+<library path="lib/libtemperature_status_plugin">
+    <class name="hdt_temperature_status/TemperatureStatusPanel" type="TemperatureStatusPanel" base_class_type="rviz::Panel">
+        <description>
+            A panel widget for real-time information about the HDT temperature status
+        </description>
+    </class>
+</library>
