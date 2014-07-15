@@ -140,6 +140,8 @@ private:
 
     void print_interactive_marker_feedback(const visualization_msgs::InteractiveMarkerFeedback& feedback_msg) const;
 
+    void move_arm_to_marker_pose(const std::string& marker_name, bool flipped = false);
+
     void object_detection_active_cb();
     void object_detection_feedback_cb(const hdt::ObjectDetectionFeedback::ConstPtr& feedback);
     void object_detection_result_cb(

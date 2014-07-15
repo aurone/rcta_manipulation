@@ -202,13 +202,33 @@ void PickAndPlacePanel::update_grasps()
 
 void PickAndPlacePanel::send_move_to_pregrasp_command()
 {
-    if (selected_marker_.empty()) {
+    move_arm_to_marker_pose(selected_marker_, false);
+}
+
+void PickAndPlacePanel::send_move_to_flipped_pregrasp_command()
+{
+    move_arm_to_marker_pose(selected_marker_, true);
+}
+
+void PickAndPlacePanel::send_move_to_grasp_command()
+{
+    move_arm_to_marker_pose(selected_grasp_marker_, false);
+}
+
+void PickAndPlacePanel::send_move_to_flipped_grasp_command()
+{
+    move_arm_to_marker_pose(selected_grasp_marker_, true);
+}
+
+void PickAndPlacePanel::move_arm_to_marker_pose(const std::string& marker_name, bool flipped)
+{
+    if (marker_name.empty()) {
         ROS_WARN("Attempt to move to pregrasp without a pregrasp marker selected");
         return;
     }
 
     visualization_msgs::InteractiveMarker selected_grasp_marker;
-    grasp_markers_server_.get(selected_marker_, selected_grasp_marker);
+    grasp_markers_server_.get(marker_name, selected_grasp_marker);
     grasp_markers_server_.applyChanges(); // who knows why this is here
 
     geometry_msgs::PoseStamped pregrasp_marker_pose;
@@ -220,6 +240,16 @@ void PickAndPlacePanel::send_move_to_pregrasp_command()
     {
         ROS_WARN("Failed to obtain goal wrist pose from pregrasp marker pose");
         return;
+    }
+
+    if (flipped) {
+        Eigen::Affine3d goal_wrist_transform_mount_frame;
+        tf::poseMsgToEigen(goal_wrist_pose_mount_frame.pose, goal_wrist_transform_mount_frame);
+
+        Eigen::Affine3d goal_wrist_transform_flipped =
+                goal_wrist_transform_mount_frame * Eigen::AngleAxisd(M_PI, Eigen::Vector3d(1.0, 0.0, 0.0));
+
+        tf::poseEigenToMsg(goal_wrist_transform_flipped, goal_wrist_pose_mount_frame.pose);
     }
 
     hdt::MoveArmCommandGoal goal;
@@ -227,54 +257,6 @@ void PickAndPlacePanel::send_move_to_pregrasp_command()
     move_arm_command_client_->sendGoal(goal, boost::bind(&PickAndPlacePanel::move_arm_command_result_cb, this, _1, _2));
     pending_move_arm_command_ = true;
     update_gui();
-}
-
-void PickAndPlacePanel::send_move_to_flipped_pregrasp_command()
-{
-    if (selected_marker_.empty()) {
-        ROS_WARN("Attempt to move to pregrasp without a pregrasp marker selected");
-        return;
-    }
-
-    visualization_msgs::InteractiveMarker selected_grasp_marker;
-    grasp_markers_server_.get(selected_marker_, selected_grasp_marker);
-    grasp_markers_server_.applyChanges(); // who knows why this is here
-
-    geometry_msgs::PoseStamped pregrasp_marker_pose;
-    pregrasp_marker_pose.header = selected_grasp_marker.header;
-    pregrasp_marker_pose.pose = selected_grasp_marker.pose;
-
-    geometry_msgs::PoseStamped goal_wrist_pose_mount_frame;
-    if (!wrist_pose_from_pregrasp_pose(pregrasp_marker_pose, goal_wrist_pose_mount_frame))
-    {
-        ROS_WARN("Failed to obtain goal wrist pose from pregrasp marker pose");
-        return;
-    }
-
-    Eigen::Affine3d goal_wrist_transform_mount_frame;
-    tf::poseMsgToEigen(goal_wrist_pose_mount_frame.pose, goal_wrist_transform_mount_frame);
-
-    Eigen::Affine3d goal_wrist_transform_flipped =
-            goal_wrist_transform_mount_frame * Eigen::AngleAxisd(M_PI, Eigen::Vector3d(1.0, 0.0, 0.0));
-
-    geometry_msgs::Pose goal_wrist_pose_flipped;
-    tf::poseEigenToMsg(goal_wrist_transform_flipped, goal_wrist_pose_flipped);
-
-    hdt::MoveArmCommandGoal goal;
-    goal.goal_pose = goal_wrist_pose_flipped;
-    move_arm_command_client_->sendGoal(goal, boost::bind(&PickAndPlacePanel::move_arm_command_result_cb, this, _1, _2));
-    pending_move_arm_command_ = true;
-    update_gui();
-}
-
-void PickAndPlacePanel::send_move_to_grasp_command()
-{
-
-}
-
-void PickAndPlacePanel::send_move_to_flipped_grasp_command()
-{
-
 }
 
 void PickAndPlacePanel::send_open_gripper_command()
@@ -719,12 +701,14 @@ void PickAndPlacePanel::setup_gui()
     connect(camera_frame_selection_,    SIGNAL(editTextChanged(const QString&)),    this, SLOT(camera_frame_box_edit_text_changed(const QString&)));
     connect(root_frame_selection_,      SIGNAL(editTextChanged(const QString&)),    this, SLOT(camera_frame_box_edit_text_changed(const QString&)));
 
-    connect(snap_point_cloud_button_, SIGNAL(clicked()), this, SLOT(take_snapshot()));
-    connect(update_grasps_button_, SIGNAL(clicked()), this, SLOT(update_grasps()));
-    connect(send_move_to_pregrasp_button_, SIGNAL(clicked()), this, SLOT(send_move_to_pregrasp_command()));
-    connect(send_move_to_flipped_pregrasp_button_, SIGNAL(clicked()), this, SLOT(send_move_to_flipped_pregrasp_command()));
-    connect(send_open_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_open_gripper_command()));
-    connect(send_close_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_close_gripper_command()));
+    connect(snap_point_cloud_button_,               SIGNAL(clicked()), this, SLOT(take_snapshot()));
+    connect(update_grasps_button_,                  SIGNAL(clicked()), this, SLOT(update_grasps()));
+    connect(send_move_to_pregrasp_button_,          SIGNAL(clicked()), this, SLOT(send_move_to_pregrasp_command()));
+    connect(send_move_to_flipped_pregrasp_button_,  SIGNAL(clicked()), this, SLOT(send_move_to_flipped_pregrasp_command()));
+    connect(send_move_to_grasp_button_,             SIGNAL(clicked()), this, SLOT(send_move_to_grasp_command()));
+    connect(send_move_to_flipped_grasp_button_,     SIGNAL(clicked()), this, SLOT(send_move_to_flipped_grasp_command()));
+    connect(send_open_gripper_command_button_,      SIGNAL(clicked()), this, SLOT(send_open_gripper_command()));
+    connect(send_close_gripper_command_button_,     SIGNAL(clicked()), this, SLOT(send_close_gripper_command()));
 }
 
 tf::Transform PickAndPlacePanel::geomsgs_pose_to_tf_transform(const geometry_msgs::Pose& pose) const
