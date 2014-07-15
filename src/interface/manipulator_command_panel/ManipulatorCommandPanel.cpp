@@ -9,7 +9,6 @@
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/TransformStamped.h>
-#include <hdt/MoveArmCommand.h>
 #include <sbpl_geometry_utils/interpolation.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <sensor_msgs/JointState.h>

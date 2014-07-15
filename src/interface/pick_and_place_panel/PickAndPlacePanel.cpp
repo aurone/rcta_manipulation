@@ -2,7 +2,6 @@
 #include <Eigen/Dense>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
-#include <hdt/MoveArmCommand.h>
 #include <ros/ros.h>
 #include <pcl_ros/transforms.h>
 #include <tf/transform_broadcaster.h>

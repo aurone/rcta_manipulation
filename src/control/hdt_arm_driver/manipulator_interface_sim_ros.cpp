@@ -3,7 +3,7 @@
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <sensor_msgs/JointState.h>
-#include <hdt/DiagnosticStatus.h>
+#include <hdt/ControllerDiagnosticStatus.h>
 #include "manipulator_interface_sim_ros.h"
 
 namespace hdt
@@ -87,11 +87,11 @@ ManipulatorInterfaceROS::RunResult ManipulatorInterfaceSimROS::run()
         noisy_joint_positions_ = sum(true_joint_positions_, perturbations);
 
         ////////////////////////////////////////////////////////////////////////
-        // Publish hdt/DiagnosticStatus to "hdt_diagnostics"
+        // Publish hdt/ControllerDiagnosticStatus to "hdt_diagnostics"
         ////////////////////////////////////////////////////////////////////////
 
         static int seqno = 0;
-        hdt::DiagnosticStatus status;
+        hdt::ControllerDiagnosticStatus status;
         status.header.stamp = now;
         status.header.seq = seqno++;
         status.header.frame_id = "";
@@ -177,7 +177,7 @@ bool ManipulatorInterfaceSimROS::init()
 
     follow_joint_traj_feedback_pub_ = nh_.advertise<control_msgs::FollowJointTrajectoryFeedback>("feedback_states", 1);
     joint_states_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_states_raw", 1);
-    diagnostic_status_pub_ = nh_.advertise<hdt::DiagnosticStatus>("hdt_diagnostics", 1);
+    diagnostic_status_pub_ = nh_.advertise<hdt::ControllerDiagnosticStatus>("hdt_diagnostics", 1);
     joint_traj_sub_ = nh_.subscribe("command", 1, &ManipulatorInterfaceSimROS::joint_trajectory_callback, this);
 
     return true;
