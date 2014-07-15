@@ -338,7 +338,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     req.motion_plan_request.goal_constraints.resize(1);
     fill_constraint(goal, planning_frame_, req.motion_plan_request.goal_constraints[0]);
     ROS_WARN("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
-    req.motion_plan_request.allowed_planning_time = 10.0;
+    req.motion_plan_request.allowed_planning_time = 2.0;
 
     // fill start state
     if (!get_initial_configuration(ph_, scene->robot_state)) {
