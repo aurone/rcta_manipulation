@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>495</width>
-    <height>463</height>
+    <width>896</width>
+    <height>776</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -24,35 +24,20 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>475</width>
-        <height>443</height>
+        <width>876</width>
+        <height>756</height>
        </rect>
       </property>
       <layout class="QGridLayout" name="gridLayout_5">
+       <item row="3" column="0">
+        <widget class="QwtPlot" name="raw_joint_states_plot"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QwtPlot" name="joint_states_plot"/>
+       </item>
        <item row="0" column="0" rowspan="2" colspan="2">
         <layout class="QGridLayout" name="gridLayout_3">
-         <item row="3" column="1">
-          <widget class="QLabel" name="have_supply_label">
-           <property name="text">
-            <string>HAVE SUPPLY</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1">
-          <widget class="QLabel" name="have_comms_label">
-           <property name="text">
-            <string>HAVE COMMS</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QLabel" name="controllable_label">
-           <property name="text">
-            <string>CONTROLLABLE</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
+         <item row="2" column="0">
           <widget class="QLabel" name="reset_occurred_icon">
            <property name="frameShape">
             <enum>QFrame::NoFrame</enum>
@@ -66,16 +51,12 @@
            <property name="text">
             <string>&lt;reset_occured_icon&gt;</string>
            </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="controllable_icon">
-           <property name="text">
-            <string>&lt;controllable_icon&gt;</string>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
-         <item row="3" column="0">
+         <item row="2" column="2">
           <widget class="QLabel" name="have_supply_icon">
            <property name="frameShape">
             <enum>QFrame::NoFrame</enum>
@@ -83,43 +64,86 @@
            <property name="text">
             <string>&lt;have_supply_icon&gt;</string>
            </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
           </widget>
          </item>
-         <item row="4" column="0">
+         <item row="2" column="3">
           <widget class="QLabel" name="have_comms_icon">
            <property name="text">
             <string>&lt;have_comms_icon&gt;</string>
            </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
           </widget>
          </item>
-         <item row="1" column="1">
+         <item row="1" column="0">
           <widget class="QLabel" name="reset_occured_label">
            <property name="text">
             <string>RESET OCCURRED</string>
            </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
           </widget>
          </item>
-         <item row="0" column="0">
+         <item row="1" column="1">
+          <widget class="QLabel" name="controllable_label">
+           <property name="text">
+            <string>CONTROLLABLE</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="2">
+          <widget class="QLabel" name="have_supply_label">
+           <property name="text">
+            <string>HAVE SUPPLY</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="3">
+          <widget class="QLabel" name="have_comms_label">
+           <property name="text">
+            <string>HAVE COMMS</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0" colspan="2">
           <widget class="QPushButton" name="emergency_stop_button">
            <property name="text">
             <string>Emergency Stop!</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
+         <item row="0" column="2" colspan="2">
           <widget class="QPushButton" name="clear_emergency_stop_button">
            <property name="text">
             <string>Clear Emergency Stop</string>
            </property>
           </widget>
          </item>
+         <item row="2" column="1">
+          <widget class="QLabel" name="controllable_icon">
+           <property name="text">
+            <string>&lt;controllable_icon&gt;</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
         </layout>
-       </item>
-       <item row="3" column="0">
-        <widget class="QwtPlot" name="raw_joint_states_plot"/>
-       </item>
-       <item row="2" column="0">
-        <widget class="QwtPlot" name="joint_states_plot"/>
        </item>
       </layout>
      </widget>
