@@ -1,3 +1,4 @@
+add_subdirectory(calibration)
 add_subdirectory(config_block)
 add_subdirectory(hdt_description)
 add_subdirectory(hdt_kinematics)

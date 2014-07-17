@@ -8,6 +8,7 @@ find_package(Boost REQUIRED system thread)
 
 # catkin
 find_package(catkin REQUIRED COMPONENTS
+    ar_track_alvar
     actionlib
     actionlib_msgs
     control_msgs 
