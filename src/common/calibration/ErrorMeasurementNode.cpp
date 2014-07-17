@@ -1,6 +1,8 @@
 #include "ErrorMeasurementNode.h"
 
+#include <cmath>
 #include <eigen_conversions/eigen_msg.h>
+#include <stringifier/stringifier.h>
 
 ErrorMeasurementNode::ErrorMeasurementNode() :
     nh_(),
@@ -12,21 +14,21 @@ ErrorMeasurementNode::ErrorMeasurementNode() :
     joint_state_msgs_(),
     last_processed_marker_msg_(),
     last_processed_joint_state_msg_(),
+    tracked_marker_id_(8),
     listener_(),
     mount_frame_("arm_mount_panel_dummy"),
     base_frame_("base_link"),
-    camera_frame_("kinect_rgb_optical_frame"),
+    camera_frame_("/kinect_rgb_optical_frame"),
     gripper_frame_("gripper_base"),
     wrist_frame_("arm_7_gripper_lift_link"),
     transforms_initialized_(false),
     base_frame_to_mount_frame_(),
     base_frame_to_camera_frame_(),
-    error_x_(0.0),
-    error_y_(0.0),
-    error_z_(0.0),
-    error_roll_(0.0),
-    error_pitch_(0.0),
-    error_yaw_(0.0)
+    total_mean_error_(Eigen::Affine3d::Identity()),
+    trans_variance_(Eigen::Vector3d::Zero()),
+    rot_variance_(0.0),
+    p_(1.0 / 80.0/*0.1*/),
+    num_measurements_(0)
 {
 }
 
@@ -51,10 +53,17 @@ bool ErrorMeasurementNode::initialize()
 int ErrorMeasurementNode::run()
 {
     ros::Rate loop_rate(30.0);
+    int loop_count = 0;
     while (ros::ok()) {
         ros::spinOnce();
 
-        auto buffer_exhausted = [this]() {return this->marker_msgs_.empty() || this->joint_state_msgs_.empty();};
+        if (loop_count % 30 == 0) {
+            double trans_error = Eigen::Vector3d(total_mean_error_.translation()).norm();
+            double rot_error = 2.0 * acos(Eigen::Quaterniond(total_mean_error_.rotation()).w());
+
+            double trans_variance = trans_variance_.norm();
+            ROS_INFO("Error is %0.3fcm, %0.3f degrees. Variance: %0.3fcm, %0.3f degrees", 100.0 * trans_error, 180.0 * rot_error / M_PI, trans_variance, rot_variance_/*, to_string(total_mean_error_).c_str()*/);
+        }
 
         // wait until we've received the fixed transforms we're interested in so that we can compare the marker and fk poses
         if (!transforms_initialized_) {
@@ -68,45 +77,48 @@ int ErrorMeasurementNode::run()
                 listener_.lookupTransform(wrist_frame_, gripper_frame_, ros::Time(0), wrist_to_gripper);
 
                 // convert tf to Eigen
-                base_frame_to_camera_frame_ = Eigen::Translation3d(base_to_camera.getOrigin().x(), base_to_camera.getOrigin().y(), base_to_camera.getOrigin().z()) *
-                                              Eigen::Quaterniond(base_to_camera.getRotation().w(), base_to_camera.getRotation().x(), base_to_camera.getRotation().y(), base_to_camera.getRotation().z());
-                base_frame_to_mount_frame_ = Eigen::Translation3d(base_to_mount.getOrigin().x(), base_to_mount.getOrigin().y(), base_to_mount.getOrigin().z()) *
-                                             Eigen::Quaterniond(base_to_mount.getRotation().w(), base_to_mount.getRotation().x(), base_to_mount.getRotation().y(), base_to_mount.getRotation().z());
-                wrist_frame_to_gripper_frame_ = Eigen::Translation3d(wrist_to_gripper.getOrigin().x(), wrist_to_gripper.getOrigin().y(), wrist_to_gripper.getOrigin().z()) *
-                                                Eigen::Quaterniond(wrist_to_gripper.getRotation().w(), wrist_to_gripper.getRotation().x(), wrist_to_gripper.getRotation().y(), wrist_to_gripper.getRotation().z());
-
-                gripper_frame_to_marker_frame_ = Eigen::Translation3d(0.18, 0.0, 0.0); // TODO: measure this for real. Eigen::Affine3d::Identity();
+                base_frame_to_camera_frame_ = tf_to_eigen(base_to_camera);
+                base_frame_to_mount_frame_ = tf_to_eigen(base_to_mount);
+                wrist_frame_to_gripper_frame_ = tf_to_eigen(wrist_to_gripper);
+                gripper_frame_to_marker_frame_ = Eigen::Translation3d(0.08, 0.0, 0.0); // TODO: measure this for real. Eigen::Affine3d::Identity();
 
                 transforms_initialized_ = true;
+            }
+            else {
+                ROS_WARN("Failed to acquire all fixed transforms");
             }
             loop_rate.sleep();
             continue;
         }
 
+        auto buffer_exhausted = [this]() { return this->marker_msgs_.empty() || this->joint_state_msgs_.empty(); };
+
         if (!buffer_exhausted()) {
-            ROS_INFO("Processing %zd marker messages and %zd joint messages", marker_msgs_.size(), joint_state_msgs_.size());
+            ROS_DEBUG("Processing %zd marker messages and %zd joint messages", marker_msgs_.size(), joint_state_msgs_.size());
         }
 
         while (!buffer_exhausted()) {
-            ar_track_alvar::AlvarMarkers::ConstPtr next_marker_msg = marker_msgs_.front();
+            ar_track_alvar::AlvarMarker::ConstPtr next_marker_msg = marker_msgs_.front();
             sensor_msgs::JointState::ConstPtr next_joint_state_msg = joint_state_msgs_.front();
 
             if (next_joint_state_msg->header.stamp < next_marker_msg->header.stamp) {
                 // Process the next joint state message
-                ROS_INFO("  Processing joint message %d (%0.3f < %0.3f)", next_joint_state_msg->header.seq,
-                        next_joint_state_msg->header.stamp.toSec(), next_marker_msg->header.stamp.toSec());
+                ROS_DEBUG("  Processing joint message %d (%0.3f < %0.3f)", next_joint_state_msg->header.seq, next_joint_state_msg->header.stamp.toSec(), next_marker_msg->header.stamp.toSec());
                 bool can_interp = last_processed_marker_msg_ && !marker_msgs_.empty();
                 if (can_interp) {
                     double dt = marker_msgs_.front()->header.stamp.toSec() - last_processed_marker_msg_->header.stamp.toSec();
                     double alpha = (next_joint_state_msg->header.stamp.toSec() - last_processed_marker_msg_->header.stamp.toSec()) / dt;
-                    ROS_INFO("  Interpolating marker messages %d and %d @ %0.3f",
-                            last_processed_marker_msg_->header.seq, marker_msgs_.front()->header.seq, alpha);
+                    ROS_DEBUG("  Interpolating marker messages %d and %d @ %0.3f", last_processed_marker_msg_->header.seq, marker_msgs_.front()->header.seq, alpha);
 
                     Eigen::Affine3d interpolated_pose = interpolated_marker_pose(last_processed_marker_msg_, marker_msgs_.front(), alpha);
                     Eigen::Affine3d joint_state_pose = compute_joint_state_pose(next_joint_state_msg);
 
                     Eigen::Affine3d error_pose = compute_pose_diff(interpolated_pose, joint_state_pose);
-                    // TODO: add measurement to whatever
+                    total_mean_error_ = interpolate(total_mean_error_, error_pose, interp_factor());
+
+                    ++num_measurements_;
+
+                    updateVariance(error_pose);
                 }
 
                 last_processed_joint_state_msg_ = next_joint_state_msg;
@@ -114,17 +126,21 @@ int ErrorMeasurementNode::run()
             }
             else {
                 // Process the next marker message
-                ROS_INFO("  Processing marker message %d (%0.3f < %0.3f)", next_marker_msg->header.seq, next_marker_msg->header.stamp.toSec(), next_joint_state_msg->header.stamp.toSec());
+                ROS_DEBUG("  Processing marker message %d (%0.3f < %0.3f)", next_marker_msg->header.seq, next_marker_msg->header.stamp.toSec(), next_joint_state_msg->header.stamp.toSec());
                 bool can_interp = last_processed_joint_state_msg_ && !joint_state_msgs_.empty();
                 if (can_interp) {
                     double dt = joint_state_msgs_.front()->header.stamp.toSec() - last_processed_joint_state_msg_->header.stamp.toSec();
                     double alpha = (next_marker_msg->header.stamp.toSec() - last_processed_joint_state_msg_->header.stamp.toSec()) / dt;
-                    ROS_INFO("  Interpolating joint messages %d and %d @ %0.3f", last_processed_joint_state_msg_->header.seq, joint_state_msgs_.front()->header.seq, alpha);
+                    ROS_DEBUG("  Interpolating joint messages %d and %d @ %0.3f", last_processed_joint_state_msg_->header.seq, joint_state_msgs_.front()->header.seq, alpha);
                     Eigen::Affine3d interpolated_pose = interpolated_joint_state_pose(last_processed_joint_state_msg_, joint_state_msgs_.front(), alpha);
                     Eigen::Affine3d marker_pose = compute_marker_pose(next_marker_msg);
 
                     Eigen::Affine3d error_pose = compute_pose_diff(marker_pose, interpolated_pose);
-                    // TODO: add measurement to whatever
+                    total_mean_error_ = interpolate(total_mean_error_, error_pose, interp_factor());
+
+                    ++num_measurements_;
+
+                    updateVariance(error_pose);
                 }
 
                 last_processed_marker_msg_ = next_marker_msg;
@@ -144,6 +160,7 @@ int ErrorMeasurementNode::run()
             }
         }
 
+        ++loop_count;
         loop_rate.sleep();
     }
     return 0;
@@ -151,21 +168,38 @@ int ErrorMeasurementNode::run()
 
 void ErrorMeasurementNode::alvar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
 {
-    if (msg->header.frame_id != camera_frame_) {
-        ROS_WARN("Expected the marker frames to be expressed in the camera frame '%s'", camera_frame_.c_str());
+    ar_track_alvar::AlvarMarker::Ptr interesting_marker(new ar_track_alvar::AlvarMarker);
+    for (const ar_track_alvar::AlvarMarker& marker : msg->markers) {
+        if (marker.id == tracked_marker_id_) {
+            if (marker.header.frame_id != camera_frame_) {
+                ROS_WARN("Expected the marker frames to be expressed in the camera frame '%s' (was '%s')", camera_frame_.c_str(), marker.header.frame_id.c_str());
+                return;
+            }
+            interesting_marker.reset(new ar_track_alvar::AlvarMarker);
+            if (!interesting_marker) {
+                ROS_WARN("Failed to instantiate Alvar Marker");
+                return;
+            }
+
+            *interesting_marker = marker;
+            interesting_marker->header.seq = msg->header.seq;
+        }
+    }
+
+    if (!interesting_marker) {
+        // did not find the marker we're tracking
         return;
     }
 
     if (!marker_msgs_.empty()) {
         // make sure that we're receiving a message that is newer
         if (marker_msgs_.back()->header.stamp > msg->header.stamp) {
-            ROS_WARN("Received a message from the past (%0.3f < %0.3f)", msg->header.stamp.toSec(),
-                    marker_msgs_.back()->header.stamp.toSec());
+            ROS_WARN("Received a message from the past (%0.3f < %0.3f)", msg->header.stamp.toSec(), marker_msgs_.back()->header.stamp.toSec());
             return;
         }
     }
 
-    marker_msgs_.push_back(msg);
+    marker_msgs_.push_back(interesting_marker);
 }
 
 void ErrorMeasurementNode::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
@@ -187,8 +221,8 @@ void ErrorMeasurementNode::joint_states_callback(const sensor_msgs::JointState::
 }
 
 Eigen::Affine3d ErrorMeasurementNode::interpolated_marker_pose(
-    const ar_track_alvar::AlvarMarkers::ConstPtr& first,
-    const ar_track_alvar::AlvarMarkers::ConstPtr& second,
+    const ar_track_alvar::AlvarMarker::ConstPtr& first,
+    const ar_track_alvar::AlvarMarker::ConstPtr& second,
     double alpha)
 {
     return interpolate(compute_marker_pose(first), compute_marker_pose(second), alpha);
@@ -205,7 +239,9 @@ Eigen::Affine3d ErrorMeasurementNode::interpolated_joint_state_pose(
 Eigen::Affine3d ErrorMeasurementNode::interpolate(const Eigen::Affine3d& a, const Eigen::Affine3d& b, double alpha)
 {
     Eigen::Vector3d interp_pos = (1.0 - alpha) * Eigen::Vector3d(a.translation()) + alpha * Eigen::Vector3d(b.translation());
-    Eigen::Quaterniond interp_rot; // TODO:
+    Eigen::Quaterniond aq(a.rotation());
+    Eigen::Quaterniond bq(b.rotation());
+    Eigen::Quaterniond interp_rot = aq.slerp(alpha, bq);
     return Eigen::Translation3d(interp_pos) * interp_rot;
 }
 
@@ -213,15 +249,17 @@ Eigen::Affine3d ErrorMeasurementNode::compute_joint_state_pose(const sensor_msgs
 {
     Eigen::Affine3d wrist_transform;
     robot_model_.compute_fk(msg->position, wrist_transform);
+    // base -> mount * mount -> wrist * wrist -> gripper * gripper -> tool = base -> tool
     return base_frame_to_mount_frame_ * wrist_transform * wrist_frame_to_gripper_frame_ * gripper_frame_to_marker_frame_;
 }
 
-Eigen::Affine3d ErrorMeasurementNode::compute_marker_pose(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
+Eigen::Affine3d ErrorMeasurementNode::compute_marker_pose(const ar_track_alvar::AlvarMarker::ConstPtr& msg)
 {
-    assert(!msg->markers.empty());
     Eigen::Affine3d marker_transform;
-    tf::poseMsgToEigen(msg->markers.front().pose.pose, marker_transform);
-    return base_frame_to_camera_frame_ * marker_transform;
+    tf::poseMsgToEigen(msg->pose.pose, marker_transform);
+    // base -> camera * camera -> marker = base -> marker
+    static const Eigen::Affine3d marker_to_tool(Eigen::AngleAxisd(M_PI / 2.0, Eigen::Vector3d(1.0, 0.0, 0.0)));
+    return base_frame_to_camera_frame_ * marker_transform * marker_to_tool;
 }
 
 Eigen::Affine3d ErrorMeasurementNode::compute_pose_diff(const Eigen::Affine3d& a, const Eigen::Affine3d& b)
@@ -232,5 +270,39 @@ Eigen::Affine3d ErrorMeasurementNode::compute_pose_diff(const Eigen::Affine3d& a
     Eigen::Quaterniond arot(a.rotation());
     Eigen::Quaterniond brot(b.rotation());
 
-    return Eigen::Affine3d(Eigen::Translation3d(apos - bpos)); // * TODO: quaternion difference Eigen::Quaterniond(arot - brot);
+    return Eigen::Affine3d(Eigen::Translation3d(apos - bpos) * arot.inverse() * brot);
+}
+
+Eigen::Affine3d ErrorMeasurementNode::tf_to_eigen(const tf::StampedTransform &transform)
+{
+    return Eigen::Translation3d(
+            transform.getOrigin().x(),
+            transform.getOrigin().y(),
+            transform.getOrigin().z()) *
+           Eigen::Quaterniond(
+                   transform.getRotation().w(),
+                   transform.getRotation().x(),
+                   transform.getRotation().y(),
+                   transform.getRotation().z());
+}
+
+void ErrorMeasurementNode::updateVariance(const Eigen::Affine3d& error)
+{
+    Eigen::Affine3d variance_diff = compute_pose_diff(error, total_mean_error_);
+
+    double meanRotDiff = 2 * acos(Eigen::Quaterniond(total_mean_error_.rotation()).w());
+    double angle = 2 * acos(Eigen::Quaterniond(variance_diff.rotation()).w());
+    auto sqrd = [](double d) { return d * d; };
+    rot_variance_ = (1.0 - interp_factor()) * rot_variance_ + interp_factor() * sqrd(angle - meanRotDiff);
+
+    Eigen::Vector3d meanTrans(total_mean_error_.translation());
+    Eigen::Vector3d transError = variance_diff.translation();
+    Eigen::Vector3d transVariance = (transError - meanTrans).array() * (transError - meanTrans).array();
+    trans_variance_ = (1.0 - interp_factor()) * trans_variance_ + interp_factor() * transVariance;
+}
+
+double ErrorMeasurementNode::interp_factor()
+{
+    return p_;
+//    return 1.0 / (num_measurements_ + 1);
 }
