@@ -140,6 +140,8 @@ bool ArmPlanningNode::init()
         return false;
     }
 
+    move_command_server_->start();
+
     ROS_INFO("Waiting for action client \"arm_controller/joint_trajectory_action\"");
     action_client_.waitForServer();
 
