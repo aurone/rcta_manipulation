@@ -240,6 +240,7 @@ void PickAndPlacePanel::move_arm_to_marker_pose(const std::string& marker_name, 
 
     geometry_msgs::PoseStamped pregrasp_marker_pose;
     pregrasp_marker_pose.header = selected_grasp_marker->interactive_marker().header;
+    pregrasp_marker_pose.header.stamp = ros::Time(0);
     pregrasp_marker_pose.pose = selected_grasp_marker->interactive_marker().pose;
 
     geometry_msgs::PoseStamped goal_wrist_pose_mount_frame;
@@ -722,19 +723,19 @@ bool PickAndPlacePanel::wrist_pose_from_pregrasp_pose(
     tf::Transform mount_to_gripper = geomsgs_pose_to_tf_transform(gripper_in_mount_frame.pose);
 
     // gripper -> wrist
-    tf::StampedTransform gripper_to_wrist;
-    const std::string wrist_frame = "arm_7_gripper_lift_link";
-    const std::string gripper_frame = "gripper_base";
-    try {
-        listener_.lookupTransform(gripper_frame, wrist_frame, ros::Time(0), gripper_to_wrist);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_WARN("Unable to lookup transform from '%s' to '%s'", wrist_frame.c_str(), gripper_frame.c_str());
-        return false;
-    }
+//    tf::StampedTransform gripper_to_wrist;
+//    const std::string wrist_frame = "arm_7_gripper_lift_link";
+//    const std::string gripper_frame = "gripper_base";
+//    try {
+//        listener_.lookupTransform(gripper_frame, wrist_frame, ros::Time(0), gripper_to_wrist);
+//    }
+//    catch (const tf::TransformException& ex) {
+//        ROS_WARN("Unable to lookup transform from '%s' to '%s'", wrist_frame.c_str(), gripper_frame.c_str());
+//        return false;
+//    }
 
     // mount -> wrist = mount -> gripper * gripper -> wrist
-    tf::Transform mount_to_wrist = mount_to_gripper * gripper_to_wrist;
+    tf::Transform mount_to_wrist = mount_to_gripper; //* gripper_to_wrist;
 
     geometry_msgs::PoseStamped wrist_pose;
     wrist_pose.header.seq = 0;
