@@ -1,6 +1,6 @@
 <launch>
 	<!-- ar_track_alvar/individualMarkers setup -->
-	<arg name="marker_size" default="4.4" />
+	<arg name="marker_size" default="4.416" />
 
 	<arg name="max_new_marker_error" default="0.08" />
 
