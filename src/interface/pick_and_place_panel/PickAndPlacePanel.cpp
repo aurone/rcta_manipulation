@@ -43,7 +43,14 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     move_arm_command_client_(),
     pending_move_arm_command_(false),
     object_detection_client_(),
-    gripper_command_client_()
+    gripper_command_client_(),
+    shutdown_watchdog_(false),
+    run_watchdog_(false),
+    watchdog_mutex_(),
+    watchdog_condvar_(),
+    refresh_pub_(),
+    refresh_sub_(),
+    watchdog_thread_()
 {
     setup_gui();
 
@@ -71,12 +78,23 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
         ROS_ERROR("Failed to instantiate Gripper Command Action Client");
     }
 
+    refresh_pub_ = ph_.advertise<std_msgs::Empty>("check_action_servers", 1);
+    refresh_sub_ = ph_.subscribe("check_action_servers", 1, &PickAndPlacePanel::check_action_servers, this);
+
     grasp_markers_server_.set_feedback_callback([this]() { return this->update_gui(); });
     update_gui();
+
+    watchdog_thread_ = std::thread(&PickAndPlacePanel::watchdog_thread, this);
 }
 
 PickAndPlacePanel::~PickAndPlacePanel()
 {
+    shutdown_watchdog_ = true;
+    stop_watchdog();
+    watchdog_condvar_.notify_one();
+    if (watchdog_thread_.joinable()) {
+        watchdog_thread_.join();
+    }
 }
 
 void PickAndPlacePanel::load(const rviz::Config& config)
@@ -140,7 +158,8 @@ void PickAndPlacePanel::choose_kdtree_indices()
 void PickAndPlacePanel::take_snapshot()
 {
     if (!object_detection_client_->isServerConnected()) {
-        QMessageBox::warning(this, tr("Action Client Failure"), tr("Unable to  send Object Detection (server is not connected")));
+        QMessageBox::warning(this, tr("Action Client Failure"), tr("Unable to  send Object Detection (server is not connected)"));
+        object_detection_client_.reset(new ObjectDetectionActionClient("object_detection_action", false));
         return;
     }
 
@@ -181,6 +200,8 @@ void PickAndPlacePanel::take_snapshot()
     pending_detection_request_ = true;
 
     update_gui();
+
+    start_watchdog();
 }
 
 void PickAndPlacePanel::update_grasps()
@@ -383,9 +404,12 @@ void PickAndPlacePanel::update_gui()
             !camera_frame_selection_->currentText().isEmpty() &&
             !root_frame_selection_->currentText().isEmpty() &&
             !pending_detection_request_);
+
     update_grasps_button_->setEnabled(last_detection_result_ && last_detection_result_->success);
+
     send_move_to_pregrasp_button_->setEnabled(selection_->pregrasp_selected() && !pending_move_arm_command_);
     send_move_to_flipped_pregrasp_button_->setEnabled(selection_->pregrasp_selected() && !pending_move_arm_command_);
+
     send_move_to_grasp_button_->setEnabled(selection_->grasp_selected() && !pending_move_arm_command_);
     send_move_to_flipped_grasp_button_->setEnabled(selection_->grasp_selected() && !pending_move_arm_command_);
 }
@@ -555,6 +579,8 @@ void PickAndPlacePanel::object_detection_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::ObjectDetectionResult::ConstPtr& result)
 {
+    stop_watchdog();
+
     ROS_INFO("Received object detection result");
     if (!result) {
         ROS_WARN("Object Detection Result is null");
@@ -791,6 +817,81 @@ bool PickAndPlacePanel::is_grasp_marker(const std::string& marker_name) const
 {
     assert(marker_name.size() >= 5);
     return marker_name.substr(0, 5) == std::string("grasp");
+}
+
+void PickAndPlacePanel::check_action_servers(const std_msgs::Empty::ConstPtr& msg)
+{
+    ROS_INFO("Checking for action server existence");
+
+    using actionlib::SimpleClientGoalState;
+    if (pending_detection_request_) {
+        // check for server aliveness
+        bool connected = object_detection_client_->isServerConnected();
+        if (!connected) {
+            QMessageBox::warning(this, tr("Action Client Error"), tr("Lost Connection with Object Detection Action Server"));
+            object_detection_client_.reset(new ObjectDetectionActionClient("object_detection_action", false));
+            pending_detection_request_ = false;
+        }
+
+        if (connected && object_detection_client_->getState() == SimpleClientGoalState(SimpleClientGoalState::LOST)) {
+            QMessageBox::warning(this, tr("Action Client Error"), tr("Object Detection Action Server Goal has been LOST"));
+            pending_detection_request_ = false;
+        }
+    }
+
+    if (pending_move_arm_command_) {
+        bool connected = move_arm_command_client_->isServerConnected();
+        if (!connected)
+        {
+            QMessageBox::warning(this, tr("Action Client Error"), tr("Lost Connection with Move Arm Command Action Server"));
+            pending_move_arm_command_ = false;
+        }
+
+        if (connected && move_arm_command_client_->getState() == SimpleClientGoalState(SimpleClientGoalState::LOST)) {
+            QMessageBox::warning(this, tr("Action Client Error"), tr("Move Arm Command Action Server Goal has been LOST"));
+            pending_move_arm_command_ = false;
+        }
+    }
+
+    if (!pending_move_arm_command_ && !pending_detection_request_) {
+        stop_watchdog();
+    }
+
+    update_gui();
+}
+
+void PickAndPlacePanel::watchdog_thread()
+{
+    while (ros::ok() && !shutdown_watchdog_) {
+        // wait until it's time to shutdown or start running
+        ROS_INFO("Suspending watchdog");
+        std::unique_lock<std::mutex> lock(watchdog_mutex_);
+        watchdog_condvar_.wait(lock, [this]() { return run_watchdog_ || shutdown_watchdog_; });
+        ROS_INFO("Awoke the watchdog!");
+
+        if (shutdown_watchdog_) {
+            break; // terminate
+        }
+
+        // publish empty messages at 1hz until told to stop running
+        ros::Rate r(1.0);
+        while (ros::ok() && run_watchdog_) {
+            std_msgs::Empty empty_msg;
+            refresh_pub_.publish(empty_msg);
+            r.sleep();
+        }
+    }
+}
+
+void PickAndPlacePanel::start_watchdog()
+{
+    run_watchdog_ = true;
+    watchdog_condvar_.notify_one();
+}
+
+void PickAndPlacePanel::stop_watchdog()
+{
+    run_watchdog_ = false;
 }
 
 } // namespace hdt

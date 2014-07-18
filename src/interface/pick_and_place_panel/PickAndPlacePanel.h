@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
@@ -15,6 +16,7 @@
 #include <pr2_vfh_database/ObjectFinder.h>
 #include <rviz/panel.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <std_msgs/Empty.h>
 #include <tf/transform_listener.h>
 #include <tf/tfMessage.h>
 #include <visualization_msgs/InteractiveMarker.h>
@@ -65,6 +67,7 @@ private Q_SLOTS:
 private:
 
     ros::NodeHandle nh_;
+    ros::NodeHandle ph_;
 
     // Training data selection tools
     QPushButton* open_database_button_;
@@ -121,6 +124,14 @@ private:
     typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
     std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
 
+    bool shutdown_watchdog_;
+    bool run_watchdog_;
+    std::mutex watchdog_mutex_;
+    std::condition_variable watchdog_condvar_;
+    ros::Publisher refresh_pub_;
+    ros::Subscriber refresh_sub_;
+    std::thread watchdog_thread_;
+
     void setup_gui();
 
     void point_cloud_callback(const sensor_msgs::PointCloud2::ConstPtr& msg);
@@ -170,6 +181,12 @@ private:
     // return true is the marker name denotes a grasp marker or false if it denotes a pregrasp marker
     // assumes that names of either grasp_* or pregrasp_* are given as input
     bool is_grasp_marker(const std::string& marker_name) const;
+
+    void check_action_servers(const std_msgs::Empty::ConstPtr& msg);
+
+    void watchdog_thread();
+    void start_watchdog();
+    void stop_watchdog();
 };
 
 } // namespace hdt
