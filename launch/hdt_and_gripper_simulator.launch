@@ -1,5 +1,0 @@
-<launch>
-    <include file="$(find hdt)/launch/hdt_simulator.launch"/>
-    <include file="$(find hdt)/launch/gripper_simulator.launch"/>
-</launch>
-
