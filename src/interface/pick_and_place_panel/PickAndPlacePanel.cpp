@@ -139,6 +139,11 @@ void PickAndPlacePanel::choose_kdtree_indices()
 
 void PickAndPlacePanel::take_snapshot()
 {
+    if (!object_detection_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Action Client Failure"), tr("Unable to  send Object Detection (server is not connected")));
+        return;
+    }
+
     // object detection parameters
     std::string database_fname = database_fname_label_->text().toStdString();
     std::string features_fname = features_fname_label_->text().toStdString();
@@ -170,6 +175,7 @@ void PickAndPlacePanel::take_snapshot()
     last_detection_request_.request_snapshot = true;
 
     ROS_INFO("Sent goal to action server object_detection_action");
+
     object_detection_client_->sendGoal(
             last_detection_request_, boost::bind(&PickAndPlacePanel::object_detection_result_cb, this, _1, _2));
     pending_detection_request_ = true;
