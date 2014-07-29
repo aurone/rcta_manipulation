@@ -1,14 +1,19 @@
 #include <limits>
+#include <thread>
 #include "gripper_interface.h"
 
-GripperInterface::GripperInterface(const std::shared_ptr<GripperConnection>& conn) :
+GripperInterface::GripperInterface(const std::shared_ptr<GripperConnection>& conn, double throttle_rate) :
     conn_(conn),
     model_(),
     transaction_id_(0),
     last_status_(),
     last_vel_(0xFF),
-    last_force_(0xFF)
+    last_force_(0xFF),
+    last_request_stamp_(),
+    timestamp_valid_(false),
+    update_interval_us_((int)std::ceil(1e6 / (throttle_rate <= 0.0 ? model_.update_rate() : throttle_rate)))
 {
+    printf("Update interval is %ld us\n", update_interval_us_.count());
 }
 
 GripperInterface::~GripperInterface()
@@ -19,35 +24,35 @@ bool GripperInterface::activate()
 {
     ActivateGripperRequest req(transaction_id_++);
     WriteRegistersGripperResponse res;
-    return conn_->send_request(req, res);
+    return send_request(req, res);
 }
 
 bool GripperInterface::reset()
 {
     ResetGripperRequest req(transaction_id_++);
     WriteRegistersGripperResponse res;
-    return conn_->send_request(req, res);
+    return send_request(req, res);
 }
 
 bool GripperInterface::release()
 {
     AutomaticReleaseGripperRequest req(transaction_id_++);
     WriteRegistersGripperResponse res;
-    return conn_->send_request(req, res);
+    return send_request(req, res);
 }
 
 bool GripperInterface::stop()
 {
     StopGripperRequest req(transaction_id_++);
     WriteRegistersGripperResponse res;
-    return conn_->send_request(req, res);
+    return send_request(req, res);
 }
 
 bool GripperInterface::set_position(double width)
 {
     GripperMotionRequest req(transaction_id_++, model_.width_to_pos_value(width), last_vel_, last_force_);
     WriteRegistersGripperResponse res;
-    return conn_->send_request(req, res);
+    return send_request(req, res);
 }
 
 bool GripperInterface::set_speed(double speed)
@@ -64,14 +69,14 @@ bool GripperInterface::set_position(uint8_t value)
 {
     GripperMotionRequest req(transaction_id_++, value, last_vel_, last_force_);
     WriteRegistersGripperResponse res;
-    return conn_->send_request(req, res);
+    return send_request(req, res);
 }
 
 bool GripperInterface::set_speed(uint8_t value)
 {
     GripperDynamicsRequest req(transaction_id_++, value, last_force_);
     WriteRegistersGripperResponse res;
-    if (conn_->send_request(req, res)) {
+    if (send_request(req, res)) {
         last_vel_ = value;
         return true;
     }
@@ -84,7 +89,7 @@ bool GripperInterface::set_force(uint8_t value)
 {
     GripperDynamicsRequest req(transaction_id_++, last_vel_, value);
     WriteRegistersGripperResponse res;
-    if (conn_->send_request(req, res)) {
+    if (send_request(req, res)) {
         last_force_ = value;
         return true;
     }
@@ -101,7 +106,7 @@ const bool GripperInterface::update()
         return false;
     }
 
-    if (conn_->send_request(req, *res)) {
+    if (send_request(req, *res)) {
         last_status_ = std::move(res);
         return true;
     }
@@ -263,5 +268,26 @@ const bool GripperInterface::connected() const
 {
     GripperStatusRequest req(transaction_id_++);
     GripperStatusResponse res;
+    return send_request(req, res);
+}
+
+bool GripperInterface::send_request(const GripperRequest& req, GripperResponse& res) const
+{
+    using namespace std::chrono;
+
+    time_point<high_resolution_clock> now = high_resolution_clock::now();
+
+    if (!timestamp_valid_) {
+        last_request_stamp_ = now;
+        timestamp_valid_ = true;
+    }
+    else {
+        time_point<high_resolution_clock> next_valid_time = last_request_stamp_ + update_interval_us_;
+        if (now < next_valid_time) {
+            std::this_thread::sleep_for(next_valid_time - now); // sleep until this request can be sent
+        }
+        last_request_stamp_ = high_resolution_clock::now();
+    }
+
     return conn_->send_request(req, res);
 }

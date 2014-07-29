@@ -43,6 +43,9 @@ public:
     uint8_t speed_to_speed_value(double speed) const;
     uint8_t force_to_force_value(double force) const;
 
+    /// @brief Return the update rate of the gripper's internal controller; requests should not be sent at a higher frequency.
+    const double update_rate() const;
+
 private:
 
     static const double GRIPPER_MAX_POS_M_;
@@ -59,6 +62,8 @@ private:
     static const double GRIPPER_MAX_FORCE_N_;
     static const uint8_t EFFECTIVE_MIN_FORCE_VALUE_;
     static const uint8_t EFFECTIVE_MAX_FORCE_VALUE_;
+
+    static const double GRIPPER_UPDATE_RATE_HZ_;
 };
 
 #endif

@@ -17,6 +17,7 @@ const double GripperModel::GRIPPER_MAX_FORCE_N_ = 100.0;
 const uint8_t GripperModel::EFFECTIVE_MIN_FORCE_VALUE_ = 0;
 const uint8_t GripperModel::EFFECTIVE_MAX_FORCE_VALUE_ = 255;
 
+const double GripperModel::GRIPPER_UPDATE_RATE_HZ_ = 200.0;
 
 const double GripperModel::minimum_width() const
 {
@@ -135,4 +136,9 @@ uint8_t GripperModel::speed_to_speed_value(double speed) const
 uint8_t GripperModel::force_to_force_value(double force) const
 {
     return (uint8_t)round((clamp(force, GRIPPER_MIN_FORCE_N_, GRIPPER_MAX_FORCE_N_) - minimum_force()) / force_per_tick());
+}
+
+const double GripperModel::update_rate() const
+{
+    return GRIPPER_UPDATE_RATE_HZ_;
 }

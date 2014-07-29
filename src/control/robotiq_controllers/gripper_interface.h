@@ -1,6 +1,7 @@
 #ifndef GripperInterface_h
 #define GripperInterface_h
 
+#include <chrono>
 #include <memory>
 #include "gripper_connection.h"
 #include "gripper_model.h"
@@ -13,7 +14,7 @@ class GripperInterface
 {
 public:
 
-    GripperInterface(const std::shared_ptr<GripperConnection>& conn);
+    GripperInterface(const std::shared_ptr<GripperConnection>& conn, double throttle_rate = 0.0);
     ~GripperInterface();
 
     const bool connected() const;
@@ -73,8 +74,15 @@ private:
 
     uint8_t last_vel_, last_force_;
 
+    mutable bool timestamp_valid_;
+    mutable std::chrono::time_point<std::chrono::high_resolution_clock> last_request_stamp_;
+
+    std::chrono::microseconds update_interval_us_;
+
     std::shared_ptr<GripperConnection> conn_;
     std::unique_ptr<GripperStatusResponse> last_status_;
+
+    bool send_request(const GripperRequest& req, GripperResponse& res) const;
 };
 
 #endif
