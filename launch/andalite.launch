@@ -1,0 +1,39 @@
+<launch>
+    <arg name="sim" default="false"/>
+    <arg name="kinect_sensor" default="false"/> <!-- false = asus, true = kinect -->
+
+    <!-- UPLOAD URDF -->
+    <include file="$(find hdt)/launch/upload_andalite.launch">
+        <arg name="sim" value="$(arg sim)"/>
+        <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
+    </include>
+
+    <!-- LAUNCH OPENNI IN LIVE MODE -->
+    <group unless="$(arg sim)">
+        <include file="$(find hdt)/launch/openni.launch">
+            <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
+        </include>
+    </group>
+
+    <!-- LAUNCH ARM DRIVER UNDER SIM, LAUNCH SEPARATELY AS ROOT IN LIVE MODE -->
+    <group if="$(arg sim)">
+        <include file="$(find hdt)/launch/hdt_arm_driver.launch">
+            <arg name="sim" value="$(arg sim)"/>
+        </include>
+    </group>
+
+    <!-- LAUNCH GRIPPER DRIVER (CURRENTLY BROKEN) -->
+    <!-- <node name="robotiq_controller" pkg="hdt" type="robotiq_controller" args="live" output="screen"/> -->
+
+    <!-- SURROGATE PROVIDERS OF /joint_states -->
+    <include file="$(find hdt)/launch/husky_simulator.launch"/>
+    <include file="$(find hdt)/launch/gripper_simulator.launch"/>
+
+    <group if="$(arg kinect_sensor)">
+        <node name="kinect_simulator" pkg="hdt" type="kinect_simulator" args="--mode=static -31"/>
+    </group>
+
+    <!-- launch robot_state_publisher to translate urdf + /joint_states to /tf -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+</launch>
+

@@ -3,7 +3,13 @@
       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
       xmlns:xacro="http://ros.org/wiki/xacro">
-  
+
+  <!-- Provides:
+       one fixed transform for the base of the kinect
+       one revolute joint for the kinect neck
+       one fixed transform to the canonical frame of the camera
+       multiple fixed transforms for convenient sensor frames -->
+
   <include filename="$(find hdt)/config/urdf/kinect_camera.gazebo.xacro" />
 
   <xacro:macro name="kinect_camera_v0" params="name parent *origin">
@@ -112,6 +118,5 @@
     <!-- extensions -->
     <xacro:kinect_camera_gazebo_v0 name="${name}" />
   </xacro:macro>
-
 </root>
 

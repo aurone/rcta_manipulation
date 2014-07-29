@@ -3,7 +3,12 @@
       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
       xmlns:xacro="http://ros.org/wiki/xacro">
-  
+
+  <!-- Provides:
+       one fixed transform for the base of the kinect
+       one revolute joint for the kinect neck
+       one fixed transform to the canonical frame of the kinect -->
+
   <include filename="$(find hdt)/config/urdf/kinect_camera.gazebo.xacro" />
 
   <xacro:property name="min_tilt_angle" value="${-27 * degrees}"/>
