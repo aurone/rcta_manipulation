@@ -266,7 +266,7 @@ std::vector<uint8_t>
 GripperStatusRequest::construct_payload() const
 {
     uint8_t buff[] = { hi(ADDRESS_REGISTER0), lo(ADDRESS_REGISTER0),
-                       0x00, 0x06 };
+                       0x00, 0x03 };
     return create_msg_data(buff, sizeof(buff), OpType::Read);
 }
 
@@ -314,7 +314,7 @@ bool GripperStatusResponse::gto_on() const
 
 Status GripperStatusResponse::status() const
 {
-    const uint8_t sbits = (((data()[0] >> 5) & 0x01) << 1) | ((data()[0] >> 4) & (0x01));
+    const uint8_t sbits = (((data()[0] >> 4) & 0x01) << 1) | ((data()[0] >> 5) & (0x01));
     if (sbits == 0x00) {
         return Status::Reset;
     }
