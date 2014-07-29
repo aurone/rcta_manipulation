@@ -95,7 +95,6 @@ bool GripperInterface::set_force(uint8_t value)
 
 const bool GripperInterface::update()
 {
-//    printf("Updating\n");
     GripperStatusRequest req(transaction_id_++);
     std::unique_ptr<GripperStatusResponse> res(new GripperStatusResponse);
     if (!res) {
