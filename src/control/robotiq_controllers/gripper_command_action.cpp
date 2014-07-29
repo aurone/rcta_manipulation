@@ -29,7 +29,7 @@ GripperCommandActionExecutor::GripperCommandActionExecutor(ros::NodeHandle& nh) 
     result_(),
     connection_(),
     gripper_(),
-    gripper_update_rate_(200)
+    gripper_throttle_rate_hz_(30)
 {
 }
 
@@ -65,7 +65,7 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
     }
 
     GripperConnection::ConnectionOptions ops;
-    ops.ip_address = gripper_ip; 
+    ops.ip_address = gripper_ip;
     ops.portno = (uint16_t)portno;
 
     // connect to gripper with configured connection
@@ -87,7 +87,8 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
     // create an interface to the gripper
     ROS_INFO("Connected to gripper");
 
-    gripper_.reset(new GripperInterface(connection_));
+    // don't allow this node to rely on sending gripper commands faster than 30hz (force gripper interface to throttle attempts)
+    gripper_.reset(new GripperInterface(connection_, gripper_throttle_rate_hz_));
     if (!gripper_) {
         ROS_ERROR("Failed to instantiate Gripper Interface");
         return FAILED_TO_INITIALIZE;
@@ -95,12 +96,17 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
 
     ROS_INFO("Activating the gripper");
     gripper_->activate();
-    gripper_->update();
-    while (gripper_->is_activating()) {
-        gripper_update_rate_.sleep();
+    if (!gripper_->update()) {
+        ROS_WARN("Failed to update gripper after activation request");
+    }
+
+    ROS_INFO("Waiting for gripper to activate");
+    while (!gripper_->is_activated()) {
         gripper_->update();
     }
-    ROS_INFO("Gripper activated");
+    ROS_INFO("Gripper finished activating");
+
+    ROS_INFO("Gripper activated. State is %s", ::to_string(gripper_->get_status()).c_str());
 
     ROS_INFO("Starting action server...");
 
@@ -117,7 +123,6 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
     joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_states", 5);
 
     const std::vector<std::string> fake_joint_names = { "finger1", "finger2" };
-    ros::Rate loop_rate(gripper_update_rate_);
     while (ros::ok())
     {
         static int seqno = 0;
@@ -150,7 +155,7 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
     }
 
     action_server_->shutdown();
-    
+
     return SUCCESS;
 }
 
@@ -191,7 +196,7 @@ void GripperCommandActionExecutor::goal_callback(const control_msgs::GripperComm
             finished = true;
         }
         else {
-            gripper_update_rate_.sleep();
+            ros::Duration(gripper_throttle_rate_hz_).sleep();
         }
     }
     while (!finished);

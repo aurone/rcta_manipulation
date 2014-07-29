@@ -46,7 +46,7 @@ private:
     std::shared_ptr<GripperConnection> connection_;
     std::shared_ptr<GripperInterface> gripper_;
 
-    ros::Rate gripper_update_rate_;
+    double gripper_throttle_rate_hz_;
 
     ros::Publisher joint_state_pub_;
 

@@ -39,6 +39,12 @@ void print_status(const GripperInterface& gripper)
     printf("Fault Status:           %s\n", to_string(gripper.get_fault_status()).c_str());
 }
 
+void sleep_for_gripper_update()
+{
+    const unsigned int gripper_update_us = 5000;
+    usleep(gripper_update_us);
+}
+
 int main(int argc, char *argv[])
 {
     std::shared_ptr<GripperConnection> default_conn;
@@ -129,10 +135,13 @@ int main(int argc, char *argv[])
             }
         }
 
+        sleep_for_gripper_update();
+
         if (!gripper.update()) {
             fprintf(stderr, "Failed to update gripper\n");
             exit(3);
         }
+
         print_status(gripper);
     }
 
