@@ -123,6 +123,7 @@ private:
     typedef control_msgs::GripperCommandResult GripperCommandResult;
     typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
     std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
+    bool pending_gripper_command_;
 
     bool shutdown_watchdog_;
     bool run_watchdog_;

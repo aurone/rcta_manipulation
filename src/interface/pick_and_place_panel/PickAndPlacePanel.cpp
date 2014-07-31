@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <pcl_ros/transforms.h>
 #include <tf/transform_broadcaster.h>
+#include <hdt/control/robotiq_controllers/gripper_model.h>
 #include "PickAndPlacePanel.h"
 #include "SimpleInteractiveMarker.h"
 #include "GraspMarkerSelectionMarker.h"
@@ -44,6 +45,7 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
     pending_move_arm_command_(false),
     object_detection_client_(),
     gripper_command_client_(),
+    pending_gripper_command_(false),
     shutdown_watchdog_(false),
     run_watchdog_(false),
     watchdog_mutex_(),
@@ -301,10 +303,12 @@ void PickAndPlacePanel::send_open_gripper_command()
         GripperCommandGoal goal_msg;
         goal_msg.command.position = 0.0854;
         gripper_command_client_->sendGoal(goal_msg, boost::bind(&PickAndPlacePanel::gripper_command_result_cb, this, _1, _2));
+        pending_gripper_command_ = true;
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
     }
+    update_gui();
 }
 
 void PickAndPlacePanel::send_close_gripper_command()
@@ -314,10 +318,12 @@ void PickAndPlacePanel::send_close_gripper_command()
         GripperCommandGoal goal_msg;
         goal_msg.command.position = 0.0;
         gripper_command_client_->sendGoal(goal_msg, boost::bind(&PickAndPlacePanel::gripper_command_result_cb, this, _1, _2));
+        pending_gripper_command_ = true;
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
     }
+    update_gui();
 }
 
 void PickAndPlacePanel::camera_frame_box_current_index_changed(int index)
@@ -546,6 +552,7 @@ void PickAndPlacePanel::gripper_command_result_cb(
     const GripperCommandResult::ConstPtr& result)
 {
     ROS_INFO("Gripper command completed");
+    pending_gripper_command_ = false;
 }
 
 void PickAndPlacePanel::move_arm_command_active_cb()
