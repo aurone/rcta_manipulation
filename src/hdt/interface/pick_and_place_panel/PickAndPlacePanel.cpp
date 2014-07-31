@@ -307,6 +307,7 @@ void PickAndPlacePanel::send_open_gripper_command()
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
+        gripper_command_client_.reset(new GripperCommandActionClient("gripper_controller/gripper_command_action", false));
     }
     update_gui();
 }
@@ -322,6 +323,7 @@ void PickAndPlacePanel::send_close_gripper_command()
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
+        gripper_command_client_.reset(new GripperCommandActionClient("gripper_controller/gripper_command_action", false));
     }
     update_gui();
 }
