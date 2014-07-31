@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/GripperCommandAction.h>
@@ -49,6 +50,8 @@ private:
     double gripper_throttle_rate_hz_;
 
     ros::Publisher joint_state_pub_;
+
+    std::mutex gripper_mutex_;
 
     void goal_callback(const control_msgs::GripperCommandGoalConstPtr& goal);
 

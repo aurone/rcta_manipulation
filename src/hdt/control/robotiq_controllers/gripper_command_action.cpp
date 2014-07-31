@@ -29,7 +29,9 @@ GripperCommandActionExecutor::GripperCommandActionExecutor(ros::NodeHandle& nh) 
     result_(),
     connection_(),
     gripper_(),
-    gripper_throttle_rate_hz_(30)
+    gripper_throttle_rate_hz_(30),
+    joint_state_pub_(),
+    gripper_mutex_()
 {
 }
 
@@ -125,12 +127,15 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
     const std::vector<std::string> fake_joint_names = { "finger1", "finger2" };
     while (ros::ok())
     {
+        ros::Rate loop_rate(gripper_throttle_rate_hz_);
+        gripper_mutex_.lock();
         static int seqno = 0;
         gripper_->update();
 
         double gripper_pos = gripper_->get_position();
         double gripper_speed = gripper_->get_speed();
         double gripper_force = gripper_->get_force();
+        gripper_mutex_.unlock();
 
         if (gripper_pos != -1.0) {
             sensor_msgs::JointState joint_state;
@@ -152,6 +157,7 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
         }
 
         ros::spinOnce();
+        loop_rate.sleep();
     }
 
     action_server_->shutdown();
@@ -162,12 +168,13 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
 void GripperCommandActionExecutor::goal_callback(const control_msgs::GripperCommandGoalConstPtr& goal)
 {
     ROS_INFO("Received Gripper Command Goal");
+    std::unique_lock<std::mutex> lock(gripper_mutex_);
+
     ROS_INFO("  position: %0.3f", goal->command.position);
     ROS_INFO("  max_effort: %0.3f", goal->command.max_effort);
 
     bool finished = false;
     bool success = true;
-
 
     gripper_->set_force(goal->command.max_effort);
     gripper_->set_position(goal->command.position);
@@ -182,22 +189,30 @@ void GripperCommandActionExecutor::goal_callback(const control_msgs::GripperComm
             break;
         }
 
+        ROS_INFO("Update!");
         gripper_->update();
         double gripper_position = gripper_->get_position();
 
-        ROS_INFO("Gripper position is %0.3f", gripper_position);
+        ROS_INFO("Gripper position is at %0.3f", gripper_position);
 
         feedback_.position = gripper_position;
         feedback_.effort = gripper_->get_force();
         feedback_.stalled = !gripper_->fingers_in_motion();
         feedback_.reached_goal = gripper_->completed_positioning();
 
-        if (fabs(gripper_position - commanded_position) < 1e-3 && !gripper_->fingers_in_motion()) {
+        if (!gripper_->fingers_in_motion()) {
+            ROS_WARN("Gripper position was set but gripper reports fingers not in motion");
+        }
+
+        if (gripper_->completed_positioning()) {
             finished = true;
         }
-        else {
-            ros::Duration(gripper_throttle_rate_hz_).sleep();
+        else if (gripper_->made_contact_closing() || gripper_->made_contact_opening()) {
+            // TODO: signal not successful or explicit "error" code for the terminal status
+            finished = true;
         }
+
+        // NOTE: GripperInterface::update will throttle this loop to the configured throttle rate
     }
     while (!finished);
 
@@ -211,6 +226,7 @@ void GripperCommandActionExecutor::goal_callback(const control_msgs::GripperComm
     }
     else {
         ROS_WARN("%s failed", action_server_name_.c_str());
+        action_server_->setSucceeded(result_);
     }
 }
 
