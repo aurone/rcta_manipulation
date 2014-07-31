@@ -58,7 +58,7 @@ add_definitions(-DQT_NO_KEYWORDS)
 # required to locate compiled headers for designer forms
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) 
 
-add_action_files(DIRECTORY action FILES ObjectDetection.action MoveArmCommand.action)
+add_action_files(DIRECTORY action FILES ObjectDetection.action MoveArmCommand.action ViservoCommand.action)
 add_message_files(FILES
     ControllerDiagnosticStatus.msg 
     JointDiagnosticStatus.msg 

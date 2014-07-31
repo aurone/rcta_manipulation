@@ -1,0 +1,9 @@
+# goal definition
+int32 goal_id
+geometry_msgs/Pose goal_pose
+---
+# feedback definition
+float64 pct_complete
+---
+# result definition
+bool success
