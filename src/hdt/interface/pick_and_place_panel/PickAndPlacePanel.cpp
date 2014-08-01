@@ -301,13 +301,21 @@ void PickAndPlacePanel::send_open_gripper_command()
     ROS_INFO("Opening the gripper!");
     if (gripper_command_client_->isServerConnected()) {
         GripperCommandGoal goal_msg;
-        goal_msg.command.position = 0.0854;
+        goal_msg.command.position = GripperModel().maximum_width();
+        goal_msg.command.max_effort = GripperModel().minimum_force();
         gripper_command_client_->sendGoal(goal_msg, boost::bind(&PickAndPlacePanel::gripper_command_result_cb, this, _1, _2));
         pending_gripper_command_ = true;
     }
     else {
         ROS_INFO("Gripper Command Client is not yet connected");
         gripper_command_client_.reset(new GripperCommandActionClient("gripper_controller/gripper_command_action", false));
+        ROS_INFO("Waiting for action server to come up");
+        if (gripper_command_client_->waitForServer(ros::Duration(5.0))) {
+            ROS_INFO("Gripper command action server available");
+        }
+        else {
+            ROS_INFO("Timed out waiting for gripper command action server");
+        }
     }
     update_gui();
 }
@@ -317,7 +325,8 @@ void PickAndPlacePanel::send_close_gripper_command()
     ROS_INFO("Closing the gripper!");
     if (gripper_command_client_->isServerConnected()) {
         GripperCommandGoal goal_msg;
-        goal_msg.command.position = 0.0;
+        goal_msg.command.position = GripperModel().minimum_width();
+        goal_msg.command.max_effort = GripperModel().minimum_force();
         gripper_command_client_->sendGoal(goal_msg, boost::bind(&PickAndPlacePanel::gripper_command_result_cb, this, _1, _2));
         pending_gripper_command_ = true;
     }
@@ -553,7 +562,7 @@ void PickAndPlacePanel::gripper_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const GripperCommandResult::ConstPtr& result)
 {
-    ROS_INFO("Gripper command completed");
+    ROS_INFO("Gripper command completed. Gripper at position %0.3f", result->position);
     pending_gripper_command_ = false;
 }
 
