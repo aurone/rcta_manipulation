@@ -53,7 +53,12 @@ private:
 
     std::mutex gripper_mutex_;
 
-    void goal_callback(const control_msgs::GripperCommandGoalConstPtr& goal);
+    control_msgs::GripperCommandGoal::ConstPtr curr_goal_;
+
+    void execute_callback(const control_msgs::GripperCommandGoalConstPtr& goal);
+
+    void goal_callback();
+    void preempt_callback();
 
     unsigned long resolve_to_ipv4(const std::string& hostname, uint16_t portno);
 };
