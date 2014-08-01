@@ -1,0 +1,2 @@
+add_executable(repeatability_measure repeatability_measure.cpp RepeatabilityMeasurementNode.cpp)
+target_link_libraries(repeatability_measure ${catkin_LIBRARIES})
