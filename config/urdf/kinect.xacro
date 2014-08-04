@@ -1,5 +1,12 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+	<!-- Provides:
+		one fixed transform for the base of the kinect
+			kinect_mount
+		one revolute joint for the kinect neck
+			kinect_base_link
+	-->	
+
     <include filename="$(find hdt)/config/urdf/common.xacro"/>
 
     <xacro:property name="min_tilt_angle" value="${-27 * degrees}"/>

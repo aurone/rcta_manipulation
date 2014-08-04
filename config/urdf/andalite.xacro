@@ -5,7 +5,6 @@
     <include filename="$(find hdt)/config/urdf/hdt.xacro"/>
     <include filename="$(find hdt)/config/urdf/fake_gripper.xacro"/>
     <include filename="$(find hdt)/config/urdf/shelf.xacro"/>
-    <include filename="$(find hdt)/config/urdf/kinect.xacro"/>
     <include filename="$(find hdt)/config/urdf/kinect_camera.urdf.xacro"/>
 
     <!-- describe the fixed front bumper to shelf transforms -->
