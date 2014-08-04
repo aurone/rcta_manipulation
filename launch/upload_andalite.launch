@@ -9,6 +9,7 @@
         </group>
         <group unless="$(arg kinect_sensor)">
             <!-- TODO: describe xtion camera in sim mode -->
+            <param name="robot_description" command="$(find xacro)/xacro.py '$(find hdt)/config/urdf/andalite.xacro'"/>
         </group>
     </group>
 
