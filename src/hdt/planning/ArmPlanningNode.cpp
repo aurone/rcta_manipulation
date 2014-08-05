@@ -78,7 +78,7 @@ bool ArmPlanningNode::init()
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ArmPlanningNode::joint_states_callback, this);
 
     move_command_server_.reset(new MoveArmActionServer(
-            "move_arm_command", boost::bind(&ArmPlanningNode::move_arm, this, _1), true));
+            "move_arm_command", boost::bind(&ArmPlanningNode::move_arm, this, _1), false));
     if (!move_command_server_) {
         ROS_ERROR("Failed to instantiate Move Arm Action Server");
         return false;
@@ -257,8 +257,6 @@ bool ArmPlanningNode::init_sbpl()
 
 void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 {
-    move_command_server_->acceptNewGoal();
-
     tf::Quaternion goal_quat(request->goal_pose.orientation.x, request->goal_pose.orientation.y, request->goal_pose.orientation.z, request->goal_pose.orientation.w);
     tf::Matrix3x3 goal_rotation_matrix(goal_quat);
 
