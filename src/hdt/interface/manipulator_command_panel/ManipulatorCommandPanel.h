@@ -41,6 +41,7 @@ public Q_SLOTS:
     void copy_current_state();
     void refresh_robot_description();
     void send_move_arm_command();
+    void send_joint_goal();
     void cycle_ik_solutions();
 
     void change_joint_1(int value);
@@ -81,6 +82,7 @@ private:
     QPushButton* copy_current_state_button_;
     QPushButton* refresh_robot_desc_button_;
     QPushButton* send_move_arm_command_button_;
+    QPushButton* send_joint_goal_button_;
     QPushButton* cycle_ik_solutions_button_;
     QSlider* joint_1_slider_;
     QSlider* joint_2_slider_;

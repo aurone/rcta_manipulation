@@ -38,6 +38,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     copy_current_state_button_(nullptr),
     refresh_robot_desc_button_(nullptr),
     send_move_arm_command_button_(nullptr),
+    send_joint_goal_button_(nullptr),
     cycle_ik_solutions_button_(nullptr),
     joint_1_slider_(nullptr),
     joint_2_slider_(nullptr),
@@ -52,6 +53,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     copy_current_state_button_ = new QPushButton(tr("Copy Current State"));
     refresh_robot_desc_button_ = new QPushButton(tr("Refresh Robot Description"));
     send_move_arm_command_button_ = new QPushButton(tr("Send Move Arm Command"));
+    send_joint_goal_button_ = new QPushButton(tr("Send Joint Goal"));
     cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
 
     joint_1_slider_ = new QSlider(Qt::Horizontal);
@@ -66,6 +68,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     layout->addWidget(copy_current_state_button_);
     layout->addWidget(refresh_robot_desc_button_);
     layout->addWidget(send_move_arm_command_button_);
+    layout->addWidget(send_joint_goal_button_);
     layout->addWidget(cycle_ik_solutions_button_);
     layout->addWidget(joint_1_slider_);
     layout->addWidget(joint_2_slider_);
@@ -82,6 +85,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
     connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
     connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
+    connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
     connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
     connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
     connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
@@ -151,18 +155,55 @@ void ManipulatorCommandPanel::send_move_arm_command()
 
     hdt::MoveArmCommandGoal move_arm_goal;
 
+    move_arm_goal.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
+
     // mounting frame -> eef = mounting_frame -> root * root -> eef
     const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
-    tf::poseEigenToMsg(root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(), move_arm_goal.goal_pose);
+    tf::poseEigenToMsg(
+            root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(),
+            move_arm_goal.goal_pose);
 
     // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
-    Eigen::Affine3d manipulator_frame_to_eef_frame = mount_frame_to_manipulator_frame_.inverse() * root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
+    Eigen::Affine3d manipulator_frame_to_eef_frame =
+            mount_frame_to_manipulator_frame_.inverse() *
+            root_to_mount_frame.inverse() *
+            rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
+
     geometry_msgs::Pose eef_in_manipulator_frame;
     tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
     ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
 
-    move_arm_client_->sendGoal(
-            move_arm_goal, boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2));
+    auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
+    move_arm_client_->sendGoal(move_arm_goal, result_callback);
+
+    pending_move_arm_command_ = true;
+    update_gui();
+}
+
+void ManipulatorCommandPanel::send_joint_goal()
+{
+    if (!move_arm_client_) {
+        ROS_WARN("Move Arm Client has not yet been instantiated");
+        return;
+    }
+
+    if (!move_arm_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
+        return;
+    }
+
+    hdt::MoveArmCommandGoal move_arm_goal;
+    move_arm_goal.type = hdt::MoveArmCommandGoal::JointGoal;
+
+    move_arm_goal.goal_joint_state.header.stamp = ros::Time::now();
+    move_arm_goal.goal_joint_state.name = robot_model_.joint_names();
+    move_arm_goal.goal_joint_state.position.reserve(7);
+    for (const std::string& joint_name : robot_model_.joint_names()) {
+        move_arm_goal.goal_joint_state.position.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
+    }
+
+    auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
+    move_arm_client_->sendGoal(move_arm_goal, result_callback);
 
     pending_move_arm_command_ = true;
     update_gui();
@@ -832,6 +873,7 @@ void ManipulatorCommandPanel::update_sliders()
 void ManipulatorCommandPanel::update_gui()
 {
     send_move_arm_command_button_->setEnabled(!pending_move_arm_command_);
+    send_joint_goal_button_->setEnabled(!pending_move_arm_command_);
 }
 
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const
