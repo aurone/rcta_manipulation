@@ -85,7 +85,11 @@ private:
     ros::NodeHandle ph_;
 
     Eigen::Vector3d workspace_min_, workspace_max_;
-    double roll_offset_, pitch_offset_, yaw_offset_;
+
+    /// orientation offsets from the camera frame
+    double roll_offset_degs_;
+    double pitch_offset_degs_;
+    double yaw_offset_degs_;
 
     Eigen::Vector3i num_samples_;
     Eigen::Vector3d sample_res_;
@@ -100,6 +104,8 @@ private:
 
     tf::TransformListener listener_;
     ros::Publisher joint_cmd_pub_;
+
+    ros::Publisher sample_eef_pose_marker_pub_;
 
     ros::Subscriber joint_states_sub_;
 
@@ -118,6 +124,7 @@ private:
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
     std::string move_arm_command_action_name_;
+    bool pending_command_;
 
     std::string urdf_description_;
     hdt::RobotModel robot_model_;

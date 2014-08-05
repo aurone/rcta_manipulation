@@ -1,10 +1,35 @@
 #include "RepeatabilityMeasurementNode.h"
 
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <sstream>
 #include <eigen_conversions/eigen_msg.h>
+#include <sbpl_geometry_utils/utils.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/stringifier/stringifier.h>
+
+std::string parseandpad(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    const int max_chars = 150 + 1;
+    char buffer[max_chars] = { 0 };
+    int retVal = vsnprintf(buffer, max_chars, fmt, args);
+
+    if (retVal >= 0 && retVal < max_chars) {
+        for (int r = retVal; r < max_chars - 1; ++r) {
+            buffer[r] = ' ';
+        }
+    }
+    buffer[max_chars - 1] = '\0';
+    va_end(args);
+    return std::string(buffer);
+}
+
+#define AU_INFO(fmt, ...) ROS_INFO("%s", parseandpad(fmt, ##__VA_ARGS__).c_str())
 
 namespace hdt
 {
@@ -27,9 +52,9 @@ RepeatabilityMeasurementNode::RepeatabilityMeasurementNode() :
     ph_("~"),
     workspace_min_(),
     workspace_max_(),
-    roll_offset_(),
-    pitch_offset_(),
-    yaw_offset_(),
+    roll_offset_degs_(),
+    pitch_offset_degs_(),
+    yaw_offset_degs_(),
     num_samples_(),
     sample_res_(),
     num_roll_samples_(),
@@ -49,7 +74,8 @@ RepeatabilityMeasurementNode::RepeatabilityMeasurementNode() :
     last_markers_msg_(),
     last_joint_state_msg_(),
     urdf_description_(),
-    robot_model_()
+    robot_model_(),
+    pending_command_(false)
 {
 }
 
@@ -92,7 +118,7 @@ int RepeatabilityMeasurementNode::run()
     {
         ros::spinOnce();
         if (!move_arm_command_client_->isServerConnected()) {
-            ROS_INFO("Waiting to connect to action server %s", move_arm_command_action_name_.c_str());
+            AU_INFO("Waiting to connect to action server %s", move_arm_command_action_name_.c_str());
         }
         else {
             break;
@@ -100,36 +126,74 @@ int RepeatabilityMeasurementNode::run()
         waitLoopRate.sleep();
     }
 
-    ROS_INFO("Connected to action server '%s'", move_arm_command_action_name_.c_str());
+    AU_INFO("Connected to action server '%s'", move_arm_command_action_name_.c_str());
 
     const double ninety_rads = M_PI / 2.0;
     camera_frame_to_tool_frame_rotation_ = Eigen::Affine3d(Eigen::AngleAxisd(ninety_rads, Eigen::Vector3d::UnitZ()));
 
     // subscribe to joint states and ar markers
     joint_cmd_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
+    sample_eef_pose_marker_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("sample_pose_markers", 1);
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &RepeatabilityMeasurementNode::joint_states_callback, this);
 
     // 2. create sparse discretized sampling
     std::vector<geometry_msgs::Pose> sample_poses = generate_sample_poses();
 
+    AU_INFO("Minimum x is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(),
+                    [](const geometry_msgs::Pose& p, const geometry_msgs::Pose& q)
+                    { return p.position.x < q.position.x; })->position.x);
+    AU_INFO("Minimum y is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(), [](const geometry_msgs::Pose& p, const geometry_msgs::Pose& q) { return p.position.y < q.position.y; })->position.y);
+    AU_INFO("Minimum z is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(), [](const geometry_msgs::Pose& p, const geometry_msgs::Pose& q) { return p.position.z < q.position.z; })->position.z);
+
+    AU_INFO("Generated %zd sample end effector locations within view of the camera", sample_poses.size());
+
     // try to move to each ik solution
     for (const auto& pose : sample_poses)
     {
         geometry_msgs::PoseStamped pose_stamped;
-        pose_stamped.header.stamp = ros::Time::now();
+        pose_stamped.header.stamp = ros::Time(0);//::now();
         pose_stamped.header.seq = 0;
         pose_stamped.header.frame_id = camera_frame_;
         pose_stamped.pose = pose;
         geometry_msgs::PoseStamped eef_pose_mount_frame;
+
+        if (!listener_.waitForTransform(mount_frame_, camera_frame_, ros::Time::now(), ros::Duration(5.0))) {
+            ROS_WARN("Unable to transform sample pose in the camera frame to the mounting frame");
+            continue;
+        }
+
         try {
             listener_.transformPose(mount_frame_, pose_stamped, eef_pose_mount_frame);
         }
         catch (const tf::TransformException& ex) {
-            ROS_WARN("Fuck TF");
+            ROS_WARN("Failed to transform pose from frame '%s' to '%s'. Fuck TF!", camera_frame_.c_str(), mount_frame_.c_str());
         }
+
+        ROS_INFO("Transformed %s (%s -> %s) = %s",
+                to_string(pose_stamped.pose).c_str(), pose_stamped.header.frame_id.c_str(),
+                eef_pose_mount_frame.header.frame_id.c_str(), to_string(eef_pose_mount_frame.pose).c_str());
 
         Eigen::Affine3d mount_to_eef;
         tf::poseMsgToEigen(eef_pose_mount_frame.pose, mount_to_eef);
+
+        AU_INFO("Measuring repeatability for end effector pose %s", to_string(mount_to_eef).c_str());
+
+        auto publish_triad = [&](){
+            // publish the new pose marker
+            geometry_msgs::Vector3 marker_scale;
+            marker_scale.x = 0.1;
+            marker_scale.y = marker_scale.z = 0.01;
+            visualization_msgs::MarkerArray pose_markers = msg_utils::create_triad_marker_arr(marker_scale);
+            for (visualization_msgs::Marker& marker : pose_markers.markers) {
+                Eigen::Affine3d marker_pose_eef_frame;
+                tf::poseMsgToEigen(marker.pose, marker_pose_eef_frame);
+                Eigen::Affine3d mount_to_marker = mount_to_eef * marker_pose_eef_frame;
+                tf::poseEigenToMsg(mount_to_marker, marker.pose);
+                marker.header.frame_id = mount_frame_;
+            }
+            sample_eef_pose_marker_pub_.publish(pose_markers);
+        };
+        publish_triad();
 
         // move back and forth between the egress position and the ik solution until all transitions have been attempted
         for (const auto& egress_position : egress_positions_) {
@@ -137,29 +201,42 @@ int RepeatabilityMeasurementNode::run()
             std::vector<double> seed(robot_model_.joint_names().size(), 0.0);
             seed[robot_model_.free_angle_index()] = egress_position.a4;
 
-            hdt::IKSolutionGenerator iksols = robot_model_.compute_all_ik_solutions(mount_to_eef, seed);
+
+            hdt::IKSolutionGenerator iksols = robot_model_.compute_all_ik_solutions(mount_to_eef.inverse(), seed);
+            int num_ik_solutions_attempted = 0;
             std::vector<double> iksol;
-            while (iksols(iksol))
+            bool res = robot_model_.compute_nearest_ik(mount_to_eef, seed, iksol);
+            if (res)//while (iksols(iksol))
             {
-                if (!move_to_position(egress_position))
-                {
-                    ROS_WARN("Failed to move to egress position");
-                }
+                publish_triad();
+                AU_INFO("  Moving to egress position %s", to_string(egress_position).c_str());
+//                if (!move_to_position(egress_position))
+//                {
+//                    ROS_WARN("    Failed to move to egress position");
+//                    continue;
+//                }
 
                 // move to the ik position
                 hdt::JointState js;
                 std::memcpy(&js, iksol.data(), iksol.size() * sizeof(double));
+                AU_INFO("  Moving to IK solution %s", to_string(js).c_str());
                 if (!move_to_position(js))
                 {
-                    ROS_WARN("Failed to move to ik solution");
+                    ROS_WARN("    Failed to move to ik solution");
+                    continue;
                 }
 
                 // record the marker pose and compare with the other times that we have moved to this end effector pose
+                AU_INFO("  Recording marker pose at this joint position");
                 geometry_msgs::Pose marker_pose_camera_frame;
                 if (!track_marker_pose(ros::Duration(1.0), marker_pose_camera_frame)) {
                     ROS_WARN("Unable to detect marker at pose %s", to_string(pose).c_str());
                 }
+
+                ++num_ik_solutions_attempted;
             }
+
+            AU_INFO("  Attempted %d IK Solutions", num_ik_solutions_attempted);
         }
     }
 
@@ -201,11 +278,19 @@ bool RepeatabilityMeasurementNode::download_params()
     workspace_max_(1) = workspace_max_coords[1];
     workspace_max_(2) = workspace_max_coords[2];
 
-    if (!ph_.getParam("roll_offset_degs", roll_offset_) ||
-        !ph_.getParam("pitch_offset_degs", pitch_offset_) ||
-        !ph_.getParam("yaw_offset_degs", yaw_offset_))
+    if (!ph_.getParam("roll_offset_degs", roll_offset_degs_) ||
+        !ph_.getParam("pitch_offset_degs", pitch_offset_degs_) ||
+        !ph_.getParam("yaw_offset_degs", yaw_offset_degs_))
     {
         ROS_ERROR("Failed to retrieve angle offset parameters from config");
+        return false;
+    }
+
+    if (!ph_.getParam("sample_resolution_x", sample_res_(0)) ||
+        !ph_.getParam("sample_resolution_y", sample_res_(1)) ||
+        !ph_.getParam("sample_resolution_z", sample_res_(2)))
+    {
+        ROS_ERROR("Failed to retrieve sampling parameters");
         return false;
     }
 
@@ -262,7 +347,7 @@ bool RepeatabilityMeasurementNode::download_egress_positions()
 
         egress_positions_.push_back(joint_state);
 
-        ROS_INFO("Read in egress position %s", to_string(joint_state).c_str());
+        AU_INFO("Read in egress position %s", to_string(joint_state).c_str());
     }
 
     return true;
@@ -293,7 +378,7 @@ const char* RepeatabilityMeasurementNode::to_cstring(XmlRpc::XmlRpcValue::Type t
 
 std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_poses()
 {
-    const double sample_resolution_m = 0.15; // ideal linear discretization
+    const double sample_resolution_m = 0.10; // ideal linear discretization
     const double sample_angle_res_degs = 30.0; // ideal angular discretization
 
     Eigen::Vector3d workspace_size = workspace_max_ - workspace_min_;
@@ -306,45 +391,50 @@ std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_p
     sample_res_(1) = workspace_size(1) / (num_samples_(1) - 1);
     sample_res_(2) = workspace_size(2) / (num_samples_(2) - 1);
 
-    num_roll_samples_ = (int)std::round(2 * roll_offset_ / sample_angle_res_degs) + 1;
-    roll_res_ = 2 * roll_offset_ / (num_roll_samples_ - 1);
+    num_roll_samples_ = (int)std::round(2 * roll_offset_degs_ / sample_angle_res_degs) + 1;
+    roll_res_ = 2 * roll_offset_degs_ / (num_roll_samples_ - 1);
 
-    num_pitch_samples_ = (int)std::round(2 * pitch_offset_ / sample_angle_res_degs) + 1;
-    pitch_res_ = 2 * pitch_offset_ / (num_pitch_samples_ - 1);
+    num_pitch_samples_ = (int)std::round(2 * pitch_offset_degs_ / sample_angle_res_degs) + 1;
+    pitch_res_ = 2 * pitch_offset_degs_ / (num_pitch_samples_ - 1);
 
-    num_yaw_samples_ = (int)std::round(2 * yaw_offset_ / sample_angle_res_degs) + 1;
-    yaw_res_ = 2 * yaw_offset_ / (num_yaw_samples_ - 1);
+    num_yaw_samples_ = (int)std::round(2 * yaw_offset_degs_ / sample_angle_res_degs) + 1;
+    yaw_res_ = 2 * yaw_offset_degs_ / (num_yaw_samples_ - 1);
     std::vector<geometry_msgs::Pose> sample_poses;
+
+    ROS_INFO("Sampling x locations in [%0.3f, %0.3f] at %0.3f m with %d samples", workspace_min_(0), workspace_max_(0), sample_res_(0), num_samples_(0));
+    ROS_INFO("Sampling y locations in [%0.3f, %0.3f] at %0.3f m with %d samples", workspace_min_(1), workspace_max_(1), sample_res_(1), num_samples_(1));
+    ROS_INFO("Sampling z locations in [%0.3f, %0.3f] at %0.3f m with %d samples", workspace_min_(2), workspace_max_(2), sample_res_(2), num_samples_(2));
 
     for (int x = 0; x < num_samples_(0); ++x)
     {
         double sample_x = workspace_min_(0) + x * sample_res_(0);
         for (int y = 0; y < num_samples_(1); ++y)
         {
-            double sample_y = workspace_min_(1) * y * sample_res_(1);
+            double sample_y = workspace_min_(1) + y * sample_res_(1);
             for (int z = 0; z < num_samples_(2); ++z)
             {
-                double sample_z = workspace_min_(2) * z * sample_res_(2);
+                double sample_z = workspace_min_(2) + z * sample_res_(2);
                 for (int roll = 0; roll < num_roll_samples_; ++roll)
                 {
-                    double sample_roll = -roll_offset_ + roll * roll_res_;
+                    double sample_roll = -roll_offset_degs_ + roll * roll_res_;
                     for (int pitch = 0; pitch < num_pitch_samples_; ++pitch)
                     {
-                        double sample_pitch = -pitch_offset_ + pitch * pitch_res_;
+                        double sample_pitch = -pitch_offset_degs_ + pitch * pitch_res_;
                         for (int yaw = 0; yaw < num_yaw_samples_; ++yaw)
                         {
-                            double sample_yaw = -yaw_offset_ + yaw * yaw_res_;
-
-                            geometry_msgs::Pose sample_pose;
+                            double sample_yaw = -yaw_offset_degs_ + yaw * yaw_res_;
 
                             Eigen::Affine3d sample_transform_camera_frame =
                                 Eigen::Translation3d(sample_x, sample_y, sample_z) *
-                                Eigen::AngleAxisd(sample_roll, Eigen::Vector3d::UnitX()) *
-                                Eigen::AngleAxisd(sample_pitch, Eigen::Vector3d::UnitY()) *
-                                Eigen::AngleAxisd(sample_yaw, Eigen::Vector3d::UnitZ());
+                                Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_roll), Eigen::Vector3d::UnitX()) *
+                                Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_pitch), Eigen::Vector3d::UnitY()) *
+                                Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_yaw), Eigen::Vector3d::UnitZ()) *
+                                camera_frame_to_tool_frame_rotation_;
 
+                            geometry_msgs::Pose sample_pose;
                             tf::poseEigenToMsg(sample_transform_camera_frame, sample_pose);
 
+                            ROS_INFO("Adding sample pose %s", to_string(sample_pose).c_str());
                             sample_poses.push_back(sample_pose);
                         }
                     }
@@ -377,9 +467,13 @@ bool RepeatabilityMeasurementNode::move_to_position(const hdt::JointState& posit
 
     auto result_callback = boost::bind(&RepeatabilityMeasurementNode::move_arm_command_result_cb, this, _1, _2);
     move_arm_command_client_->sendGoal(goal, result_callback);
-    if (!move_arm_command_client_->waitForResult(ros::Duration(20.0))) {
-        ROS_WARN("Timed out waiting for Move Arm Command Result");
-        return false;
+    pending_command_ = true;
+    ros::Rate lr(2);
+    while (ros::ok() && pending_command_)
+    {
+        // TODO: manually check for timeout here
+        ros::spinOnce();
+        lr.sleep();
     }
 
     return true;
@@ -400,5 +494,6 @@ void RepeatabilityMeasurementNode::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::MoveArmCommandResult::ConstPtr& result)
 {
-    ROS_INFO("Received a Move Arm Command Result!");
+    AU_INFO("Received a Move Arm Command Result!");
+    pending_command_ = false;
 }
