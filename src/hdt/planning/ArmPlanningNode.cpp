@@ -5,6 +5,7 @@
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <trajectory_msgs/JointTrajectory.h>
+#include <hdt/common/msg_utils/msg_utils.h>
 #include "HDTRobotModel.h"
 
 namespace hdt
@@ -102,8 +103,6 @@ int ArmPlanningNode::run()
 
 bool ArmPlanningNode::init_robot()
 {
-    group_name_ = "hdt_arm"; // TODO: figure out what this is for; it only gets passed to the collision checker
-
     if (!nh_.hasParam("robot_description")) {
         ROS_ERROR("Missing parameter \"robot_description\"");
         return false;
@@ -122,6 +121,8 @@ bool ArmPlanningNode::init_robot()
         ROS_ERROR("Failed to find joint 'arm_1_shoulder_twist'");
         return false;
     }
+
+    group_name_ = "hdt_arm"; // TODO: figure out what this is for; it only gets passed to the collision checker
 
     kinematics_frame_ = first_joint->parent_link_name; // TODO: figure out what this is for; it doesn't appear to be used anywhere
     planning_frame_ = first_joint->parent_link_name;
@@ -257,33 +258,20 @@ bool ArmPlanningNode::init_sbpl()
 
 void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 {
-    tf::Quaternion goal_quat(request->goal_pose.orientation.x, request->goal_pose.orientation.y, request->goal_pose.orientation.z, request->goal_pose.orientation.w);
-    tf::Matrix3x3 goal_rotation_matrix(goal_quat);
+    bool success = false;
+    trajectory_msgs::JointTrajectory result_traj;
 
-    double goal_roll, goal_pitch, goal_yaw;
-    goal_rotation_matrix.getEulerYPR(goal_yaw, goal_pitch, goal_roll);
-    const std::vector<double> goal = {
-            request->goal_pose.position.x, request->goal_pose.position.y, request->goal_pose.position.z,
-            goal_roll, goal_pitch, goal_yaw };
+    ////////////////////////////////////////////////////////////////////////////////
+    // Construct the current Planning Scene and start state
+    ////////////////////////////////////////////////////////////////////////////////
 
-    // collision objects
     moveit_msgs::PlanningScenePtr scene(new moveit_msgs::PlanningScene);
-
     ph_.param<std::string>("object_filename", object_filename_, "");
     if (!object_filename_.empty()) {
         scene->world.collision_objects = get_collision_objects(object_filename_, planning_frame_);
     }
-
-    // create goal
-    moveit_msgs::GetMotionPlan::Request req;
-    moveit_msgs::GetMotionPlan::Response res;
     scene->world.collision_map.header.frame_id = planning_frame_;
-
-    // fill goal state
-    req.motion_plan_request.goal_constraints.resize(1);
-    fill_constraint(goal, planning_frame_, req.motion_plan_request.goal_constraints[0]);
-    ROS_WARN("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
-    req.motion_plan_request.allowed_planning_time = 2.0;
+    scene->robot_state.joint_state.header.frame_id = planning_frame_;
 
     // fill start state
     if (!get_initial_configuration(ph_, scene->robot_state)) {
@@ -292,69 +280,46 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
         return;
     }
 
-    scene->robot_state.joint_state.header.frame_id = planning_frame_;
-    req.motion_plan_request.start_state = scene->robot_state;
+    ////////////////////////////////////////////////////////////////////////////////
+    // Plan to the received goal state
+    ////////////////////////////////////////////////////////////////////////////////
 
-    // set planning scene
-    //cc->setPlanningScene(*scene);
-
-    // plan
-    ROS_INFO("Calling solve...");
-    bool plan_result = planner_->solve(scene, req, res);
-    if (!plan_result) {
-        ROS_ERROR("Failed to plan.");
+    if (request->type == hdt::MoveArmCommandGoal::JointGoal) {
+        ROS_INFO("Received a joint goal");
+        success = plan_to_joint_goal(scene, scene->robot_state, *request, result_traj);
     }
-    else {
-        ROS_INFO("Planning succeeded");
+    else if (request->type == hdt::MoveArmCommandGoal::EndEffectorGoal) {
+        ROS_INFO("Received an end effector goal");
+        success = plan_to_eef_goal(scene, scene->robot_state, *request, result_traj);
     }
 
-    // print statistics
-    std::map<std::string, double> planning_stats = planner_->getPlannerStats();
+    ////////////////////////////////////////////////////////////////////////////////
+    // Post-process the plan and send to the joint trajectory follower
+    ////////////////////////////////////////////////////////////////////////////////
 
-    ROS_INFO("Planning statistics");
-    for (const auto& statistic : statistic_names_) {
-        auto it = planning_stats.find(statistic);
-        if (it != planning_stats.end()) {
-            ROS_INFO("    %s: %0.3f", statistic.c_str(), it->second);
-        }
-        else {
-            ROS_WARN("Did not find planning statistic \"%s\"", statistic.c_str());
-        }
-    }
-
-    // visualizations
-    marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
-    marker_array_pub_.publish(collision_checker_->getVisualization("distance_field"));
-    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
-    marker_array_pub_.publish(planner_->getVisualization("goal"));
-
-    // visualize, filter, and publish plan
-    if (plan_result) {
-        marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
-
-        trajectory_msgs::JointTrajectory& joint_trajectory = res.motion_plan_response.trajectory.joint_trajectory;
-        ROS_INFO("Original joint path (%zd points):", joint_trajectory.points.size());
-        for (int i = 0; i < (int)joint_trajectory.points.size(); ++i) {
-            const trajectory_msgs::JointTrajectoryPoint& joint_state = joint_trajectory.points[i];
+    if (success) {
+        ROS_INFO("Original joint path (%zd points):", result_traj.points.size());
+        for (int i = 0; i < (int)result_traj.points.size(); ++i) {
+            const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
             ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
         }
 
-        apply_shortcutting(res);
+        apply_shortcutting(result_traj);
 
-        ROS_INFO("Shortcut trajectory (%zd points):", joint_trajectory.points.size());
-        for (int i = 0; i < (int)joint_trajectory.points.size(); ++i) {
-            const trajectory_msgs::JointTrajectoryPoint& joint_state = joint_trajectory.points[i];
+        ROS_INFO("Shortcut trajectory (%zd points):", result_traj.points.size());
+        for (int i = 0; i < (int)result_traj.points.size(); ++i) {
+            const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
             ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
         }
 
-        bool interp_res = add_interpolation_to_plan(res);
+        bool interp_res = add_interpolation_to_plan(result_traj);
         if (!interp_res) {
             ROS_ERROR("Failed to interpolate joint trajectory");
             move_command_server_->setAborted();
             return;
         }
 
-        publish_trajectory(res.motion_plan_response.trajectory);
+        publish_trajectory(result_traj);
     }
 
     move_command_server_->setSucceeded();
@@ -541,7 +506,7 @@ void ArmPlanningNode::joint_states_callback(const sensor_msgs::JointState::Const
     }
 }
 
-bool ArmPlanningNode::add_interpolation_to_plan(moveit_msgs::GetMotionPlan::Response& res) const
+bool ArmPlanningNode::add_interpolation_to_plan(trajectory_msgs::JointTrajectory& res_traj) const
 {
     if (min_limits_.size() != planning_joints_.size() ||
         max_limits_.size() != planning_joints_.size() ||
@@ -551,28 +516,26 @@ bool ArmPlanningNode::add_interpolation_to_plan(moveit_msgs::GetMotionPlan::Resp
         return false;
     }
 
-    trajectory_msgs::JointTrajectory& joint_trajectory = res.motion_plan_response.trajectory.joint_trajectory;
+    ROS_INFO("Interpolating trajectory of size %zd", res_traj.points.size());
 
-    ROS_INFO("Interpolating trajectory of size %zd", joint_trajectory.points.size());
-
-    if (joint_trajectory.joint_names.empty()) {
-        joint_trajectory.joint_names = planning_joints_;
+    if (res_traj.joint_names.empty()) {
+        res_traj.joint_names = planning_joints_;
     }
 
     // find the index of each planning joint in the returned message
     std::map<std::string, int> planning_joint_indices;
     std::vector<std::string> index_to_planning_joint;
-    for (int i = 0; i < (int)joint_trajectory.joint_names.size(); ++i) {
-        const std::string& joint_name = joint_trajectory.joint_names[i];
+    for (int i = 0; i < (int)res_traj.joint_names.size(); ++i) {
+        const std::string& joint_name = res_traj.joint_names[i];
         planning_joint_indices[joint_name] = i;
     }
 
     // interpolate between each consecutive pair of waypoints
     trajectory_msgs::JointTrajectory interp_traj;
-    interp_traj.joint_names = joint_trajectory.joint_names;
-    for (int i = 0; i < (int)joint_trajectory.points.size() - 1; ++i) {
-        const trajectory_msgs::JointTrajectoryPoint& curr_point = joint_trajectory.points[i];
-        const trajectory_msgs::JointTrajectoryPoint& next_point = joint_trajectory.points[i + 1];
+    interp_traj.joint_names = res_traj.joint_names;
+    for (int i = 0; i < (int)res_traj.points.size() - 1; ++i) {
+        const trajectory_msgs::JointTrajectoryPoint& curr_point = res_traj.points[i];
+        const trajectory_msgs::JointTrajectoryPoint& next_point = res_traj.points[i + 1];
 
         if (curr_point.positions.size() != planning_joints_.size() || next_point.positions.size() != planning_joints_.size()) {
             ROS_WARN("Intermediate joint trajectory point does not have as many joints as the number of planning joints (%zd)", curr_point.positions.size());
@@ -640,12 +603,12 @@ bool ArmPlanningNode::add_interpolation_to_plan(moveit_msgs::GetMotionPlan::Resp
 
     ROS_INFO("Interpolated joint trajectory contains %zd points", interp_traj.points.size());
 
-    joint_trajectory = interp_traj;
+    res_traj = interp_traj;
 
     return true;
 }
 
-void ArmPlanningNode::publish_trajectory(const moveit_msgs::RobotTrajectory& trajectory)
+void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory& joint_trajectory)
 {
     const std::vector<std::string> joint_names = { "arm_1_shoulder_twist",
                                                    "arm_2_shoulder_lift",
@@ -663,18 +626,18 @@ void ArmPlanningNode::publish_trajectory(const moveit_msgs::RobotTrajectory& tra
 
     // map from planning joints to index in resulting message
     std::map<std::string, int> planning_joint_indices;
-    for (int i = 0; i < (int)trajectory.joint_trajectory.joint_names.size(); ++i) {
-        const std::string& joint_name = trajectory.joint_trajectory.joint_names[i];
+    for (int i = 0; i < (int)joint_trajectory.joint_names.size(); ++i) {
+        const std::string& joint_name = joint_trajectory.joint_names[i];
         planning_joint_indices.insert({joint_name, i});
     }
 
     // for each point in the resulting trajectory
-    if (!trajectory.joint_trajectory.points.empty()) {
+    if (!joint_trajectory.points.empty()) {
         traj.joint_names = joint_names;
-        traj.points.resize(trajectory.joint_trajectory.points.size());
+        traj.points.resize(joint_trajectory.points.size());
         int pidx = 0;
         double t = 0.0;
-        for (const auto& point : trajectory.joint_trajectory.points) {
+        for (const auto& point : joint_trajectory.points) {
             trajectory_msgs::JointTrajectoryPoint& traj_point = traj.points[pidx];
             traj_point.positions.resize(traj.joint_names.size());
             traj_point.velocities.resize(traj.joint_names.size());
@@ -713,10 +676,8 @@ void ArmPlanningNode::publish_trajectory(const moveit_msgs::RobotTrajectory& tra
     }
 }
 
-void ArmPlanningNode::apply_shortcutting(moveit_msgs::GetMotionPlan::Response& res) const
+void ArmPlanningNode::apply_shortcutting(trajectory_msgs::JointTrajectory& joint_trajectory) const
 {
-    trajectory_msgs::JointTrajectory& joint_trajectory = res.motion_plan_response.trajectory.joint_trajectory;
-
     std::vector<int> costs(joint_trajectory.points.size() - 1, 1);
 
     JointInterpolationPathGenerator generator;
@@ -737,6 +698,112 @@ void ArmPlanningNode::apply_shortcutting(moveit_msgs::GetMotionPlan::Response& r
     else {
         joint_trajectory.points = std::move(new_points);
     }
+}
+
+bool ArmPlanningNode::plan_to_eef_goal(
+    const moveit_msgs::PlanningScenePtr& scene,
+    const moveit_msgs::RobotState& start,
+    const hdt::MoveArmCommandGoal& goal,
+    trajectory_msgs::JointTrajectory& traj)
+{
+    // fill goal state
+    moveit_msgs::GetMotionPlan::Request req;
+    req.motion_plan_request.goal_constraints.resize(1);
+    std::vector<double> goal_vector = convert_to_sbpl_goal(goal.goal_pose);
+    fill_constraint(goal_vector, planning_frame_, req.motion_plan_request.goal_constraints[0]);
+    ROS_WARN("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
+    req.motion_plan_request.allowed_planning_time = 2.0;
+    req.motion_plan_request.start_state = scene->robot_state;
+
+    // set planning scene
+    //cc->setPlanningScene(*scene);
+
+    // plan
+    ROS_INFO("Calling solve...");
+    moveit_msgs::GetMotionPlan::Response res;
+    bool plan_result = planner_->solve(scene, req, res);
+    if (!plan_result) {
+        ROS_ERROR("Failed to plan.");
+    }
+    else {
+        ROS_INFO("Planning succeeded");
+    }
+
+    // print statistics
+    std::map<std::string, double> planning_stats = planner_->getPlannerStats();
+
+    ROS_INFO("Planning statistics");
+    for (const auto& statistic : statistic_names_) {
+        auto it = planning_stats.find(statistic);
+        if (it != planning_stats.end()) {
+            ROS_INFO("    %s: %0.3f", statistic.c_str(), it->second);
+        }
+        else {
+            ROS_WARN("Did not find planning statistic \"%s\"", statistic.c_str());
+        }
+    }
+
+    // visualizations
+    marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
+    marker_array_pub_.publish(collision_checker_->getVisualization("distance_field"));
+    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
+    marker_array_pub_.publish(planner_->getVisualization("goal"));
+
+    // visualize, filter, and publish plan
+    if (plan_result) {
+        marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
+        traj = res.motion_plan_response.trajectory.joint_trajectory;
+    }
+
+    return plan_result;
+}
+
+bool ArmPlanningNode::plan_to_joint_goal(
+    const moveit_msgs::PlanningScenePtr& scene,
+    const moveit_msgs::RobotState& start,
+    const hdt::MoveArmCommandGoal& goal,
+    trajectory_msgs::JointTrajectory& traj)
+{
+    trajectory_msgs::JointTrajectory interp_traj;
+    interp_traj.header.frame_id = "";
+    interp_traj.joint_names = manipulator_joint_names_;
+    interp_traj.points.resize(2);
+
+    sensor_msgs::JointState start_joint_state = start.joint_state;
+    if (!msg_utils::reorder_joints(start_joint_state, manipulator_joint_names_)) {
+        ROS_WARN("Start robot state contains joints other than manipulator joints");
+        return false;
+    }
+
+    sensor_msgs::JointState goal_joint_state = goal.goal_joint_state;
+    if (!msg_utils::reorder_joints(goal_joint_state, manipulator_joint_names_)) {
+        ROS_WARN("Goal state contains joints other than manipulator joints");
+        return false;
+    }
+
+    interp_traj.points[0].positions = start_joint_state.position;
+    interp_traj.points[1].positions = goal_joint_state.position;
+
+    add_interpolation_to_plan(interp_traj);
+
+    for (const trajectory_msgs::JointTrajectoryPoint& point : interp_traj.points) {
+        double dist = 0.0;
+        if (!collision_checker_->isStateValid(point.positions, false, false, dist)) {
+            return false;
+        }
+    }
+
+    traj = std::move(interp_traj);
+    return true;
+}
+
+std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(const geometry_msgs::Pose& pose)
+{
+    tf::Quaternion goal_quat(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
+    tf::Matrix3x3 goal_rotation_matrix(goal_quat);
+    double goal_roll, goal_pitch, goal_yaw;
+    goal_rotation_matrix.getEulerYPR(goal_yaw, goal_pitch, goal_roll);
+    return { pose.position.x, pose.position.y, pose.position.z, goal_roll, goal_pitch, goal_yaw };
 }
 
 } //namespace hdt

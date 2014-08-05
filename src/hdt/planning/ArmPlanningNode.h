@@ -113,11 +113,23 @@ private:
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
-    bool add_interpolation_to_plan(moveit_msgs::GetMotionPlan::Response& res) const;
+    void apply_shortcutting(trajectory_msgs::JointTrajectory& joint_trajectory) const;
+    bool add_interpolation_to_plan(trajectory_msgs::JointTrajectory& res_traj) const;
+    void publish_trajectory(const trajectory_msgs::JointTrajectory& joint_trajectory);
 
-    void publish_trajectory(const moveit_msgs::RobotTrajectory& trajectory);
+    std::vector<double> convert_to_sbpl_goal(const geometry_msgs::Pose& pose);
 
-    void apply_shortcutting(moveit_msgs::GetMotionPlan::Response& res) const;
+    bool plan_to_eef_goal(
+            const moveit_msgs::PlanningScenePtr& scene,
+            const moveit_msgs::RobotState& start,
+            const hdt::MoveArmCommandGoal& goal,
+            trajectory_msgs::JointTrajectory& traj);
+
+    bool plan_to_joint_goal(
+            const moveit_msgs::PlanningScenePtr& scene,
+            const moveit_msgs::RobotState& start,
+            const hdt::MoveArmCommandGoal& goal,
+            trajectory_msgs::JointTrajectory& traj);
 };
 
 } // namespace hdt
