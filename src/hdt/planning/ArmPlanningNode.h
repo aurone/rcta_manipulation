@@ -24,32 +24,10 @@
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/common/stringifier/stringifier.h>
+#include "JointInterpolationPathGenerator.h"
 
 namespace hdt
 {
-
-class JointInterpolationPathGenerator : public sbpl::shortcut::PathGenerator<trajectory_msgs::JointTrajectoryPoint, int>
-{
-public:
-
-    JointInterpolationPathGenerator();
-
-    bool initialize(const std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace>& collision_checker,
-                    const std::vector<double>& min_limits, const std::vector<double>& max_limits,
-                    const std::vector<bool>& continuous);
-
-    bool generate_path(const trajectory_msgs::JointTrajectoryPoint& start,
-                       const trajectory_msgs::JointTrajectoryPoint& end,
-                       std::vector<trajectory_msgs::JointTrajectoryPoint>& path_out,
-                       int& cost_out) const;
-
-private:
-
-    std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
-    std::vector<double> min_limits_;
-    std::vector<double> max_limits_;
-    std::vector<bool> continuous_;
-};
 
 /// @brief Class that provides a simple ROS API to the SBPL arm planner for the HDT arm
 class ArmPlanningNode
