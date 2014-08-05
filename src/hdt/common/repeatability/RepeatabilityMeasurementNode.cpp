@@ -25,7 +25,31 @@ std::string to_string(const hdt::JointState& js)
 RepeatabilityMeasurementNode::RepeatabilityMeasurementNode() :
     nh_(),
     ph_("~"),
-    listener_()
+    workspace_min_(),
+    workspace_max_(),
+    roll_offset_(),
+    pitch_offset_(),
+    yaw_offset_(),
+    num_samples_(),
+    sample_res_(),
+    num_roll_samples_(),
+    num_pitch_samples_(),
+    num_yaw_samples_(),
+    roll_res_(),
+    pitch_res_(),
+    yaw_res_(),
+    listener_(),
+    joint_cmd_pub_(),
+    joint_states_sub_(),
+    egress_positions_(),
+    sample_eef_poses_(),
+    camera_frame_(),
+    mount_frame_(),
+    camera_frame_to_tool_frame_rotation_(),
+    last_markers_msg_(),
+    last_joint_state_msg_(),
+    urdf_description_(),
+    robot_model_()
 {
 }
 
@@ -55,42 +79,42 @@ int RepeatabilityMeasurementNode::run()
         return FAILED_TO_INITIALIZE;
     }
 
+    // initialize simple action client for move arm commands
+    move_arm_command_action_name_ = "move_arm_command";
+    move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
+    if (!move_arm_command_client_) {
+        ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
+        return FAILED_TO_INITIALIZE;
+    }
+
+    ros::Rate waitLoopRate(1.0);
+    while (ros::ok())
+    {
+        ros::spinOnce();
+        if (!move_arm_command_client_->isServerConnected()) {
+            ROS_INFO("Waiting to connect to action server %s", move_arm_command_action_name_.c_str());
+        }
+        else {
+            break;
+        }
+        waitLoopRate.sleep();
+    }
+
+    ROS_INFO("Connected to action server '%s'", move_arm_command_action_name_.c_str());
+
     const double ninety_rads = M_PI / 2.0;
     camera_frame_to_tool_frame_rotation_ = Eigen::Affine3d(Eigen::AngleAxisd(ninety_rads, Eigen::Vector3d::UnitZ()));
 
+    // subscribe to joint states and ar markers
     joint_cmd_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
-
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &RepeatabilityMeasurementNode::joint_states_callback, this);
 
-    // 2. create sparse sampling
-
-    double sample_resolution_m = 0.15; // ideal linear discretization
-    double sample_angle_res_degs = 30.0; // ideal angular discretization
-
-    Eigen::Vector3d workspace_size = workspace_max_ - workspace_min_;
-
-    num_samples_(0) = (int)std::round(workspace_size(0) / sample_resolution_m) + 1;
-    num_samples_(1) = (int)std::round(workspace_size(1) / sample_resolution_m) + 1;
-    num_samples_(2) = (int)std::round(workspace_size(2) / sample_resolution_m) + 1;
-
-    sample_res_(0) = workspace_size(0) / (num_samples_(0) - 1);
-    sample_res_(1) = workspace_size(1) / (num_samples_(1) - 1);
-    sample_res_(2) = workspace_size(2) / (num_samples_(2) - 1);
-
-    num_roll_samples_ = (int)std::round(2 * roll_offset_ / sample_angle_res_degs) + 1;
-    roll_res_ = 2 * roll_offset_ / (num_roll_samples_ - 1);
-
-    num_pitch_samples_ = (int)std::round(2 * pitch_offset_ / sample_angle_res_degs) + 1;
-    pitch_res_ = 2 * pitch_offset_ / (num_pitch_samples_ - 1);
-
-    num_yaw_samples_ = (int)std::round(2 * yaw_offset_ / sample_angle_res_degs) + 1;
-    yaw_res_ = 2 * yaw_offset_ / (num_yaw_samples_ - 1);
-
+    // 2. create sparse discretized sampling
     std::vector<geometry_msgs::Pose> sample_poses = generate_sample_poses();
 
+    // try to move to each ik solution
     for (const auto& pose : sample_poses)
     {
-
         geometry_msgs::PoseStamped pose_stamped;
         pose_stamped.header.stamp = ros::Time::now();
         pose_stamped.header.seq = 0;
@@ -117,12 +141,18 @@ int RepeatabilityMeasurementNode::run()
             std::vector<double> iksol;
             while (iksols(iksol))
             {
-                (void)move_to_position(egress_position);
+                if (!move_to_position(egress_position))
+                {
+                    ROS_WARN("Failed to move to egress position");
+                }
 
                 // move to the ik position
                 hdt::JointState js;
                 std::memcpy(&js, iksol.data(), iksol.size() * sizeof(double));
-                (void)move_to_position(js);
+                if (!move_to_position(js))
+                {
+                    ROS_WARN("Failed to move to ik solution");
+                }
 
                 // record the marker pose and compare with the other times that we have moved to this end effector pose
                 geometry_msgs::Pose marker_pose_camera_frame;
@@ -179,6 +209,22 @@ bool RepeatabilityMeasurementNode::download_params()
         return false;
     }
 
+    if (!download_egress_positions()) {
+        return false;
+    }
+
+    if (!ph_.getParam("camera_frame", camera_frame_)) {
+        ROS_ERROR("Failed to retrieve 'camera_frame' from config");
+        return false;
+    }
+
+    mount_frame_ = "arm_mount_panel_dummy";
+
+    return true;
+}
+
+bool RepeatabilityMeasurementNode::download_egress_positions()
+{
     XmlRpc::XmlRpcValue egress_positions;
     if (!ph_.getParam("egress_positions", egress_positions) ||
         egress_positions.getType() != XmlRpc::XmlRpcValue::TypeArray)
@@ -219,14 +265,6 @@ bool RepeatabilityMeasurementNode::download_params()
         ROS_INFO("Read in egress position %s", to_string(joint_state).c_str());
     }
 
-    if (!ph_.getParam("camera_frame", camera_frame_))
-    {
-        ROS_ERROR("Failed to retrieve 'camera_frame' from config");
-        return false;
-    }
-
-    mount_frame_ = "arm_mount_panel_dummy";
-
     return true;
 }
 
@@ -255,6 +293,27 @@ const char* RepeatabilityMeasurementNode::to_cstring(XmlRpc::XmlRpcValue::Type t
 
 std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_poses()
 {
+    const double sample_resolution_m = 0.15; // ideal linear discretization
+    const double sample_angle_res_degs = 30.0; // ideal angular discretization
+
+    Eigen::Vector3d workspace_size = workspace_max_ - workspace_min_;
+
+    num_samples_(0) = (int)std::round(workspace_size(0) / sample_resolution_m) + 1;
+    num_samples_(1) = (int)std::round(workspace_size(1) / sample_resolution_m) + 1;
+    num_samples_(2) = (int)std::round(workspace_size(2) / sample_resolution_m) + 1;
+
+    sample_res_(0) = workspace_size(0) / (num_samples_(0) - 1);
+    sample_res_(1) = workspace_size(1) / (num_samples_(1) - 1);
+    sample_res_(2) = workspace_size(2) / (num_samples_(2) - 1);
+
+    num_roll_samples_ = (int)std::round(2 * roll_offset_ / sample_angle_res_degs) + 1;
+    roll_res_ = 2 * roll_offset_ / (num_roll_samples_ - 1);
+
+    num_pitch_samples_ = (int)std::round(2 * pitch_offset_ / sample_angle_res_degs) + 1;
+    pitch_res_ = 2 * pitch_offset_ / (num_pitch_samples_ - 1);
+
+    num_yaw_samples_ = (int)std::round(2 * yaw_offset_ / sample_angle_res_degs) + 1;
+    yaw_res_ = 2 * yaw_offset_ / (num_yaw_samples_ - 1);
     std::vector<geometry_msgs::Pose> sample_poses;
 
     for (int x = 0; x < num_samples_(0); ++x)
@@ -299,45 +358,28 @@ std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_p
 
 bool RepeatabilityMeasurementNode::move_to_position(const hdt::JointState& position)
 {
-    trajectory_msgs::JointTrajectory traj_cmd;
-    traj_cmd.header.stamp = ros::Time::now();
-    traj_cmd.joint_names = robot_model_.joint_names();
-    traj_cmd.points.resize(1);
-    traj_cmd.points[0].positions.resize(7);
-    traj_cmd.points[0].positions[0] = position.a0;
-    traj_cmd.points[0].positions[1] = position.a1;
-    traj_cmd.points[0].positions[2] = position.a2;
-    traj_cmd.points[0].positions[3] = position.a3;
-    traj_cmd.points[0].positions[4] = position.a4;
-    traj_cmd.points[0].positions[5] = position.a5;
-    traj_cmd.points[0].positions[6] = position.a6;
-    joint_cmd_pub_.publish(traj_cmd);
+    if (!move_arm_command_client_->isServerConnected()) {
+        ROS_WARN("Move Arm Command Client (%s) is not connected", move_arm_command_action_name_.c_str());
+        return false;
+    }
 
-    // spin until the arm is in the requested position
-    bool in_position = false;
-    ros::Rate loop_rate(10.0);
-    while (ros::ok() && !in_position) {
-        hdt::JointState curr_joint_state(
-            last_joint_state_msg_->position[0],
-            last_joint_state_msg_->position[1],
-            last_joint_state_msg_->position[2],
-            last_joint_state_msg_->position[3],
-            last_joint_state_msg_->position[4],
-            last_joint_state_msg_->position[5],
-            last_joint_state_msg_->position[6]);
+    std::vector<double> joint_vector =
+            { position.a0, position.a1, position.a2, position.a3, position.a4, position.a5, position.a6 };
 
-        hdt::JointState diff = position - curr_joint_state;
+    hdt::MoveArmCommandGoal goal;
 
-        bool within_bounds = true;
-        std::vector<double> errors(7, 3.0);
-        for (int i = 0; i < 7; ++i) {
-            if (fabs(diff[i]) > fabs(errors[i])) {
-                within_bounds = false;
-            }
-        }
+    goal.type = hdt::MoveArmCommandGoal::JointGoal;
+    goal.goal_joint_state.header.stamp = ros::Time::now();
+    goal.goal_joint_state.header.frame_id = "";
+    goal.goal_joint_state.header.seq = 0;
+    goal.goal_joint_state.name = robot_model_.joint_names();
+    goal.goal_joint_state.position = joint_vector;
 
-        in_position = within_bounds;
-        loop_rate.sleep();
+    auto result_callback = boost::bind(&RepeatabilityMeasurementNode::move_arm_command_result_cb, this, _1, _2);
+    move_arm_command_client_->sendGoal(goal, result_callback);
+    if (!move_arm_command_client_->waitForResult(ros::Duration(20.0))) {
+        ROS_WARN("Timed out waiting for Move Arm Command Result");
+        return false;
     }
 
     return true;
@@ -352,4 +394,11 @@ bool RepeatabilityMeasurementNode::track_marker_pose(const ros::Duration& listen
 
     pose = geometry_msgs::Pose();
     return false;
+}
+
+void RepeatabilityMeasurementNode::move_arm_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::MoveArmCommandResult::ConstPtr& result)
+{
+    ROS_INFO("Received a Move Arm Command Result!");
 }

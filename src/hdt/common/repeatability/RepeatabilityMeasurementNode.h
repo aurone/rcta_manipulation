@@ -5,14 +5,13 @@
 #include <string>
 #include <vector>
 #include <Eigen/Dense>
+#include <actionlib/client/simple_action_client.h>
 #include <ar_track_alvar/AlvarMarkers.h>
 #include <geometry_msgs/Pose.h>
-#include <moveit/distance_field/propagation_distance_field.h>
 #include <ros/ros.h>
-#include <sbpl_collision_checking/sbpl_collision_space.h>
-#include <sbpl_manipulation_components/occupancy_grid.h>
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_listener.h>
+#include <hdt/MoveArmCommandAction.h>
 #include <hdt/common/hdt_description/RobotModel.h>
 
 namespace hdt
@@ -116,17 +115,18 @@ private:
     ar_track_alvar::AlvarMarkers::ConstPtr last_markers_msg_;
     sensor_msgs::JointState::ConstPtr last_joint_state_msg_;
 
+    typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
+    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
+    std::string move_arm_command_action_name_;
+
     std::string urdf_description_;
     hdt::RobotModel robot_model_;
-
-    std::unique_ptr<distance_field::PropagationDistanceField> distance_field_;
-    std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid_;
-    std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
 
     void ar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
     bool download_params();
+    bool download_egress_positions();
 
     static const char* to_cstring(XmlRpc::XmlRpcValue::Type type);
 
@@ -135,6 +135,10 @@ private:
     bool move_to_position(const hdt::JointState& position);
 
     bool track_marker_pose(const ros::Duration& listen_duration, geometry_msgs::Pose& pose);
+
+    void move_arm_command_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::MoveArmCommandResult::ConstPtr& result);
 };
 
 #endif
