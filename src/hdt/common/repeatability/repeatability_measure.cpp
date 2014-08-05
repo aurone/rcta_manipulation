@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include "RepeatabilityMeasurementNode.h"
 
 int main(int argc, char* argv[])
 {

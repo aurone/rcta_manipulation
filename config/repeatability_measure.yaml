@@ -1,0 +1,14 @@
+# defines bounding box in the frame of the camera from which
+# samples will be taken for goal end effector poses
+workspace_min: [ 0.2, -0.4, -0.4 ]
+workspace_max: [ 1.0, 0.4, 0.4 ]
+
+roll_offset_degs: 30
+pitch_offset_degs: 30
+yaw_offset_degs: 30
+
+camera_frame: "asus_rgb_frame"
+
+egress_positions: [
+  [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+]
