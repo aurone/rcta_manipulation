@@ -248,10 +248,12 @@ bool ArmPlanningNode::init_collision_model()
     const double origin_z = -1.0;
     const double max_dist_m = 0.2;
 
-    distance_field_.reset(new distance_field::PropagationDistanceField(size_x, size_y, size_z,
-                                                                       cell_res_m,
-                                                                       origin_x, origin_y, origin_z,
-                                                                       max_dist_m));
+    distance_field_.reset(new distance_field::PropagationDistanceField(
+            size_x, size_y, size_z,
+            cell_res_m,
+            origin_x, origin_y, origin_z,
+            max_dist_m));
+
     if (!distance_field_) {
         ROS_ERROR("Failed to instantiate Propagation Distance Field");
         return false;
@@ -293,10 +295,9 @@ bool ArmPlanningNode::init_sbpl()
         return false;
     }
 
-    planner_.reset(new sbpl_arm_planner::SBPLArmPlannerInterface(robot_model_.get(),
-                                                                 collision_checker_.get(),
-                                                                 sbpl_action_set_.get(),
-                                                                 distance_field_.get()));
+    planner_.reset(new sbpl_arm_planner::SBPLArmPlannerInterface(
+            robot_model_.get(), collision_checker_.get(), sbpl_action_set_.get(), distance_field_.get()));
+
     if (!planner_) {
         ROS_ERROR("Failed to instantiate SBPL Arm Planner Interface");
         return false;

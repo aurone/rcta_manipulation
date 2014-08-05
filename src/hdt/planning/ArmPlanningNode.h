@@ -8,6 +8,7 @@
 #include <vector>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
+#include <control_msgs/FollowJointTrajectoryAction.h>
 #include <moveit/distance_field/propagation_distance_field.h>
 #include <moveit_msgs/CollisionObject.h>
 #include <moveit_msgs/Constraints.h>
@@ -19,45 +20,13 @@
 #include <sbpl_manipulation_components/collision_checker.h>
 #include <sbpl_manipulation_components/occupancy_grid.h>
 #include <sbpl_manipulation_components/kdl_robot_model.h>
-#include <control_msgs/FollowJointTrajectoryAction.h>
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/MoveArmCommandAction.h>
+#include <hdt/common/stringifier/stringifier.h>
 
 namespace hdt
 {
-
-template <typename T>
-std::string to_string(const std::vector<T>& vec)
-{
-    std::stringstream ss;
-    ss << "[ ";
-    for (int i = 0; i < (int)vec.size(); ++i) {
-        ss << vec[i];
-        if (i != vec.size() - 1) {
-            ss << ", ";
-        }
-    }
-    ss << ']';
-    return ss.str();
-}
-
-template <> inline std::string to_string<double>(const std::vector<double>& vec)
-{
-    std::stringstream ss;
-    ss << "[ ";
-    for (int i = 0; i < (int)vec.size(); ++i) {
-        // output doubles in fixed-point notation with 3 digits after the
-        // decimal point; allow space for the decimal point, leading 0, and
-        // possible - sign
-        ss << std::fixed << std::setprecision(3) << std::setw(6) << vec[i];
-        if (i != vec.size() - 1) {
-            ss << ", ";
-        }
-    }
-    ss << " ]";
-    return ss.str();
-}
 
 class JointInterpolationPathGenerator : public sbpl::shortcut::PathGenerator<trajectory_msgs::JointTrajectoryPoint, int>
 {
