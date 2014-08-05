@@ -4,8 +4,11 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/JointState.h>
 #include <trajectory_msgs/JointTrajectory.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace msg_utils
 {
@@ -25,6 +28,9 @@ bool contains_only_joints(const sensor_msgs::JointState& joint_state, const std:
 bool reorder_joints(sensor_msgs::JointState& joint_state, const std::vector<std::string>& joint_order);
 
 bool reorder_joints(trajectory_msgs::JointTrajectory& joint_trajectory, const std::vector<std::string>& joint_order);
+
+visualization_msgs::Marker create_arrow_marker(const geometry_msgs::Vector3 &scale);
+visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vector3& scale);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
