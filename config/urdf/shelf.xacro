@@ -26,10 +26,13 @@
     <xacro:property name="shelf_width_m" value="0.00500" />
     <xacro:property name="shelf_height_m" value="0.24362" />
     <xacro:property name="arm_mount_panel_height_m" value="0.171" />
-    <xacro:property name="arm_mount_panel_edge_offset_m" value="0.098322" />
+    <!-- <xacro:property name="arm_mount_panel_edge_offset_m" value="0.098322" /> -->
     <xacro:property name="bottom_shelf_height_offset" value="0.045"/>
     <xacro:property name="top_shelf_length_m" value="0.151"/>
     <!-- arm mount panel currently inherits thickness from the shelving unit -->
+
+    <!-- values measure on 2014-08-07 (moved arm mount due to no room to mount asus servo) -->
+    <xacro:property name="arm_mount_panel_edge_offset_m" value="0.07508" />
 
     <!-- bumper_frame: the name of the frame of the front bumper -->
     <!-- bumper_to_shelf_x: the distance between the bumper frame and the front of the right shelf support -->
