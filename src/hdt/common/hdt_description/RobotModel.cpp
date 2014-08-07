@@ -1,17 +1,24 @@
 #include <hdt_description/RobotModel.h>
+
+#include <cassert>
 #include <hdt_kinematics/kinematics.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <urdf_parser/urdf_parser.h>
 
-#define VALIDATE_WITH_FK 1
+#define RM_DEBUG 0
+#if RM_DEBUG
+#define RM_ASSERT(cond) assert(cond)
+#else
+#define RM_ASSERT(cond) do { (void) sizeof((cond)); } while(0) // assert implementation borrowed from SDL
+#endif
 
 namespace hdt
 {
 
 double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std::vector<double>& joints2)
 {
-    assert(joints1.size() == 7 && joints2.size() == 7);
+    RM_ASSERT(joints1.size() == 7 && joints2.size() == 7);
 
     auto squared = [](double x) { return x * x; };
     double dist = 0.0;
@@ -27,20 +34,24 @@ double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std
 
 IKSolutionGenerator::IKSolutionGenerator(const std::vector<std::vector<double>>& solutions) :
     solutions_(solutions),
-    csol_(-1)
+    csol_(0)
+{
+}
+
+IKSolutionGenerator::IKSolutionGenerator(std::vector<std::vector<double>>&& solutions) :
+    solutions_(solutions),
+    csol_(0)
 {
 }
 
 bool IKSolutionGenerator::operator()(std::vector<double>& solution)
 {
-    csol_++;
-    if (csol_ >= solution.size())
-    {
+    if (csol_ >= solutions_.size()) {
         return false;
     }
-    else
-    {
+    else {
         solution = std::move(solutions_[csol_]);
+        ++csol_;
         return true;
     }
 }
@@ -136,54 +147,35 @@ bool RobotModel::compute_nearest_ik(
     const std::vector<double>& seed,
     std::vector<double>& solution_out) const
 {
-    if (seed.size() < 7) {
-        return false;
+    // get a generator for all valid solutions with the specified free angle
+    IKSolutionGenerator solution_generator = compute_all_ik_solutions(eef_transform, seed);
+
+    std::vector<std::vector<double>> solutions;
+    std::vector<double> solution;
+    // gather all the solutions
+    while (solution_generator(solution)) {
+        RM_ASSERT(solution.size() == 7);
+        solutions.push_back(std::move(solution));
+        RM_ASSERT(solutions.back().size() == 7);
     }
 
-    double solver_trans[3];
-    double solver_rot[9];
-    convert(eef_transform, solver_trans, solver_rot);
-
-    double free_angle = seed[free_angle_index_];
-
-    ikfast::IkSolutionList<double> ik_solutions;
-    if (!ComputeIk(solver_trans, solver_rot, &free_angle, ik_solutions)) {
-        return false;
-    }
-
-    // check ik solutions and pick the closest one
-    std::size_t num_valid = 0;
-    int best_solution = -1;             // index of closest solution
-    double best_joint_dist = -1.0;      // joint distance from seed state
-    for (size_t i = 0; i < ik_solutions.GetNumSolutions(); ++i) {
-        double solution[7];
-        ik_solutions.GetSolution(i).GetSolution(solution, nullptr);
-
-#if VALIDATE_WITH_FK 
-        const bool close = check_ik_solution(solution, eef_transform);
-#else
-        const bool close = true;
-#endif
-
-        std::vector<double> vsolution(solution, solution + sizeof(solution) / sizeof(double));
-        const bool within_limits = within_joint_limits(vsolution);
-
-        if (close && within_limits) {
-            // compare this solution with our current best found
-            double joint_dist = ComputeJointStateL2NormSqrd(vsolution, seed);
-            if (best_solution == -1 || joint_dist < best_joint_dist)
-            {
-                solution_out = std::move(vsolution);
-                best_solution = (int)i;
-                best_joint_dist = joint_dist;
-            }
-            ++num_valid;
+    // find the best solution in terms of the l2 norm on joint angle
+    int best_solution = -1;
+    double best_joint_dist = -1.0;
+    for (std::size_t i = 0; i < solutions.size(); ++i) {
+        const std::vector<double>& sol = solutions[i];
+        double joint_dist = ComputeJointStateL2NormSqrd(sol, seed);
+        RM_ASSERT(joint_dist >= 0.0);
+        if (best_solution == -1 || joint_dist < best_joint_dist) {
+            best_solution = (int)i;
+            best_joint_dist = joint_dist;
         }
     }
 
-//    if (num_valid != ik_solutions.GetNumSolutions() && ik_solutions.GetNumSolutions() != 0) {
-//        ROS_WARN("%zd out of %zd solutions were invalid", ik_solutions.GetNumSolutions() - num_valid, ik_solutions.GetNumSolutions());
-//    }
+    if (best_solution != -1) {
+        solution_out = std::move(solutions[best_solution]);
+        RM_ASSERT(solution_out.size() == 7);
+    }
 
     return best_solution != -1;
 }
@@ -262,38 +254,36 @@ IKSolutionGenerator RobotModel::compute_all_ik_solutions(
 
     ikfast::IkSolutionList<double> ik_solutions;
     if (!ComputeIk(solver_trans, solver_rot, &free_angle, ik_solutions)) {
+        ROS_WARN("Failed to compute IK");
         return IKSolutionGenerator();
     }
 
     std::vector<std::vector<double>> solutions;
-    solutions.resize(ik_solutions.GetNumSolutions());
+    solutions.reserve(ik_solutions.GetNumSolutions());
 
     // check ik solutions and pick the closest one
-    std::size_t num_valid = 0;
-    for (size_t i = 0; i < ik_solutions.GetNumSolutions(); ++i) {
+    for (std::size_t i = 0; i < ik_solutions.GetNumSolutions(); ++i) {
         double solution[7];
         ik_solutions.GetSolution(i).GetSolution(solution, nullptr);
-
-#if VALIDATE_WITH_FK 
-        const bool close = check_ik_solution(solution, eef_transform);
-#else
-        const bool close = true;
-#endif
+        RM_ASSERT(check_ik_solution(solution, eef_transform));
 
         std::vector<double> vsolution(solution, solution + sizeof(solution) / sizeof(double));
+        RM_ASSERT(vsolution.size() == 7);
         const bool within_limits = within_joint_limits(vsolution);
 
-        if (close && within_limits) {
+        if (within_limits) {
             solutions.push_back(std::move(vsolution));
-            ++num_valid;
         }
     }
 
-//    if (!solutions.empty() && num_valid != solutions.size()) {
-//        ROS_WARN("%zd out of %zd solutions were invalid", solutions.size() - num_valid, solutions.size());
-//    }
+    if (solutions.empty()) {
+        ROS_ERROR("All IK solutions are invalid");
+    }
+    else {
+        ROS_INFO("Computed %zd ik solutions", solutions.size());
+    }
 
-    return IKSolutionGenerator(solutions);
+    return IKSolutionGenerator(std::move(solutions));
 }
 
 IKSolutionGenerator RobotModel::search_all_ik_solutions(
