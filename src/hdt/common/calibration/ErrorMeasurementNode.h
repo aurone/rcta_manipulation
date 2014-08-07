@@ -24,7 +24,7 @@ private:
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
-    hdt::RobotModel robot_model_;
+    hdt::RobotModelPtr robot_model_;
 
     ros::Subscriber ar_marker_sub_;
     ros::Subscriber joint_state_sub_;

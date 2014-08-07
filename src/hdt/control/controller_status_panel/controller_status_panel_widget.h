@@ -53,7 +53,7 @@ private:
     ros::Subscriber hdt_diagnostics_sub_;
     rospack::Rospack rospack_;
 
-    hdt::RobotModel robot_model_;
+    hdt::RobotModelPtr robot_model_;
 
     std::mutex msg_mutex_;
     hdt::ControllerDiagnosticStatus::ConstPtr last_msg_;

@@ -196,9 +196,9 @@ void ManipulatorCommandPanel::send_joint_goal()
     move_arm_goal.type = hdt::MoveArmCommandGoal::JointGoal;
 
     move_arm_goal.goal_joint_state.header.stamp = ros::Time::now();
-    move_arm_goal.goal_joint_state.name = robot_model_.joint_names();
+    move_arm_goal.goal_joint_state.name = robot_model_->joint_names();
     move_arm_goal.goal_joint_state.position.reserve(7);
-    for (const std::string& joint_name : robot_model_.joint_names()) {
+    for (const std::string& joint_name : robot_model_->joint_names()) {
         move_arm_goal.goal_joint_state.position.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
     }
 
@@ -234,7 +234,7 @@ void ManipulatorCommandPanel::cycle_ik_solutions()
    const double ik_search_res = sbpl::utils::ToRadians(1.0);
 
    std::vector<std::vector<double>> ik_solutions;
-   IKSolutionGenerator solgen = robot_model_.compute_all_ik_solutions(new_eef_pose, curr_joint_angles);
+   SimpleIKSolutionGenerator solgen = robot_model_->compute_all_ik_solutions(new_eef_pose, curr_joint_angles);
 
    std::vector<double> iksol;
    while (solgen(iksol)) {
@@ -392,16 +392,16 @@ bool ManipulatorCommandPanel::do_init()
 
 bool ManipulatorCommandPanel::check_robot_model_consistency()
 {
-    for (const std::string& joint_name : robot_model_.joint_names()) {
+    for (const std::string& joint_name : robot_model_->joint_names()) {
         if (!rm_->hasJointModel(joint_name)) {
             ROS_ERROR("MoveIt Robot Model does not contain joint %s", joint_name.c_str());
             return false;
         }
     }
 
-    for (std::size_t i = 1; i < robot_model_.joint_names().size(); ++i) {
-        const std::string& parent_joint_name = robot_model_.joint_names()[i - 1];
-        const std::string& child_joint_name = robot_model_.joint_names()[i];
+    for (std::size_t i = 1; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& parent_joint_name = robot_model_->joint_names()[i - 1];
+        const std::string& child_joint_name = robot_model_->joint_names()[i];
 
         std::vector<robot_model::JointModel*> child_joints;
         child_joints = rm_->getJointModel(parent_joint_name)->getChildLinkModel()->getChildJointModels();
@@ -440,7 +440,7 @@ void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::Inte
     std::vector<double> iksol;
 
     // run ik to the pose of the marker
-    if (robot_model_.search_nearest_ik(new_eef_pose, curr_joint_angles, iksol, ik_search_res)) {
+    if (robot_model_->search_nearest_ik(new_eef_pose, curr_joint_angles, iksol, ik_search_res)) {
         if (!set_phantom_joint_angles(iksol)) {
             QMessageBox::warning(this, tr("Interactive Marker Feedback"), tr("Failed to set phantom state from interactive marker-driven IK"));
             return;
@@ -640,7 +640,7 @@ bool ManipulatorCommandPanel::reinit_robot()
         return false;
     }
 
-    if (!robot_model_.load(urdf_string)) {
+    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
         ROS_ERROR("Failed to load robot model from the URDF");
         return false;
     }
@@ -724,26 +724,26 @@ bool ManipulatorCommandPanel::reinit_robot()
     server_.applyChanges();
 
     joint_1_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[0])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[0])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[0])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[0])));
     joint_2_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[1])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[1])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[1])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[1])));
     joint_3_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[2])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[2])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[2])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[2])));
     joint_4_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[3])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[3])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[3])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[3])));
     joint_5_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[4])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[4])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[4])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[4])));
     joint_6_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[5])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[5])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[5])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[5])));
     joint_7_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_.min_limits()[6])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_.max_limits()[6])));
+            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[6])),
+            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[6])));
 
     update_sliders();
 
@@ -879,9 +879,9 @@ void ManipulatorCommandPanel::update_gui()
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const
 {
     std::vector<double> curr_joint_angles;
-    curr_joint_angles.resize(robot_model_.joint_names().size());
-    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
-        const std::string& joint_name = robot_model_.joint_names()[i];
+    curr_joint_angles.resize(robot_model_->joint_names().size());
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_->joint_names()[i];
         (void)get_joint_value(last_joint_state_, joint_name, curr_joint_angles[i]);
     }
     return curr_joint_angles;
@@ -890,9 +890,9 @@ std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const
 std::vector<double> ManipulatorCommandPanel::get_phantom_joint_angles() const
 {
     std::vector<double> curr_joint_angles;
-    curr_joint_angles.reserve(robot_model_.joint_names().size());
+    curr_joint_angles.reserve(robot_model_->joint_names().size());
 
-    for (const std::string& joint_name : robot_model_.joint_names()) {
+    for (const std::string& joint_name : robot_model_->joint_names()) {
         curr_joint_angles.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
     }
 
@@ -901,12 +901,12 @@ std::vector<double> ManipulatorCommandPanel::get_phantom_joint_angles() const
 
 bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>& joint_angles)
 {
-    if (joint_angles.size() != robot_model_.joint_names().size()) {
+    if (joint_angles.size() != robot_model_->joint_names().size()) {
         return false;
     }
 
     std::size_t i = 0;
-    for (const std::string& joint_name : robot_model_.joint_names()) {
+    for (const std::string& joint_name : robot_model_->joint_names()) {
         rs_->getJointState(joint_name)->setVariableValues(&joint_angles[i]);
         ++i;
     }

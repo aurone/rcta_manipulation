@@ -62,7 +62,7 @@ private:
     std::unique_ptr<MoveArmCommandActionClient> move_arm_client_;
     bool pending_move_arm_command_;
 
-    hdt::RobotModel robot_model_;
+    hdt::RobotModelPtr robot_model_;
 
     std::unique_ptr<robot_model_loader::RobotModelLoader> rm_loader_;
     robot_model::RobotModelPtr rm_;

@@ -66,12 +66,12 @@ bool JointTrajectoryExecutor::initialize()
         return false;
     }
 
-    if (!robot_model_.load(urdf_string)) {
+    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
         ROS_ERROR("Failed to load Robot Model");
         return false;
     }
 
-    joint_names_ = robot_model_.joint_names();
+    joint_names_ = robot_model_->joint_names();
 
     current_segment_ = 0;
 
@@ -183,8 +183,8 @@ bool JointTrajectoryExecutor::within_goal_constraints(
 
     Eigen::Affine3d actual_ee_pose;
     Eigen::Affine3d target_ee_pose;
-    robot_model_.compute_fk(msg->actual.positions, actual_ee_pose);
-    robot_model_.compute_fk(traj.points[last].positions, target_ee_pose);
+    robot_model_->compute_fk(msg->actual.positions, actual_ee_pose);
+    robot_model_->compute_fk(traj.points[last].positions, target_ee_pose);
 
     bool ee_outside = !within_goal_ee_constraints(actual_ee_pose, target_ee_pose);
 
