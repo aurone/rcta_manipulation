@@ -100,7 +100,7 @@ int RepeatabilityMeasurementNode::run()
         ROS_ERROR("Failed to retrieve 'robot_description' from param server");
         return FAILED_TO_INITIALIZE;
     }
-    if (!robot_model_.load(urdf_description_)) {
+    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_description_))) {
         ROS_ERROR("Failed to load Robot Model from URDF");
         return FAILED_TO_INITIALIZE;
     }
@@ -176,7 +176,7 @@ int RepeatabilityMeasurementNode::run()
         Eigen::Affine3d mount_to_eef;
         tf::poseMsgToEigen(eef_pose_mount_frame.pose, mount_to_eef);
 
-        AU_INFO("Measuring repeatability for end effector pose %s", to_string(mount_to_eef).c_str());
+//        AU_INFO("Measuring repeatability for end effector pose %s", to_string(mount_to_eef).c_str());
 
         auto publish_triad = [&](){
             // publish the new pose marker
@@ -198,10 +198,11 @@ int RepeatabilityMeasurementNode::run()
         // move back and forth between the egress position and the ik solution until all transitions have been attempted
         for (const auto& egress_position : egress_positions_) {
             // seed the ik search with the free angle at the egress pose
-            std::vector<double> seed(robot_model_.joint_names().size(), 0.0);
-            seed[robot_model_.free_angle_index()] = egress_position.a4;
+            std::vector<double> seed(robot_model_->joint_names().size(), 0.0);
+            seed[robot_model_->free_angle_index()] = egress_position.a4;
 
-            hdt::IKSolutionGenerator iksols = robot_model_.compute_all_ik_solutions(mount_to_eef, seed);
+            hdt::IKSolutionGenerator iksols =
+                    robot_model_->search_all_ik_solutions(mount_to_eef, seed, sbpl::utils::ToRadians(1.0));
             int num_ik_solutions_attempted = 0;
             std::vector<double> iksol;
             while (iksols(iksol))
@@ -234,7 +235,8 @@ int RepeatabilityMeasurementNode::run()
                 ++num_ik_solutions_attempted;
             }
 
-            AU_INFO("  Attempted %d IK Solutions", num_ik_solutions_attempted);
+            if (num_ik_solutions_attempted != 0)
+                AU_INFO("  Attempted %d IK Solutions", num_ik_solutions_attempted);
         }
     }
 
@@ -460,7 +462,7 @@ bool RepeatabilityMeasurementNode::move_to_position(const hdt::JointState& posit
     goal.goal_joint_state.header.stamp = ros::Time::now();
     goal.goal_joint_state.header.frame_id = "";
     goal.goal_joint_state.header.seq = 0;
-    goal.goal_joint_state.name = robot_model_.joint_names();
+    goal.goal_joint_state.name = robot_model_->joint_names();
     goal.goal_joint_state.position = joint_vector;
 
     auto result_callback = boost::bind(&RepeatabilityMeasurementNode::move_arm_command_result_cb, this, _1, _2);

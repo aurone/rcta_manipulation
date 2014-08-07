@@ -127,7 +127,7 @@ private:
     bool pending_command_;
 
     std::string urdf_description_;
-    hdt::RobotModel robot_model_;
+    hdt::RobotModelPtr robot_model_;
 
     void ar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
