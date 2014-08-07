@@ -169,7 +169,7 @@ int RepeatabilityMeasurementNode::run()
             ROS_WARN("Failed to transform pose from frame '%s' to '%s'. Fuck TF!", camera_frame_.c_str(), mount_frame_.c_str());
         }
 
-        ROS_INFO("Transformed %s (%s -> %s) = %s",
+        ROS_DEBUG("Transformed %s (%s -> %s) = %s",
                 to_string(pose_stamped.pose).c_str(), pose_stamped.header.frame_id.c_str(),
                 eef_pose_mount_frame.header.frame_id.c_str(), to_string(eef_pose_mount_frame.pose).c_str());
 
@@ -201,20 +201,18 @@ int RepeatabilityMeasurementNode::run()
             std::vector<double> seed(robot_model_.joint_names().size(), 0.0);
             seed[robot_model_.free_angle_index()] = egress_position.a4;
 
-
-            hdt::IKSolutionGenerator iksols = robot_model_.compute_all_ik_solutions(mount_to_eef.inverse(), seed);
+            hdt::IKSolutionGenerator iksols = robot_model_.compute_all_ik_solutions(mount_to_eef, seed);
             int num_ik_solutions_attempted = 0;
             std::vector<double> iksol;
-            bool res = robot_model_.compute_nearest_ik(mount_to_eef, seed, iksol);
-            if (res)//while (iksols(iksol))
+            while (iksols(iksol))
             {
                 publish_triad();
                 AU_INFO("  Moving to egress position %s", to_string(egress_position).c_str());
-//                if (!move_to_position(egress_position))
-//                {
-//                    ROS_WARN("    Failed to move to egress position");
-//                    continue;
-//                }
+                if (!move_to_position(egress_position))
+                {
+                    ROS_WARN("    Failed to move to egress position");
+                    continue;
+                }
 
                 // move to the ik position
                 hdt::JointState js;
