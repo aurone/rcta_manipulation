@@ -1,10 +1,12 @@
 #include "ViservoControlExecutor.h"
 
+#include <hdt/common/msg_utils/msg_utils.h>
+
 ViservoControlExecutor::ViservoControlExecutor() :
     nh_(),
     ph_("~"),
-    as_(),
     action_name_("viservo_command"),
+    as_(),
     joint_command_pub_(),
     joint_states_sub_()
 {
@@ -39,13 +41,61 @@ int ViservoControlExecutor::run()
         return FAILED_TO_INITIALIZE;
     }
 
+    std::string urdf_string;
+    if (!nh_.getParam("robot_description", urdf_string)) {
+        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
+        return FAILED_TO_INITIALIZE;
+    }
+
+    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
+    if (!robot_model_) {
+        ROS_ERROR("Failed to instantiate Robot Model");
+        return FAILED_TO_INITIALIZE;
+    }
+
     joint_command_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
     joint_states_sub_ = nh_.subscribe("/joint_states", 1, &ViservoControlExecutor::joint_states_cb, this);
+    ar_marker_sub_ = nh_.subscribe("/ar_pose_marker", 1, &ViservoControlExecutor::ar_markers_cb, this);
 
     ros::Rate executive_rate(10.0);
     while (ros::ok())
     {
         ros::spinOnce();
+
+        if (!as_->isActive()) {
+            executive_rate.sleep();
+            continue;
+        }
+
+        // when receiving goal
+        //     1. make sure that the markers are in view of the camera
+
+
+        // incorporate the newest marker measurement and estimate the current
+        // wrist pose based off of that and the last two joints
+
+        // check goal stati
+        //     1. lost track of the marker
+        //     2. check whether the estimated wrist pose has reached the goal within the specified tolerance
+        //     3. check whether the wrist has moved too far from the goal (and the canonical path follower should retry)
+
+        void update_wrist_pose_estimate();
+
+        hdt::ViservoCommandResult result;
+        if (!reached_goal()) {
+            result.result = hdt::ViservoCommandResult::SUCCESS;
+            as_->setSucceeded(result);
+        }
+
+        if (lost_marker()) {
+            result.result = hdt::ViservoCommandResult::LOST_MARKER;
+            as_->setAborted(result);
+        }
+
+        if (moved_too_far()) {
+            result.result = hdt::ViservoCommandResult::MOVED_TOO_FAR;
+            as_->setAborted(result);
+        }
 
         // TODO: Attach markers to both the gripper and the forearm
         //       Use the forearm plus the last few joints as one measurement for the current pose of the end effector
@@ -61,11 +111,35 @@ int ViservoControlExecutor::run()
         //     apply the jacobian in the direction of the error to derive a joint state that moves the arm toward the goal
         //     send that joint state to the arm controller
 
-        ROS_INFO("Last AR Markers message had %zd markers", last_ar_markers_msg_->markers.size());
+        Eigen::Affine3d wrist_transform_estimate; // in camera frame
+        tf::poseMsgToEigen(wrist_pose_estimate_, wrist_transform_estimate);
+
+        Eigen::Affine3d goal_wrist_transform; // in camera frame
+        tf::poseMsgToEigen(current_goal_->goal_pose, goal_wrist_transform);
+
+        Eigen::Affine3d error = msg_utils::transform_diff(goal_wrist_transform, wrist_transform_estimate);
+
+        Eigen::AngleAxisd aa_error(error.rotation());
+        double angle_error = aa_error.angle();
+
+        Eigen::Vector3d verror(error.translation());
+
+        // FOR NOW: disallow motions if the joints will not be able to reach their target positions within a reasonable amount of time
 
         trajectory_msgs::JointTrajectory traj_cmd;
         traj_cmd.points = std::vector<double>(7, 0.0); // TODO: fill out the real deal here
         joint_command_pub_.publish(traj_cmd);
+
+        tf::StampedTransform transform;
+        const std::string& target_frame = camera_frame_;
+        const std::string& source_frame = wrist_frame_;
+        try {
+            listener_.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+        }
+        catch (const tf::TransformException& ex) {
+            ROS_ERROR("I hate TF");
+
+        }
 
         executive_rate.sleep();
     }
