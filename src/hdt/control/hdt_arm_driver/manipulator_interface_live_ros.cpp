@@ -210,7 +210,7 @@ bool ManipulatorInterfaceLiveROS::init()
         return false;
     }
 
-    if (!robot_model_.load(urdf_string)) {
+    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
         ROS_ERROR("Failed to load Robot Model from URDF");
         return false;
     }
@@ -374,16 +374,16 @@ void ManipulatorInterfaceLiveROS::acknowledge_reset_callback(const hdt::Acknowle
 
 bool ManipulatorInterfaceLiveROS::assert_joint_limits(const ManipulatorParameters& manip_params)
 {
-    if (robot_model_.joint_names().size() != manip_params.getNumJoints()) {
+    if (robot_model_->joint_names().size() != manip_params.getNumJoints()) {
         ROS_ERROR("Robot Model and HDT Manipulator Interface have different number of joints");
         return false;
     }
 
     auto almost_equals = [](double u, double v, double eps) { return fabs(u - v) <= fabs(eps); };
 
-    for (std::size_t i = 0; i < robot_model_.min_limits().size(); ++i) {
-        double urdf_min_limit = robot_model_.min_limits()[i];
-        double urdf_max_limit = robot_model_.max_limits()[i];
+    for (std::size_t i = 0; i < robot_model_->min_limits().size(); ++i) {
+        double urdf_min_limit = robot_model_->min_limits()[i];
+        double urdf_max_limit = robot_model_->max_limits()[i];
 
         float hdt_min_limit;
         ManipulatorError error = manip_params.getMinPosition(i, &hdt_min_limit);

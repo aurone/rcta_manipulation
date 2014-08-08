@@ -95,7 +95,7 @@ private:
     control_msgs::FollowJointTrajectoryFeedback::ConstPtr last_controller_state_;
     industrial_msgs::RobotStatus last_robot_status_;
 
-    hdt::RobotModel robot_model_;
+    hdt::RobotModelPtr robot_model_;
 
     static const double DEFAULT_GOAL_THRESHOLD;
     static const double DEFAULT_END_EFFECTOR_GOAL_TOLERANCE;

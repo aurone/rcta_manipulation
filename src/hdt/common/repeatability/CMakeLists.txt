@@ -1,2 +1,2 @@
 add_executable(repeatability_measure repeatability_measure.cpp RepeatabilityMeasurementNode.cpp)
-target_link_libraries(repeatability_measure ${catkin_LIBRARIES})
+target_link_libraries(repeatability_measure ${catkin_LIBRARIES} hdt_robot_model msg_utils)

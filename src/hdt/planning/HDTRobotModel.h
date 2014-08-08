@@ -51,7 +51,7 @@ public:
 
 private:
 
-    hdt::RobotModel robot_model_;
+    hdt::RobotModelPtr robot_model_;
 
     std::vector<double> min_limits_;
     std::vector<double> max_limits_;

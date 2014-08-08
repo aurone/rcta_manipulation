@@ -1,5 +1,10 @@
 # goal 
+uint8 EndEffectorGoal = 0
+uint8 JointGoal = 1
+
 geometry_msgs/Pose goal_pose
+sensor_msgs/JointState goal_joint_state
+uint8 type
 ---
 # result
 bool success

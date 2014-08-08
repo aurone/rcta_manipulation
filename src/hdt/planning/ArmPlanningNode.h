@@ -8,6 +8,7 @@
 #include <vector>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
+#include <control_msgs/FollowJointTrajectoryAction.h>
 #include <moveit/distance_field/propagation_distance_field.h>
 #include <moveit_msgs/CollisionObject.h>
 #include <moveit_msgs/Constraints.h>
@@ -19,68 +20,14 @@
 #include <sbpl_manipulation_components/collision_checker.h>
 #include <sbpl_manipulation_components/occupancy_grid.h>
 #include <sbpl_manipulation_components/kdl_robot_model.h>
-#include <control_msgs/FollowJointTrajectoryAction.h>
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/MoveArmCommandAction.h>
+#include <hdt/common/stringifier/stringifier.h>
+#include "JointInterpolationPathGenerator.h"
 
 namespace hdt
 {
-
-template <typename T>
-std::string to_string(const std::vector<T>& vec)
-{
-    std::stringstream ss;
-    ss << "[ ";
-    for (int i = 0; i < (int)vec.size(); ++i) {
-        ss << vec[i];
-        if (i != vec.size() - 1) {
-            ss << ", ";
-        }
-    }
-    ss << ']';
-    return ss.str();
-}
-
-template <> inline std::string to_string<double>(const std::vector<double>& vec)
-{
-    std::stringstream ss;
-    ss << "[ ";
-    for (int i = 0; i < (int)vec.size(); ++i) {
-        // output doubles in fixed-point notation with 3 digits after the
-        // decimal point; allow space for the decimal point, leading 0, and
-        // possible - sign
-        ss << std::fixed << std::setprecision(3) << std::setw(6) << vec[i];
-        if (i != vec.size() - 1) {
-            ss << ", ";
-        }
-    }
-    ss << " ]";
-    return ss.str();
-}
-
-class JointInterpolationPathGenerator : public sbpl::shortcut::PathGenerator<trajectory_msgs::JointTrajectoryPoint, int>
-{
-public:
-
-    JointInterpolationPathGenerator();
-
-    bool initialize(const std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace>& collision_checker,
-                    const std::vector<double>& min_limits, const std::vector<double>& max_limits,
-                    const std::vector<bool>& continuous);
-
-    bool generate_path(const trajectory_msgs::JointTrajectoryPoint& start,
-                       const trajectory_msgs::JointTrajectoryPoint& end,
-                       std::vector<trajectory_msgs::JointTrajectoryPoint>& path_out,
-                       int& cost_out) const;
-
-private:
-
-    std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
-    std::vector<double> min_limits_;
-    std::vector<double> max_limits_;
-    std::vector<bool> continuous_;
-};
 
 /// @brief Class that provides a simple ROS API to the SBPL arm planner for the HDT arm
 class ArmPlanningNode
@@ -166,11 +113,23 @@ private:
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
-    bool add_interpolation_to_plan(moveit_msgs::GetMotionPlan::Response& res) const;
+    void apply_shortcutting(trajectory_msgs::JointTrajectory& joint_trajectory) const;
+    bool add_interpolation_to_plan(trajectory_msgs::JointTrajectory& res_traj) const;
+    void publish_trajectory(const trajectory_msgs::JointTrajectory& joint_trajectory);
 
-    void publish_trajectory(const moveit_msgs::RobotTrajectory& trajectory);
+    std::vector<double> convert_to_sbpl_goal(const geometry_msgs::Pose& pose);
 
-    void apply_shortcutting(moveit_msgs::GetMotionPlan::Response& res) const;
+    bool plan_to_eef_goal(
+            const moveit_msgs::PlanningScenePtr& scene,
+            const moveit_msgs::RobotState& start,
+            const hdt::MoveArmCommandGoal& goal,
+            trajectory_msgs::JointTrajectory& traj);
+
+    bool plan_to_joint_goal(
+            const moveit_msgs::PlanningScenePtr& scene,
+            const moveit_msgs::RobotState& start,
+            const hdt::MoveArmCommandGoal& goal,
+            trajectory_msgs::JointTrajectory& traj);
 };
 
 } // namespace hdt

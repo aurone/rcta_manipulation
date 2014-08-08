@@ -40,7 +40,7 @@ bool ErrorMeasurementNode::initialize()
         return false;
     }
 
-    if (!robot_model_.load(urdf_string)) {
+    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
         ROS_ERROR("Failed to load Robot Model from the URDF");
         return false;
     }
@@ -248,7 +248,7 @@ Eigen::Affine3d ErrorMeasurementNode::interpolate(const Eigen::Affine3d& a, cons
 Eigen::Affine3d ErrorMeasurementNode::compute_joint_state_pose(const sensor_msgs::JointState::ConstPtr& msg)
 {
     Eigen::Affine3d wrist_transform;
-    robot_model_.compute_fk(msg->position, wrist_transform);
+    robot_model_->compute_fk(msg->position, wrist_transform);
     // base -> mount * mount -> wrist * wrist -> gripper * gripper -> tool = base -> tool
     return base_frame_to_mount_frame_ * wrist_transform * wrist_frame_to_gripper_frame_ * gripper_frame_to_marker_frame_;
 }

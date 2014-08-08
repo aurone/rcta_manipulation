@@ -1,17 +1,25 @@
 #include <hdt_description/RobotModel.h>
+
+#include <cassert>
+#include <utility>
 #include <hdt_kinematics/kinematics.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <urdf_parser/urdf_parser.h>
 
-#define VALIDATE_WITH_FK 1
+#define RM_DEBUG 0
+#if RM_DEBUG
+#define RM_ASSERT(cond) assert(cond)
+#else
+#define RM_ASSERT(cond) do { (void) sizeof((cond)); } while(0) // assert implementation borrowed from SDL
+#endif
 
 namespace hdt
 {
 
 double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std::vector<double>& joints2)
 {
-    assert(joints1.size() == 7 && joints2.size() == 7);
+    RM_ASSERT(joints1.size() == 7 && joints2.size() == 7);
 
     auto squared = [](double x) { return x * x; };
     double dist = 0.0;
@@ -25,24 +33,139 @@ double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std
     return dist;
 }
 
-IKSolutionGenerator::IKSolutionGenerator(const std::vector<std::vector<double>>& solutions) :
-    solutions_(solutions),
-    csol_(-1)
+SimpleIKSolutionGenerator::SimpleIKSolutionGenerator(const std::vector<std::vector<double>>& solutions) :
+    curr_sols_(solutions),
+    curr_sol_idx_(0)
+{
+}
+
+SimpleIKSolutionGenerator::SimpleIKSolutionGenerator(std::vector<std::vector<double>>&& solutions) :
+    curr_sols_(solutions),
+    curr_sol_idx_(0)
+{
+}
+
+bool SimpleIKSolutionGenerator::operator()(std::vector<double>& solution)
+{
+    if (curr_sol_idx_ >= curr_sols_.size()) {
+        return false;
+    }
+    else {
+        solution = std::move(curr_sols_[curr_sol_idx_]);
+        ++curr_sol_idx_;
+        return true;
+    }
+}
+
+IKSolutionGenerator::IKSolutionGenerator(
+    const RobotModelConstPtr& robot_model,
+    const Eigen::Affine3d& eef_transform,
+    const std::vector<double>& seed,
+    double search_res)
+:
+    robot_model_(robot_model),
+    eef_transform_(eef_transform),
+    curr_gen_(),
+    seed_(seed),
+    search_res_(search_res),
+    inside_upper_bound_(true),
+    inside_lower_bound_(true),
+    curr_iteration_(0),
+    found_solution_(false)
 {
 }
 
 bool IKSolutionGenerator::operator()(std::vector<double>& solution)
 {
-    csol_++;
-    if (csol_ >= solution.size())
-    {
-        return false;
+    // TODO: minimize conversions from eigen matrix to double arrays
+
+    // search for another solution until we search out of bounds or find a solution
+    bool in_bounds = inside_lower_bound_ && inside_upper_bound_;
+    while (in_bounds) {
+        ROS_DEBUG("Generating solution for iteration %d", curr_iteration_);
+        // on successive iterations, start searching around the free angle
+        if (curr_iteration_ > 0) {
+            // unless searching is disabled
+            if (search_res_ == 0.0) {
+                return false;
+            }
+
+            // cycle through the last batch of ik solutions
+            std::vector<double> next_sol;
+            if (curr_gen_(next_sol)) {
+                ROS_DEBUG("Returning solution from the batch!");
+                solution = std::move(next_sol);
+                ++curr_iteration_;
+                return true;
+            }
+
+            // advance the free angle search
+            const double free_angle_seed = seed_[robot_model_->free_angle_index()];
+            const double free_angle_min = robot_model_->min_limits()[robot_model_->free_angle_index()];
+            const double free_angle_max = robot_model_->max_limits()[robot_model_->free_angle_index()];
+
+            if (curr_iteration_ % 2 != 0) {
+                if (inside_upper_bound_) {
+                    // odd iterations search up from the canonical free angle
+                    double up_free_angle = free_angle_seed + ((curr_iteration_ + 1) >> 1) * search_res_;
+                    ROS_DEBUG("Attempting free angle of %0.3f", up_free_angle);
+                    if (sbpl::utils::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
+                        seed_[robot_model_->free_angle_index()] = up_free_angle;
+                        curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
+                    }
+                    else {
+                        ROS_DEBUG("Exited upper limit of %0.3f [%0.3f]", free_angle_max, up_free_angle);
+                        inside_upper_bound_ = false;
+                    }
+                }
+            }
+            else {
+                if (inside_lower_bound_) {
+                    // even iterations search down from the canonical free angle
+                    double down_free_angle = free_angle_seed - ((curr_iteration_ + 1) >> 1) * search_res_;
+                    ROS_DEBUG("Attempting free angle of %0.3f", down_free_angle);
+                    if (sbpl::utils::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
+                        seed_[robot_model_->free_angle_index()] = down_free_angle;
+                        curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
+                    }
+                    else {
+                        ROS_DEBUG("Exited lower limit of %0.3f [%0.3f]", free_angle_min, down_free_angle);
+                        inside_lower_bound_ = false;
+                    }
+                }
+            }
+        }
+        else {
+            // compute canonical free angle ik solutions if we dont have any
+            curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
+            std::vector<double> next_sol;
+            if (curr_gen_(next_sol)) {
+                solution = std::move(next_sol);
+                ++curr_iteration_; // don't forget this
+                return true;
+            }
+        }
+
+        in_bounds = inside_upper_bound_ || inside_lower_bound_;
+        ++curr_iteration_;
     }
-    else
-    {
-        solution = std::move(solutions_[csol_]);
-        return true;
+
+    // free angle joint limits have been breached
+    return false;
+}
+
+RobotModelPtr RobotModel::LoadFromURDF(const std::string& urdf_string)
+{
+    RobotModelPtr robot_model_ptr(new RobotModel);
+    if (robot_model_ptr) {
+        if (robot_model_ptr->load(urdf_string)) {
+            return robot_model_ptr;
+        }
+        else {
+            return RobotModelPtr();
+        }
     }
+    return robot_model_ptr;
 }
 
 RobotModel::RobotModel() :
@@ -136,54 +259,35 @@ bool RobotModel::compute_nearest_ik(
     const std::vector<double>& seed,
     std::vector<double>& solution_out) const
 {
-    if (seed.size() < 7) {
-        return false;
+    // get a generator for all valid solutions with the specified free angle
+    SimpleIKSolutionGenerator solution_generator = compute_all_ik_solutions(eef_transform, seed);
+
+    std::vector<std::vector<double>> solutions;
+    std::vector<double> solution;
+    // gather all the solutions
+    while (solution_generator(solution)) {
+        RM_ASSERT(solution.size() == 7);
+        solutions.push_back(std::move(solution));
+        RM_ASSERT(solutions.back().size() == 7);
     }
 
-    double solver_trans[3];
-    double solver_rot[9];
-    convert(eef_transform, solver_trans, solver_rot);
-
-    double free_angle = seed[free_angle_index_];
-
-    ikfast::IkSolutionList<double> ik_solutions;
-    if (!ComputeIk(solver_trans, solver_rot, &free_angle, ik_solutions)) {
-        return false;
-    }
-
-    // check ik solutions and pick the closest one
-    std::size_t num_valid = 0;
-    int best_solution = -1;             // index of closest solution
-    double best_joint_dist = -1.0;      // joint distance from seed state
-    for (size_t i = 0; i < ik_solutions.GetNumSolutions(); ++i) {
-        double solution[7];
-        ik_solutions.GetSolution(i).GetSolution(solution, nullptr);
-
-#if VALIDATE_WITH_FK 
-        const bool close = check_ik_solution(solution, eef_transform);
-#else
-        const bool close = true;
-#endif
-
-        std::vector<double> vsolution(solution, solution + sizeof(solution) / sizeof(double));
-        const bool within_limits = within_joint_limits(vsolution);
-
-        if (close && within_limits) {
-            // compare this solution with our current best found
-            double joint_dist = ComputeJointStateL2NormSqrd(vsolution, seed);
-            if (best_solution == -1 || joint_dist < best_joint_dist)
-            {
-                solution_out = std::move(vsolution);
-                best_solution = (int)i;
-                best_joint_dist = joint_dist;
-            }
-            ++num_valid;
+    // find the best solution in terms of the l2 norm on joint angle
+    int best_solution = -1;
+    double best_joint_dist = -1.0;
+    for (std::size_t i = 0; i < solutions.size(); ++i) {
+        const std::vector<double>& sol = solutions[i];
+        double joint_dist = ComputeJointStateL2NormSqrd(sol, seed);
+        RM_ASSERT(joint_dist >= 0.0);
+        if (best_solution == -1 || joint_dist < best_joint_dist) {
+            best_solution = (int)i;
+            best_joint_dist = joint_dist;
         }
     }
 
-//    if (num_valid != ik_solutions.GetNumSolutions() && ik_solutions.GetNumSolutions() != 0) {
-//        ROS_WARN("%zd out of %zd solutions were invalid", ik_solutions.GetNumSolutions() - num_valid, ik_solutions.GetNumSolutions());
-//    }
+    if (best_solution != -1) {
+        solution_out = std::move(solutions[best_solution]);
+        RM_ASSERT(solution_out.size() == 7);
+    }
 
     return best_solution != -1;
 }
@@ -246,12 +350,12 @@ bool RobotModel::search_nearest_ik(
     return found_solution;
 }
 
-IKSolutionGenerator RobotModel::compute_all_ik_solutions(
+SimpleIKSolutionGenerator RobotModel::compute_all_ik_solutions(
     const Eigen::Affine3d& eef_transform,
     const std::vector<double>& seed) const
 {
     if (seed.size() < 7) {
-        return IKSolutionGenerator();
+        return SimpleIKSolutionGenerator();
     }
 
     double solver_trans[3];
@@ -262,47 +366,37 @@ IKSolutionGenerator RobotModel::compute_all_ik_solutions(
 
     ikfast::IkSolutionList<double> ik_solutions;
     if (!ComputeIk(solver_trans, solver_rot, &free_angle, ik_solutions)) {
-        return IKSolutionGenerator();
+        ROS_WARN("Failed to compute IK");
+        return SimpleIKSolutionGenerator();
     }
 
     std::vector<std::vector<double>> solutions;
-    solutions.resize(ik_solutions.GetNumSolutions());
+    solutions.reserve(ik_solutions.GetNumSolutions());
 
     // check ik solutions and pick the closest one
-    std::size_t num_valid = 0;
-    for (size_t i = 0; i < ik_solutions.GetNumSolutions(); ++i) {
+    for (std::size_t i = 0; i < ik_solutions.GetNumSolutions(); ++i) {
         double solution[7];
         ik_solutions.GetSolution(i).GetSolution(solution, nullptr);
-
-#if VALIDATE_WITH_FK 
-        const bool close = check_ik_solution(solution, eef_transform);
-#else
-        const bool close = true;
-#endif
+        RM_ASSERT(check_ik_solution(solution, eef_transform));
 
         std::vector<double> vsolution(solution, solution + sizeof(solution) / sizeof(double));
+        RM_ASSERT(vsolution.size() == 7);
         const bool within_limits = within_joint_limits(vsolution);
 
-        if (close && within_limits) {
+        if (within_limits) {
             solutions.push_back(std::move(vsolution));
-            ++num_valid;
         }
     }
 
-//    if (!solutions.empty() && num_valid != solutions.size()) {
-//        ROS_WARN("%zd out of %zd solutions were invalid", solutions.size() - num_valid, solutions.size());
-//    }
-
-    return IKSolutionGenerator(solutions);
+    return SimpleIKSolutionGenerator(std::move(solutions));
 }
 
 IKSolutionGenerator RobotModel::search_all_ik_solutions(
     const Eigen::Affine3d& eef_transform,
     const std::vector<double>& seed,
-    double free_angle_search_res) const
+    double search_res) const
 {
-    ROS_WARN("Unimplemented");
-    return IKSolutionGenerator();
+    return IKSolutionGenerator(shared_from_this(), eef_transform, seed, search_res);
 }
 
 void RobotModel::convert(const double* trans, const double* rot, Eigen::Affine3d& transform_out)

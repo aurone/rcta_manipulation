@@ -93,7 +93,7 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
         return;
     }
 
-    if (!robot_model_.load(urdf_string)) {
+    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
         ROS_ERROR("Failed to initialize Robot Model from URDF string");
         return;
     }
@@ -108,10 +108,10 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
 
     ui->raw_joint_states_plot->setTitle(tr("Raw Joint States"));
 
-    past_raw_joint_states_.resize(robot_model_.joint_names().size());
-    raw_joint_states_curves_.resize(robot_model_.joint_names().size());
-    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
-        const std::string& joint_name = robot_model_.joint_names()[i];
+    past_raw_joint_states_.resize(robot_model_->joint_names().size());
+    raw_joint_states_curves_.resize(robot_model_->joint_names().size());
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_->joint_names()[i];
 
         // create a circular buffer of size
         boost::circular_buffer<double>& past_raw_joint_state = past_raw_joint_states_[i];
@@ -137,10 +137,10 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
 
     ui->joint_states_plot->setTitle(tr("Joint States"));
 
-    past_joint_states_.resize(robot_model_.joint_names().size());
-    joint_states_curves_.resize(robot_model_.joint_names().size());
-    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
-        const std::string& joint_name = robot_model_.joint_names()[i];
+    past_joint_states_.resize(robot_model_->joint_names().size());
+    joint_states_curves_.resize(robot_model_->joint_names().size());
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_->joint_names()[i];
 
         // create a circular buffer of size
         boost::circular_buffer<double>& past_joint_state = past_joint_states_[i];
@@ -221,7 +221,7 @@ void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::Joint
     }
 
     // update the data associated with the curves and refresh the joint state plots
-    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
         // convert circular buffer to
         QVector<QPointF> plot_data;
         plot_data.reserve(past_joint_states_.size());
@@ -252,7 +252,7 @@ void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::J
     }
 
     // update the data associated with the curves and refresh the joint state plots
-    for (std::size_t i = 0; i < robot_model_.joint_names().size(); ++i) {
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
         // convert circular buffer to
         QVector<QPointF> plot_data;
         plot_data.reserve(past_raw_joint_states_.size());
@@ -384,8 +384,8 @@ void ControllerStatusPanelWidget::watchdog_thread()
 
 int ControllerStatusPanelWidget::get_joint_index(const std::string& joint_name) const
 {
-    for (int i = 0; i < (int)robot_model_.joint_names().size(); ++i) {
-        if (robot_model_.joint_names()[i] == joint_name) {
+    for (int i = 0; i < (int)robot_model_->joint_names().size(); ++i) {
+        if (robot_model_->joint_names()[i] == joint_name) {
             return i;
         }
     }

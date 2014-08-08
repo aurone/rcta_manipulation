@@ -47,7 +47,7 @@ private:
 
     boost::shared_ptr<const trajectory_msgs::JointTrajectory> last_command_;
 
-    RobotModel robot_model_;
+    RobotModelPtr robot_model_;
 
     bool init();
 

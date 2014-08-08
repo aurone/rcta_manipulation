@@ -1,0 +1,18 @@
+# defines bounding box in the frame of the camera from which
+# samples will be taken for goal end effector poses
+workspace_min: [ 0.3, -0.2, -0.1 ]
+workspace_max: [ 0.6, 0.2, 0.1 ]
+
+sample_resolution_x: 0.15
+sample_resolution_y: 0.15
+sample_resolution_z: 0.1
+
+roll_offset_degs: 10
+pitch_offset_degs: 10
+yaw_offset_degs: 10
+
+camera_frame: "kinect_rgb_frame"
+
+egress_positions: [
+  [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+]
