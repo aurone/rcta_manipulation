@@ -130,6 +130,8 @@ private:
             const moveit_msgs::RobotState& start,
             const hdt::MoveArmCommandGoal& goal,
             trajectory_msgs::JointTrajectory& traj);
+
+    void clamp_to_joint_limits(std::vector<double>& joint_vector);
 };
 
 } // namespace hdt

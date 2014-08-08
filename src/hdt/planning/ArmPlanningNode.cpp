@@ -784,6 +784,9 @@ bool ArmPlanningNode::plan_to_joint_goal(
     interp_traj.points[0].positions = start_joint_state.position;
     interp_traj.points[1].positions = goal_joint_state.position;
 
+    clamp_to_joint_limits(interp_traj.points[0].positions);
+    clamp_to_joint_limits(interp_traj.points[1].positions);
+
     add_interpolation_to_plan(interp_traj);
 
     for (const trajectory_msgs::JointTrajectoryPoint& point : interp_traj.points) {
@@ -804,6 +807,14 @@ std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(const geometry_msgs::P
     double goal_roll, goal_pitch, goal_yaw;
     goal_rotation_matrix.getEulerYPR(goal_yaw, goal_pitch, goal_roll);
     return { pose.position.x, pose.position.y, pose.position.z, goal_roll, goal_pitch, goal_yaw };
+}
+
+void ArmPlanningNode::clamp_to_joint_limits(std::vector<double>& joint_vector)
+{
+    auto clamp = [](double d, double min, double max) { if (d < min) return min; else if (d > max) return max; else return d; };
+    for (std::size_t i = 0; i < joint_vector.size(); ++i) {
+        joint_vector[i] = clamp(joint_vector[i], min_limits_[i], max_limits_[i]);
+    }
 }
 
 } //namespace hdt
