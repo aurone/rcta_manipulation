@@ -2,8 +2,12 @@
 int32 goal_id
 geometry_msgs/Pose goal_pose
 ---
+# result definition
+uint8 SUCCESS=0
+uint8 LOST_MARKER=1
+uint8 MOVED_TOO_FAR=2
+uint8 result
+---
 # feedback definition
 float64 pct_complete
----
-# result definition
-bool success
+
