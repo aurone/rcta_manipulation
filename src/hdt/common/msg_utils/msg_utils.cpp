@@ -161,4 +161,25 @@ visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vec
     return markers;
 }
 
+Eigen::Affine3d interp(const Eigen::Affine3d& s, const Eigen::Affine3d& t, double alpha)
+{
+    Eigen::Vector3d interp_pos = (1.0 - alpha) * Eigen::Vector3d(s.translation()) +
+                                        alpha  * Eigen::Vector3d(t.translation());
+    Eigen::Quaterniond aq(s.rotation());
+    Eigen::Quaterniond bq(t.rotation());
+    Eigen::Quaterniond interp_rot = aq.slerp(alpha, bq);
+    return Eigen::Translation3d(interp_pos) * interp_rot;
+}
+
+Eigen::Affine3d transform_diff(const Eigen::Affine3d& s, const Eigen::Affine3d& t)
+{
+    Eigen::Vector3d apos(s.translation());
+    Eigen::Vector3d bpos(t.translation());
+
+    Eigen::Quaterniond arot(s.rotation());
+    Eigen::Quaterniond brot(t.rotation());
+
+    return Eigen::Affine3d(Eigen::Translation3d(apos - bpos) * arot.inverse() * brot);
+}
+
 } // namespace msg_utils

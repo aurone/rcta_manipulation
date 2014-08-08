@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <Eigen/Dense>
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/JointState.h>
 #include <trajectory_msgs/JointTrajectory.h>
@@ -31,6 +32,9 @@ bool reorder_joints(trajectory_msgs::JointTrajectory& joint_trajectory, const st
 
 visualization_msgs::Marker create_arrow_marker(const geometry_msgs::Vector3 &scale);
 visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vector3& scale);
+
+Eigen::Affine3d interp(const Eigen::Affine3d& s, const Eigen::Affine3d& t, double alpha);
+Eigen::Affine3d transform_diff(const Eigen::Affine3d& s, const Eigen::Affine3d& t);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
