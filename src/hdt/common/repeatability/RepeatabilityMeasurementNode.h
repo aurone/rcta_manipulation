@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
@@ -13,6 +14,40 @@
 #include <tf/transform_listener.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/common/hdt_description/RobotModel.h>
+
+inline std::string to_string(const std::tuple<int, int, int, int, int, int>& coord)
+{
+    std::stringstream ss;
+    ss << "("
+       << std::get<0>(coord) << ", "
+       << std::get<1>(coord) << ", "
+       << std::get<2>(coord) << ", "
+       << std::get<3>(coord) << ", "
+       << std::get<4>(coord) << ", "
+       << std::get<5>(coord) << ")";
+    return ss.str();
+}
+
+namespace std
+{
+
+// awful, i know
+template <>
+struct hash<tuple<int, int, int, int, int, int>>
+{
+    size_t operator()(const std::tuple<int, int, int, int, int, int>& t) const
+    {
+        size_t seed = std::hash<int>()(std::get<5>(t));
+        boost::hash_combine(seed, std::hash<int>()(std::get<4>(t)));
+        boost::hash_combine(seed, std::hash<int>()(std::get<3>(t)));
+        boost::hash_combine(seed, std::hash<int>()(std::get<2>(t)));
+        boost::hash_combine(seed, std::hash<int>()(std::get<1>(t)));
+        boost::hash_combine(seed, std::hash<int>()(std::get<0>(t)));
+        return seed;
+    }
+};
+
+} // namespace std
 
 namespace hdt
 {
@@ -49,6 +84,9 @@ struct JointState
 
     double& operator[](int index) { return *(&a0 + index); }
     const double& operator[](int index) const { return *(&a0 + index); }
+
+    std::vector<double> to_joint_vector() const
+    { return std::vector<double>(&this->operator[](0), &this->operator[](7)); }
 };
 
 inline JointState::const_iterator begin(const JointState& js) { return js.cbegin(); }
@@ -108,6 +146,7 @@ private:
     ros::Publisher sample_eef_pose_marker_pub_;
 
     ros::Subscriber joint_states_sub_;
+    ros::Subscriber ar_markers_sub_;
 
     std::vector<hdt::JointState> egress_positions_;
 
@@ -129,23 +168,56 @@ private:
     std::string urdf_description_;
     hdt::RobotModelPtr robot_model_;
 
+    unsigned int tracked_marker_id_;
+
+    typedef std::tuple<int, int, int, int, int, int> DiscCoord;
+    struct SamplePose
+    {
+        DiscCoord coord;
+        geometry_msgs::Pose pose;
+
+        bool operator==(const SamplePose& rhs) const
+        {
+            return coord == rhs.coord;
+        }
+    };
+
+    struct SamplePoseHash
+    {
+        std::size_t operator()(const SamplePose& sp) const
+       {
+            return std::hash<std::tuple<int, int, int, int, int, int>>()(sp.coord);
+        }
+    };
+
+    std::unordered_map<SamplePose, Eigen::Affine3d, SamplePoseHash> offset_means_;
+    std::unordered_map<SamplePose, Eigen::Affine3d, SamplePoseHash> offset_variance_;
+
     void ar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
     bool download_params();
     bool download_egress_positions();
+    bool connect_to_move_arm_client();
 
     static const char* to_cstring(XmlRpc::XmlRpcValue::Type type);
 
-    std::vector<geometry_msgs::Pose> generate_sample_poses();
+    std::vector<SamplePose> generate_sample_poses();
 
     bool move_to_position(const hdt::JointState& position);
 
     bool track_marker_pose(const ros::Duration& listen_duration, geometry_msgs::Pose& pose);
+    bool track_eef_pose(const ros::Duration& listen_duration, geometry_msgs::Pose& pose);
 
     void move_arm_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::MoveArmCommandResult::ConstPtr& result);
+
+    void publish_triad(const Eigen::Affine3d& mount_to_eef);
+
+    std::vector<double> gather_joint_values(const sensor_msgs::JointState& joint_state) const;
+
+    bool write_variances_to_file();
 };
 
 #endif

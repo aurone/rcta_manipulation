@@ -29,7 +29,9 @@ std::string parseandpad(const char* fmt, ...)
     return std::string(buffer);
 }
 
+#define AU_DEBUG(fmt, ...) ROS_DEBUG("%s", parseandpad(fmt, ##__VA_ARGS__).c_str())
 #define AU_INFO(fmt, ...) ROS_INFO("%s", parseandpad(fmt, ##__VA_ARGS__).c_str())
+#define AU_WARN(fmt, ...) ROS_WARN("%s", parseandpad(fmt, ##__VA_ARGS__).c_str())
 
 namespace hdt
 {
@@ -81,17 +83,9 @@ RepeatabilityMeasurementNode::RepeatabilityMeasurementNode() :
 
 int RepeatabilityMeasurementNode::run()
 {
-    // overview:
-    //     1. Create a number of known safe configurations that we can
-    //        reasonably interpolate to and from for most poses in the visible
-    //        workspace
-    //     2. Create a sparse sampling of visible/reachable poses for the end effector
-    //     3. For each sample end effector pose
-    //     4.     For each known safe configuration
-    //     5.         Add to measure of the variance in the actual measured pose of the end effector at this end effector pose
-    //
-
-    // 1. egress positions are read from config
+    // 1. Create a number of known safe configurations that we can
+    //    reasonably interpolate to and from for most poses in the visible
+    //    workspace
     if (!download_params()) { // errors printed within
         return FAILED_TO_INITIALIZE;
     }
@@ -105,28 +99,10 @@ int RepeatabilityMeasurementNode::run()
         return FAILED_TO_INITIALIZE;
     }
 
-    // initialize simple action client for move arm commands
-    move_arm_command_action_name_ = "move_arm_command";
-    move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
-    if (!move_arm_command_client_) {
-        ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
+    if (!connect_to_move_arm_client()) {
+        ROS_ERROR("Failed to connect to move arm client");
         return FAILED_TO_INITIALIZE;
     }
-
-    ros::Rate waitLoopRate(1.0);
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        if (!move_arm_command_client_->isServerConnected()) {
-            AU_INFO("Waiting to connect to action server %s", move_arm_command_action_name_.c_str());
-        }
-        else {
-            break;
-        }
-        waitLoopRate.sleep();
-    }
-
-    AU_INFO("Connected to action server '%s'", move_arm_command_action_name_.c_str());
 
     const double ninety_rads = M_PI / 2.0;
     camera_frame_to_tool_frame_rotation_ = Eigen::Affine3d(Eigen::AngleAxisd(ninety_rads, Eigen::Vector3d::UnitZ()));
@@ -134,27 +110,33 @@ int RepeatabilityMeasurementNode::run()
     // subscribe to joint states and ar markers
     joint_cmd_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
     sample_eef_pose_marker_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("sample_pose_markers", 1);
-    joint_states_sub_ = nh_.subscribe("joint_states", 1, &RepeatabilityMeasurementNode::joint_states_callback, this);
+    joint_states_sub_ = nh_.subscribe("joint_states", 10, &RepeatabilityMeasurementNode::joint_states_callback, this);
+    ar_markers_sub_ = nh_.subscribe("ar_pose_marker", 5, &RepeatabilityMeasurementNode::ar_markers_callback, this);
 
-    // 2. create sparse discretized sampling
-    std::vector<geometry_msgs::Pose> sample_poses = generate_sample_poses();
+    // 2. Create a sparse sampling of visible/reachable poses for the end effector
+    std::vector<SamplePose> sample_poses = generate_sample_poses();
 
     AU_INFO("Minimum x is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(),
-                    [](const geometry_msgs::Pose& p, const geometry_msgs::Pose& q)
-                    { return p.position.x < q.position.x; })->position.x);
-    AU_INFO("Minimum y is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(), [](const geometry_msgs::Pose& p, const geometry_msgs::Pose& q) { return p.position.y < q.position.y; })->position.y);
-    AU_INFO("Minimum z is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(), [](const geometry_msgs::Pose& p, const geometry_msgs::Pose& q) { return p.position.z < q.position.z; })->position.z);
+            [](const SamplePose& p, const SamplePose& q)
+            { return p.pose.position.x < q.pose.position.x; })->pose.position.x);
+    AU_INFO("Minimum y is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(),
+            [](const SamplePose& p, const SamplePose& q)
+            { return p.pose.position.y < q.pose.position.y; })->pose.position.y);
+    AU_INFO("Minimum z is %0.3f", std::min_element(sample_poses.begin(), sample_poses.end(),
+            [](const SamplePose& p, const SamplePose& q)
+            { return p.pose.position.z < q.pose.position.z; })->pose.position.z);
 
     AU_INFO("Generated %zd sample end effector locations within view of the camera", sample_poses.size());
 
-    // try to move to each ik solution
-    for (const auto& pose : sample_poses)
+    // 3. For each sample end effector pose, try to move to each ik solution
+    for (const auto& sample : sample_poses)
     {
+        // Transform this sample pose into the mounting frame for visualization
         geometry_msgs::PoseStamped pose_stamped;
-        pose_stamped.header.stamp = ros::Time(0);//::now();
+        pose_stamped.header.stamp = ros::Time(0);
         pose_stamped.header.seq = 0;
         pose_stamped.header.frame_id = camera_frame_;
-        pose_stamped.pose = pose;
+        pose_stamped.pose = sample.pose;
         geometry_msgs::PoseStamped eef_pose_mount_frame;
 
         if (!listener_.waitForTransform(mount_frame_, camera_frame_, ros::Time::now(), ros::Duration(5.0))) {
@@ -176,69 +158,156 @@ int RepeatabilityMeasurementNode::run()
         Eigen::Affine3d mount_to_eef;
         tf::poseMsgToEigen(eef_pose_mount_frame.pose, mount_to_eef);
 
-//        AU_INFO("Measuring repeatability for end effector pose %s", to_string(mount_to_eef).c_str());
+        publish_triad(mount_to_eef);
 
-        auto publish_triad = [&](){
-            // publish the new pose marker
-            geometry_msgs::Vector3 marker_scale;
-            marker_scale.x = 0.1;
-            marker_scale.y = marker_scale.z = 0.01;
-            visualization_msgs::MarkerArray pose_markers = msg_utils::create_triad_marker_arr(marker_scale);
-            for (visualization_msgs::Marker& marker : pose_markers.markers) {
-                Eigen::Affine3d marker_pose_eef_frame;
-                tf::poseMsgToEigen(marker.pose, marker_pose_eef_frame);
-                Eigen::Affine3d mount_to_marker = mount_to_eef * marker_pose_eef_frame;
-                tf::poseEigenToMsg(mount_to_marker, marker.pose);
-                marker.header.frame_id = mount_frame_;
-            }
-            sample_eef_pose_marker_pub_.publish(pose_markers);
-        };
-        publish_triad();
-
+        // 4. For each known safe configuration
         // move back and forth between the egress position and the ik solution until all transitions have been attempted
         for (const auto& egress_position : egress_positions_) {
-            // seed the ik search with the free angle at the egress pose
-            std::vector<double> seed(robot_model_->joint_names().size(), 0.0);
-            seed[robot_model_->free_angle_index()] = egress_position.a4;
-
+            // Generate IK Solutions
+            std::vector<double> seed = egress_position.to_joint_vector();
+            ROS_DEBUG("Generating IK solutions starting from seed state %s", to_string(seed).c_str());
             hdt::IKSolutionGenerator iksols =
                     robot_model_->search_all_ik_solutions(mount_to_eef, seed, sbpl::utils::ToRadians(1.0));
-            int num_ik_solutions_attempted = 0;
+
+            // Retrieve all IK Solutions
+            std::vector<std::vector<double>> all_solutions;
             std::vector<double> iksol;
-            while (iksols(iksol))
+            while (iksols(iksol)) {
+                all_solutions.push_back(std::move(iksol));
+            }
+
+            ROS_DEBUG("Gathered %zd IK Solutions", all_solutions.size());
+
+            // Pick the top most-different IK Solutions
+            std::vector<std::pair<int, double>> dists(all_solutions.size());
+            for (std::size_t i = 0; i < all_solutions.size(); ++i) {
+                dists[i] = std::make_pair(i, 0.0);
+                for (std::size_t j = 0; j < all_solutions.size(); ++j) {
+                    if (i != j) {
+                        dists[i].second += hdt::ComputeJointStateL2NormSqrd(all_solutions[i], all_solutions[j]);
+                    }
+                }
+            }
+
+            std::sort(dists.begin(), dists.end(),
+                    [](const std::pair<int, double>& a, const std::pair<int, double>& b)
+                    { return b.second < a.second; });
+
+            const int max_attempts = 4;
+            std::vector<std::vector<double>> solutions_to_attempt;
+            const std::size_t num_attempts = std::min(all_solutions.size(), (std::size_t)max_attempts);
+            for (std::size_t i = 0; i < num_attempts; ++i) {
+                solutions_to_attempt.push_back(std::move(all_solutions[dists[i].first]));
+            }
+
+            std::vector<Eigen::Affine3d> differences;
+            differences.reserve(num_attempts);
+
+            int num_ik_solutions_attempted = 0;
+            for (const std::vector<double>& sol : solutions_to_attempt)
             {
-                publish_triad();
-                AU_INFO("  Moving to egress position %s", to_string(egress_position).c_str());
+                publish_triad(mount_to_eef);
+                AU_DEBUG("  Moving to egress position %s", to_string(egress_position).c_str());
                 if (!move_to_position(egress_position))
                 {
-                    ROS_WARN("    Failed to move to egress position");
+                    ROS_ERROR("    Failed to move to egress position");
                     continue;
                 }
 
                 // move to the ik position
                 hdt::JointState js;
-                std::memcpy(&js, iksol.data(), iksol.size() * sizeof(double));
-                AU_INFO("  Moving to IK solution %s", to_string(js).c_str());
+                std::memcpy(&js, sol.data(), sol.size() * sizeof(double));
+                AU_DEBUG("  Moving to IK solution %s", to_string(js).c_str());
                 if (!move_to_position(js))
                 {
                     ROS_WARN("    Failed to move to ik solution");
                     continue;
                 }
 
-                // record the marker pose and compare with the other times that we have moved to this end effector pose
-                AU_INFO("  Recording marker pose at this joint position");
+                // the controller currently reports success as soon as it gets within its capture radius, even if the
+                // arm is still moving because the underlying joint controller doesnt think its reached the target yet;
+                // sleep here for a couple seconds to let it finish and stabilize
+                ros::Duration(2.0).sleep();
+
+                const double record_time_s = 3.0;
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // Pose Measurements. SKIP THIS POSITION IF EITHER FAILS
+                ////////////////////////////////////////////////////////////////////////////////
+
+                // record the marker pose
+                AU_DEBUG("  Recording marker pose at this joint position over the next %0.3f seconds", record_time_s);
                 geometry_msgs::Pose marker_pose_camera_frame;
-                if (!track_marker_pose(ros::Duration(1.0), marker_pose_camera_frame)) {
-                    ROS_WARN("Unable to detect marker at pose %s", to_string(pose).c_str());
+                if (!track_marker_pose(ros::Duration(record_time_s), marker_pose_camera_frame)) {
+                    ROS_WARN("Unable to detect marker at pose %s", to_string(sample.pose).c_str());
+                    continue;
+                }
+                Eigen::Affine3d marker_transform(Eigen::Affine3d::Identity());
+                tf::poseMsgToEigen(marker_pose_camera_frame, marker_transform);
+
+                // record the wrist pose via forward kinematics
+                AU_INFO("  Recording end effector position from joint states over the next %0.3f seconds", record_time_s);
+                geometry_msgs::Pose eef_pose;
+                if (!track_eef_pose(ros::Duration(record_time_s), eef_pose)) {
+                    ROS_WARN("Unable to track end effector at pose %s", to_string(sample.pose).c_str());
+                    continue;
+                }
+                Eigen::Affine3d eef_transform(Eigen::Affine3d::Identity());
+                tf::poseMsgToEigen(eef_pose, eef_transform);
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // Incorporate difference measurement into average
+                ////////////////////////////////////////////////////////////////////////////////
+
+                differences.push_back(msg_utils::transform_diff(marker_transform, eef_transform));
+
+                // 5. Incorporate the difference measurement between the end effector and marker into the average
+                auto omit = offset_means_.find(sample);
+                if (omit == offset_means_.end()) {
+                    offset_means_[sample] = differences.back();
+                    ROS_INFO("  Average pose delta is now %s", to_string(differences.back()).c_str());
+                }
+                else {
+                    double alpha = 1.0 / (num_ik_solutions_attempted + 1);
+                    omit->second = msg_utils::interp(omit->second, differences.back(), 1.0 - alpha);
+                    ROS_INFO("  Average pose delta is now %s", to_string(omit->second).c_str());
                 }
 
                 ++num_ik_solutions_attempted;
             }
 
-            if (num_ik_solutions_attempted != 0)
-                AU_INFO("  Attempted %d IK Solutions", num_ik_solutions_attempted);
+            // 6. compute a variance matrix
+            if (!differences.empty())
+            {
+                Eigen::Affine3d variance_matrix;
+                const Eigen::Affine3d& average_diff = offset_means_[sample];
+                AU_INFO("The average offset between the marker and the wrist is %s", to_string(average_diff).c_str());
+                int num_added = 0;
+                for (const Eigen::Affine3d& diff : differences) {
+                    if (num_added == 0) {
+                        variance_matrix = msg_utils::transform_diff(diff, average_diff);
+                        Eigen::AngleAxisd aa(variance_matrix.rotation());
+                        aa.angle();
+
+                    }
+                    else {
+                        double alpha = 1.0 / (num_added + 1);
+                        variance_matrix = msg_utils::interp(variance_matrix, msg_utils::transform_diff(diff, average_diff), 1.0 - alpha);
+                    }
+                    ++num_added;
+                }
+
+                AU_INFO("Variance in pose for coord %s: %s", to_string(sample.coord).c_str(), to_string(variance_matrix).c_str());
+                offset_variance_[sample] = variance_matrix;
+            }
+
+            if (num_ik_solutions_attempted != 0) {
+                AU_WARN("  Attempted %d IK Solutions", num_ik_solutions_attempted);
+            }
         }
     }
+
+    write_variances_to_file();
 
     return SUCCESS;
 }
@@ -293,6 +362,19 @@ bool RepeatabilityMeasurementNode::download_params()
         ROS_ERROR("Failed to retrieve sampling parameters");
         return false;
     }
+
+    int tracked_marker_id = -1;
+    if (!ph_.getParam("tracked_marker_id", tracked_marker_id)) {
+        ROS_ERROR("Failed to retrieve 'tracked_marker_id' from the param server");
+        return false;
+    }
+
+    if (tracked_marker_id < 0) {
+        ROS_ERROR("Param 'tracked_marker_id' must be non-negative");
+        return false;
+    }
+
+    tracked_marker_id_ = (unsigned)tracked_marker_id;
 
     if (!download_egress_positions()) {
         return false;
@@ -353,6 +435,33 @@ bool RepeatabilityMeasurementNode::download_egress_positions()
     return true;
 }
 
+bool RepeatabilityMeasurementNode::connect_to_move_arm_client()
+{
+    move_arm_command_action_name_ = "move_arm_command";
+    move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
+    if (!move_arm_command_client_) {
+        ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
+        return false;
+    }
+
+    ros::Rate waitLoopRate(1.0);
+    while (ros::ok())
+    {
+        ros::spinOnce();
+        if (!move_arm_command_client_->isServerConnected()) {
+            AU_INFO("Waiting to connect to action server %s", move_arm_command_action_name_.c_str());
+        }
+        else {
+            break;
+        }
+        waitLoopRate.sleep();
+    }
+
+    AU_INFO("Connected to action server '%s'", move_arm_command_action_name_.c_str());
+
+    return true;
+}
+
 const char* RepeatabilityMeasurementNode::to_cstring(XmlRpc::XmlRpcValue::Type type)
 {
     switch (type)
@@ -376,7 +485,7 @@ const char* RepeatabilityMeasurementNode::to_cstring(XmlRpc::XmlRpcValue::Type t
     }
 }
 
-std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_poses()
+auto RepeatabilityMeasurementNode::generate_sample_poses() -> std::vector<SamplePose>
 {
     const double sample_resolution_m = 0.10; // ideal linear discretization
     const double sample_angle_res_degs = 30.0; // ideal angular discretization
@@ -399,12 +508,12 @@ std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_p
 
     num_yaw_samples_ = (int)std::round(2 * yaw_offset_degs_ / sample_angle_res_degs) + 1;
     yaw_res_ = 2 * yaw_offset_degs_ / (num_yaw_samples_ - 1);
-    std::vector<geometry_msgs::Pose> sample_poses;
 
     ROS_INFO("Sampling x locations in [%0.3f, %0.3f] at %0.3f m with %d samples", workspace_min_(0), workspace_max_(0), sample_res_(0), num_samples_(0));
     ROS_INFO("Sampling y locations in [%0.3f, %0.3f] at %0.3f m with %d samples", workspace_min_(1), workspace_max_(1), sample_res_(1), num_samples_(1));
     ROS_INFO("Sampling z locations in [%0.3f, %0.3f] at %0.3f m with %d samples", workspace_min_(2), workspace_max_(2), sample_res_(2), num_samples_(2));
 
+    std::vector<SamplePose> sample_poses;
     for (int x = 0; x < num_samples_(0); ++x)
     {
         double sample_x = workspace_min_(0) + x * sample_res_(0);
@@ -431,11 +540,12 @@ std::vector<geometry_msgs::Pose> RepeatabilityMeasurementNode::generate_sample_p
                                 Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_yaw), Eigen::Vector3d::UnitZ()) *
                                 camera_frame_to_tool_frame_rotation_;
 
-                            geometry_msgs::Pose sample_pose;
-                            tf::poseEigenToMsg(sample_transform_camera_frame, sample_pose);
+                            SamplePose sample;
+                            sample.coord = std::make_tuple(x,y, z, roll, pitch, yaw);
+                            tf::poseEigenToMsg(sample_transform_camera_frame, sample.pose);
 
-                            ROS_INFO("Adding sample pose %s", to_string(sample_pose).c_str());
-                            sample_poses.push_back(sample_pose);
+                            ROS_INFO("Adding sample pose %s", to_string(sample.pose).c_str());
+                            sample_poses.push_back(sample);
                         }
                     }
                 }
@@ -481,19 +591,143 @@ bool RepeatabilityMeasurementNode::move_to_position(const hdt::JointState& posit
 
 bool RepeatabilityMeasurementNode::track_marker_pose(const ros::Duration& listen_duration, geometry_msgs::Pose& pose)
 {
+    ROS_INFO("    Recording marker position...");
+    last_markers_msg_.reset(); // only listen for fresh markers
+
+    ar_track_alvar::AlvarMarkers::ConstPtr last_processed_msg;
+    Eigen::Affine3d marker_transform(Eigen::Affine3d::Identity());
+
     ros::Time start = ros::Time::now();
     while (ros::ok() && ros::Time::now() < start + listen_duration) {
         ros::spinOnce(); // wait for marker message
+        if (!last_markers_msg_) {
+            continue;
+        }
+
+        if (!last_processed_msg) {
+            // skip empty messages or messages that don't have the marker we're looking for (assume only one marker for the time being)
+            if (last_markers_msg_->markers.empty() || last_markers_msg_->markers.front().id != tracked_marker_id_) {
+                continue;
+            }
+
+            // initial reading of the pose
+            tf::poseMsgToEigen(last_markers_msg_->markers.front().pose.pose, marker_transform);
+        }
+        else {
+            // skip empty messages or messages that don't have the marker we're looking for (assume only one marker for the time being)
+            if (last_markers_msg_->markers.empty() || last_markers_msg_->markers.front().id != tracked_marker_id_) {
+                continue;
+            }
+            // start filtering that bad boy
+            Eigen::Affine3d curr_marker_transform;
+            tf::poseMsgToEigen(last_markers_msg_->markers.front().pose.pose, curr_marker_transform);
+            const double pose_gain = 0.1;
+            marker_transform = msg_utils::interp(marker_transform, curr_marker_transform, pose_gain);
+        }
+
+        //
+        last_processed_msg = last_markers_msg_;
     }
 
-    pose = geometry_msgs::Pose();
-    return false;
+    // no messages were processed
+    if (!last_processed_msg) {
+        return false;
+    }
+
+    tf::poseEigenToMsg(marker_transform, pose);
+    return true;
+}
+
+bool RepeatabilityMeasurementNode::track_eef_pose(const ros::Duration& listen_duration, geometry_msgs::Pose& pose)
+{
+    ROS_INFO("    Recording wrist position via forward kinematics...");
+    last_joint_state_msg_.reset(); // only listen for joint states
+
+    sensor_msgs::JointState::ConstPtr last_incorp_msg;
+    Eigen::Affine3d eef_transform;
+    ros::Time start = ros::Time::now();
+    while (ros::ok() && ros::Time::now() < start + listen_duration) {
+        ros::spinOnce(); // wait for marker message
+
+        if (last_joint_state_msg_) {
+            if (!last_incorp_msg) {
+                // initial reading of the pose
+                std::vector<double> joint_vals = gather_joint_values(*last_joint_state_msg_);
+                if (!joint_vals.empty()) {
+                    robot_model_->compute_fk(joint_vals, eef_transform);
+                }
+            }
+            else {
+                // start filtering that bad boy
+                Eigen::Affine3d curr_marker_transform;
+                std::vector<double> joint_vals = gather_joint_values(*last_joint_state_msg_);
+                const double pose_gain = 0.1;
+                eef_transform = msg_utils::interp(eef_transform, curr_marker_transform, pose_gain);
+            }
+
+            last_incorp_msg = last_joint_state_msg_;
+        }
+    }
+
+    if (!last_incorp_msg) {
+        return false;
+    }
+
+    tf::poseEigenToMsg(eef_transform, pose);
+    return true;
 }
 
 void RepeatabilityMeasurementNode::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::MoveArmCommandResult::ConstPtr& result)
 {
-    AU_INFO("Received a Move Arm Command Result!");
+    AU_DEBUG("Received a Move Arm Command Result!");
     pending_command_ = false;
+}
+
+void RepeatabilityMeasurementNode::publish_triad(const Eigen::Affine3d& mount_to_eef)
+{
+    // publish the new pose marker
+    geometry_msgs::Vector3 marker_scale;
+    marker_scale.x = 0.1;
+    marker_scale.y = marker_scale.z = 0.01;
+    visualization_msgs::MarkerArray pose_markers = msg_utils::create_triad_marker_arr(marker_scale);
+    for (visualization_msgs::Marker& marker : pose_markers.markers) {
+        Eigen::Affine3d marker_pose_eef_frame;
+        tf::poseMsgToEigen(marker.pose, marker_pose_eef_frame);
+        Eigen::Affine3d mount_to_marker = mount_to_eef * marker_pose_eef_frame;
+        tf::poseEigenToMsg(mount_to_marker, marker.pose);
+        marker.header.frame_id = mount_frame_;
+    }
+    sample_eef_pose_marker_pub_.publish(pose_markers);
+}
+
+std::vector<double> RepeatabilityMeasurementNode::gather_joint_values(const sensor_msgs::JointState& joint_state) const
+{
+    if (msg_utils::contains_only_joints(joint_state, robot_model_->joint_names())) {
+        sensor_msgs::JointState js = joint_state;
+        msg_utils::reorder_joints(js, robot_model_->joint_names());
+        return js.position;
+    }
+    else {
+        return std::vector<double>();
+    }
+}
+
+bool RepeatabilityMeasurementNode::write_variances_to_file()
+{
+    FILE* f = fopen("variances.txt", "w");
+    if (!f) {
+        ROS_ERROR("Failed to open variances.txt for writing");
+        return false;
+    }
+
+    for (const auto& variance : offset_variance_) {
+        std::stringstream ss;
+        ss << "Coord: " << to_string(variance.first.pose) << ", Variance: " << ::to_string(variance.second) << "\n";
+        fprintf(f, "%s", ss.str().c_str());
+    }
+
+    fclose(f);
+    return true;
 }
