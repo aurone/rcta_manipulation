@@ -78,8 +78,8 @@ bool ArmPlanningNode::init()
     joint_trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ArmPlanningNode::joint_states_callback, this);
 
-    move_command_server_.reset(new MoveArmActionServer(
-            "move_arm_command", boost::bind(&ArmPlanningNode::move_arm, this, _1), false));
+    auto move_command_callback = boost::bind(&ArmPlanningNode::move_arm, this, _1);
+    move_command_server_.reset(new MoveArmActionServer("move_arm_command", move_command_callback, false));
     if (!move_command_server_) {
         ROS_ERROR("Failed to instantiate Move Arm Action Server");
         return false;
