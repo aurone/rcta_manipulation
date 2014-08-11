@@ -1,0 +1,3 @@
+add_executable(viservo_control_executor ViservoControlExecutor.cpp)
+target_link_libraries(viservo_control_executor ${catkin_LIBRARIES} hdt_robot_model msg_utils)
+

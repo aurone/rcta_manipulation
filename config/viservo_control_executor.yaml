@@ -1,0 +1,9 @@
+tracked_marker_id: 8
+tracked_marker_attached_link: "arm_5_wrist_twist"
+marker_to_link_x: 0.0
+marker_to_link_y: 0.0
+marker_to_link_z: 0.0
+marker_to_link_roll: 0.0
+marker_to_link_pitch: 0.0
+marker_to_link_yaw: 0.0
+

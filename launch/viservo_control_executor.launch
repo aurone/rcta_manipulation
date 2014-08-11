@@ -1,0 +1,5 @@
+<launch>
+    <node name="viservo_control_executor" pkg="hdt" type="viservo_control_executor" output="screen">
+        <rosparam command="load" file="$(find hdt)/config/viservo_control_executor.yaml"/>
+    </node>
+</launch>
