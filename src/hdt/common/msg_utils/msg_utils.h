@@ -1,15 +1,18 @@
 #ifndef msg_utils_h
 #define msg_utils_h
 
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <Eigen/Dense>
 #include <geometry_msgs/Vector3.h>
+#include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <XmlRpc.h>
 
 namespace msg_utils
 {
@@ -36,6 +39,22 @@ visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vec
 Eigen::Affine3d interp(const Eigen::Affine3d& s, const Eigen::Affine3d& t, double alpha);
 Eigen::Affine3d transform_diff(const Eigen::Affine3d& s, const Eigen::Affine3d& t);
 
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, bool& bout);
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, int& iout);
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, double& dout);
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::string& sout);
+
+template <typename T>
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::vector<T>& vout);
+
+template <typename T>
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::map<std::string, T>& mout);
+
+template <typename T>
+bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T& tout);
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +79,66 @@ bool vector_sets_equal(const std::vector<T>& u, const std::vector<T>& v)
     }
 
     return true;
+}
+
+template <typename T>
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::vector<T>& vout)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+        ROS_WARN("Expected XML value of type array");
+        return false;
+    }
+
+    // attempt to convert individual xmlrpc elements to values
+    std::vector<T> t_array(value.size());
+    for (std::size_t i = 0; i < t_array.size(); ++i) {
+        if (!extract_xml_value(value[i], t_array[i])) {
+            ROS_WARN("Failed to extract array element");
+            return false;
+        }
+    }
+
+    vout = std::move(t_array);
+    return true;
+}
+
+template <typename T>
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::map<std::string, T>& mout)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
+        ROS_WARN("Expected XML value of type struct");
+        return false;
+    }
+
+    // copy the map
+    std::map<std::string, T> t_map;
+    for (auto it = value.begin(); it != value.end(); ++it) {
+        T t;
+        if (!extract_xml_value(it->second, t)) {
+            ROS_WARN("Failed to extract struct field");
+            return false;
+        }
+        else {
+            t_map[it->first] = t;
+        }
+    }
+
+    mout = std::move(t_map);
+    return true;
+}
+
+template <typename T>
+bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T& tout)
+{
+    ROS_INFO("Retrieveing parameter %s", param_name.c_str());
+
+    XmlRpc::XmlRpcValue value_array;
+    if (!nh.getParam(param_name, value_array)) {
+        ROS_WARN("Failed to retrieve param '%s' from the param server", param_name.c_str());
+        return false;
+    }
+
+    return extract_xml_value(value_array, tout);
 }
 
 } // namespace msg_utils

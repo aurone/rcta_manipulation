@@ -182,4 +182,95 @@ Eigen::Affine3d transform_diff(const Eigen::Affine3d& s, const Eigen::Affine3d& 
     return Eigen::Affine3d(Eigen::Translation3d(apos - bpos) * arot.inverse() * brot);
 }
 
+const char* to_string(XmlRpc::XmlRpcValue::Type type)
+{
+    switch (type) {
+    case XmlRpc::XmlRpcValue::TypeInvalid:
+        return "Invalid";
+    case XmlRpc::XmlRpcValue::TypeBoolean:
+        return "Boolean";
+    case XmlRpc::XmlRpcValue::TypeInt:
+        return "Integer";
+    case XmlRpc::XmlRpcValue::TypeDouble:
+        return "Double";
+    case XmlRpc::XmlRpcValue::TypeString:
+        return "String";
+    case XmlRpc::XmlRpcValue::TypeDateTime:
+        return "DateTime";
+    case XmlRpc::XmlRpcValue::TypeBase64:
+        return "Base64";
+    case XmlRpc::XmlRpcValue::TypeArray:
+        return "Array";
+    case XmlRpc::XmlRpcValue::TypeStruct:
+        return "Struct";
+    }
+}
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, bool& bout)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeBoolean) {
+        ROS_WARN("Expected XML value of type boolean (got %s)", to_string(value.getType()));
+        return false;
+    }
+    else {
+        bout = bool(value);
+        return true;
+    }
+}
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, int& iout)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeInt) {
+        ROS_WARN("Expected XML value of type integer (got %s)", to_string(value.getType()));
+        return false;
+    }
+    else {
+        iout = int(value);
+        return true;
+    }
+}
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, double& dout)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeDouble) {
+        ROS_WARN("Expected XML value of type double (got %s)", to_string(value.getType()));
+        return false;
+    }
+    else {
+        dout = double(value);
+        return true;
+    }
+}
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::string& sout)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeString) {
+        ROS_WARN("Expected XML value of type string (got %s)", to_string(value.getType()));
+        return false;
+    }
+    else {
+        sout = std::string(value);
+        return true;
+    }
+}
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p)
+{
+    std::map<std::string, double> params;
+    bool success = extract_xml_value(value, params);
+    if (!success ||
+        params.find("x") == params.end() ||
+        params.find("y") == params.end() ||
+        params.find("z") == params.end())
+    {
+        return false;
+    }
+    else {
+        p.x = params["x"];
+        p.y = params["y"];
+        p.z = params["z"];
+        return true;
+    }
+}
+
 } // namespace msg_utils

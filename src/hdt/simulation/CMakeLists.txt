@@ -1,2 +1,3 @@
-add_executable(kinect_simulator kinect_simulator.cpp)
-target_link_libraries(kinect_simulator ${catkin_LIBRARIES})
+add_subdirectory(kinect_simulator)
+add_subdirectory(static_world_publisher)
+
