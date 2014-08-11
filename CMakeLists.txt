@@ -45,6 +45,9 @@ find_package(PkgConfig REQUIRED)
 # lua5.2
 pkg_check_modules(lua REQUIRED lua5.2)
 
+# sdl2
+pkg_check_modules(sdl REQUIRED sdl2)
+
 # Openni
 pkg_check_modules(openni REQUIRED libopenni)
 include_directories(${openni_INCLUDE_DIRS})
@@ -54,6 +57,15 @@ link_directories(${openni_LIBRARY_DIRS})
 find_package(Qt4 REQUIRED COMPONENTS QtCore QtGui)
 include(${QT_USE_FILE})
 add_definitions(-DQT_NO_KEYWORDS)
+
+# OpenGL
+find_package(OpenGL REQUIRED)
+include_directories(${OPENGL_INCLUDE_DIR})
+
+# glew
+pkg_check_modules(glew REQUIRED glew)
+include_directories(${glew_INCLUDE_DIRS})
+link_directories(${glew_LIBRARY_DIRS})
 
 # required to locate compiled headers for designer forms
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) 

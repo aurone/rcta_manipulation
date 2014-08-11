@@ -1,3 +1,4 @@
+add_subdirectory(depth_sensor_simulator)
 add_subdirectory(kinect_simulator)
 add_subdirectory(static_world_publisher)
 
