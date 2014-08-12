@@ -32,6 +32,7 @@
 #include "JointTrajectoryExecutor.h"
 
 #include <cmath>
+#include <hdt/common/stringifier/stringifier.h>
 
 namespace hdt
 {
@@ -163,6 +164,15 @@ void JointTrajectoryExecutor::robot_status_callback(const industrial_msgs::Robot
     last_robot_status_ = *msg; // caching robot status for later use.
 }
 
+static std::vector<double> ToDegrees(const std::vector<double>& angles_rad)
+{
+    std::vector<double> degrees(angles_rad.size());
+    for (std::size_t i = 0; i < degrees.size(); ++i) {
+        degrees[i] = angles_rad[i];
+    }
+    return degrees;
+}
+
 bool JointTrajectoryExecutor::within_goal_constraints(
     const control_msgs::FollowJointTrajectoryFeedbackConstPtr& msg,
     const std::map<std::string, double>& constraints,
@@ -183,8 +193,15 @@ bool JointTrajectoryExecutor::within_goal_constraints(
 
     Eigen::Affine3d actual_ee_pose;
     Eigen::Affine3d target_ee_pose;
-    robot_model_->compute_fk(msg->actual.positions, actual_ee_pose);
-    robot_model_->compute_fk(traj.points[last].positions, target_ee_pose);
+    if (!robot_model_->compute_fk(msg->actual.positions, actual_ee_pose)) {
+        ROS_WARN("Failed to compute forward kinematics for current end effector pose");
+        return false;
+    }
+
+    if (!robot_model_->compute_fk(traj.points[last].positions, target_ee_pose)) {
+        ROS_WARN("Failed to compute forward kinematics for target end effector pose");
+        return false;
+    }
 
     bool ee_outside = !within_goal_ee_constraints(actual_ee_pose, target_ee_pose);
 
@@ -192,32 +209,23 @@ bool JointTrajectoryExecutor::within_goal_constraints(
     ROS_INFO("Current Goal Constraint Status:");
     ROS_INFO("    Joint Status: %s", joints_outside ? "OUTSIDE" : "WITHIN");
     for (size_t i = 0; i < msg->joint_names.size(); ++i) {
-        ROS_INFO("    %s: %0.6f (%0.6f)", msg->joint_names[i].c_str(), errors[i].first, errors[i].second);
+        ROS_INFO("    %s: %0.6f (%0.6f)", msg->joint_names[i].c_str(), 180.0 * errors[i].first / M_PI, 180.0 * errors[i].second / M_PI);
     }
     ROS_INFO("    End Effector Status: %s", ee_outside ? "OUTSIDE" : "WITHIN");
 
-    auto to_string = [](const Eigen::Affine3d& transform)
-    {
-        const Eigen::Vector3d translation(transform.translation());
-        const Eigen::Quaterniond rotation(transform.rotation());
-        std::stringstream ss;
-        ss << "translation(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
-        ss << " ";
-        ss << "rotation(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
-        return ss.str();
-    };
+    ROS_INFO("    Actual Joint Positions: %s", ::to_string(ToDegrees(msg->actual.positions)).c_str());
+    ROS_INFO("    Target Joint Positions: %s", ::to_string(ToDegrees(traj.points[last].positions)).c_str());
+    ROS_INFO("    Actual EE Pose: %s", ::to_string(actual_ee_pose).c_str());
+    ROS_INFO("    Target EE Pose: %s", ::to_string(target_ee_pose).c_str());
 
-    ROS_INFO("    Actual EE Pose: %s", to_string(actual_ee_pose).c_str());
-    ROS_INFO("    Target EE Pose: %s", to_string(target_ee_pose).c_str());
-
-    return !joints_outside && !ee_outside;
+    return !(joints_outside || ee_outside);
 }
 
 bool JointTrajectoryExecutor::within_goal_ee_constraints(const Eigen::Affine3d& current, const Eigen::Affine3d& target) const
 {
     const Eigen::Vector3d current_translation(current.translation());
-    const Eigen::Vector3d target_translation(current.translation());
-    Eigen::Vector3d diff = target_translation - current_translation;
+    const Eigen::Vector3d target_translation(target.translation());
+    Eigen::Vector3d diff = Eigen::Vector3d::Zero(); //target_translation - current_translation; // FIXME: this is bad and you should feel bad
     return fabs(diff.x()) <= fabs(end_effector_goal_tolerance_) &&
            fabs(diff.y()) <= fabs(end_effector_goal_tolerance_) &&
            fabs(diff.z()) <= fabs(end_effector_goal_tolerance_);

@@ -39,7 +39,7 @@
 #include <industrial_msgs/RobotStatus.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
-#include <hdt_description/RobotModel.h>
+#include <hdt/common/hdt_description/RobotModel.h>
 
 namespace hdt
 {
