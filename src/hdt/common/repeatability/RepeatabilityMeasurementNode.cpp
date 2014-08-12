@@ -110,8 +110,76 @@ int RepeatabilityMeasurementNode::run()
     // subscribe to joint states and ar markers
     joint_cmd_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
     sample_eef_pose_marker_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("sample_pose_markers", 1);
+    bounds_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("repeatability_bounds_markers", 5);
     joint_states_sub_ = nh_.subscribe("joint_states", 10, &RepeatabilityMeasurementNode::joint_states_callback, this);
     ar_markers_sub_ = nh_.subscribe("ar_pose_marker", 5, &RepeatabilityMeasurementNode::ar_markers_callback, this);
+
+    std::vector<Eigen::Vector3d> line_vertices = {
+        Eigen::Vector3d(workspace_min_(0), workspace_min_(1), workspace_min_(2)),
+        Eigen::Vector3d(workspace_min_(0), workspace_min_(1), workspace_max_(2)),
+        Eigen::Vector3d(workspace_min_(0), workspace_max_(1), workspace_min_(2)),
+        Eigen::Vector3d(workspace_min_(0), workspace_max_(1), workspace_max_(2)),
+        Eigen::Vector3d(workspace_max_(0), workspace_min_(1), workspace_min_(2)),
+        Eigen::Vector3d(workspace_max_(0), workspace_min_(1), workspace_max_(2)),
+        Eigen::Vector3d(workspace_max_(0), workspace_max_(1), workspace_min_(2)),
+        Eigen::Vector3d(workspace_max_(0), workspace_max_(1), workspace_max_(2))
+    };
+
+    // each consecutive pair of two indices represents one line
+    std::vector<int> line_indices = {
+        0, 1, 0, 2, 2, 3, 3, 1, 2, 6, 3, 7, 1, 5, 0, 4, 6, 4, 4, 5, 5, 7, 6, 7
+    };
+
+    // publish bounds markers
+    visualization_msgs::MarkerArray bounds_markers;
+
+    visualization_msgs::Marker lines_marker;
+    lines_marker.header.seq = 0;
+    lines_marker.header.stamp = ros::Time::now();
+    lines_marker.header.frame_id = camera_frame_;
+    lines_marker.ns = "repeatability_bounds";
+    lines_marker.id = 0;
+    lines_marker.type = visualization_msgs::Marker::LINE_LIST;
+    lines_marker.action = visualization_msgs::Marker::ADD;
+    lines_marker.scale.x = 0.01;
+    lines_marker.scale.y = 0.01;
+    lines_marker.scale.z = 0.01;
+
+    int num_lines = line_indices.size() >> 1;
+    ROS_INFO("Adding %d lines for bounds marker", num_lines);
+    for (int i = 0; i < num_lines; ++i) {
+        const Eigen::Vector3d& line_a = line_vertices[line_indices[2 * i]];
+        const Eigen::Vector3d& line_b = line_vertices[line_indices[2 * i + 1]];
+
+        geometry_msgs::Point point_a;
+        point_a.x = line_a(0);
+        point_a.y = line_a(1);
+        point_a.z = line_a(2);
+
+        geometry_msgs::Point point_b;
+        point_b.x = line_b(0);
+        point_b.y = line_b(1);
+        point_b.z = line_b(2);
+
+        lines_marker.points.push_back(point_a);
+        lines_marker.points.push_back(point_b);
+
+        std_msgs::ColorRGBA color;
+        color.r = 1.0;
+        color.a = 0.8;
+        lines_marker.colors.push_back(color);
+        lines_marker.colors.push_back(color);
+    }
+
+    bounds_markers.markers.push_back(lines_marker);
+    ROS_INFO("Publishing marker array with %zd markers", bounds_markers.markers.size());
+    ROS_INFO("    First marker has %zd points", bounds_markers.markers.front().points.size());
+    bounds_markers_pub_.publish(bounds_markers);
+
+    ros::Time then = ros::Time::now();
+    while (ros::Time::now() < then + ros::Duration(5.0)) {
+        ros::spinOnce();
+    }
 
     // 2. Create a sparse sampling of visible/reachable poses for the end effector
     std::vector<SamplePose> sample_poses = generate_sample_poses();
@@ -208,6 +276,7 @@ int RepeatabilityMeasurementNode::run()
             {
                 publish_triad(mount_to_eef);
                 AU_DEBUG("  Moving to egress position %s", to_string(egress_position).c_str());
+                bounds_markers_pub_.publish(bounds_markers);
                 if (!move_to_position(egress_position))
                 {
                     ROS_ERROR("    Failed to move to egress position");
@@ -218,6 +287,7 @@ int RepeatabilityMeasurementNode::run()
                 hdt::JointState js;
                 std::memcpy(&js, sol.data(), sol.size() * sizeof(double));
                 AU_DEBUG("  Moving to IK solution %s", to_string(js).c_str());
+                bounds_markers_pub_.publish(bounds_markers);
                 if (!move_to_position(js))
                 {
                     ROS_WARN("    Failed to move to ik solution");

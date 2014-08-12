@@ -144,6 +144,7 @@ private:
     ros::Publisher joint_cmd_pub_;
 
     ros::Publisher sample_eef_pose_marker_pub_;
+    ros::Publisher bounds_markers_pub_;
 
     ros::Subscriber joint_states_sub_;
     ros::Subscriber ar_markers_sub_;
