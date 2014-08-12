@@ -24,6 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
     pluginlib
     pr2_vfh_database
     roscpp 
+    rospack
     rviz 
     sbpl_geometry_utils 
     sbpl_manipulation
