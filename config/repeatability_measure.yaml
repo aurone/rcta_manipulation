@@ -1,7 +1,7 @@
 # defines bounding box in the frame of the camera from which
 # samples will be taken for goal end effector poses
-workspace_min: [ 0.5, -0.4,  0.0 ]
-workspace_max: [ 0.8,  0.0, 0.2 ]
+workspace_min: [ 0.5, -0.4,  -0.1 ]
+workspace_max: [ 1.0,  0.05, 0.2 ]
 
 sample_resolution_x: 0.15
 sample_resolution_y: 0.15
