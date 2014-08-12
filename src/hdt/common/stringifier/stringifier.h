@@ -64,9 +64,9 @@ inline std::string to_string(const Eigen::Affine3d& transform)
     const Eigen::Vector3d translation(transform.translation());
     const Eigen::Quaterniond rotation(transform.rotation());
     std::stringstream ss;
-    ss << "translation(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
+    ss << "pos(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
     ss << " ";
-    ss << "rotation(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
+    ss << "rot(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
     return ss.str();
 }
 
