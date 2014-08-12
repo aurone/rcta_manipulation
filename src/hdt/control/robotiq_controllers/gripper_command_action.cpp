@@ -112,6 +112,8 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
 
     ROS_INFO("Starting action server...");
 
+    gripper_->set_speed(gripper_->model().minimum_speed());
+
 //    auto callback = boost::bind(&GripperCommandActionExecutor::execute_callback, this, _1);
     auto goal_cb = boost::bind(&GripperCommandActionExecutor::goal_callback, this);
     auto preempt_cb = boost::bind(&GripperCommandActionExecutor::preempt_callback, this);
