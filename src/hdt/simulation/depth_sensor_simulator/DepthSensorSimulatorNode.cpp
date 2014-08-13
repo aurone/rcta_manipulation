@@ -1,13 +1,47 @@
 #include "DepthSensorSimulatorNode.h"
 
+#include <cmath>
+#include <chrono>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
+#include <Eigen/Dense>
 #include <SDL.h>
 #include <GL/glew.h>
 #include <rospack/rospack.h>
+#include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
+
+#define GL_CALL(fun, ...) fun(__VA_ARGS__); if (glGetError() != GL_NO_ERROR) { ROS_ERROR("Call to " #fun " return an error"); }
+
+static Eigen::Projective3f CreatePerspectiveMatrix(float fovy, float aspect, float near, float far)
+{
+    Eigen::Projective3f projection;
+    float f = 1.0 / tan(0.5 * fovy);
+    projection(0, 0) = f / aspect;
+    projection(1, 0) = 0.0f;
+    projection(2, 0) = 0.0f;
+    projection(3, 0) = 0.0f;
+
+    projection(0, 1) = 0.0f;
+    projection(1, 1) = f;
+    projection(2, 1) = 0.0f;
+    projection(3, 1) = 0.0f;
+
+    projection(0, 2) = 0.0f;
+    projection(1, 2) = 0.0f;
+    projection(2, 2) = (far + near) / (near - far);
+    projection(3, 2) = -1.0f;
+
+    projection(0, 3) = 0.0f;
+    projection(1, 3) = 0.0f;
+    projection(2, 3) = (2 * far * near) / (near - far);
+    projection(3, 3) = 0.0f;
+
+    return projection;
+}
 
 /// Code derived from tutorial at http://www.opengl-tutorial.org/beginners-tutorials/tutorial-2-the-first-triangle/
 static GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
@@ -123,8 +157,8 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
         return FAILED_TO_INITIALIZE;
     }
 
-    const int win_width = 1024;
-    const int win_height = 786;
+    const int win_width = 800;
+    const int win_height = 600;
     std::unique_ptr<SDL_Window, std::function<void(SDL_Window*)>> window(
             SDL_CreateWindow(
                     "Depth Sensor Simulator",
@@ -181,6 +215,45 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
          1.0f,  1.0f,  1.0f
     };
 
+    static const GLfloat g_cube_unindexed_vertex_buffer_data[] = {
+        -1.0f,-1.0f,-1.0f, // triangle 1 : begin
+        -1.0f,-1.0f, 1.0f,
+        -1.0f, 1.0f, 1.0f, // triangle 1 : end
+         1.0f, 1.0f,-1.0f, // triangle 2 : begin
+        -1.0f,-1.0f,-1.0f,
+        -1.0f, 1.0f,-1.0f, // triangle 2 : end
+         1.0f,-1.0f, 1.0f,
+        -1.0f,-1.0f,-1.0f,
+         1.0f,-1.0f,-1.0f,
+         1.0f, 1.0f,-1.0f,
+         1.0f,-1.0f,-1.0f,
+        -1.0f,-1.0f,-1.0f,
+        -1.0f,-1.0f,-1.0f,
+        -1.0f, 1.0f, 1.0f,
+        -1.0f, 1.0f,-1.0f,
+         1.0f,-1.0f, 1.0f,
+        -1.0f,-1.0f, 1.0f,
+        -1.0f,-1.0f,-1.0f,
+        -1.0f, 1.0f, 1.0f,
+        -1.0f,-1.0f, 1.0f,
+         1.0f,-1.0f, 1.0f,
+         1.0f, 1.0f, 1.0f,
+         1.0f,-1.0f,-1.0f,
+         1.0f, 1.0f,-1.0f,
+         1.0f,-1.0f,-1.0f,
+         1.0f, 1.0f, 1.0f,
+         1.0f,-1.0f, 1.0f,
+         1.0f, 1.0f, 1.0f,
+         1.0f, 1.0f,-1.0f,
+        -1.0f, 1.0f,-1.0f,
+         1.0f, 1.0f, 1.0f,
+        -1.0f, 1.0f,-1.0f,
+        -1.0f, 1.0f, 1.0f,
+         1.0f, 1.0f, 1.0f,
+        -1.0f, 1.0f, 1.0f,
+         1.0f,-1.0f, 1.0f
+    };
+
     GLuint vertex_buffer;
     glGenBuffers(1, &vertex_buffer);
 
@@ -189,15 +262,44 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
 
     GLuint program_id = LoadShaders((resource_path + "/simple.vert").c_str(), (resource_path + "/simple.frag").c_str());
 
+//    Eigen::Affine3f model_matrix = Eigen::Affine3f::Identity();
+
+    Eigen::Affine3f model_matrix(Eigen::Affine3f::Identity()); // world -> model
+//    Eigen::Affine3f model_matrix(Eigen::AngleAxisf(M_PI / 4.0, Eigen::Vector3f(0.0f, 0.0f, 1.0f)));
+
+//    Eigen::Affine3f view_matrix = Eigen::Affine3f::Identity();
+    Eigen::Affine3f view_matrix(Eigen::Translation3f(0.0f, 0.0f, -5.0f)); // camera -> world (where the camera faces down the -z axis)
+
+    Eigen::Projective3f projection_matrix = CreatePerspectiveMatrix(sbpl::utils::ToRadians(60.0), 1.0f, 0.01f, 100.0f); // clip -> camera
+//    Eigen::Projective3f projection_matrix(Eigen::Projective3f::Identity());
+
+    // clip -> model
+    Eigen::Projective3f transformation_matrix(projection_matrix * view_matrix * model_matrix);
+
+    GLuint matrix_id = glGetUniformLocation(program_id, "MVP");
+    if (matrix_id == -1) {
+        ROS_ERROR("Failed to get uniform 'MVP'");
+    }
+
+    GL_CALL(glUseProgram, program_id);
+    std::cout << "Uniform MVP @ " << matrix_id << std::endl;
+    GL_CALL(glUniformMatrix4fv, matrix_id, 1, GL_FALSE, transformation_matrix.data());
+
     ////////////////////////////////////////////////////////////////////////////////
     // Executive loop
     ////////////////////////////////////////////////////////////////////////////////
 
-    ros::Rate executive_rate(1.0);
+    ros::Rate executive_rate(30.0);
     bool shutdown = false;
     bool skip_sleep = false;
+    std::chrono::time_point<std::chrono::high_resolution_clock> then = std::chrono::high_resolution_clock::now();
+    float triangle_rotation = 0.0f;
     while (ros::ok() && !shutdown) {
+        std::chrono::time_point<std::chrono::high_resolution_clock> now = std::chrono::high_resolution_clock::now();
+        double dt = std::chrono::duration<double, std::ratio<1>>(now - then).count();
+
         RunUponDestruction rod([&]() {
+            then = now;
             if (skip_sleep) {
                 return;
             }
@@ -232,6 +334,12 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(program_id);
+
+        triangle_rotation += M_PI / 4 * dt;
+        model_matrix = Eigen::AngleAxisf(triangle_rotation, Eigen::Vector3f(0.0f, 1.0f, 0.0f));
+        Eigen::Projective3f transformation_matrix(projection_matrix * view_matrix * model_matrix);
+
+        GL_CALL(glUniformMatrix4fv, matrix_id, 1, GL_FALSE, transformation_matrix.data());
 
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
