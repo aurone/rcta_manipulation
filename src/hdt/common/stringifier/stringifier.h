@@ -18,6 +18,8 @@ std::string to_string(const std::vector<T>& v);
 std::string to_string(const std::vector<double>& v);
 
 std::string to_string(const Eigen::Affine3d& transform);
+std::string to_string(const Eigen::Vector3d& v);
+
 std::string to_string(const geometry_msgs::Pose& pose);
 
 template <typename T, std::size_t N>
@@ -67,6 +69,13 @@ inline std::string to_string(const Eigen::Affine3d& transform)
     ss << "pos(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
     ss << " ";
     ss << "rot(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
+    return ss.str();
+}
+
+inline std::string to_string(const Eigen::Vector3d& v)
+{
+    std::stringstream ss;
+    ss << "(" << v(0) << ", " << v(1) << ", " << v(2) << ")";
     return ss.str();
 }
 
