@@ -55,6 +55,9 @@ bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T&
 
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p);
 
+template <typename T>
+bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -139,6 +142,21 @@ bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T&
     }
 
     return extract_xml_value(value_array, tout);
+}
+
+template <typename T>
+bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv)
+{
+    if (u.size() != v.size()) {
+        return false;
+    }
+
+    uv.resize(u.size());
+    for (std::size_t i = 0; i < u.size(); ++i) {
+        uv[i] = u[i] + v[i];
+    }
+
+    return true;
 }
 
 } // namespace msg_utils
