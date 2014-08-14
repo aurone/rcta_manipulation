@@ -52,6 +52,7 @@ private:
     double marker_validity_timeout_;
 
     Eigen::Affine3d wrist_transform_estimate_;
+    Eigen::Affine3d eef_transform_from_joint_state_;
 
     /// maximum velocities in workspace and in joint space
     double max_translational_velocity_mps_;

@@ -26,7 +26,7 @@ ViservoControlExecutor::ViservoControlExecutor() :
     marker_validity_timeout_(), // read from param server
     wrist_transform_estimate_(),
     max_translational_velocity_mps_(0.05),
-    max_rotational_velocity_rps_(sbpl::utils::ToRadians(5.0)),
+    max_rotational_velocity_rps_(sbpl::utils::ToRadians(1.0)),
     max_joint_velocities_rps_(7, sbpl::utils::ToRadians(20.0)),
     listener_(),
     camera_frame_("asus_rgb_frame"),
@@ -78,7 +78,7 @@ int ViservoControlExecutor::run()
 
     joint_command_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
     corrected_wrist_goal_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("corrected_eef_goal", 1);
-    joint_states_sub_ = nh_.subscribe("/joint_states", 1, &ViservoControlExecutor::joint_states_cb, this);
+    joint_states_sub_ = nh_.subscribe("/joint_states", 10, &ViservoControlExecutor::joint_states_cb, this);
     ar_marker_sub_ = nh_.subscribe("/ar_pose_marker", 1, &ViservoControlExecutor::ar_markers_cb, this);
 
     ROS_INFO("Starting action server 'viservo_command'...");
@@ -99,7 +99,7 @@ int ViservoControlExecutor::run()
     //       Use the gripper markers as another measurement for the current pose of the end effector
     //       Have some filtering mechanism to determine the most confident current pose
 
-    const double rate_hz = 10;
+    const double rate_hz = 10.0;
     ros::Rate executive_rate(rate_hz);
     double dt = 1.0 / rate_hz;
     while (ros::ok())
@@ -111,7 +111,8 @@ int ViservoControlExecutor::run()
             continue;
         }
 
-        ROS_INFO("Executing viservo control. Current joint state is %s", (bool)last_joint_state_msg_ ? to_string(last_joint_state_msg_->position).c_str() : "null");
+        ROS_INFO("Executing viservo control. Current joint state is %s",
+                (bool)last_joint_state_msg_ ? to_string(msg_utils::to_degrees(last_joint_state_msg_->position)).c_str() : "null");
 
         if (as_->isPreemptRequested()) {
             ROS_WARN("Goal preemption currently unimplemented");
@@ -124,8 +125,34 @@ int ViservoControlExecutor::run()
             continue;
         }
 
-        // 2. check whether the estimated wrist pose has reached the goal within the specified tolerance
+        tf::StampedTransform transform;
+        try {
+//            listener_.lookupTransform(mount_frame_, camera_frame_, ros::Time(0), transform);
+            listener_.lookupTransform(camera_frame_, mount_frame_, ros::Time(0), transform);
+        }
+        catch (const tf::TransformException& ex) {
+            ROS_ERROR("Unable to lookup transform from %s to %s (%s)", mount_frame_.c_str(), camera_frame_.c_str(), ex.what());
+        }
+
+        Eigen::Affine3d camera_to_mount =
+            Eigen::Translation3d(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z()) *
+            Eigen::Quaterniond(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
+
+        ROS_WARN("Mount to camera: %s", to_string(camera_to_mount.inverse()).c_str());
+
         hdt::ViservoCommandResult result;
+
+        if (!robot_model_->compute_fk(last_joint_state_msg_->position, eef_transform_from_joint_state_)) {
+            ROS_ERROR("Failed to compute end effector transform from joint state");
+            result.result = hdt::ViservoCommandResult::STUCK;
+            as_->setSucceeded(result);
+            continue;
+        }
+
+        // camera -> wrist = camera -> mount * mount -> wrist
+        eef_transform_from_joint_state_ = camera_to_mount * eef_transform_from_joint_state_;
+
+        // 2. check whether the estimated wrist pose has reached the goal within the specified tolerance
         if (reached_goal()) {
             ROS_INFO("Wrist has reached goal. Completing action...");
             result.result = hdt::ViservoCommandResult::SUCCESS;
@@ -149,13 +176,21 @@ int ViservoControlExecutor::run()
             continue;
         }
 
+        double roll, pitch, yaw;
+
         Eigen::Affine3d goal_wrist_transform; // in camera frame
         tf::poseMsgToEigen(current_goal_->goal_pose, goal_wrist_transform);
+
+        Eigen::Quaterniond goal_quat(goal_wrist_transform.rotation());
+        Eigen::Vector3d goal_pos(goal_wrist_transform.translation());
+        tf::Transform goalTF(tf::Quaternion(goal_quat.x(), goal_quat.y(), goal_quat.z(), goal_quat.w()), tf::Vector3(goal_pos.x(), goal_pos.y(), goal_pos.z()));
+        goalTF.getBasis().getEulerYPR(yaw, pitch, roll, 1);
 
         // transform from the goal to the current pose
         Eigen::Affine3d error = msg_utils::transform_diff(goal_wrist_transform, wrist_transform_estimate_);
 
         ROS_INFO("  Goal Wrist Transform (camera frame): %s", to_string(goal_wrist_transform).c_str());
+        ROS_INFO("      Euler Angles: r: %0.3f, p: %0.3f, y: %0.3f", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
         ROS_INFO("  Curr Wrist Transform (camera frame): %s", to_string(wrist_transform_estimate_).c_str());
         ROS_INFO("  Error: %s", to_string(error).c_str());
 
@@ -163,7 +198,7 @@ int ViservoControlExecutor::run()
         // Compute target position
         ////////////////////////////////////////////////////////////////////////////////
 
-        Eigen::Vector3d current_wrist_pos(wrist_transform_estimate_.translation());
+        Eigen::Vector3d current_wrist_pos(eef_transform_from_joint_state_.translation());
         Eigen::Vector3d pos_error(error.translation());
 
         ROS_INFO("    Position Error: %s", to_string(pos_error).c_str());
@@ -185,14 +220,34 @@ int ViservoControlExecutor::run()
 
         ROS_INFO("    Rotation Error: %0.3f degs about %s", sbpl::utils::ToDegrees(angle_error), to_string(aa_error.axis()).c_str());
 
-        if (angle_error > max_rotational_velocity_rps_) {
+        if (fabs(angle_error) > fabs(max_rotational_velocity_rps_)) {
             angle_error = clamp(angle_error, -max_rotational_velocity_rps_, max_rotational_velocity_rps_);
         }
 
-        Eigen::Quaterniond delta_quat(Eigen::AngleAxisd(angle_error * dt, aa_error.axis()));
+        Eigen::Quaterniond error_quat(error.rotation());
+        Eigen::Quaterniond current_quat(eef_transform_from_joint_state_.rotation());
 
-        Eigen::Quaterniond current_quat(wrist_transform_estimate_.rotation());
-        Eigen::Quaterniond target_rot = current_quat * delta_quat;
+        ROS_INFO("    Wrist Rotation Estimate: %s", to_string(Eigen::AngleAxisd(wrist_transform_estimate_.rotation())).c_str());
+        ROS_INFO("    Goal Rotation: %s", to_string(Eigen::AngleAxisd(goal_wrist_transform.rotation())).c_str());
+        ROS_INFO("    Error Rotation: %s", to_string(Eigen::AngleAxisd(error_quat)).c_str());
+        ROS_INFO("    Error Rotation Inverse: %s", to_string(Eigen::AngleAxisd(error_quat.inverse())).c_str());
+        ROS_INFO("    Current Rotation Inverse: %s", to_string(Eigen::AngleAxisd(current_quat)).c_str());
+        ROS_INFO("    Current Rotation x Error: %s", to_string(Eigen::AngleAxisd(current_quat * error_quat)).c_str());
+        ROS_INFO("    Current Rotation x Error Inverse: %s", to_string(Eigen::AngleAxisd(current_quat * error_quat.inverse())).c_str());
+        ROS_INFO("    Error x Current Rotation: %s", to_string(Eigen::AngleAxisd(error_quat * current_quat)).c_str());
+        ROS_INFO("    Inverse Error x Current Rotation: %s", to_string(Eigen::AngleAxisd(error_quat.inverse() * current_quat)).c_str());
+
+        const double alpha = 0.2;
+//        Eigen::Quaterniond target_rot = current_quat * error_quat;
+//        Eigen::Quaterniond target_rot = error_quat * current_quat;
+        Eigen::Quaterniond target_rot = current_quat * error_quat.inverse();
+//        Eigen::Quaterniond target_rot = error_quat.inverse() * current_quat;
+
+        const double REACHAROUND_FACTOR = 0.1;
+        target_rot = current_quat.slerp(REACHAROUND_FACTOR, current_quat * error_quat.inverse());
+
+        tf::Transform t(tf::Quaternion(target_rot.x(), target_rot.y(), target_rot.z(), target_rot.w()), tf::Vector3(target_pos.x(), target_pos.y(), target_pos.z()));
+        t.getBasis().getEulerYPR(yaw, pitch, roll, 1);
 
         ////////////////////////////////////////////////////////////////////////////////
         // Compute target transform
@@ -201,65 +256,79 @@ int ViservoControlExecutor::run()
         Eigen::Affine3d camera_to_target_wrist_transform = Eigen::Translation3d(target_pos) * target_rot;
 
         ROS_INFO("    Target Wrist Transform: %s", to_string(camera_to_target_wrist_transform).c_str());
+        ROS_INFO("      Euler Angles: r: %0.3f, p: %0.3f, y: %0.3f", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
 
-        // TODO: convert the target transform (which is in the camera frame) to the mount frame
-
-
-        tf::StampedTransform transform;
-        try {
-            listener_.lookupTransform(camera_frame_, mount_frame_, ros::Time(0), transform);
-        }
-        catch (const tf::TransformException& ex) {
-            ROS_ERROR("Unable to lookup transform from %s to %s (%s)", mount_frame_.c_str(), camera_frame_.c_str(), ex.what());
-        }
-
-        Eigen::Affine3d mount_to_camera =
-            Eigen::Translation3d(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z()) *
-            Eigen::Quaterniond(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
-
-        Eigen::Affine3d mount_to_target_wrist = mount_to_camera * camera_to_target_wrist_transform;
+        Eigen::Affine3d mount_to_target_wrist = camera_to_mount.inverse() * camera_to_target_wrist_transform;
         ROS_INFO("    Target Wrist Transform in Mount Frame: %s", to_string(mount_to_target_wrist).c_str());
+
+        /////////////////////////////////////////
+        geometry_msgs::Vector3 scale;
+        scale.x = 0.10;
+        scale.y = 0.01;
+        scale.z = 0.01;
+        visualization_msgs::MarkerArray triad_marker = msg_utils::create_triad_marker_arr(scale);
+
+        for (auto& marker : triad_marker.markers) {
+            marker.header.frame_id = camera_frame_;
+            marker.ns = "wrist_goal";
+
+            Eigen::Affine3d triad_marker_transform;
+            tf::poseMsgToEigen(marker.pose, triad_marker_transform);
+            triad_marker_transform = camera_to_target_wrist_transform * triad_marker_transform;
+
+            tf::poseEigenToMsg(triad_marker_transform, marker.pose);
+        }
+
+        corrected_wrist_goal_pub_.publish(triad_marker);
+        /////////////////////////////////////////
 
         // Find IK Solution that puts the end effector at the target location
         hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(
-                mount_to_target_wrist, last_joint_state_msg_->position, sbpl::utils::ToRadians(5.0));
+                mount_to_target_wrist, last_joint_state_msg_->position, sbpl::utils::ToRadians(1.0));
 
         std::vector<double> iksol;
-        bool ik_found = ikgen(iksol);
-        if (!ik_found) {
-            ROS_WARN("Unable to find IK Solution to move the arm towards the goal. Aborting Viservo action...");
-            result.result = hdt::ViservoCommandResult::STUCK;
-            as_->setAborted(result);
-            continue;
-        }
+        bool found_ik = false;
 
-        assert(iksol.size() == robot_model_->joint_names().size());
+        // loop through ik solutions until we find one that looks safe to move to
+        while (ikgen(iksol)) {
+            assert(iksol.size() == robot_model_->joint_names().size());
 
-        // FOR NOW: disallow motions if the joints will not be able to reach
-        // their target positions within a reasonable amount of time
-        bool safe_joint_command = true;
-        const double angle_threshold_degs = 45;
-        for (std::size_t solidx = 0; solidx < iksol.size(); ++solidx) {
-            double current_angle = last_joint_state_msg_->position[solidx];
-            double solution_angle = iksol[solidx];
-            double min_angle = robot_model_->min_limits()[solidx];
-            double max_angle = robot_model_->max_limits()[solidx];
+            // FOR NOW: disallow motions if the joints will not be able to reach
+            // their target positions within a reasonable amount of time
+            bool safe_joint_command = true;
+            const double angle_threshold_degs = 45.0;
+            for (std::size_t solidx = 0; solidx < iksol.size(); ++solidx) {
+                double current_angle = last_joint_state_msg_->position[solidx];
+                double solution_angle = iksol[solidx];
+                double min_angle = robot_model_->min_limits()[solidx];
+                double max_angle = robot_model_->max_limits()[solidx];
 
-            safe_joint_command &=
-                    sbpl::utils::ShortestAngleDiffWithLimits(solution_angle, current_angle, min_angle, max_angle) >
-                    sbpl::utils::ToRadians(angle_threshold_degs);
+                safe_joint_command &=
+                        sbpl::utils::ShortestAngleDistWithLimits(solution_angle, current_angle, min_angle, max_angle) <
+                        sbpl::utils::ToRadians(angle_threshold_degs);
 
-            if (!safe_joint_command) {
-                ROS_ERROR("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
+                if (!safe_joint_command) {
+                    ROS_ERROR("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
                         sbpl::utils::ToDegrees(solution_angle),
                         sbpl::utils::ToDegrees(current_angle),
                         angle_threshold_degs);
+                    break;
+                }
+            }
+
+//            if (!safe_joint_command) {
+//                ROS_WARN("Candidate joint command %s seems unsafe", to_string(msg_utils::to_degrees(iksol)).c_str());
+//                continue;
+//            }
+//            else
+            {
+                found_ik = true;
                 break;
             }
         }
 
-        if (!safe_joint_command) {
-            ROS_WARN("Candidate joint command seems unsafe");
+        if (!found_ik) {
+            ROS_WARN("Unable to find IK solution to move the arm towards the goal. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setAborted(result);
             continue;
@@ -267,8 +336,10 @@ int ViservoControlExecutor::run()
 
         // Publish the resulting command
         trajectory_msgs::JointTrajectory traj_cmd;
+        traj_cmd.points.resize(1);
+        traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = iksol;
-        ROS_INFO("Publishing joint command %s", to_string(traj_cmd.points[0].positions).c_str());
+        ROS_INFO("Publishing joint command %s", to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str());
         joint_command_pub_.publish(traj_cmd);
     }
 
@@ -454,9 +525,9 @@ bool ViservoControlExecutor::download_marker_params()
     double marker_to_link_x;
     double marker_to_link_y;
     double marker_to_link_z;
-    double marker_to_link_roll;
-    double marker_to_link_pitch;
-    double marker_to_link_yaw;
+    double marker_to_link_roll_degs;
+    double marker_to_link_pitch_degs;
+    double marker_to_link_yaw_degs;
 
     bool success =
             msg_utils::download_param(ph_, "tracked_marker_id", attached_marker_.marker_id) &&
@@ -464,20 +535,22 @@ bool ViservoControlExecutor::download_marker_params()
             msg_utils::download_param(ph_, "marker_to_link_x", marker_to_link_x) &&
             msg_utils::download_param(ph_, "marker_to_link_y", marker_to_link_y) &&
             msg_utils::download_param(ph_, "marker_to_link_z", marker_to_link_z) &&
-            msg_utils::download_param(ph_, "marker_to_link_roll", marker_to_link_roll) &&
-            msg_utils::download_param(ph_, "marker_to_link_pitch", marker_to_link_pitch) &&
-            msg_utils::download_param(ph_, "marker_to_link_yaw", marker_to_link_yaw) &&
+            msg_utils::download_param(ph_, "marker_to_link_roll_deg", marker_to_link_roll_degs) &&
+            msg_utils::download_param(ph_, "marker_to_link_pitch_deg", marker_to_link_pitch_degs) &&
+            msg_utils::download_param(ph_, "marker_to_link_yaw_deg", marker_to_link_yaw_degs) &&
             msg_utils::download_param(ph_, "marker_validity_timeout", marker_validity_timeout_) &&
             msg_utils::download_param(ph_, "goal_pos_tolerance_x_m", goal_pos_tolerance_(0)) &&
             msg_utils::download_param(ph_, "goal_pos_tolerance_y_m", goal_pos_tolerance_(1)) &&
             msg_utils::download_param(ph_, "goal_pos_tolerance_z_m", goal_pos_tolerance_(2)) &&
             msg_utils::download_param(ph_, "goal_rot_tolerance_deg", goal_rot_tolerance_);
 
+    goal_rot_tolerance_ = sbpl::utils::ToRadians(goal_rot_tolerance_);
+
     attached_marker_.link_to_marker = Eigen::Affine3d(
             Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
-            Eigen::AngleAxisd(marker_to_link_yaw, Eigen::Vector3d::UnitZ()) *
-            Eigen::AngleAxisd(marker_to_link_pitch, Eigen::Vector3d::UnitY()) *
-            Eigen::AngleAxisd(marker_to_link_roll, Eigen::Vector3d::UnitX()));
+            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX()));
 
 
     return success;
