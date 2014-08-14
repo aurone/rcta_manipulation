@@ -1,9 +1,25 @@
+#tracked_marker_id: 8
+#tracked_marker_attached_link: "arm_5_wrist_twist_link"
+#marker_to_link_x: 0.0
+#marker_to_link_y: 0.0
+#marker_to_link_z: 0.0
+#marker_to_link_roll: 0.0
+#marker_to_link_pitch: 0.0
+#marker_to_link_yaw: 0.0
+
 tracked_marker_id: 8
-tracked_marker_attached_link: "arm_5_wrist_twist"
-marker_to_link_x: 0.0
+tracked_marker_attached_link: "arm_7_gripper_lift_link"
+marker_to_link_x: 0.15
 marker_to_link_y: 0.0
 marker_to_link_z: 0.0
 marker_to_link_roll: 0.0
 marker_to_link_pitch: 0.0
 marker_to_link_yaw: 0.0
 
+marker_validity_timeout: 1.0
+
+goal_pos_tolerance_x_m: 0.01
+goal_pos_tolerance_y_m: 0.01
+goal_pos_tolerance_z_m: 0.01
+
+goal_rot_tolerance_deg: 1.0

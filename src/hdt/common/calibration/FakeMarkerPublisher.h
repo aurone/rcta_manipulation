@@ -12,16 +12,24 @@ public:
 	FakeMarkerPublisher();
 
 	bool initialize();
+
+	enum RunResult
+	{
+	    SUCCESS = 0,
+	    FAILED_TO_INITIALIZE
+	};
 	int run();
 
 private:
 
 	ros::NodeHandle nh_;
+	ros::NodeHandle ph_;
 	ros::Publisher markers_pub_;
 	tf::TransformListener listener_;
 	tf::TransformBroadcaster broadcaster_;
+
+	std::string camera_frame_;
+	std::string wrist_frame_;
 };
-
-
 
 #endif

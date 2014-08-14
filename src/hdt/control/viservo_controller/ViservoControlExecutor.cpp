@@ -1,10 +1,14 @@
 #include "ViservoControlExecutor.h"
 
+#include <cmath>
+#include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <visualization_msgs/Marker.h>
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/utils/utils.h>
 #include <hdt/common/stringifier/stringifier.h>
+#include <hdt/common/utils/RunUponDestruction.h>
 
 ViservoControlExecutor::ViservoControlExecutor() :
     nh_(),
@@ -26,7 +30,7 @@ ViservoControlExecutor::ViservoControlExecutor() :
     max_joint_velocities_rps_(7, sbpl::utils::ToRadians(20.0)),
     listener_(),
     camera_frame_("asus_rgb_frame"),
-    wrist_frame_("arm_7_gripper_lift"),
+    wrist_frame_("arm_7_gripper_lift_link"),
     mount_frame_("arm_mount_panel_dummy"),
     attached_marker_()
 {
@@ -60,7 +64,7 @@ int ViservoControlExecutor::run()
     }
 
     const std::string& chain_root_link = "arm_mount_panel_dummy"; //robot_model_->joint_names().front();
-    const std::string& chain_tip_link = robot_model_->joint_names().back();
+    const std::string& chain_tip_link = robot_model_->joint_names().back() + "_link";
     const int free_angle = 4;
     kdl_robot_model_.reset(new sbpl_arm_planner::KDLRobotModel(chain_root_link, chain_tip_link, free_angle));
     if (!kdl_robot_model_) {
@@ -73,10 +77,13 @@ int ViservoControlExecutor::run()
     }
 
     joint_command_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
+    corrected_wrist_goal_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("corrrected_eef_goal", 1);
     joint_states_sub_ = nh_.subscribe("/joint_states", 1, &ViservoControlExecutor::joint_states_cb, this);
     ar_marker_sub_ = nh_.subscribe("/ar_pose_marker", 1, &ViservoControlExecutor::ar_markers_cb, this);
 
+    ROS_INFO("Starting action server 'viservo_command'...");
     as_->start();
+    ROS_INFO("Action server started");
 
     // overview:
     //
@@ -97,43 +104,49 @@ int ViservoControlExecutor::run()
     double dt = 1.0 / rate_hz;
     while (ros::ok())
     {
+        RunUponDestruction rod([&]() { executive_rate.sleep(); });
         ros::spinOnce();
 
         if (!as_->isActive()) {
-            executive_rate.sleep();
             continue;
         }
 
-        // TODO: check for cancellation/preemption
+        ROS_INFO("Executing viservo control. Current joint state is %s", (bool)last_joint_state_msg_ ? to_string(last_joint_state_msg_->position).c_str() : "null");
+
         if (as_->isPreemptRequested()) {
-            ROS_WARN("Goal Preempting currently unimplemented");
+            ROS_WARN("Goal preemption currently unimplemented");
         }
 
         // incorporate the newest marker measurement and estimate the current
         // wrist pose based off of that and the last two joints
         if (!update_wrist_pose_estimate()) {
             ROS_WARN("Failed to update the pose of the wrist");
-            executive_rate.sleep();
             continue;
         }
 
         // 2. check whether the estimated wrist pose has reached the goal within the specified tolerance
         hdt::ViservoCommandResult result;
-        if (!reached_goal()) {
+        if (reached_goal()) {
+            ROS_INFO("Wrist has reached goal. Completing action...");
             result.result = hdt::ViservoCommandResult::SUCCESS;
             as_->setSucceeded(result);
+            continue;
         }
 
         // 1. lost track of the marker
         if (lost_marker()) {
+            ROS_WARN("Marker has been lost. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::LOST_MARKER;
             as_->setAborted(result);
+            continue;
         }
 
         // 3. check whether the wrist has moved too far from the goal (and the canonical path follower should retry)
         if (moved_too_far()) {
+            ROS_INFO("Arm has moved too far from the goal. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::MOVED_TOO_FAR;
             as_->setAborted(result);
+            continue;
         }
 
         Eigen::Affine3d goal_wrist_transform; // in camera frame
@@ -177,7 +190,7 @@ int ViservoControlExecutor::run()
             listener_.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
         }
         catch (const tf::TransformException& ex) {
-            ROS_ERROR("I hate TF");
+            ROS_ERROR("Unable to lookup transform from %s to %s (%s)", source_frame.c_str(), target_frame.c_str(), ex.what());
         }
 
         hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(
@@ -186,8 +199,9 @@ int ViservoControlExecutor::run()
         std::vector<double> iksol;
         bool ik_found = ikgen(iksol);
         if (!ik_found) {
-            ROS_WARN("Unable to find IK Solution to move the arm towards the goal");
-            executive_rate.sleep();
+            ROS_WARN("Unable to find IK Solution to move the arm towards the goal. Aborting Viservo action...");
+            result.result = hdt::ViservoCommandResult::STUCK;
+            as_->setAborted(result);
             continue;
         }
 
@@ -204,7 +218,6 @@ int ViservoControlExecutor::run()
             {
                 ROS_ERROR("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
                         180.0 * solution_angle / M_PI, 180.0 * current_angle / M_PI, angle_threshold_degs);
-                executive_rate.sleep();
                 continue;
             }
         }
@@ -212,9 +225,8 @@ int ViservoControlExecutor::run()
         // Publish the command
         trajectory_msgs::JointTrajectory traj_cmd;
         traj_cmd.points[0].positions = iksol;
+        ROS_INFO("Publishing joint command %s", to_string(traj_cmd.points[0].positions).c_str());
         joint_command_pub_.publish(traj_cmd);
-
-        executive_rate.sleep();
     }
 
     return SUCCESS;
@@ -225,6 +237,22 @@ void ViservoControlExecutor::goal_callback()
     // TODO: make sure that the markers are in view of the camera or catch this during executive
     current_goal_ = as_->acceptNewGoal();
     ROS_WARN("Received a goal to move the wrist to %s in the camera frame", to_string(current_goal_->goal_pose).c_str());
+
+    // for visualization:
+    //     1. estimate the current wrist frame
+    //     2.
+
+    geometry_msgs::Vector3 scale;
+    scale.x = 0.10;
+    scale.y = 0.01;
+    scale.z = 0.01;
+    visualization_msgs::MarkerArray triad_marker = msg_utils::create_triad_marker_arr(scale);
+
+    for (auto& marker : triad_marker.markers) {
+        marker.header.frame_id = camera_frame_;
+    }
+
+    corrected_wrist_goal_pub_.publish(triad_marker);
 }
 
 void ViservoControlExecutor::preempt_callback()
@@ -234,6 +262,8 @@ void ViservoControlExecutor::preempt_callback()
 
 void ViservoControlExecutor::joint_states_cb(const sensor_msgs::JointState::ConstPtr& msg)
 {
+    ROS_DEBUG("Received a Joint State at %s", boost::posix_time::to_simple_string(msg->header.stamp.toBoost()).c_str());
+
     // filter out joint states that are not for the arm and reorder to canonical joint order
     if (msg_utils::contains_only_joints(*msg, robot_model_->joint_names())) {
         sensor_msgs::JointState::Ptr clean_msg(new sensor_msgs::JointState);
@@ -254,22 +284,46 @@ void ViservoControlExecutor::joint_states_cb(const sensor_msgs::JointState::Cons
 
 void ViservoControlExecutor::ar_markers_cb(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
 {
+    ROS_DEBUG("Received an AR marker message at %s", boost::posix_time::to_simple_string(msg->header.stamp.toBoost()).c_str());
     last_ar_markers_msg_ = msg;
 }
 
-bool ViservoControlExecutor::lost_marker() const
+bool ViservoControlExecutor::lost_marker()
 {
-    return true;
+    if (!last_ar_markers_msg_) {
+        ROS_WARN("Haven't received a fresh AR marker message");
+        return true;
+    }
+
+    if (ros::Time::now() > last_ar_markers_msg_->header.stamp + ros::Duration(marker_validity_timeout_)) {
+        ROS_WARN("AR Marker has gone stale after %0.3f seconds", marker_validity_timeout_);
+        last_ar_markers_msg_.reset();
+        return true;
+    }
+    return false;
 }
 
 bool ViservoControlExecutor::reached_goal() const
 {
-    return true;
+    Eigen::Affine3d goal_transform;
+    tf::poseMsgToEigen(current_goal_->goal_pose, goal_transform);
+    Eigen::Affine3d diff = msg_utils::transform_diff(goal_transform, wrist_transform_estimate_);
+
+    Eigen::Vector3d pos_diff(diff.translation());
+    Eigen::AngleAxisd rot_diff(diff.rotation());
+
+    return fabs(pos_diff(0)) < goal_pos_tolerance_(0) &&
+           fabs(pos_diff(1)) < goal_pos_tolerance_(1) &&
+           fabs(pos_diff(2)) < goal_pos_tolerance_(2) &&
+           fabs(rot_diff.angle()) < goal_rot_tolerance_;
 }
 
 bool ViservoControlExecutor::moved_too_far() const
 {
-    return true;
+    // TODO: save the original position of the arm (end effector/joints) and
+    // abort if they don't appear to be progressing towards the given end
+    // effector goal
+    return false;
 }
 
 bool ViservoControlExecutor::update_wrist_pose_estimate()
@@ -356,13 +410,19 @@ bool ViservoControlExecutor::download_marker_params()
             msg_utils::download_param(ph_, "marker_to_link_z", marker_to_link_z) &&
             msg_utils::download_param(ph_, "marker_to_link_roll", marker_to_link_roll) &&
             msg_utils::download_param(ph_, "marker_to_link_pitch", marker_to_link_pitch) &&
-            msg_utils::download_param(ph_, "marker_to_link_yaw", marker_to_link_yaw);
+            msg_utils::download_param(ph_, "marker_to_link_yaw", marker_to_link_yaw) &&
+            msg_utils::download_param(ph_, "marker_validity_timeout", marker_validity_timeout_) &&
+            msg_utils::download_param(ph_, "goal_pos_tolerance_x_m", goal_pos_tolerance_(0)) &&
+            msg_utils::download_param(ph_, "goal_pos_tolerance_y_m", goal_pos_tolerance_(1)) &&
+            msg_utils::download_param(ph_, "goal_pos_tolerance_z_m", goal_pos_tolerance_(2)) &&
+            msg_utils::download_param(ph_, "goal_rot_tolerance_deg", goal_rot_tolerance_);
 
     attached_marker_.link_to_marker = Eigen::Affine3d(
             Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
             Eigen::AngleAxisd(marker_to_link_yaw, Eigen::Vector3d::UnitZ()) *
             Eigen::AngleAxisd(marker_to_link_pitch, Eigen::Vector3d::UnitY()) *
             Eigen::AngleAxisd(marker_to_link_roll, Eigen::Vector3d::UnitX()));
+
 
     return success;
 }

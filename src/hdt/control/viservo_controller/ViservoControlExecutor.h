@@ -39,6 +39,7 @@ private:
     std::unique_ptr<ViservoCommandActionServer> as_;
 
     ros::Publisher joint_command_pub_;
+    ros::Publisher corrected_wrist_goal_pub_;
 
     ros::Subscriber joint_states_sub_;
     ros::Subscriber ar_marker_sub_;
@@ -48,7 +49,7 @@ private:
     sensor_msgs::JointState::ConstPtr last_joint_state_msg_;
     ar_track_alvar::AlvarMarkers::ConstPtr last_ar_markers_msg_;
 
-    bool marker_validity_timeout_;
+    double marker_validity_timeout_;
 
     Eigen::Affine3d wrist_transform_estimate_;
 
@@ -72,12 +73,15 @@ private:
 
     AttachedMarker attached_marker_;
 
+    Eigen::Vector3d goal_pos_tolerance_;
+    double goal_rot_tolerance_;
+
     void goal_callback();
     void preempt_callback();
     void joint_states_cb(const sensor_msgs::JointState::ConstPtr& msg);
     void ar_markers_cb(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
 
-    bool lost_marker() const;
+    bool lost_marker();
     bool reached_goal() const;
     bool moved_too_far() const;
 
