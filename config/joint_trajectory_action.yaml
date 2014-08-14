@@ -2,7 +2,7 @@ constraints:
 
     arm_1_shoulder_twist:
         trajectory_degs: 1.0
-        goal_degs: 5.0
+        goal_degs: 3.0
 
     arm_2_shoulder_lift:
         trajectory_degs: 1.0
@@ -10,23 +10,23 @@ constraints:
 
     arm_3_elbow_twist:
         trajectory_degs: 1.0
-        goal_degs: 5.0
+        goal_degs: 1.0
 
     arm_4_elbow_lift:
         trajectory_degs: 1.0
-        goal_degs: 5.0
+        goal_degs: 1.0
 
     arm_5_wrist_twist:
         trajectory_degs: 1.0
-        goal_degs: 5.0
+        goal_degs: 1.0
 
     arm_6_wrist_lift:
         trajectory_degs: 1.0
-        goal_degs: 5.0
+        goal_degs: 1.0
 
     arm_7_gripper_lift:
         trajectory_degs: 1.0
-        goal_degs: 5.0
+        goal_degs: 1.0
 
     end_effector:
         trajectory_m: 0.04
