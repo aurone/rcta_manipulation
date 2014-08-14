@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <sbpl_geometry_utils/utils.h>
 
 namespace msg_utils
 {
@@ -171,15 +172,15 @@ Eigen::Affine3d interp(const Eigen::Affine3d& s, const Eigen::Affine3d& t, doubl
     return Eigen::Translation3d(interp_pos) * interp_rot;
 }
 
-Eigen::Affine3d transform_diff(const Eigen::Affine3d& s, const Eigen::Affine3d& t)
+Eigen::Affine3d transform_diff(const Eigen::Affine3d& a, const Eigen::Affine3d& b)
 {
-    Eigen::Vector3d apos(s.translation());
-    Eigen::Vector3d bpos(t.translation());
+    Eigen::Vector3d apos(a.translation());
+    Eigen::Vector3d bpos(b.translation());
 
-    Eigen::Quaterniond arot(s.rotation());
-    Eigen::Quaterniond brot(t.rotation());
+    Eigen::Quaterniond arot(a.rotation());
+    Eigen::Quaterniond brot(b.rotation());
 
-    return Eigen::Affine3d(Eigen::Translation3d(apos - bpos) * arot.inverse() * brot);
+    return Eigen::Affine3d(Eigen::Translation3d(apos - bpos) * Eigen::Quaterniond(arot.inverse() * brot));
 }
 
 const char* to_string(XmlRpc::XmlRpcValue::Type type)
@@ -271,6 +272,15 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p)
         p.z = params["z"];
         return true;
     }
+}
+
+std::vector<double> to_degrees(const std::vector<double>& v)
+{
+    std::vector<double> v_degs(v.size());
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        v_degs[i] = sbpl::utils::ToDegrees(v[i]);
+    }
+    return v_degs;
 }
 
 } // namespace msg_utils

@@ -58,6 +58,8 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p);
 template <typename T>
 bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv);
 
+std::vector<double> to_degrees(const std::vector<double>& v);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
 ////////////////////////////////////////////////////////////////////////////////
