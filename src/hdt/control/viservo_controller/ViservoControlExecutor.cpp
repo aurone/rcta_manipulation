@@ -286,44 +286,35 @@ int ViservoControlExecutor::run()
         hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(
                 mount_to_target_wrist, last_joint_state_msg_->position, sbpl::utils::ToRadians(1.0));
 
+
+        std::vector<std::vector<double>> ik_solutions;
+        static const int max_ik_solutions = 100;
         std::vector<double> iksol;
+
+        int num_solutions_found = 0;
+        while (ikgen(iksol) && num_solutions_found < max_ik_solutions) {
+            ++num_solutions_found;
+            ik_solutions.push_back(std::move(iksol));
+        }
+
         bool found_ik = false;
-
-        // loop through ik solutions until we find one that looks safe to move to
-        while (ikgen(iksol)) {
-            assert(iksol.size() == robot_model_->joint_names().size());
-
-            // FOR NOW: disallow motions if the joints will not be able to reach
-            // their target positions within a reasonable amount of time
-            bool safe_joint_command = true;
-            const double angle_threshold_degs = 45.0;
-            for (std::size_t solidx = 0; solidx < iksol.size(); ++solidx) {
-                double current_angle = last_joint_state_msg_->position[solidx];
-                double solution_angle = iksol[solidx];
-                double min_angle = robot_model_->min_limits()[solidx];
-                double max_angle = robot_model_->max_limits()[solidx];
-
-                safe_joint_command &=
-                        sbpl::utils::ShortestAngleDistWithLimits(solution_angle, current_angle, min_angle, max_angle) <
-                        sbpl::utils::ToRadians(angle_threshold_degs);
-
-                if (!safe_joint_command) {
-                    ROS_ERROR("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
-                        sbpl::utils::ToDegrees(solution_angle),
-                        sbpl::utils::ToDegrees(current_angle),
-                        angle_threshold_degs);
-                    break;
-                }
-            }
-
-//            if (!safe_joint_command) {
-//                ROS_WARN("Candidate joint command %s seems unsafe", to_string(msg_utils::to_degrees(iksol)).c_str());
-//                continue;
-//            }
-//            else
+        double best_dist = -1.0;
+        std::vector<double> chosen_solution;
+        for (const std::vector<double>& sol : ik_solutions) {
+            if (safe_joint_delta(last_joint_state_msg_->position, sol))
             {
-                found_ik = true;
-                break;
+                if (!found_ik) {
+                    found_ik = true;
+                    best_dist = hdt::ComputeJointStateL2NormSqrd(last_joint_state_msg_->position, sol);
+                    chosen_solution = sol;
+                }
+                else {
+                    double dist = hdt::ComputeJointStateL2NormSqrd(last_joint_state_msg_->position, sol);
+                    if (dist < best_dist) {
+                        best_dist = dist;
+                        chosen_solution = sol;
+                    }
+                }
             }
         }
 
@@ -338,7 +329,7 @@ int ViservoControlExecutor::run()
         trajectory_msgs::JointTrajectory traj_cmd;
         traj_cmd.points.resize(1);
         traj_cmd.joint_names = robot_model_->joint_names();
-        traj_cmd.points[0].positions = iksol;
+        traj_cmd.points[0].positions = chosen_solution;
         ROS_INFO("Publishing joint command %s", to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str());
         joint_command_pub_.publish(traj_cmd);
     }
@@ -595,6 +586,33 @@ bool ViservoControlExecutor::get_tracked_marker_pose(Eigen::Affine3d& marker_pos
     }
 
     return found;
+}
+
+bool ViservoControlExecutor::safe_joint_delta(const std::vector<double>& from, const std::vector<double>& to) const
+{
+    assert(from.size() == to.size() && from.size() == 7);
+
+    const double angle_threshold_degs = 45.0;
+    for (std::size_t solidx = 0; solidx < from.size(); ++solidx) {
+        double from_angle = from[solidx];
+        double to_angle = to[solidx];
+        double min_angle = robot_model_->min_limits()[solidx];
+        double max_angle = robot_model_->max_limits()[solidx];
+
+        bool safe_joint_command =
+                sbpl::utils::ShortestAngleDistWithLimits(to_angle, from_angle, min_angle, max_angle) <
+                sbpl::utils::ToRadians(angle_threshold_degs);
+
+        if (!safe_joint_command) {
+            ROS_ERROR("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
+                sbpl::utils::ToDegrees(to_angle),
+                sbpl::utils::ToDegrees(from_angle),
+                angle_threshold_degs);
+            return false;
+        }
+    }
+
+    return true;
 }
 
 int main(int argc, char* argv[])

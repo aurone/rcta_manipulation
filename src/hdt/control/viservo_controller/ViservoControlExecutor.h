@@ -94,6 +94,8 @@ private:
     bool download_marker_params();
 
     bool get_tracked_marker_pose(Eigen::Affine3d& marker_pose);
+
+    bool safe_joint_delta(const std::vector<double>& from, const std::vector<double>& to) const;
 };
 
 #endif
