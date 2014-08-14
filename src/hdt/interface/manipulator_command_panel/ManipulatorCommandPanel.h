@@ -21,6 +21,7 @@
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <hdt/MoveArmCommandAction.h>
+#include <hdt/ViservoCommandAction.h>
 
 class QPushButton;
 
@@ -52,6 +53,8 @@ public Q_SLOTS:
     void change_joint_6(int value);
     void change_joint_7(int value);
 
+    void send_viservo_command();
+
 private:
 
     bool initialized_;
@@ -61,6 +64,10 @@ private:
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_client_;
     bool pending_move_arm_command_;
+
+    typedef actionlib::SimpleActionClient<hdt::ViservoCommandAction> ViservoCommandActionClient;
+    std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
+    bool pending_viservo_command_;
 
     hdt::RobotModelPtr robot_model_;
 
@@ -84,6 +91,7 @@ private:
     QPushButton* send_move_arm_command_button_;
     QPushButton* send_joint_goal_button_;
     QPushButton* cycle_ik_solutions_button_;
+    QPushButton* send_viservo_command_button_;
     QSlider* joint_1_slider_;
     QSlider* joint_2_slider_;
     QSlider* joint_3_slider_;
@@ -127,6 +135,12 @@ private:
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
         const hdt::MoveArmCommandResult::ConstPtr& result);
+
+    void viservo_command_active_cb();
+    void viservo_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
+    void viservo_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const hdt::ViservoCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
         const robot_state::RobotState& robot_state,

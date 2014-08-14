@@ -133,7 +133,7 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, std::map<std::string, T>& mou
 template <typename T>
 bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T& tout)
 {
-    ROS_INFO("Retrieveing parameter %s", param_name.c_str());
+    ROS_INFO("Retrieving parameter %s", param_name.c_str());
 
     XmlRpc::XmlRpcValue value_array;
     if (!nh.getParam(param_name, value_array)) {

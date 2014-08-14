@@ -29,6 +29,8 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     nh_(),
     move_arm_client_(),
     pending_move_arm_command_(false),
+    viservo_command_client_(),
+    pending_viservo_command_(false),
     rm_loader_(),
     rm_(),
     rs_(),
@@ -40,6 +42,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     send_move_arm_command_button_(nullptr),
     send_joint_goal_button_(nullptr),
     cycle_ik_solutions_button_(nullptr),
+    send_viservo_command_button_(nullptr),
     joint_1_slider_(nullptr),
     joint_2_slider_(nullptr),
     joint_3_slider_(nullptr),
@@ -55,6 +58,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     send_move_arm_command_button_ = new QPushButton(tr("Send Move Arm Command"));
     send_joint_goal_button_ = new QPushButton(tr("Send Joint Goal"));
     cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
+    send_viservo_command_button_ = new QPushButton(tr("Send Visual Servo Command"));
 
     joint_1_slider_ = new QSlider(Qt::Horizontal);
     joint_2_slider_ = new QSlider(Qt::Horizontal);
@@ -70,6 +74,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     layout->addWidget(send_move_arm_command_button_);
     layout->addWidget(send_joint_goal_button_);
     layout->addWidget(cycle_ik_solutions_button_);
+    layout->addWidget(send_viservo_command_button_);
     layout->addWidget(joint_1_slider_);
     layout->addWidget(joint_2_slider_);
     layout->addWidget(joint_3_slider_);
@@ -87,6 +92,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
     connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
     connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
+    connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
     connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
     connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
     connect(joint_3_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_3(int)));
@@ -375,6 +381,40 @@ void ManipulatorCommandPanel::change_joint_7(int value)
     publish_phantom_robot_visualizations();
 }
 
+void ManipulatorCommandPanel::send_viservo_command()
+{
+    if (!viservo_command_client_) {
+        ROS_WARN("Viservo Command Client has not yet been instantiated");
+        return;
+    }
+
+    if (!viservo_command_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Viservo Command (server is not connected)"));
+        return;
+    }
+
+    const std::string camera_link_name = "asus_rgb_frame";
+    const std::string wrist_link_name = "arm_7_gripper_lift_link";
+
+    if (!rs_->hasLinkState(camera_link_name) || !rs_->hasLinkState(wrist_link_name)) {
+        ROS_ERROR("Robot State does not contain transforms for camera or wrist links");
+        return;
+    }
+
+    // construct the goal wrist pose in the camera frame; the goal pose should be the same pose as whatever pose we think we're currently at.
+    const Eigen::Affine3d& root_to_camera = rs_->getLinkState(camera_link_name)->getGlobalLinkTransform();
+    const Eigen::Affine3d& root_to_wrist = rs_->getLinkState(wrist_link_name)->getGlobalLinkTransform();
+    Eigen::Affine3d camera_to_wrist = root_to_camera.inverse() * root_to_wrist;
+
+    hdt::ViservoCommandGoal viservo_goal;
+    tf::poseEigenToMsg(camera_to_wrist, viservo_goal.goal_pose);
+    auto result_callback = boost::bind(&ManipulatorCommandPanel::viservo_command_result_cb, this, _1, _2);
+    viservo_command_client_->sendGoal(viservo_goal, result_callback);
+
+    pending_viservo_command_ = true;
+    update_gui();
+}
+
 bool ManipulatorCommandPanel::do_init()
 {
     if (!reinit_robot()) {
@@ -383,6 +423,13 @@ bool ManipulatorCommandPanel::do_init()
 
     move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
     if (!move_arm_client_) {
+        ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
+        return false;
+    }
+
+    viservo_command_client_.reset(new ViservoCommandActionClient("viservo_command", false));
+    if (!viservo_command_client_) {
+        ROS_WARN("Failed to instantiate Viservo Command Action Client");
         return false;
     }
 
@@ -773,6 +820,25 @@ void ManipulatorCommandPanel::move_arm_command_result_cb(
     update_gui();
 }
 
+void ManipulatorCommandPanel::viservo_command_active_cb()
+{
+
+}
+
+void ManipulatorCommandPanel::viservo_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback)
+{
+
+}
+
+void ManipulatorCommandPanel::viservo_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::ViservoCommandResult::ConstPtr& result)
+{
+    ROS_INFO("Received Result from Viservo Command Action");
+    pending_viservo_command_ = false;
+    update_gui();
+}
+
 bool ManipulatorCommandPanel::gatherRobotMarkers(
     const robot_state::RobotState& robot_state,
     const std::vector<std::string>& link_names,
@@ -872,8 +938,13 @@ void ManipulatorCommandPanel::update_sliders()
 
 void ManipulatorCommandPanel::update_gui()
 {
-    send_move_arm_command_button_->setEnabled(!pending_move_arm_command_);
-    send_joint_goal_button_->setEnabled(!pending_move_arm_command_);
+    bool pending_motion_command = pending_move_arm_command_ || pending_viservo_command_;
+    ROS_INFO("Updating gui. pending move arm command: %s, pending viservo command: %s",
+            pending_move_arm_command_ ? "TRUE" : "FALSE",
+                    pending_viservo_command_ ? "TRUE" : "FALSE");
+    send_move_arm_command_button_->setEnabled(!pending_motion_command);
+    send_viservo_command_button_->setEnabled(!pending_motion_command);
+    send_joint_goal_button_->setEnabled(!pending_motion_command);
 }
 
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const

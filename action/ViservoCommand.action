@@ -6,6 +6,7 @@ geometry_msgs/Pose goal_pose
 uint8 SUCCESS=0
 uint8 LOST_MARKER=1
 uint8 MOVED_TOO_FAR=2
+uint8 STUCK=3
 uint8 result
 ---
 # feedback definition
