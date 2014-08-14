@@ -6,5 +6,7 @@
         <param name="hdt_manipulator_config" value="$(find hdt)/config/HDTManipulatorParameters.lua"/>
     </node>
 
-    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter"/>
+    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter" output="screen">
+        <rosparam command="load" file="$(find hdt)/config/joint_states_filter.yaml"/>
+    </node>
 </launch>
