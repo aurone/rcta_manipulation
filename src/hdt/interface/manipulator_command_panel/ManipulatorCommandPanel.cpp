@@ -390,6 +390,14 @@ void ManipulatorCommandPanel::send_viservo_command()
 
     if (!viservo_command_client_->isServerConnected()) {
         QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Viservo Command (server is not connected)"));
+
+        // try and reset the action client to grab a fresh connection
+        viservo_command_client_.reset(new ViservoCommandActionClient("viservo_command", false));
+        if (!viservo_command_client_) {
+            ROS_WARN("Failed to instantiate Viservo Command Action Client");
+            return;
+        }
+
         return;
     }
 
@@ -984,6 +992,7 @@ bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>
 
     return true;
 }
+
 
 } // namespace hdt
 
