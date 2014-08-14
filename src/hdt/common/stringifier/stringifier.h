@@ -7,6 +7,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <geometry_msgs/Pose.h>
+#include <sbpl_geometry_utils/utils.h>
 
 ////////////////////////////////
 /// Because, let's be honest ///
@@ -19,6 +20,7 @@ std::string to_string(const std::vector<double>& v);
 
 std::string to_string(const Eigen::Affine3d& transform);
 std::string to_string(const Eigen::Vector3d& v);
+std::string to_string(const Eigen::AngleAxisd& aa);
 
 std::string to_string(const geometry_msgs::Pose& pose);
 
@@ -66,9 +68,9 @@ inline std::string to_string(const Eigen::Affine3d& transform)
     const Eigen::Vector3d translation(transform.translation());
     const Eigen::Quaterniond rotation(transform.rotation());
     std::stringstream ss;
-    ss << "pos(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
+    ss << "pos: (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
     ss << " ";
-    ss << "rot(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
+    ss << "rot: (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
     return ss.str();
 }
 
@@ -76,6 +78,13 @@ inline std::string to_string(const Eigen::Vector3d& v)
 {
     std::stringstream ss;
     ss << "(" << v(0) << ", " << v(1) << ", " << v(2) << ")";
+    return ss.str();
+}
+
+inline std::string to_string(const Eigen::AngleAxisd& aa)
+{
+    std::stringstream ss;
+    ss << "{ angle: " << sbpl::utils::ToDegrees(aa.angle()) << " degs @ " << to_string(aa.axis()) << " }";
     return ss.str();
 }
 
