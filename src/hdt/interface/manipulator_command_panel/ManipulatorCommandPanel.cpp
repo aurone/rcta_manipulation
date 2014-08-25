@@ -85,7 +85,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     setLayout(layout);
 
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
-    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("phantom_robot", 1);
+    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
     connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
     connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
@@ -519,21 +519,19 @@ void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::Inte
 
 void ManipulatorCommandPanel::publish_phantom_robot_visualizations()
 {
-    visualization_msgs::MarkerArray marker_array;
+    const std::vector<std::string>& link_names = rm_->getLinkModelNames();
+
     std_msgs::ColorRGBA color;
     color.a = 1.0;
     color.r = 0.94;
     color.g = 0.44;
     color.b = 0.44;
-    std::string ns = "phantom";
+
+    std::string ns = "phantom_robot_link";
+
     ros::Duration d(0);
 
-    const std::vector<std::string>& link_names = rm_->getLinkModelNames();
-//    rs_->getRobotMarkers(marker_array, link_names, color, ns, d, false);
-    for (auto& marker : marker_array.markers) {
-//        marker.header.frame_id = rm_->getRootLinkName();
-    }
-
+    visualization_msgs::MarkerArray marker_array;
     gatherRobotMarkers(*rs_, link_names, color, ns, d, marker_array);
     robot_markers_pub_.publish(marker_array);
 }
