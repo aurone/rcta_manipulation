@@ -1,6 +1,0 @@
-<launch>
-    <node name="hdt_manipulation_test" pkg="hdt_arm_planning" type="hdt_manipulation_test" output="screen">
-        <rosparam command="load" file="$(find hdt)/config/hdt_arm_planner.yaml"/>
-        <rosparam command="load" file="$(find hdt)/config/hdt_collision_checking.yaml"/>
-    </node>
-</launch>
