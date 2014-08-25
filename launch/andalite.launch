@@ -3,7 +3,7 @@
     <arg name="kinect_sensor" default="false"/> <!-- false = asus, true = kinect -->
 
     <!-- UPLOAD URDF -->
-    <include file="$(find hdt)/launch/upload_andalite.launch">
+    <include file="$(find hdt)/launch/urdf/upload_andalite.launch">
         <arg name="sim" value="$(arg sim)"/>
         <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
     </include>
