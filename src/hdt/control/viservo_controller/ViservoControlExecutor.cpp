@@ -359,6 +359,12 @@ int ViservoControlExecutor::run()
         traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = chosen_solution;
         ROS_INFO("Publishing joint command %s", to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str());
+
+        // TODO: close the loop with the HDT PID controller here so that we can
+        // estimate how much the wrist has moved, even if we are unable to
+        // detect the AR marker. This should allow longer AR marker timeouts or
+        // perhaps no timeout if the motion can be executed from only the
+        // initial estimate
         joint_command_pub_.publish(traj_cmd);
     }
 
