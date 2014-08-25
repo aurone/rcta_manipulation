@@ -328,8 +328,13 @@ bool ViservoControlExecutor::moved_too_far() const
 
 bool ViservoControlExecutor::update_wrist_pose_estimate()
 {
-    if (!last_joint_state_msg_ || !last_ar_markers_msg_) {
-        ROS_WARN("Have yet to receive a valid Joint State");
+    if (!last_joint_state_msg_) {
+        ROS_WARN("Have yet to receive a valid Joint State message");
+        return false;
+    }
+
+    if (!last_ar_markers_msg_) {
+        ROS_WARN("Have yet to receive valid AR markers message");
         return false;
     }
 
