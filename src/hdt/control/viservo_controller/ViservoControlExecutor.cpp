@@ -126,8 +126,7 @@ int ViservoControlExecutor::run()
             ROS_WARN("Goal preemption currently unimplemented");
         }
 
-        // incorporate the newest marker measurement and estimate the current
-        // wrist pose based off of that and the last two joints
+        // incorporate any new marker measurements and estimate the current wrist pose based off of that and the last two joints
         if (!update_wrist_pose_estimate()) {
             ROS_WARN("Failed to update the pose of the wrist");
             continue;
@@ -308,15 +307,22 @@ int ViservoControlExecutor::run()
         hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(
                 mount_to_target_wrist, last_joint_state_msg_->position, sbpl::utils::ToRadians(1.0));
 
-
         std::vector<std::vector<double>> ik_solutions;
         static const int max_ik_solutions = 100;
         std::vector<double> iksol;
 
+        // gather a lot of candidate ik solutions
         int num_solutions_found = 0;
         while (ikgen(iksol) && num_solutions_found < max_ik_solutions) {
             ++num_solutions_found;
             ik_solutions.push_back(std::move(iksol));
+        }
+
+        if (num_solutions_found == 0) {
+            ROS_ERROR("Failed to compute IK solution to move the arm towards the goal. Aborting Viservo action...");
+            result.result = hdt::ViservoCommandResult::STUCK;
+            as_->setAborted(result);
+            continue;
         }
 
         bool found_ik = false;
@@ -341,7 +347,7 @@ int ViservoControlExecutor::run()
         }
 
         if (!found_ik) {
-            ROS_WARN("Unable to find IK solution to move the arm towards the goal. Aborting Viservo action...");
+            ROS_WARN("No IK solution to move the arm towards the goal is deemed safe. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setAborted(result);
             continue;
