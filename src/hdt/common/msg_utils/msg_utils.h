@@ -38,6 +38,7 @@ visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vec
 
 Eigen::Affine3d interp(const Eigen::Affine3d& s, const Eigen::Affine3d& t, double alpha);
 Eigen::Affine3d transform_diff(const Eigen::Affine3d& s, const Eigen::Affine3d& t);
+void get_euler_ypr(const Eigen::Affine3d& transform, double& yaw, double& pitch, double& roll);
 
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, bool& bout);
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, int& iout);

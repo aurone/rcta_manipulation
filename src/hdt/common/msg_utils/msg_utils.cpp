@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <sbpl_geometry_utils/utils.h>
+#include <tf/transform_datatypes.h>
 
 namespace msg_utils
 {
@@ -181,6 +182,14 @@ Eigen::Affine3d transform_diff(const Eigen::Affine3d& a, const Eigen::Affine3d& 
     Eigen::Quaterniond brot(b.rotation());
 
     return Eigen::Affine3d(Eigen::Translation3d(apos - bpos) * Eigen::Quaterniond(arot.inverse() * brot));
+}
+
+void get_euler_ypr(const Eigen::Affine3d& transform, double& yaw, double& pitch, double& roll)
+{
+    Eigen::Quaterniond q(transform.rotation());
+    Eigen::Vector3d p(transform.translation());
+    tf::Transform goalTF(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(p.x(), p.y(), p.z()));
+    goalTF.getBasis().getEulerYPR(yaw, pitch, roll, 1);
 }
 
 const char* to_string(XmlRpc::XmlRpcValue::Type type)
