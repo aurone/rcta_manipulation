@@ -49,7 +49,8 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     joint_4_slider_(nullptr),
     joint_5_slider_(nullptr),
     joint_6_slider_(nullptr),
-    joint_7_slider_(nullptr)
+    joint_7_slider_(nullptr),
+    listener_()
 {
     ROS_INFO("Instantiating Manipulator Command Panel");
 
@@ -404,13 +405,34 @@ void ManipulatorCommandPanel::send_viservo_command()
     const std::string camera_link_name = "asus_rgb_frame";
     const std::string wrist_link_name = "arm_7_gripper_lift_link";
 
-    if (!rs_->hasLinkState(camera_link_name) || !rs_->hasLinkState(wrist_link_name)) {
+    if (/*!rs_->hasLinkState(camera_link_name) ||*/ !rs_->hasLinkState(wrist_link_name)) {
         ROS_ERROR("Robot State does not contain transforms for camera or wrist links");
         return;
     }
 
+    geometry_msgs::PoseStamped identity_pose_camera_frame;
+    identity_pose_camera_frame.header.frame_id = camera_link_name;
+    identity_pose_camera_frame.header.stamp = ros::Time(0);
+    identity_pose_camera_frame.header.seq = 0;
+    identity_pose_camera_frame.pose.position.x = identity_pose_camera_frame.pose.position.y = identity_pose_camera_frame.pose.position.z = 0.0;
+    identity_pose_camera_frame.pose.orientation.x = identity_pose_camera_frame.pose.orientation.y = identity_pose_camera_frame.pose.orientation.z = 0.0;
+    identity_pose_camera_frame.pose.orientation.w = 1.0;
+    geometry_msgs::PoseStamped root_to_camera_pose;
+    try {
+        listener_.transformPose(rs_->getRobotModel()->getRootLinkName(), identity_pose_camera_frame, root_to_camera_pose);
+    }
+    catch (const tf::TransformException& ex) {
+        ROS_ERROR("Failed to find fixed transform between '%s' and %s'", camera_link_name.c_str(), wrist_link_name.c_str());
+        return;
+    }
+
+    Eigen::Affine3d root_to_camera;
+    tf::poseMsgToEigen(root_to_camera_pose.pose, root_to_camera);
+
+    ROS_INFO("Root to camera: %s", to_string(root_to_camera).c_str());
+
     // construct the goal wrist pose in the camera frame; the goal pose should be the same pose as whatever pose we think we're currently at.
-    const Eigen::Affine3d& root_to_camera = rs_->getLinkState(camera_link_name)->getGlobalLinkTransform();
+//    const Eigen::Affine3d& root_to_camera = rs_->getLinkState(camera_link_name)->getGlobalLinkTransform();
     const Eigen::Affine3d& root_to_wrist = rs_->getLinkState(wrist_link_name)->getGlobalLinkTransform();
     Eigen::Affine3d camera_to_wrist = root_to_camera.inverse() * root_to_wrist;
 

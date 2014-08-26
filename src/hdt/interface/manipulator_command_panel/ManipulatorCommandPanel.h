@@ -18,6 +18,7 @@
 #include <ros/ros.h>
 #include <rviz/panel.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <hdt/MoveArmCommandAction.h>
@@ -102,6 +103,8 @@ private:
 
     Eigen::Affine3d root_to_first_link_;
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
+
+    tf::TransformListener listener_;
 
     bool do_init();
     bool check_robot_model_consistency();
