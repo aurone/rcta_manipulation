@@ -366,7 +366,7 @@ SimpleIKSolutionGenerator RobotModel::compute_all_ik_solutions(
 
     ikfast::IkSolutionList<double> ik_solutions;
     if (!ComputeIk(solver_trans, solver_rot, &free_angle, ik_solutions)) {
-        ROS_WARN("Failed to compute IK");
+        ROS_WARN_ONCE("ikfast failed to compute IK");
         return SimpleIKSolutionGenerator();
     }
 
