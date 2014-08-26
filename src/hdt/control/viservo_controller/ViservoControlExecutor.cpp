@@ -25,7 +25,7 @@ ViservoControlExecutor::ViservoControlExecutor() :
     last_ar_markers_msg_(),
     marker_validity_timeout_(), // read from param server
     wrist_transform_estimate_(),
-    max_translational_velocity_mps_(0.05),
+    max_translational_velocity_mps_(0.10),
     max_rotational_velocity_rps_(sbpl::utils::ToRadians(0.25 * 90.0)), // 90 degrees in 4 seconds
     max_joint_velocities_rps_(7, sbpl::utils::ToRadians(20.0)),
     listener_(),
@@ -132,6 +132,26 @@ int ViservoControlExecutor::run()
             continue;
         }
 
+        // publish ee estimate marker
+        geometry_msgs::Vector3 scale;
+        scale.x = 0.10;
+        scale.y = 0.01;
+        scale.z = 0.01;
+        visualization_msgs::MarkerArray estimate_triad_marker = msg_utils::create_triad_marker_arr(scale);
+
+        for (auto& marker : estimate_triad_marker.markers) {
+            marker.header.frame_id = camera_frame_;
+            marker.ns = "ee estimate";
+
+            Eigen::Affine3d estimate_triad_marker;
+            tf::poseMsgToEigen(marker.pose, estimate_triad_marker);
+            estimate_triad_marker = wrist_transform_estimate_ * estimate_triad_marker;
+
+            tf::poseEigenToMsg(estimate_triad_marker, marker.pose);
+        }
+
+        corrected_wrist_goal_pub_.publish(estimate_triad_marker);
+
         ////////////////////////////////////////////////////////////////////////////////
         // Check for termination
         ////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +201,7 @@ int ViservoControlExecutor::run()
             Eigen::Translation3d(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z()) *
             Eigen::Quaterniond(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
 
-        ROS_INFO("camera -> mount: %s", to_string(camera_to_mount).c_str());
+        ROS_DEBUG("camera -> mount: %s", to_string(camera_to_mount).c_str());
 
         Eigen::Affine3d manip_to_ee;
         if (!robot_model_->compute_fk(last_joint_state_msg_->position, manip_to_ee)) {
@@ -192,13 +212,13 @@ int ViservoControlExecutor::run()
         }
 
         const Eigen::Affine3d& mount_to_manip = robot_model_->mount_to_manipulator_transform();
-        ROS_INFO("mount -> manipulator: %s", to_string(mount_to_manip).c_str());
+        ROS_DEBUG("mount -> manipulator: %s", to_string(mount_to_manip).c_str());
 
-        ROS_INFO("manipulator -> ee: %s", to_string(manip_to_ee).c_str());
+        ROS_DEBUG("manipulator -> ee: %s", to_string(manip_to_ee).c_str());
 
         // camera -> ee = camera -> mount * mount -> manip * manip -> ee
         Eigen::Affine3d camera_to_ee = camera_to_mount * mount_to_manip * manip_to_ee;
-        ROS_INFO("camera -> ee: %s", to_string(camera_to_ee).c_str());
+        ROS_DEBUG("camera -> ee: %s", to_string(camera_to_ee).c_str());
 
         ////////////////////////////////////////////////////////////////////////////////
         // Compute the error between the goal transform and the ee estimate
@@ -217,9 +237,14 @@ int ViservoControlExecutor::run()
         ROS_INFO("Goal Wrist Transform [camera frame]: %s", to_string(goal_wrist_transform).c_str());
         ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
 
-        msg_utils::get_euler_ypr(wrist_transform_estimate_, yaw, pitch, roll);
-        ROS_INFO("Curr Wrist Transform [camera frame]: %s", to_string(wrist_transform_estimate_).c_str());
+        msg_utils::get_euler_ypr(camera_to_ee, yaw, pitch, roll);
+        ROS_INFO("Curr Wrist Transform Belief [camera frame]: %s", to_string(camera_to_ee).c_str());
         ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+
+        msg_utils::get_euler_ypr(wrist_transform_estimate_, yaw, pitch, roll);
+        ROS_INFO("Curr Wrist Transform Estimate [camera frame]: %s", to_string(wrist_transform_estimate_).c_str());
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+
         ROS_INFO("Error: %s", to_string(error).c_str());
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -230,14 +255,23 @@ int ViservoControlExecutor::run()
 
         ROS_INFO("    Position Error: %s", to_string(pos_error).c_str());
 
+#define PROLLYBAD 1
+#if !PROLLYBAD
         // cap the positional error vector by the max translational velocity_mps
         if (pos_error.norm() > max_translational_velocity_mps_ * max_translational_velocity_mps_) {
             pos_error.normalize();
             pos_error *= max_translational_velocity_mps_;
         }
 
+        ROS_INFO("    EE Velocity [camera frame]: %s", to_string(pos_error).c_str());
+#endif
+
         Eigen::Vector3d current_wrist_pos(camera_to_ee.translation());
+#if PROLLYBAD
+        Eigen::Vector3d target_pos = current_wrist_pos + pos_error;
+#else
         Eigen::Vector3d target_pos = current_wrist_pos + pos_error * dt;
+#endif
 
         ////////////////////////////////////////////////////////////////////////////////
         // Compute target rotation
@@ -263,7 +297,11 @@ int ViservoControlExecutor::run()
 
         double delta_angle = angular_velocity_rps * dt;
         double angle_dist = current_quat.angularDistance(corrected_goal_rot);
+#if PROLLYBAD
+        double REACHAROUND_FACTOR = 1.0;
+#else
         double REACHAROUND_FACTOR = angle_dist > 1e-4 ? clamp(fabs(delta_angle / angle_dist), 0.0, 1.0) : 1.0;
+#endif
         Eigen::Quaterniond target_rot = current_quat.slerp(REACHAROUND_FACTOR, corrected_goal_rot);
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -272,19 +310,17 @@ int ViservoControlExecutor::run()
 
         Eigen::Affine3d camera_to_target_wrist_transform = Eigen::Translation3d(target_pos) * target_rot;
 
-        ROS_INFO("Target Wrist Transform: %s", to_string(camera_to_target_wrist_transform).c_str());
+        ROS_INFO("Target Wrist Transform [camera frame]: %s", to_string(camera_to_target_wrist_transform).c_str());
         msg_utils::get_euler_ypr(camera_to_target_wrist_transform, roll, pitch, yaw);
         ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
 
         Eigen::Affine3d mount_to_target_wrist = camera_to_mount.inverse() * camera_to_target_wrist_transform;
         ROS_INFO("Target Wrist Transform [mount frame]: %s", to_string(mount_to_target_wrist).c_str());
 
+        // TODO: transform into the manipulator frame before IK (works for now because manip -> mount = I)
+
         // publish a marker for the target transform
 
-        geometry_msgs::Vector3 scale;
-        scale.x = 0.10;
-        scale.y = 0.01;
-        scale.z = 0.01;
         visualization_msgs::MarkerArray triad_marker = msg_utils::create_triad_marker_arr(scale);
 
         for (auto& marker : triad_marker.markers) {
@@ -324,6 +360,8 @@ int ViservoControlExecutor::run()
             as_->setAborted(result);
             continue;
         }
+
+        ROS_INFO("Picking best IK solution out of %d", num_solutions_found);
 
         bool found_ik = false;
         double best_dist = -1.0;
@@ -381,6 +419,7 @@ void ViservoControlExecutor::goal_callback()
     //     1. estimate the current wrist frame
     //     2.
 
+    // TODO: dont need to bail here upon failure to update wrist? maybe this is because only visualizations follow
     update_wrist_pose_estimate();
 
     geometry_msgs::Vector3 scale;
@@ -391,7 +430,7 @@ void ViservoControlExecutor::goal_callback()
 
     for (auto& marker : triad_marker.markers) {
         marker.header.frame_id = camera_frame_;
-        marker.ns = "corrected_ee_goal";
+        marker.ns = "initial ee estimate";
 
         Eigen::Affine3d triad_marker_transform;
         tf::poseMsgToEigen(marker.pose, triad_marker_transform);
@@ -401,6 +440,78 @@ void ViservoControlExecutor::goal_callback()
     }
 
     corrected_wrist_goal_pub_.publish(triad_marker);
+
+    Eigen::Affine3d goal_transform;
+    tf::poseMsgToEigen(current_goal_->goal_pose, goal_transform);
+    Eigen::Affine3d error = msg_utils::transform_diff(goal_transform, wrist_transform_estimate_);
+
+    // TODO: derive the corrected ee goal and publish a marker to show the goal position
+
+    // Obtain the current transform of the ee (using joint state data) in the frame of the camera
+    tf::StampedTransform transform;
+    try {
+        listener_.lookupTransform(camera_frame_, mount_frame_, ros::Time(0), transform);
+    }
+    catch (const tf::TransformException& ex) {
+        ROS_ERROR("Unable to lookup transform from %s to %s (%s)", mount_frame_.c_str(), camera_frame_.c_str(), ex.what());
+        return;
+    }
+
+    Eigen::Affine3d camera_to_mount =
+        Eigen::Translation3d(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z()) *
+        Eigen::Quaterniond(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
+
+    ROS_DEBUG("camera -> mount: %s", to_string(camera_to_mount).c_str());
+
+    Eigen::Affine3d manip_to_ee;
+    if (!robot_model_->compute_fk(last_joint_state_msg_->position, manip_to_ee)) {
+        ROS_ERROR("Failed to compute end effector transform from joint state");
+        return;
+    }
+
+    const Eigen::Affine3d& mount_to_manip = robot_model_->mount_to_manipulator_transform();
+    ROS_DEBUG("mount -> manipulator: %s", to_string(mount_to_manip).c_str());
+
+    ROS_DEBUG("manipulator -> ee: %s", to_string(manip_to_ee).c_str());
+
+    // camera -> ee = camera -> mount * mount -> manip * manip -> ee
+    Eigen::Affine3d camera_to_ee = camera_to_mount * mount_to_manip * manip_to_ee;
+    ROS_DEBUG("camera -> ee: %s", to_string(camera_to_ee).c_str());
+
+    // current/e
+    Eigen::Translation3d corrected_goal_pos(Eigen::Vector3d(camera_to_ee.translation()) + Eigen::Vector3d(error.translation()));
+    Eigen::Quaterniond corrected_goal_rot = Eigen::Quaterniond(camera_to_ee.rotation()) *
+                                            Eigen::Quaterniond(error.rotation()).inverse();
+
+    // TODO: AAAAAH MASSIVE COPYPASTA HERE AND ABOVE
+    Eigen::Affine3d corrected_ee_goal_transform = corrected_goal_pos * corrected_goal_rot;
+
+    triad_marker = msg_utils::create_triad_marker_arr(scale); // refresh marker transforms
+    for (auto& marker : triad_marker.markers) {
+        marker.header.frame_id = camera_frame_;
+        marker.ns = "corrected_ee_goal";
+
+        Eigen::Affine3d triad_marker_transform;
+        tf::poseMsgToEigen(marker.pose, triad_marker_transform);
+        triad_marker_transform = corrected_ee_goal_transform * triad_marker_transform;
+
+        tf::poseEigenToMsg(triad_marker_transform, marker.pose);
+    }
+
+    corrected_wrist_goal_pub_.publish(triad_marker);
+
+    // make sure that we're able to come up with an IK solution for the target goal ee pose
+
+    // TODO: to manipulator frame
+    Eigen::Affine3d mount_to_corrected_goal = camera_to_mount.inverse() * corrected_goal_rot;
+    auto ikgen = robot_model_->search_all_ik_solutions(mount_to_corrected_goal, last_joint_state_msg_->position, sbpl::utils::ToRadians(1.0));
+    std::vector<double> sol;
+    if (!ikgen(sol)) {
+        ROS_ERROR("No IK Solution exists for corrected goal position");
+    }
+    else {
+        ROS_INFO("Found valid IK solution for corrected goal pose at %s", to_string(sol).c_str());
+    }
 }
 
 void ViservoControlExecutor::preempt_callback()
@@ -443,7 +554,22 @@ bool ViservoControlExecutor::lost_marker()
         return true;
     }
 
-    if (ros::Time::now() > last_ar_markers_msg_->header.stamp + ros::Duration(marker_validity_timeout_)) {
+    bool found = false;
+    ros::Time marker_stamp;
+    for (const auto& marker : last_ar_markers_msg_->markers) {
+        if (marker.id == attached_marker_.marker_id) {
+            found = true;
+            marker_stamp = marker.header.stamp;
+            break;
+        }
+    }
+
+    if (!found) {
+        ROS_WARN("Did not find AR Marker in AR Markers message");
+        return true;
+    }
+
+    if (ros::Time::now() > marker_stamp + ros::Duration(marker_validity_timeout_)) {
         ROS_WARN("AR Marker has gone stale after %0.3f seconds", marker_validity_timeout_);
         last_ar_markers_msg_.reset();
         return true;
@@ -581,7 +707,7 @@ bool ViservoControlExecutor::download_marker_params()
             Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
             Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
             Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX()));
+            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
 
     return success;
@@ -597,7 +723,7 @@ bool ViservoControlExecutor::get_tracked_marker_pose(Eigen::Affine3d& marker_pos
     for (const auto& marker : last_ar_markers_msg_->markers) {
         if (marker.id == attached_marker_.marker_id) {
 
-            const std::string& msg_frame = last_ar_markers_msg_->header.frame_id;
+            const std::string& msg_frame = marker.header.frame_id;
             geometry_msgs::PoseStamped marker_in_msg_frame;
             marker_in_msg_frame.header.frame_id = msg_frame;
             marker_in_msg_frame.header.stamp = last_ar_markers_msg_->header.stamp;
@@ -611,7 +737,7 @@ bool ViservoControlExecutor::get_tracked_marker_pose(Eigen::Affine3d& marker_pos
                     listener_.transformPose(camera_frame_, marker_in_msg_frame, marker_in_camera_frame);
                 }
                 catch (const tf::TransformException& ex) {
-                    ROS_ERROR("Sadness");
+                    ROS_ERROR("Failed to transform from frame '%s' to '%s' (%s)", marker_in_msg_frame.header.frame_id.c_str(), camera_frame_.c_str(), ex.what());
                     return false;
                 }
             }
