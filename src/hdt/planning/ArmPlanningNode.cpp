@@ -652,7 +652,7 @@ void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory&
                     traj_point.positions[jidx] = 0.0;
                 }
                 traj_point.time_from_start = ros::Duration(t);
-                traj_point.velocities[jidx] = 20.0;
+                traj_point.velocities[jidx] = sbpl::utils::ToRadians(20.0);
                 ++jidx;
             }
 
