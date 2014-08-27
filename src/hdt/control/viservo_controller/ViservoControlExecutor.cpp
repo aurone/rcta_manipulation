@@ -25,8 +25,10 @@ ViservoControlExecutor::ViservoControlExecutor() :
     last_ar_markers_msg_(),
     marker_validity_timeout_(), // read from param server
     wrist_transform_estimate_(),
-    max_translational_velocity_mps_(0.10),
-    max_rotational_velocity_rps_(sbpl::utils::ToRadians(0.25 * 90.0)), // 90 degrees in 4 seconds
+    max_translational_velocity_mps_(0.40),
+    max_rotational_velocity_rps_(sbpl::utils::ToRadians(90.0)), // 90 degrees in 4 seconds
+    deadband_joint_velocities_rps_(),
+    minimum_joint_velocities_rps_(),
     max_joint_velocities_rps_(7, sbpl::utils::ToRadians(20.0)),
     listener_(),
     camera_frame_("asus_rgb_frame"),
@@ -121,6 +123,18 @@ int ViservoControlExecutor::run()
 
         ROS_WARN("Executing viservo control. Current joint state is %s",
                 (bool)last_joint_state_msg_ ? to_string(msg_utils::to_degrees(last_joint_state_msg_->position)).c_str() : "null");
+
+        if (last_joint_state_msg_) {
+            static std::vector<int> misbehaved_joints_histogram(7, 0);
+            for (std::size_t i = 0; i < last_curr_.size(); ++i) {
+                if (signf(last_joint_state_msg_->position[i] - last_curr_[i], sbpl::utils::ToRadians(1.0)) !=
+                    signf(last_diff_[i], sbpl::utils::ToRadians(1.0)))
+                {
+                    ++misbehaved_joints_histogram[i];
+                }
+            }
+            ROS_INFO("Misbehaved joint histogram: %s", to_string(misbehaved_joints_histogram).c_str());
+        }
 
         if (as_->isPreemptRequested()) {
             ROS_WARN("Goal preemption currently unimplemented");
@@ -245,6 +259,10 @@ int ViservoControlExecutor::run()
         ROS_INFO("Curr Wrist Transform Estimate [camera frame]: %s", to_string(wrist_transform_estimate_).c_str());
         ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
 
+        msg_utils::get_euler_ypr(camera_to_mount.inverse() * wrist_transform_estimate_, yaw, pitch, roll);
+        ROS_INFO("Curr Wrist Transform Estimate [mount frame]: %s", to_string(camera_to_mount.inverse() * wrist_transform_estimate_).c_str());
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+
         ROS_INFO("Error: %s", to_string(error).c_str());
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -255,10 +273,10 @@ int ViservoControlExecutor::run()
 
         ROS_INFO("    Position Error: %s", to_string(pos_error).c_str());
 
-#define PROLLYBAD 1
+#define PROLLYBAD 0
 #if !PROLLYBAD
         // cap the positional error vector by the max translational velocity_mps
-        if (pos_error.norm() > max_translational_velocity_mps_ * max_translational_velocity_mps_) {
+        if (pos_error.squaredNorm() > max_translational_velocity_mps_ * max_translational_velocity_mps_) {
             pos_error.normalize();
             pos_error *= max_translational_velocity_mps_;
         }
@@ -396,7 +414,19 @@ int ViservoControlExecutor::run()
         traj_cmd.points.resize(1);
         traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = chosen_solution;
+
+        correct_joint_velocity_cmd(last_joint_state_msg_->position, traj_cmd.points[0].positions, dt);
+
         ROS_INFO("Publishing joint command %s", to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str());
+
+        last_curr_ = last_joint_state_msg_->position;
+//        std::vector<double> diff;
+        if (msg_utils::vector_diff(traj_cmd.points[0].positions, last_joint_state_msg_->position, last_diff_)) {
+            ROS_INFO("Joint Command Difference: %s", to_string(msg_utils::to_degrees(last_diff_)).c_str());
+        }
+        else {
+            ROS_WARN("Failed to compute difference between two vectors?");
+        }
 
         // TODO: close the loop with the HDT PID controller here so that we can
         // estimate how much the wrist has moved, even if we are unable to
@@ -686,6 +716,11 @@ bool ViservoControlExecutor::download_marker_params()
     double marker_to_link_pitch_degs;
     double marker_to_link_yaw_degs;
 
+    deadband_joint_velocities_rps_.resize(7);
+    minimum_joint_velocities_rps_.resize(7);
+
+    std::vector<double> deadband_joint_velocities_dps;
+    std::vector<double> minimum_joint_velocities_dps;
     bool success =
             msg_utils::download_param(ph_, "tracked_marker_id", attached_marker_.marker_id) &&
             msg_utils::download_param(ph_, "tracked_marker_attached_link", attached_marker_.attached_link) &&
@@ -699,7 +734,19 @@ bool ViservoControlExecutor::download_marker_params()
             msg_utils::download_param(ph_, "goal_pos_tolerance_x_m", goal_pos_tolerance_(0)) &&
             msg_utils::download_param(ph_, "goal_pos_tolerance_y_m", goal_pos_tolerance_(1)) &&
             msg_utils::download_param(ph_, "goal_pos_tolerance_z_m", goal_pos_tolerance_(2)) &&
-            msg_utils::download_param(ph_, "goal_rot_tolerance_deg", goal_rot_tolerance_);
+            msg_utils::download_param(ph_, "goal_rot_tolerance_deg", goal_rot_tolerance_) &&
+            msg_utils::download_param(ph_, "deadband_joint_velocities_deg", deadband_joint_velocities_dps) &&
+            msg_utils::download_param(ph_, "minimum_joint_velocities_deg", minimum_joint_velocities_dps)
+    ; // LO'D!
+
+    success &= deadband_joint_velocities_dps.size() == 7 && minimum_joint_velocities_dps.size() == 7;
+    if (!success) {
+        return false;
+    }
+
+    // convert to radians
+    deadband_joint_velocities_rps_ = msg_utils::to_radians(deadband_joint_velocities_dps);
+    minimum_joint_velocities_rps_ = msg_utils::to_radians(minimum_joint_velocities_dps);
 
     goal_rot_tolerance_ = sbpl::utils::ToRadians(goal_rot_tolerance_);
 
@@ -708,7 +755,6 @@ bool ViservoControlExecutor::download_marker_params()
             Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
             Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
             Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
-
 
     return success;
 }
@@ -779,6 +825,24 @@ bool ViservoControlExecutor::safe_joint_delta(const std::vector<double>& from, c
     }
 
     return true;
+}
+
+void ViservoControlExecutor::correct_joint_velocity_cmd(
+    const std::vector<double>& from,
+    std::vector<double>& to,
+    double dt)
+{
+    std::vector<double> diff;
+    msg_utils::vector_diff(to, from, diff);
+
+    for (std::size_t i = 0; i < from.size(); ++i) {
+        if (fabs(diff[i]) < deadband_joint_velocities_rps_[i]) {
+            to[i] = from[i];
+        }
+        else if (fabs(diff[i]) < minimum_joint_velocities_rps_[i]) {
+            to[i] = from[i] + signf(diff[i]) * minimum_joint_velocities_rps_[i];
+        }
+    }
 }
 
 int main(int argc, char* argv[])

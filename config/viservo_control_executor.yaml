@@ -1,7 +1,14 @@
+max_linear_velocity_mps: 0.40
+max_angular_velocity_dps: 90.0
+deadband_joint_velocities_deg: [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ]
+minimum_joint_velocities_deg: [ 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0 ]
+maximum_joint_velocities_deg: [ 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0 ]
+
 marker_validity_timeout: 1.0
 
-goal_pos_tolerance_x_m: 0.01
-goal_pos_tolerance_y_m: 0.01
-goal_pos_tolerance_z_m: 0.01
+goal_pos_tolerance_x_m: 0.015
+goal_pos_tolerance_y_m: 0.015
+goal_pos_tolerance_z_m: 0.015
 
-goal_rot_tolerance_deg: 1.0
+goal_rot_tolerance_deg: 5.0
+

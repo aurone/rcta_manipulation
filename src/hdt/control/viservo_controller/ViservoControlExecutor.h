@@ -57,7 +57,9 @@ private:
     /// maximum velocities in workspace and in joint space
     double max_translational_velocity_mps_;
     double max_rotational_velocity_rps_;
-    std::vector<double> max_joint_velocities_rps_;
+    std::vector<double> deadband_joint_velocities_rps_; // velocities at which and below velocities will be truncated to 0
+    std::vector<double> minimum_joint_velocities_rps_; // velocities between the deadband and this will be clamped to these values
+    std::vector<double> max_joint_velocities_rps_; // velocities greater than these will be clamped to these values
 
     tf::TransformListener listener_;
 
@@ -76,6 +78,9 @@ private:
 
     Eigen::Vector3d goal_pos_tolerance_;
     double goal_rot_tolerance_;
+
+    std::vector<double> last_curr_;
+    std::vector<double> last_diff_;
 
     void goal_callback();
     void preempt_callback();
@@ -96,6 +101,8 @@ private:
     bool get_tracked_marker_pose(Eigen::Affine3d& marker_pose);
 
     bool safe_joint_delta(const std::vector<double>& from, const std::vector<double>& to) const;
+
+    void correct_joint_velocity_cmd(const std::vector<double>& from, std::vector<double>& to, double dt);
 };
 
 #endif
