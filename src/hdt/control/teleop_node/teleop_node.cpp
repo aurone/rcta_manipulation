@@ -1,3 +1,4 @@
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -33,7 +34,7 @@ TeleopNode::TeleopNode() :
     joint_velocities_(joint_names_.size(), 0.0),
     selected_joint_idx_(0),
     joint_pos_target_(joint_names_.size(), 0.0),
-    joint_vel_target_(joint_names_.size(), 0.0),
+    joint_vel_target_(joint_names_.size(), 20.0 * M_PI / 180.0),
     last_joint_state_(),
     deadman_on_(false)
 {
@@ -286,11 +287,11 @@ void TeleopNode::set_position(double value)
 
 void TeleopNode::set_velocity(double value)
 {
-    if (!last_joint_state_) {
-        return;
-    }
-
-    joint_vel_target_[selected_joint_idx_] = joint_velocities_[selected_joint_idx_] + value * (MAX_DELTA_VEL_RPSPS * (1.0 / loop_rate_hz_));
+//    if (!last_joint_state_) {
+//        return;
+//    }
+//
+//    joint_vel_target_[selected_joint_idx_] = joint_velocities_[selected_joint_idx_] + value * (MAX_DELTA_VEL_RPSPS * (1.0 / loop_rate_hz_));
 }
 
 void TeleopNode::set_torque(double value)
