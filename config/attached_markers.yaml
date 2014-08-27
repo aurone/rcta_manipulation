@@ -1,0 +1,18 @@
+#tracked_marker_id: 8
+#tracked_marker_attached_link: "arm_5_wrist_twist_link"
+#marker_to_link_x: 0.0
+#marker_to_link_y: 0.0
+#marker_to_link_z: 0.0
+#marker_to_link_roll: 0.0
+#marker_to_link_pitch: 0.0
+#marker_to_link_yaw: 0.0
+
+tracked_marker_id: 2
+tracked_marker_attached_link: "arm_7_gripper_lift_link"
+marker_to_link_x: 0.0939881
+marker_to_link_y: -0.01364
+marker_to_link_z: -0.065864
+marker_to_link_roll_deg: 0.0
+marker_to_link_pitch_deg: 175.0
+marker_to_link_yaw_deg: 0.0
+

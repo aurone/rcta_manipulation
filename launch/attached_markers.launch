@@ -1,0 +1,10 @@
+<launch>
+    <!-- include marker tracking -->
+    <include file="$(find hdt)/launch/track_wrist_marker.launch"/>
+
+    <!-- marker filter to filter markers we don't care about and correct the orientations of those we do -->
+    <node name="attached_markers_filter" pkg="hdt" type="attached_markers_filter" output="screen">
+        <rosparam command="load" file="$(find hdt)/config/attached_markers.yaml"/>
+    </node>
+</launch>
+
