@@ -1,21 +1,6 @@
 <launch>
-    <!-- This launch file provides a simulated industrial robot
-
-        Several nodes are started, to simulate low-level robot communication
-        and higher-level actionlib support:
-            - industrial_robot simulator : accepts motion commands and publishes robot state
-
-        Usage:
-            hdt_simulator.launch
-    -->
-
-    <rosparam> 
-        /tilt_mount_controller_joint_names: [ "tilt_mount_tilt_joint" ]
-    </rosparam> 
-
-    <!-- industrial_robot_simulator: accepts robot commands and reports status -->
-    <node pkg="industrial_robot_simulator" type="industrial_robot_simulator" name="tilt_mount_industrial_robot_simulator">
-        <remap from="/controller_joint_names" to="/tilt_mount_controller_joint_names"/>
+    <node name="tilt_mount_simulator" pkg="hdt" type="tilt_mount_simulator">
+        <param name="fixed_tilt_angle_deg" value="-20.0"/>
     </node>
 </launch>
 
