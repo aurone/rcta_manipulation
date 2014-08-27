@@ -36,6 +36,12 @@
     <xacro:property name="kinect_side_edge_depth_offset_m" value="0.125"/>
     <xacro:property name="kinect_front_edge_offset_m" value=".048"/>
 
+    <!-- values measured on 2014-07-08 -->
+    <xacro:property name="asus_left_screw_mount_offset_m" value="0.242"/>   <!-- The left side of the left screw (facing the robot) from the right edge of the top shelf -->
+    <xacro:property name="asus_right_screw_mount_offset_m" value="0.114"/>  <!-- The left side of the right screw (facing the robot) from the right edge of the top shelf -->
+    <xacro:property name="asus_bay_top_offset_m" value="0.110"/>            <!-- The top of the housing surrounding the camera from the top of the top shelf -->
+    <xacro:property name="asus_bay_bottom_offset_m" value="0.145"/>         <!-- The bottom of the housing surrounding the camera from the top of the top shelf -->
+
     <!-- Build the robot -->
 
     <xacro:husky_shelf
@@ -50,12 +56,6 @@
     <property name="cal_kinect_roll" value="0.0"/>
     <property name="cal_kinect_pitch" value="0.0"/>
     <property name="cal_kinect_yaw" value="0.0"/>
-
-    <!-- values measured on 2014-07-08 -->
-    <xacro:property name="asus_left_screw_mount_offset_m" value="0.242"/>   <!-- The left side of the left screw (facing the robot) from the right edge of the top shelf -->
-    <xacro:property name="asus_right_screw_mount_offset_m" value="0.114"/>  <!-- The left side of the right screw (facing the robot) from the right edge of the top shelf -->
-    <xacro:property name="asus_bay_top_offset_m" value="0.110"/>            <!-- The top of the housing surrounding the camera from the top of the top shelf -->
-    <xacro:property name="asus_bay_bottom_offset_m" value="0.145"/>         <!-- The bottom of the housing surrounding the camera from the top of the top shelf -->
 
     <xacro:tilt_mount name="tilt_mount" parent="top_shelf">
         <origin xyz="0
