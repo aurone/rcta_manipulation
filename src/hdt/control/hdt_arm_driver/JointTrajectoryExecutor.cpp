@@ -462,7 +462,7 @@ bool JointTrajectoryExecutor::send_command()
     current_traj_ = active_goal_.getGoal()->trajectory; // Andrew: copy over the goal trajectory to get the joint names and header information?
     current_traj_.points.clear();
     current_traj_.points.push_back(active_goal_.getGoal()->trajectory.points[current_segment_ + 1]); // push back the end point of the current segment
-    ROS_INFO("Publishing command %s", to_string(current_traj_.points.back()).c_str());
+    ROS_INFO("Publishing command %s rads", to_string(current_traj_.points.back()).c_str());
     pub_controller_command_.publish(current_traj_);
     return true;
 }
@@ -489,6 +489,13 @@ std::string JointTrajectoryExecutor::to_string(const trajectory_msgs::JointTraje
     for (size_t i = 0; i < traj_point.positions.size(); ++i) {
         ss << "a" << i << ": " << traj_point.positions[i];
         if (i != traj_point.positions.size() - 1) {
+            ss << ", ";
+        }
+    }
+    ss << ") @ (";
+    for (size_t i = 0; i < traj_point.velocities.size(); ++i) {
+        ss << "a" << i << ": " << traj_point.velocities[i];
+        if (i != traj_point.velocities.size() - 1) {
             ss << ", ";
         }
     }
