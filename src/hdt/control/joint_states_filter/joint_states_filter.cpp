@@ -43,6 +43,8 @@ public:
 
         ROS_INFO("Retrieved joint position offsets: %s", to_string(position_offsets_).c_str());
 
+        position_offsets_ = msg_utils::to_radians(position_offsets_);
+
         ros::spin();
         return 0;
     }
