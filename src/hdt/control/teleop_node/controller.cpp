@@ -50,7 +50,7 @@ void Controller::process_events()
     std::stringstream ss;
     ss << "Axes: [ ";
     for (unsigned i = 0; i < joystick_.NumAxes(); ++i) {
-        ss << joystick_.Axis(i) << ' ';
+        ss << joystick_.Axis(i, 0.1) << ' ';
     }
     ss << ']';
     ss << ' ';
@@ -95,7 +95,7 @@ void Controller::process_events()
 
     // TODO: only call axis commands if value has changed?
     for (unsigned i = 0; i < joystick_.NumAxes(); ++i) {
-        float val = joystick_.Axis(i);
+        float val = joystick_.Axis(i, 0.1);
         int axis_command = axis_index_to_command(i);
         if (axis_command < 0) {
             continue;
