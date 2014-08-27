@@ -292,4 +292,13 @@ std::vector<double> to_degrees(const std::vector<double>& v)
     return v_degs;
 }
 
+std::vector<double> to_radians(const std::vector<double>& v)
+{
+    std::vector<double> v_rads(v.size());
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        v_rads[i] = sbpl::utils::ToRadians(v[i]);
+    }
+    return v_rads;
+}
+
 } // namespace msg_utils

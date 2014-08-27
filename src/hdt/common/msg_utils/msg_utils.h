@@ -1,6 +1,7 @@
 #ifndef msg_utils_h
 #define msg_utils_h
 
+#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -56,10 +57,23 @@ bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T&
 
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p);
 
+template <typename T, typename Op>
+bool vector_pwiseop(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const Op& op);
+
 template <typename T>
 bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv);
 
+template <typename T, typename PlusOp>
+bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const PlusOp& op);
+
+template <typename T>
+bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv);
+
+template <typename T, typename MinusOp>
+bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const MinusOp& op);
+
 std::vector<double> to_degrees(const std::vector<double>& v);
+std::vector<double> to_radians(const std::vector<double>& v);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
@@ -147,8 +161,8 @@ bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T&
     return extract_xml_value(value_array, tout);
 }
 
-template <typename T>
-bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv)
+template <typename T, typename Op>
+bool vector_pwiseop(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const Op& op)
 {
     if (u.size() != v.size()) {
         return false;
@@ -156,10 +170,34 @@ bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>
 
     uv.resize(u.size());
     for (std::size_t i = 0; i < u.size(); ++i) {
-        uv[i] = u[i] + v[i];
+        uv[i] = op(u[i], v[i]);
     }
 
     return true;
+}
+
+template <typename T>
+bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv)
+{
+    return vector_pwiseop(u, v, uv, std::plus<T>());
+}
+
+template <typename T, typename PlusOp>
+bool vector_sum(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const PlusOp& op)
+{
+    return vector_pwiseop(u, v, uv, op);
+}
+
+template <typename T>
+bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv)
+{
+    return vector_pwiseop(u, v, uv, std::minus<T>());
+}
+
+template <typename T, typename MinusOp>
+bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const MinusOp& op)
+{
+    return vector_pwiseop(u, v, uv, op);
 }
 
 } // namespace msg_utils
