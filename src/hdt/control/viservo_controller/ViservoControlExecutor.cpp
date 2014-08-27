@@ -140,9 +140,13 @@ int ViservoControlExecutor::run()
             ROS_WARN("Goal preemption currently unimplemented");
         }
 
+        hdt::ViservoCommandResult result;
+
         // incorporate any new marker measurements and estimate the current wrist pose based off of that and the last two joints
         if (!update_wrist_pose_estimate()) {
             ROS_WARN("Failed to update the pose of the wrist");
+            result.result = hdt::ViservoCommandResult::STUCK;
+            as_->setSucceeded(result);
             continue;
         }
 
@@ -170,7 +174,6 @@ int ViservoControlExecutor::run()
         // Check for termination
         ////////////////////////////////////////////////////////////////////////////////
 
-        hdt::ViservoCommandResult result;
 
         // 1. check whether the estimated wrist pose has reached the goal within the specified tolerance
         if (reached_goal()) {
@@ -415,18 +418,18 @@ int ViservoControlExecutor::run()
         traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = chosen_solution;
 
-        correct_joint_velocity_cmd(last_joint_state_msg_->position, traj_cmd.points[0].positions, dt);
+        correct_joint_velocity_cmd(last_joint_state_msg_->position, last_targ_, traj_cmd.points[0].positions, dt);
 
         ROS_INFO("Publishing joint command %s", to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str());
 
         last_curr_ = last_joint_state_msg_->position;
-//        std::vector<double> diff;
-        if (msg_utils::vector_diff(traj_cmd.points[0].positions, last_joint_state_msg_->position, last_diff_)) {
+        if (msg_utils::vector_diff(traj_cmd.points[0].positions, last_curr_, last_diff_)) {
             ROS_INFO("Joint Command Difference: %s", to_string(msg_utils::to_degrees(last_diff_)).c_str());
         }
         else {
             ROS_WARN("Failed to compute difference between two vectors?");
         }
+        last_targ_ = traj_cmd.points[0].positions;
 
         // TODO: close the loop with the HDT PID controller here so that we can
         // estimate how much the wrist has moved, even if we are unable to
@@ -829,6 +832,7 @@ bool ViservoControlExecutor::safe_joint_delta(const std::vector<double>& from, c
 
 void ViservoControlExecutor::correct_joint_velocity_cmd(
     const std::vector<double>& from,
+    const std::vector<double>& last_to,
     std::vector<double>& to,
     double dt)
 {
@@ -837,7 +841,7 @@ void ViservoControlExecutor::correct_joint_velocity_cmd(
 
     for (std::size_t i = 0; i < from.size(); ++i) {
         if (fabs(diff[i]) < deadband_joint_velocities_rps_[i]) {
-            to[i] = from[i];
+            to[i] = from[i]; //last_to.empty() ? from[i] : last_to[i]; //from[i];
         }
         else if (fabs(diff[i]) < minimum_joint_velocities_rps_[i]) {
             to[i] = from[i] + signf(diff[i]) * minimum_joint_velocities_rps_[i];

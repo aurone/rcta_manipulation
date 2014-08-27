@@ -81,6 +81,7 @@ private:
 
     std::vector<double> last_curr_;
     std::vector<double> last_diff_;
+    std::vector<double> last_targ_;
 
     void goal_callback();
     void preempt_callback();
@@ -102,7 +103,7 @@ private:
 
     bool safe_joint_delta(const std::vector<double>& from, const std::vector<double>& to) const;
 
-    void correct_joint_velocity_cmd(const std::vector<double>& from, std::vector<double>& to, double dt);
+    void correct_joint_velocity_cmd(const std::vector<double>& from, const std::vector<double>& last_to, std::vector<double>& to, double dt);
 };
 
 #endif
