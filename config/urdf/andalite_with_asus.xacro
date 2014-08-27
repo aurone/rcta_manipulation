@@ -6,6 +6,7 @@
     <include filename="$(find hdt)/config/urdf/fake_gripper.xacro"/>
     <include filename="$(find hdt)/config/urdf/shelf.xacro"/>
     <include filename="$(find hdt)/config/urdf/asus_camera.urdf.xacro"/>
+    <include filename="$(find hdt)/config/urdf/tilt_mount.xacro"/>
 
     <!-- describe the fixed front bumper to shelf transforms -->
 
@@ -56,10 +57,14 @@
     <xacro:property name="asus_bay_top_offset_m" value="0.110"/>            <!-- The top of the housing surrounding the camera from the top of the top shelf -->
     <xacro:property name="asus_bay_bottom_offset_m" value="0.145"/>         <!-- The bottom of the housing surrounding the camera from the top of the top shelf -->
 
-    <xacro:asus_xtion_pro_live name="asus" parent="top_shelf">
-        <origin xyz="${0.5 * top_shelf_length_m}
+    <xacro:tilt_mount name="tilt_mount" parent="top_shelf">
+        <origin xyz="0
                      ${0.5 * rail_width + shelf_width_m - 0.5 * (asus_left_screw_mount_offset_m + asus_right_screw_mount_offset_m)}
-                     ${0.5 * shelf_width_m - 0.5 * (asus_bay_top_offset_m + asus_bay_bottom_offset_m)}"/>
+                     ${-0.5 * shelf_width_m}"/>
+    </xacro:tilt_mount>
+
+    <xacro:asus_xtion_pro_live name="asus" parent="tilt_mount_sensor_basket">
+        <origin xyz="0.05 ${-0.5 * basket_part_ab_width_m - basket_part_c_width_m - 0.5 * 0.035} 0" rpy="${-pi / 2} 0 0"/>
     </xacro:asus_xtion_pro_live>
 
     <xacro:hdt_arm mounting_link="arm_mount_panel_dummy" mounting_origin="0 0 0" />

@@ -28,6 +28,7 @@
     <!-- SURROGATE PROVIDERS OF /joint_states -->
     <include file="$(find hdt)/launch/husky_simulator.launch"/>
     <include file="$(find hdt)/launch/gripper_simulator.launch"/>
+    <include file="$(find hdt)/launch/tilt_mount_simulator.launch"/>
 
     <group if="$(arg kinect_sensor)">
         <node name="kinect_simulator" pkg="hdt" type="kinect_simulator" args="--mode=static 0"/>

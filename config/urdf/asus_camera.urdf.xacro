@@ -23,15 +23,17 @@
         <joint name="${name}_mount_joint" type="fixed">
             <insert_block name="origin" />
             <parent link="${parent}"/>
-            <child link="${name}_base_link"/>
+            <child link="${name}_frame"/>
         </joint>
         
         <!-- fixed joint from tilt frame to camera frame -->
+        <!--
         <joint name="${name}_frame_joint" type="fixed">
             <parent link="${name}_base_link" />
             <child link="${name}_frame" />
             <origin xyz="0.0 0.0 0" rpy="0 0 0" />
         </joint>
+        -->
         
         <!-- camera frame -> depth frame -->
         <joint name="${name}_depth_frame_joint" type="fixed">
@@ -64,7 +66,7 @@
         </joint>
         
         <!-- base link -->
-        <link name="${name}_base_link" />
+        <!-- <link name="${name}_base_link" /> -->
         
         <!-- camera frame -->
         <link name="${name}_frame">
@@ -77,7 +79,7 @@
             <visual>
                 <origin xyz="0.0 0.0 0" rpy="0 0 0"/>
                 <geometry>
-                    <mesh filename="package://hdt/resource/meshes/kinect_v0/kinect_head.dae" scale="0.001
+                    <mesh filename="package://hdt/resource/meshes/kinect_v0/kinect_head.dae" scale="0.001 
                         0.001 0.001" />
                 </geometry>
             </visual>

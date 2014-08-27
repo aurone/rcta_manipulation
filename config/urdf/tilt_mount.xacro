@@ -1,0 +1,175 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:property name="plate_thickness_m" value="0.0116667"/>
+    <xacro:property name="plate_length_m" value="0.10"/>
+
+    <!-- cradle properties -->
+
+    <xacro:property name="cradle_part_a_length_m" value="0.10"/> <!-- plate_length_m -->
+    <xacro:property name="cradle_part_a_width_m" value="0.256"/>
+    <xacro:property name="cradle_part_a_height_m" value="0.0116667"/> <!-- plate_thickness_m -->
+
+    <xacro:property name="cradle_part_bc_length_m" value="0.10"/> <!-- plate_length_m -->
+    <xacro:property name="cradle_part_bc_width_m" value="0.123"/>
+    <xacro:property name="cradle_part_bc_height_m" value="0.0116667"/> <!-- plate_thickness_m -->
+
+    <xacro:property name="cradle_part_de_length_m" value="0.10"/> <!-- plate_length_m -->
+    <xacro:property name="cradle_part_de_width_m" value="0.0116667"/> <!-- plate_thickness_m -->
+    <xacro:property name="cradle_part_de_height_m" value="0.1113333"/>
+
+    <xacro:property name="servo_length_m" value="0.10"/>
+    <xacro:property name="servo_width_m" value="0.0556665"/>
+    <xacro:property name="servo_height_m" value="0.08349975"/>
+
+    <!-- basket properties -->
+
+    <xacro:property name="basket_part_ab_length_m" value="0.10"/> <!-- plate_length_m -->
+    <xacro:property name="basket_part_ab_width_m" value="0.065"/>
+    <xacro:property name="basket_part_ab_height_m" value="0.0116667"/>
+
+    <xacro:property name="basket_part_c_length_m" value="0.10"/> <!-- plate_length_m -->
+    <xacro:property name="basket_part_c_width_m" value="0.0116667"/>
+    <xacro:property name="basket_part_c_height_m" value="0.25"/>
+
+    <xacro:property name="basket_sensor_gap" value="0.035"/>
+
+    <xacro:property name="basket_part_d_length_m" value="0.10"/> <!-- plate_length_m -->
+    <xacro:property name="basket_part_d_width_m" value="0.0116667"/>
+    <xacro:property name="basket_part_d_height_m" value="0.23"/>
+
+    <material name="gray">
+        <color rgba="0.5 0.5 0.5 1.0"/>
+    </material>
+
+    <xacro:macro name="tilt_mount" params="name parent *origin">
+        <joint name="${name}_mount_joint" type="fixed">
+            <insert_block name="origin"/>
+            <parent link="${parent}"/>
+            <child link="${name}_servo_cradle"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="0 0 -0.8" rpy="${pi / 2} 0 0"/>
+        </joint>
+
+        <joint name="${name}_tilt_joint" type="revolute">
+            <parent link="${name}_servo_cradle"/>
+            <child link="${name}_sensor_basket"/>
+            <limit lower="${-30 * degrees}" upper="${30 * degrees}" effort="0.0" velocity="0.0"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="0.0 0.0 -0.08" rpy="${pi / 2} 0.0 0.0"/>
+        </joint>
+
+        <link name="${name}_servo_cradle">
+            <!-- part a -->
+            <visual name="part_a">
+                <origin xyz="0 0 ${-0.5 * cradle_part_a_height_m}"/>
+                <geometry>
+                    <box size="${cradle_part_a_length_m} ${cradle_part_a_width_m} ${cradle_part_a_height_m}"/>
+                </geometry>
+                <!-- Good, I'm glad. I'm glad that only the material on the first visual tag matters. That's real swell. -->
+                <material name="black">
+                    <color rgba="0.1 0.1 0.1 1.0"/>
+                </material>
+            </visual>
+
+            <!-- part b -->
+            <visual name="part_b">
+                <origin xyz="0
+                             ${ 0.167 * cradle_part_a_width_m + 0.5 * cradle_part_bc_width_m}
+                             ${-cradle_part_a_height_m - 0.5 * cradle_part_bc_height_m}"/>
+                <geometry>
+                    <box size="${cradle_part_bc_length_m} ${cradle_part_bc_width_m} ${cradle_part_bc_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- part c -->
+            <visual name="part_c">
+                <origin xyz="0
+                             ${-0.167 * cradle_part_a_width_m - 0.5 * cradle_part_bc_width_m}
+                             ${-cradle_part_a_height_m - 0.5 * cradle_part_bc_height_m}"/>
+                <geometry>
+                    <box size="${cradle_part_bc_length_m} ${cradle_part_bc_width_m} ${cradle_part_bc_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- part d -->
+            <visual name="part_d">
+                <origin xyz="0
+                             ${ 0.167 * cradle_part_a_width_m + cradle_part_bc_width_m - 0.5 * cradle_part_de_width_m}
+                             ${-cradle_part_a_height_m - cradle_part_bc_height_m - 0.5 * cradle_part_de_height_m}"/>
+                <geometry>
+                    <box size="${cradle_part_de_length_m} ${cradle_part_de_width_m} ${cradle_part_de_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- part e -->
+            <visual name="part_e">
+                <origin xyz="0
+                             ${-0.167 * cradle_part_a_width_m - cradle_part_bc_width_m + 0.5 * cradle_part_de_width_m}
+                             ${-cradle_part_a_height_m - cradle_part_bc_height_m - 0.5 * cradle_part_de_height_m}"/>
+                <geometry>
+                    <box size="${cradle_part_de_length_m} ${cradle_part_de_width_m} ${cradle_part_de_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- right servo -->
+            <visual name="right_servo">
+                <origin xyz="0
+                             ${+0.167 * cradle_part_a_width_m + cradle_part_bc_width_m - cradle_part_de_width_m - 0.5 * servo_width_m}
+                             ${-cradle_part_a_height_m - cradle_part_bc_height_m - 0.5 * servo_height_m}"/>
+                <geometry>
+                    <box size="${servo_length_m} ${servo_width_m} ${servo_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- left servo -->
+            <visual name="left_servo">
+                <origin xyz="0
+                             ${-0.167 * cradle_part_a_width_m - cradle_part_bc_width_m + cradle_part_de_width_m + 0.5 * servo_width_m}
+                             ${-cradle_part_a_height_m - cradle_part_bc_height_m - 0.5 * servo_height_m}"/>
+                <geometry>
+                    <box size="${servo_length_m} ${servo_width_m} ${servo_height_m}"/>
+                </geometry>
+            </visual>
+        </link>
+
+        <link name="${name}_sensor_basket">
+            <!-- part a -->
+            <visual name="part_a">
+                <origin xyz="0 
+                             0
+                             ${ 0.167 * cradle_part_a_width_m + cradle_part_bc_width_m - cradle_part_de_width_m - servo_width_m - 0.5 * basket_part_ab_height_m}"/>
+                <geometry>
+                    <box size="${basket_part_ab_length_m} ${basket_part_ab_width_m} ${basket_part_ab_height_m}"/>
+                </geometry>
+                <material name="gray"/>
+            </visual>
+
+            <!-- part b -->
+            <visual name="part_b">
+                <origin xyz="0 
+                             0
+                             ${-0.167 * cradle_part_a_width_m - cradle_part_bc_width_m + cradle_part_de_width_m + servo_width_m + 0.5 * basket_part_ab_height_m}"/>
+                <geometry>
+                    <box size="${basket_part_ab_length_m} ${basket_part_ab_width_m} ${basket_part_ab_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- part c -->
+            <visual name="part_c">
+                <origin xyz="0 ${-0.5 * basket_part_ab_width_m - 0.5 * basket_part_c_width_m} 0"/>
+                <geometry>
+                    <box size="${basket_part_c_length_m} ${basket_part_c_width_m} ${basket_part_c_height_m}"/>
+                </geometry>
+            </visual>
+
+            <!-- part d -->
+            <visual name="part_d">
+                <origin xyz="0 ${-0.5 * basket_part_ab_width_m - basket_part_c_width_m - basket_sensor_gap - 0.5 * basket_part_d_width_m} 0"/>
+                <geometry>
+                    <box size="${basket_part_d_length_m} ${basket_part_d_width_m} ${basket_part_d_height_m}"/>
+                </geometry>
+            </visual>
+        </link>
+    </xacro:macro>
+</robot>
+
