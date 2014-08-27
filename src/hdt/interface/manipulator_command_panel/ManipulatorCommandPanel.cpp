@@ -157,6 +157,7 @@ void ManipulatorCommandPanel::send_move_arm_command()
 
     if (!move_arm_client_->isServerConnected()) {
         QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
+        move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
         return;
     }
 
@@ -196,6 +197,7 @@ void ManipulatorCommandPanel::send_joint_goal()
 
     if (!move_arm_client_->isServerConnected()) {
         QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
+        move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
         return;
     }
 
