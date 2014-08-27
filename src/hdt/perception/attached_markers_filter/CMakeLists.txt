@@ -1,0 +1,3 @@
+add_executable(attached_markers_filter attached_markers_filter.cpp)
+target_link_libraries(attached_markers_filter ${catkin_LIBRARIES} msg_utils hdt_robot_model)
+
