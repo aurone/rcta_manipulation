@@ -65,6 +65,7 @@ ManipulatorInterfaceROS::RunResult ManipulatorInterfaceLiveROS::run()
         fake_msg_ptr->joint_names = joint_names();
         fake_msg_ptr->points.resize(1);
         fake_msg_ptr->points.front().positions = std::vector<double>(joint_names().size(), 0.0);
+        fake_msg_ptr->points.front().velocities = std::vector<double>(joint_names().size(), 0.0);
 
         std::vector<float> raw_joint_positions(manip_.getNumJoints());
         ManipulatorError error(ManipulatorError::NO_ERROR());
@@ -289,14 +290,21 @@ void ManipulatorInterfaceLiveROS::joint_trajectory_callback(const trajectory_msg
             return;
         }
 
-        const double velocity_limit_dps = 20.0;
-        double velocity_limit_rps = velocity_limit_dps * M_PI / 180.0;
-        ROS_WARN_ONCE("Using hardcoded velocity limit of %0.3f deg/s (%0.3f rad/s)", velocity_limit_dps, velocity_limit_rps);
-        std::vector<double> joint_velocity_limits(joint_names().size(), velocity_limit_rps);
-
         std::vector<float> float_positions, float_velocities;
+
         coerce(target, float_positions);
-        coerce(joint_velocity_limits, float_velocities);
+
+        if (msg->points.front().velocities.empty()) {
+            const double velocity_limit_dps = 20.0;
+            double velocity_limit_rps = velocity_limit_dps * M_PI / 180.0;
+            ROS_WARN_ONCE("Using hardcoded velocity limit of %0.3f deg/s (%0.3f rad/s)", velocity_limit_dps, velocity_limit_rps);
+            std::vector<double> joint_velocity_limits(joint_names().size(), velocity_limit_rps);
+            coerce(joint_velocity_limits, float_velocities);
+        }
+        else {
+            coerce(msg->points.front().velocities, float_velocities);
+        }
+
         target_position_and_velocity(float_positions, float_velocities);
     }
 }
