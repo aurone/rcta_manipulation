@@ -7,6 +7,7 @@
 #include <ar_track_alvar/AlvarMarkers.h>
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_listener.h>
+#include <trajectory_msgs/JointTrajectory.h>
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/common/hdt_description/RobotModel.h>
 #include <sbpl_manipulation_components/kdl_robot_model.h>
@@ -81,7 +82,9 @@ private:
 
     std::vector<double> last_curr_;
     std::vector<double> last_diff_;
-    std::vector<double> last_targ_;
+    trajectory_msgs::JointTrajectoryPoint prev_cmd_;
+
+    int cmd_seqno_;
 
     void goal_callback();
     void preempt_callback();
@@ -103,7 +106,15 @@ private:
 
     bool safe_joint_delta(const std::vector<double>& from, const std::vector<double>& to) const;
 
-    void correct_joint_velocity_cmd(const std::vector<double>& from, const std::vector<double>& last_to, std::vector<double>& to, double dt);
+    void correct_joint_trajectory_cmd(
+            const sensor_msgs::JointState& from,
+            const trajectory_msgs::JointTrajectoryPoint& prev_cmd,
+            trajectory_msgs::JointTrajectoryPoint& curr_cmd,
+            double dt);
+
+    bool is_valid_command(const trajectory_msgs::JointTrajectoryPoint& cmd);
+
+    void stop_arm(int seqno);
 };
 
 #endif

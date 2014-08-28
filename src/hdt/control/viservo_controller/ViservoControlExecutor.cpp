@@ -34,7 +34,8 @@ ViservoControlExecutor::ViservoControlExecutor() :
     camera_frame_("asus_rgb_frame"),
     wrist_frame_("arm_7_gripper_lift_link"),
     mount_frame_("arm_mount_panel_dummy"),
-    attached_marker_()
+    attached_marker_(),
+    cmd_seqno_(0)
 {
 }
 
@@ -147,6 +148,7 @@ int ViservoControlExecutor::run()
             ROS_WARN("Failed to update the pose of the wrist");
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setSucceeded(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -174,12 +176,12 @@ int ViservoControlExecutor::run()
         // Check for termination
         ////////////////////////////////////////////////////////////////////////////////
 
-
         // 1. check whether the estimated wrist pose has reached the goal within the specified tolerance
         if (reached_goal()) {
             ROS_INFO("Wrist has reached goal. Completing action...");
             result.result = hdt::ViservoCommandResult::SUCCESS;
             as_->setSucceeded(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -188,6 +190,7 @@ int ViservoControlExecutor::run()
             ROS_WARN("Marker has been lost. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::LOST_MARKER;
             as_->setAborted(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -196,6 +199,7 @@ int ViservoControlExecutor::run()
             ROS_INFO("Arm has moved too far from the goal. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::MOVED_TOO_FAR;
             as_->setAborted(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -211,6 +215,7 @@ int ViservoControlExecutor::run()
         }
         catch (const tf::TransformException& ex) {
             ROS_ERROR("Unable to lookup transform from %s to %s (%s)", mount_frame_.c_str(), camera_frame_.c_str(), ex.what());
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -225,6 +230,7 @@ int ViservoControlExecutor::run()
             ROS_ERROR("Failed to compute end effector transform from joint state");
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setSucceeded(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -279,7 +285,7 @@ int ViservoControlExecutor::run()
 #define PROLLYBAD 0
 #if !PROLLYBAD
         // cap the positional error vector by the max translational velocity_mps
-        if (pos_error.squaredNorm() > max_translational_velocity_mps_ * max_translational_velocity_mps_) {
+        if (pos_error.squaredNorm() > sqrd(max_translational_velocity_mps_)) {
             pos_error.normalize();
             pos_error *= max_translational_velocity_mps_;
         }
@@ -379,6 +385,7 @@ int ViservoControlExecutor::run()
             ROS_ERROR("Failed to compute IK solution to move the arm towards the goal. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setAborted(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
@@ -409,18 +416,37 @@ int ViservoControlExecutor::run()
             ROS_WARN("No IK solution to move the arm towards the goal is deemed safe. Aborting Viservo action...");
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setAborted(result);
+            stop_arm(cmd_seqno_++);
             continue;
         }
 
         // Publish the resulting command
         trajectory_msgs::JointTrajectory traj_cmd;
+        traj_cmd.header.seqno = cmd_seqno_++;
         traj_cmd.points.resize(1);
         traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = chosen_solution;
 
-        correct_joint_velocity_cmd(last_joint_state_msg_->position, last_targ_, traj_cmd.points[0].positions, dt);
+        if (is_valid_command(prev_cmd_)) {
+            std::vector<double> diff;
+            msg_utils::vector_diff(prev_cmd_.positions, last_joint_state_msg_->position, diff);
+            msg_utils::vector_sum(traj_cmd.points[0].positions, diff, traj_cmd.points[0].positions);
+        }
 
-        ROS_INFO("Publishing joint command %s", to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str());
+        std::vector<double> delta_joints;
+        std::vector<double> joint_velocities;
+        msg_utils::vector_diff(chosen_solution, last_joint_state_msg_->position, delta_joints);
+        msg_utils::vector_mul(delta_joints, std::vector<double>(robot_model_->joint_names().size(), dt), joint_velocities);
+        for (double& vel : joint_velocities) { // convert velocities to speeds
+            vel = fabs(vel);
+        }
+        traj_cmd.points[0].velocities = joint_velocities;
+
+        correct_joint_trajectory_cmd(*last_joint_state_msg_, prev_cmd_, traj_cmd.points[0], dt);
+
+        ROS_INFO("Publishing joint command %s @ %s",
+                to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str(),
+                to_string(msg_utils::to_degrees(traj_cmd.points[0].velocities)).c_str());
 
         last_curr_ = last_joint_state_msg_->position;
         if (msg_utils::vector_diff(traj_cmd.points[0].positions, last_curr_, last_diff_)) {
@@ -429,7 +455,7 @@ int ViservoControlExecutor::run()
         else {
             ROS_WARN("Failed to compute difference between two vectors?");
         }
-        last_targ_ = traj_cmd.points[0].positions;
+        prev_cmd_ = traj_cmd.points.front();
 
         // TODO: close the loop with the HDT PID controller here so that we can
         // estimate how much the wrist has moved, even if we are unable to
@@ -446,6 +472,9 @@ void ViservoControlExecutor::goal_callback()
 {
     current_goal_ = as_->acceptNewGoal();
     ROS_WARN("Received a goal to move the wrist to %s in the camera frame", to_string(current_goal_->goal_pose).c_str());
+
+    prev_cmd_.positions.clear(); // indicate that we have no previous command for this goal
+    prev_cmd_.velocities.clear();
 
     // TODO: make sure that the markers are in view of the camera or catch this during executive
     // for visualization:
@@ -830,23 +859,53 @@ bool ViservoControlExecutor::safe_joint_delta(const std::vector<double>& from, c
     return true;
 }
 
-void ViservoControlExecutor::correct_joint_velocity_cmd(
-    const std::vector<double>& from,
-    const std::vector<double>& last_to,
-    std::vector<double>& to,
+void ViservoControlExecutor::correct_joint_trajectory_cmd(
+    const sensor_msgs::JointState& from,
+    const trajectory_msgs::JointTrajectoryPoint& prev_cmd,
+    trajectory_msgs::JointTrajectoryPoint& curr_cmd,
     double dt)
 {
     std::vector<double> diff;
-    msg_utils::vector_diff(to, from, diff);
+    msg_utils::vector_diff(curr_cmd.positions, from.position, diff);
 
-    for (std::size_t i = 0; i < from.size(); ++i) {
-        if (fabs(diff[i]) < deadband_joint_velocities_rps_[i]) {
-            to[i] = from[i]; //last_to.empty() ? from[i] : last_to[i]; //from[i];
+    for (std::size_t i = 0; i < from.position.size(); ++i) {
+        if (fabs(diff[i]) < deadband_joint_velocities_rps_[i] * dt) {
+            curr_cmd.positions[i] = from.position[i]; //last_to.empty() ? from.position[i] : last_to[i]; //from.position[i];
         }
-        else if (fabs(diff[i]) < minimum_joint_velocities_rps_[i]) {
-            to[i] = from[i] + signf(diff[i]) * minimum_joint_velocities_rps_[i];
+        else if (fabs(diff[i]) < minimum_joint_velocities_rps_[i] * dt) {
+            curr_cmd.positions[i] = from.position[i] + signf(diff[i]) * minimum_joint_velocities_rps_[i];
         }
     }
+
+    // apply velocity corrections
+    for (std::size_t i = 0; i < from.position.size(); ++i) {
+        if (curr_cmd.velocities[i] < deadband_joint_velocities_rps_[i] * dt) {
+            curr_cmd.velocities[i] = 0.0;
+        }
+        else if (fabs(curr_cmd.velocities[i]) < minimum_joint_velocities_rps_[i] * dt) {
+            curr_cmd.velocities[i] = minimum_joint_velocities_rps_[i];
+        }
+    }
+}
+
+bool ViservoControlExecutor::is_valid_command(const trajectory_msgs::JointTrajectoryPoint& cmd)
+{
+    return cmd.positions.size() == robot_model_->joint_names().size() &&
+           cmd.velocities.size() == robot_model_->joint_names().size();
+}
+
+void ViservoControlExecutor::stop_arm(int seqno)
+{
+    trajectory_msgs::JointTrajectory traj_cmd;
+    traj_cmd.header.frame_id = "";
+    traj_cmd.header.seq = seqno;
+    traj_cmd.header.stamp = ros::Time::now();
+    traj_cmd.joint_names = robot_model_->joint_names();
+    traj_cmd.points.resize(1);
+    traj_cmd.points[0].positions = last_joint_state_msg_->position;
+    traj_cmd.points[0].velocities = std::vector<double>(robot_model_->joint_names().size(), 0.0);
+
+    joint_command_pub_.publish(traj_cmd);
 }
 
 int main(int argc, char* argv[])
