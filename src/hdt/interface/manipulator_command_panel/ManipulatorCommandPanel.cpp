@@ -785,7 +785,7 @@ bool ManipulatorCommandPanel::reinit_robot()
             tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), interactive_marker.pose);
             interactive_marker.name = jmg->getName() + "_control";
             interactive_marker.description = std::string("Control of ") + tip_link_ + std::string(" of manipulator ") + jmg->getName();
-            interactive_marker.scale = 0.5f;
+            interactive_marker.scale = 0.25f;
             interactive_marker.menu_entries.clear();
             interactive_marker.controls.clear();
             interactive_marker.controls = create_sixdof_controls();

@@ -72,6 +72,9 @@ bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T
 template <typename T, typename MinusOp>
 bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const MinusOp& op);
 
+template <typename T>
+bool vector_mul(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv);
+
 std::vector<double> to_degrees(const std::vector<double>& v);
 std::vector<double> to_radians(const std::vector<double>& v);
 
@@ -198,6 +201,12 @@ template <typename T, typename MinusOp>
 bool vector_diff(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const MinusOp& op)
 {
     return vector_pwiseop(u, v, uv, op);
+}
+
+template <typename T>
+bool vector_mul(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv)
+{
+    return vector_pwiseop(u, v, uv, std::multiplies<T>());
 }
 
 } // namespace msg_utils
