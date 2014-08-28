@@ -422,7 +422,7 @@ int ViservoControlExecutor::run()
 
         // Publish the resulting command
         trajectory_msgs::JointTrajectory traj_cmd;
-        traj_cmd.header.seqno = cmd_seqno_++;
+        traj_cmd.header.seq = cmd_seqno_++;
         traj_cmd.points.resize(1);
         traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = chosen_solution;
