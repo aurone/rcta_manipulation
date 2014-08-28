@@ -1,3 +1,4 @@
 #position_offsets_degs: [ -1.4, 3, 2.28, 0.48, 2.02, 5.36, -1.27 ]
-position_offsets_degs: [ 0.0, -0.75, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+#position_offsets_degs: [ 0.0, -0.75, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+position_offsets_degs: [ -0.003,  0.054,  0.001, -0.002,  0.000,  0.000,  0.000 ]
 
