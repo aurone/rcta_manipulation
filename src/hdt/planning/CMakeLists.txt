@@ -1,0 +1,3 @@
+add_subdirectory(arm_planning_node)
+add_subdirectory(spline_grasp_generator)
+
