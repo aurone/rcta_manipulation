@@ -19,6 +19,7 @@ std::string to_string(const std::vector<T>& v);
 std::string to_string(const std::vector<double>& v);
 
 std::string to_string(const Eigen::Affine3d& transform);
+std::string to_string(const Eigen::Vector2d& v);
 std::string to_string(const Eigen::Vector3d& v);
 std::string to_string(const Eigen::AngleAxisd& aa);
 
@@ -71,6 +72,13 @@ inline std::string to_string(const Eigen::Affine3d& transform)
     ss << "pos: (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
     ss << " ";
     ss << "rot: (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
+    return ss.str();
+}
+
+inline std::string to_string(const Eigen::Vector2d& v)
+{
+    std::stringstream ss;
+    ss << "(" << v(0) << ", " << v(1) << ")";
     return ss.str();
 }
 
