@@ -68,6 +68,9 @@ pkg_check_modules(glew REQUIRED glew)
 include_directories(${glew_INCLUDE_DIRS})
 link_directories(${glew_LIBRARY_DIRS})
 
+find_package(GLUT REQUIRED)
+include_directories(${GLUT_INCLUDE_DIR})
+
 # required to locate compiled headers for designer forms
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) 
 
