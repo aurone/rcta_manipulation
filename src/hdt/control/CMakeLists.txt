@@ -7,4 +7,5 @@ add_subdirectory(robotiq_controllers)
 add_subdirectory(teleop_node)
 add_subdirectory(teleop_status_panel)
 add_subdirectory(viservo_controller)
+add_subdirectory(hdt_velocity_forward_kinematics)
 
