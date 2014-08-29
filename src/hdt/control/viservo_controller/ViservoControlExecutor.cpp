@@ -1,6 +1,8 @@
 #include "ViservoControlExecutor.h"
 
+#include <cassert>
 #include <cmath>
+#include <sstream>
 #include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
@@ -9,6 +11,28 @@
 #include <hdt/common/utils/utils.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/utils/RunUponDestruction.h>
+
+typedef boost::shared_ptr<urdf::Link> LinkPtr;
+typedef boost::shared_ptr<const urdf::Link> LinkConstPtr;
+typedef boost::shared_ptr<urdf::Joint> JointPtr;
+typedef boost::shared_ptr<const urdf::Joint> JointConstPtr;
+
+std::string to_string(const KDL::Vector& v)
+{
+    std::stringstream ss;
+    ss << "(" << v.x() << ", " << v.y() << ", " << v.z() << ")";
+    return ss.str();
+}
+
+std::string to_string(const KDL::Rotation& r)
+{
+    double w, x, y, z;
+    r.GetQuaternion(x, y, z, w);
+
+    std::stringstream ss;
+    ss << "(" << w << ", " << x << ", " << y << ", " << z << ")";
+    return ss.str();
+}
 
 ViservoControlExecutor::ViservoControlExecutor() :
     nh_(),
@@ -21,7 +45,7 @@ ViservoControlExecutor::ViservoControlExecutor() :
     joint_states_sub_(),
     ar_marker_sub_(),
     current_goal_(),
-    last_joint_state_msg_(),
+    curr_joint_state_(),
     last_ar_markers_msg_(),
     marker_validity_timeout_(), // read from param server
     wrist_transform_estimate_(),
@@ -35,35 +59,38 @@ ViservoControlExecutor::ViservoControlExecutor() :
     wrist_frame_("arm_7_gripper_lift_link"),
     mount_frame_("arm_mount_panel_dummy"),
     attached_marker_(),
-    cmd_seqno_(0)
+    cmd_seqno_(0),
+    misbehaved_joints_histogram_(7, 0),
+    kdl_chain_(),
+    fv_solver_()
 {
 }
 
-int ViservoControlExecutor::run()
+bool ViservoControlExecutor::initialize()
 {
     as_.reset(new ViservoCommandActionServer(action_name_, false));
     if (!as_) {
         ROS_WARN("Failed to instantiated Viservo Command Action Server");
-        return FAILED_TO_INITIALIZE;
+        return false;
     }
 
     as_->registerGoalCallback(boost::bind(&ViservoControlExecutor::goal_callback, this));
     as_->registerPreemptCallback(boost::bind(&ViservoControlExecutor::preempt_callback, this));
 
     if (!download_marker_params()) {
-        return FAILED_TO_INITIALIZE;
+        return false;
     }
 
     std::string urdf_string;
     if (!nh_.getParam("robot_description", urdf_string)) {
         ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
-        return FAILED_TO_INITIALIZE;
+        return false;
     }
 
     robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
     if (!robot_model_) {
         ROS_ERROR("Failed to instantiate Robot Model");
-        return FAILED_TO_INITIALIZE;
+        return false;
     }
 
     const std::string& chain_root_link = "arm_mount_panel_dummy";
@@ -76,7 +103,78 @@ int ViservoControlExecutor::run()
 
     if (!kdl_robot_model_->init(urdf_string, robot_model_->joint_names())) {
         ROS_ERROR("Failed to initialize KDL Robot Model");
-        return FAILED_TO_INITIALIZE;
+        return false;
+    }
+
+    // BECAUSE I HAVEN'T INSTANTIATED ENOUGH ROBOT MODELS YET, OK?!
+    boost::shared_ptr<urdf::ModelInterface> urdf_model = urdf::parseURDF(urdf_string);
+    if (!urdf_model) {
+        ROS_WARN("Failed to parse URDF from XML string");
+        return false;
+    }
+
+    const std::string arm_link_1_name = "arm_1_shoulder_twist_link";
+    const std::string gripper_base_link_name = "arm_7_gripper_lift_link";
+
+    LinkConstPtr first_arm_link = urdf_model->getLink(arm_link_1_name);
+    LinkConstPtr mount_link = first_arm_link->getParent();
+    LinkConstPtr gripper_link = urdf_model->getLink(gripper_base_link_name);
+
+    if (!first_arm_link || !mount_link || !gripper_link) {
+        ROS_ERROR("Some required link doesn't exist");
+        return false;
+    }
+
+    ROS_INFO("Found first_arm_link @ %p", first_arm_link.get());
+    ROS_INFO("Found mount_link @ %p", mount_link.get());
+    ROS_INFO("Found gripper_link @ %p", gripper_link.get());
+
+    // Build the kinematic chain and forward velocity solver
+    LinkConstPtr curr_link = first_arm_link;
+    while (curr_link != gripper_link) {
+        ROS_INFO("Current Link: %s", curr_link->name.c_str());
+        JointConstPtr parent_joint = curr_link->parent_joint;
+
+        JointConstPtr child_joint = curr_link->child_joints.front(); // Assume One Joint
+        LinkConstPtr child_link = urdf_model->getLink(child_joint->child_link_name);
+
+        KDL::Vector joint_origin(0, 0, 0);
+        KDL::Vector joint_axis(parent_joint->axis.x, parent_joint->axis.y, parent_joint->axis.z);
+
+        // find the transform to the tip of the segment
+        double ax = 0, ay = 0, az = 0, qx = 0, qy = 0, qz = 0, qw = 1;
+        if (child_link != gripper_link) {
+            ax = child_joint->parent_to_joint_origin_transform.position.x;
+            ay = child_joint->parent_to_joint_origin_transform.position.y;
+            az = child_joint->parent_to_joint_origin_transform.position.z;
+            qx = child_joint->parent_to_joint_origin_transform.rotation.x;
+            qy = child_joint->parent_to_joint_origin_transform.rotation.y;
+            qz = child_joint->parent_to_joint_origin_transform.rotation.z;
+            qw = child_joint->parent_to_joint_origin_transform.rotation.w;
+        }
+
+        KDL::Vector tip_position(ax, ay, az);
+        KDL::Rotation tip_rotation(KDL::Rotation::Quaternion(qx, qy, qz, qw));
+
+        kdl_chain_.addSegment(KDL::Segment(
+                KDL::Joint(joint_origin, joint_axis, KDL::Joint::RotAxis),
+                KDL::Frame(tip_rotation, tip_position)));
+
+        ROS_INFO("Joint: %s", parent_joint->name.c_str());
+        ROS_INFO("    Joint Origin: (%0.3f, %0.3f, %0.3f)", joint_origin(0), joint_origin(1), joint_origin(2));
+        ROS_INFO("    Joint Axis: (%0.3f, %0.3f, %0.3f)", joint_axis(0), joint_axis(1), joint_axis(2));
+        ROS_INFO("    Tip Position: (%0.3f, %0.3f, %0.3f)", tip_position(0), tip_position(1), tip_position(2));
+        ROS_INFO("    Tip Rotation: (%0.3f, %0.3f, %0.3f, %0.3f)", qw, qx, qy, qz);
+
+        curr_link = child_link;
+    }
+
+    ROS_INFO("Constructed KDL Chain with %u joints", kdl_chain_.getNrOfJoints());
+
+    fv_solver_.reset(new KDL::ChainFkSolverVel_recursive(kdl_chain_));
+    if (!fv_solver_) {
+        ROS_ERROR("Failed to instantiate KDL Chain Fk Solver Vel recursive");
+        return false;
     }
 
     joint_command_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
@@ -87,6 +185,15 @@ int ViservoControlExecutor::run()
     ROS_INFO("Starting action server 'viservo_command'...");
     as_->start();
     ROS_INFO("Action server started");
+
+    return true;
+}
+
+int ViservoControlExecutor::run()
+{
+    if (!initialize()) {
+        return FAILED_TO_INITIALIZE;
+    }
 
     // TODO: Procedure for setting up and configuring markers for visual servoing
     //     0. Prepare and measure markers.
@@ -107,8 +214,7 @@ int ViservoControlExecutor::run()
     const double rate_hz = 10.0;
     ros::Rate executive_rate(rate_hz);
     double dt = 1.0 / rate_hz;
-    while (ros::ok())
-    {
+    while (ros::ok()) {
         // ensure that we always execute this loop no faster than 10 Hz.
         RunUponDestruction rod([&]() { executive_rate.sleep(); });
 
@@ -118,32 +224,75 @@ int ViservoControlExecutor::run()
             continue;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Proceed with current goal
-        ////////////////////////////////////////////////////////////////////////////////
-
-        ROS_WARN("Executing viservo control. Current joint state is %s",
-                (bool)last_joint_state_msg_ ? to_string(msg_utils::to_degrees(last_joint_state_msg_->position)).c_str() : "null");
-
-        if (last_joint_state_msg_) {
-            static std::vector<int> misbehaved_joints_histogram(7, 0);
-            for (std::size_t i = 0; i < last_curr_.size(); ++i) {
-                if (signf(last_joint_state_msg_->position[i] - last_curr_[i], sbpl::utils::ToRadians(1.0)) !=
-                    signf(last_diff_[i], sbpl::utils::ToRadians(1.0)))
-                {
-                    ++misbehaved_joints_histogram[i];
-                }
-            }
-            ROS_INFO("Misbehaved joint histogram: %s", to_string(misbehaved_joints_histogram).c_str());
-        }
-
         if (as_->isPreemptRequested()) {
             ROS_WARN("Goal preemption currently unimplemented");
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        // Proceed with current goal
+        ////////////////////////////////////////////////////////////////////////////////
+
+        if (!curr_joint_state_) {
+            ROS_WARN("Goal is active but not joint state has been received");
+            continue;
+        }
+
+        ROS_WARN("Executing viservo control. Current joint state is %s", to_string(msg_utils::to_degrees(curr_joint_state_->position)).c_str());
+
+        update_histogram();
+
         hdt::ViservoCommandResult result;
 
-        // incorporate any new marker measurements and estimate the current wrist pose based off of that and the last two joints
+        ////////////////////////////////////////////////////////////////////////////////
+        // Incorporate latest measurements from joint states and AR markers
+        ////////////////////////////////////////////////////////////////////////////////
+
+        // Retrieve (static) transform from camera to mount using tf
+        Eigen::Affine3d camera_to_mount;
+        if (!lookup_transform(camera_frame_, mount_frame_, ros::Time(0), camera_to_mount)) {
+            stop_arm(cmd_seqno_++);
+            continue;
+        }
+
+        ROS_DEBUG("camera -> mount: %s", to_string(camera_to_mount).c_str());
+
+        // Obtain the current transform of the ee (using joint state data) in the frame of the camera
+        // Note: this could probably be done with another simple call to tf but for some reason I hate tf
+        Eigen::Affine3d manip_to_ee;
+        if (!robot_model_->compute_fk(curr_joint_state_->position, manip_to_ee)) {
+            ROS_ERROR("Failed to compute end effector transform from joint state");
+            result.result = hdt::ViservoCommandResult::STUCK;
+            as_->setAborted(result);
+            stop_arm(cmd_seqno_++);
+            continue;
+        }
+
+        const Eigen::Affine3d& mount_to_manip = robot_model_->mount_to_manipulator_transform();
+        ROS_DEBUG("mount -> manipulator: %s", to_string(mount_to_manip).c_str());
+
+        ROS_DEBUG("manipulator -> ee: %s", to_string(manip_to_ee).c_str());
+
+        // camera -> ee = camera -> mount * mount -> manip * manip -> ee
+        Eigen::Affine3d camera_to_ee = camera_to_mount * mount_to_manip * manip_to_ee;
+        ROS_DEBUG("camera -> ee: %s", to_string(camera_to_ee).c_str());
+
+        // Compute End Effector velocity in the camera frame
+        KDL::FrameVel fv_frame = compute_ee_velocity(*curr_joint_state_);
+
+        ROS_INFO("EE at %s", to_string(fv_frame.p.p).c_str());
+        ROS_INFO("Rotating %0.3f deg/s about %s", sbpl::utils::ToDegrees(fv_frame.M.w.Norm()), to_string(fv_frame.M.w).c_str());
+        ROS_INFO("EE moving at %s (%0.3f m/s)", to_string(fv_frame.p.v).c_str(), fv_frame.p.v.Norm());
+
+        Eigen::Vector3d ee_vel_mount_frame(fv_frame.p.v(0), fv_frame.p.v(1), fv_frame.p.v(2));
+        Eigen::Vector3d ee_vel_camera_frame = camera_to_mount.rotation() * ee_vel_mount_frame;
+
+        Eigen::Vector3d ee_rot_vel_mount_frame(fv_frame.M.w(0), fv_frame.M.w(2), fv_frame.M.w(2));
+        Eigen::Vector3d ee_rot_vel_camera_frame = camera_to_mount.rotation() * ee_rot_vel_mount_frame;
+
+        ROS_INFO("EE Pos Velocity [camera frame]: %s", to_string(ee_vel_camera_frame).c_str());
+        ROS_INFO("EE Rot Velocity [camera frame]: %0.3f deg/s about %s", sbpl::utils::ToDegrees(ee_rot_vel_camera_frame.norm()), to_string(ee_rot_vel_camera_frame.normalized()).c_str());
+
+        // Incorporate new marker measurements and estimate the current wrist pose from them
         if (!update_wrist_pose_estimate()) {
             ROS_WARN("Failed to update the pose of the wrist");
             result.result = hdt::ViservoCommandResult::STUCK;
@@ -152,25 +301,7 @@ int ViservoControlExecutor::run()
             continue;
         }
 
-        // publish ee estimate marker
-        geometry_msgs::Vector3 scale;
-        scale.x = 0.10;
-        scale.y = 0.01;
-        scale.z = 0.01;
-        visualization_msgs::MarkerArray estimate_triad_marker = msg_utils::create_triad_marker_arr(scale);
-
-        for (auto& marker : estimate_triad_marker.markers) {
-            marker.header.frame_id = camera_frame_;
-            marker.ns = "ee estimate";
-
-            Eigen::Affine3d estimate_triad_marker;
-            tf::poseMsgToEigen(marker.pose, estimate_triad_marker);
-            estimate_triad_marker = wrist_transform_estimate_ * estimate_triad_marker;
-
-            tf::poseEigenToMsg(estimate_triad_marker, marker.pose);
-        }
-
-        corrected_wrist_goal_pub_.publish(estimate_triad_marker);
+        publish_triad_marker("ee estimate", wrist_transform_estimate_, camera_frame_);
 
         ////////////////////////////////////////////////////////////////////////////////
         // Check for termination
@@ -204,47 +335,7 @@ int ViservoControlExecutor::run()
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Compute the current ee transform from joint state data
-        ////////////////////////////////////////////////////////////////////////////////
-
-        // Obtain the current transform of the ee (using joint state data) in the frame of the camera
-
-        tf::StampedTransform transform;
-        try {
-            listener_.lookupTransform(camera_frame_, mount_frame_, ros::Time(0), transform);
-        }
-        catch (const tf::TransformException& ex) {
-            ROS_ERROR("Unable to lookup transform from %s to %s (%s)", mount_frame_.c_str(), camera_frame_.c_str(), ex.what());
-            stop_arm(cmd_seqno_++);
-            continue;
-        }
-
-        Eigen::Affine3d camera_to_mount =
-            Eigen::Translation3d(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z()) *
-            Eigen::Quaterniond(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
-
-        ROS_DEBUG("camera -> mount: %s", to_string(camera_to_mount).c_str());
-
-        Eigen::Affine3d manip_to_ee;
-        if (!robot_model_->compute_fk(last_joint_state_msg_->position, manip_to_ee)) {
-            ROS_ERROR("Failed to compute end effector transform from joint state");
-            result.result = hdt::ViservoCommandResult::STUCK;
-            as_->setSucceeded(result);
-            stop_arm(cmd_seqno_++);
-            continue;
-        }
-
-        const Eigen::Affine3d& mount_to_manip = robot_model_->mount_to_manipulator_transform();
-        ROS_DEBUG("mount -> manipulator: %s", to_string(mount_to_manip).c_str());
-
-        ROS_DEBUG("manipulator -> ee: %s", to_string(manip_to_ee).c_str());
-
-        // camera -> ee = camera -> mount * mount -> manip * manip -> ee
-        Eigen::Affine3d camera_to_ee = camera_to_mount * mount_to_manip * manip_to_ee;
-        ROS_DEBUG("camera -> ee: %s", to_string(camera_to_ee).c_str());
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Compute the error between the goal transform and the ee estimate
+        // Compute target ee transform
         ////////////////////////////////////////////////////////////////////////////////
 
         Eigen::Affine3d goal_wrist_transform; // in camera frame
@@ -284,13 +375,24 @@ int ViservoControlExecutor::run()
 
 #define PROLLYBAD 0
 #if !PROLLYBAD
-        // cap the positional error vector by the max translational velocity_mps
+        // the desired velocity; cap the positional error vector by the max translational velocity_mps
         if (pos_error.squaredNorm() > sqrd(max_translational_velocity_mps_)) {
             pos_error.normalize();
             pos_error *= max_translational_velocity_mps_;
         }
 
-        ROS_INFO("    EE Velocity [camera frame]: %s", to_string(pos_error).c_str());
+//        accum_ee_vel_error += (pos_error - ee_vel_camera_frame);
+//        accum_ee_vel_error *= 0.95;
+//        pos_error = KP_ * (pos_error - ee_vel_camera_frame) + KI_ * accum_ee_vel_error; // P TO THE DESIRED FOO!!!!!!
+//
+//        ROS_INFO("    Accumulated EE Velocity Error [camera frame]: %s", to_string(accum_ee_vel_error).c_str());
+//        ROS_INFO("    EE Velocity [camera frame]: %s", to_string(pos_error).c_str());
+//
+//        // the desired velocity; cap the positional error vector by the max translational velocity_mps
+//        if (pos_error.squaredNorm() > sqrd(max_translational_velocity_mps_)) {
+//            pos_error.normalize();
+//            pos_error *= max_translational_velocity_mps_;
+//        }
 #endif
 
         Eigen::Vector3d current_wrist_pos(camera_to_ee.translation());
@@ -314,6 +416,8 @@ int ViservoControlExecutor::run()
             angular_velocity_rps = clamp(angular_velocity_rps, -max_rotational_velocity_rps_, max_rotational_velocity_rps_);
         }
 
+        double real_angular_velocity_rps = ee_rot_vel_camera_frame.norm();
+
         Eigen::Quaterniond error_quat(error.rotation());
         Eigen::Quaterniond current_quat(camera_to_ee.rotation());
 
@@ -332,7 +436,7 @@ int ViservoControlExecutor::run()
         Eigen::Quaterniond target_rot = current_quat.slerp(REACHAROUND_FACTOR, corrected_goal_rot);
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Compute target transform
+        // Construct target transform
         ////////////////////////////////////////////////////////////////////////////////
 
         Eigen::Affine3d camera_to_target_wrist_transform = Eigen::Translation3d(target_pos) * target_rot;
@@ -344,117 +448,58 @@ int ViservoControlExecutor::run()
         Eigen::Affine3d mount_to_target_wrist = camera_to_mount.inverse() * camera_to_target_wrist_transform;
         ROS_INFO("Target Wrist Transform [mount frame]: %s", to_string(mount_to_target_wrist).c_str());
 
-        // TODO: transform into the manipulator frame before IK (works for now because manip -> mount = I)
-
-        // publish a marker for the target transform
-
-        visualization_msgs::MarkerArray triad_marker = msg_utils::create_triad_marker_arr(scale);
-
-        for (auto& marker : triad_marker.markers) {
-            marker.header.frame_id = camera_frame_;
-            marker.ns = "viservo_wrist_target";
-
-            Eigen::Affine3d triad_marker_transform;
-            tf::poseMsgToEigen(marker.pose, triad_marker_transform);
-            triad_marker_transform = camera_to_target_wrist_transform * triad_marker_transform;
-
-            tf::poseEigenToMsg(triad_marker_transform, marker.pose);
-        }
-
-        corrected_wrist_goal_pub_.publish(triad_marker);
+        publish_triad_marker("viservo_wrist_target", camera_to_target_wrist_transform, camera_frame_);
 
         ////////////////////////////////////////////////////////////////////////////////
         // Find a reasonable IK solution that puts the end effector at the target location
         ////////////////////////////////////////////////////////////////////////////////
 
-        hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(
-                mount_to_target_wrist, last_joint_state_msg_->position, sbpl::utils::ToRadians(1.0));
-
-        std::vector<std::vector<double>> ik_solutions;
-        static const int max_ik_solutions = 100;
-        std::vector<double> iksol;
-
-        // gather a lot of candidate ik solutions
-        int num_solutions_found = 0;
-        while (ikgen(iksol) && num_solutions_found < max_ik_solutions) {
-            ++num_solutions_found;
-            ik_solutions.push_back(std::move(iksol));
-        }
-
-        if (num_solutions_found == 0) {
-            ROS_ERROR("Failed to compute IK solution to move the arm towards the goal. Aborting Viservo action...");
-            result.result = hdt::ViservoCommandResult::STUCK;
-            as_->setAborted(result);
-            stop_arm(cmd_seqno_++);
-            continue;
-        }
-
-        ROS_INFO("Picking best IK solution out of %d", num_solutions_found);
-
-        bool found_ik = false;
-        double best_dist = -1.0;
         std::vector<double> chosen_solution;
-        for (const std::vector<double>& sol : ik_solutions) {
-            if (safe_joint_delta(last_joint_state_msg_->position, sol))
-            {
-                if (!found_ik) {
-                    found_ik = true;
-                    best_dist = hdt::ComputeJointStateL2NormSqrd(last_joint_state_msg_->position, sol);
-                    chosen_solution = sol;
-                }
-                else {
-                    double dist = hdt::ComputeJointStateL2NormSqrd(last_joint_state_msg_->position, sol);
-                    if (dist < best_dist) {
-                        best_dist = dist;
-                        chosen_solution = sol;
-                    }
-                }
-            }
-        }
-
-        if (!found_ik) {
-            ROS_WARN("No IK solution to move the arm towards the goal is deemed safe. Aborting Viservo action...");
+        std::string why;
+        if (!choose_best_ik_solution(mount_to_target_wrist, curr_joint_state_->position, chosen_solution, why)) {
+            ROS_WARN("Failed to find target joint state (%s). Aborting Viservo action...", why.c_str());
             result.result = hdt::ViservoCommandResult::STUCK;
             as_->setAborted(result);
             stop_arm(cmd_seqno_++);
-            continue;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         // Publish the resulting command
+        ////////////////////////////////////////////////////////////////////////////////
+
         trajectory_msgs::JointTrajectory traj_cmd;
         traj_cmd.header.seq = cmd_seqno_++;
         traj_cmd.points.resize(1);
         traj_cmd.joint_names = robot_model_->joint_names();
         traj_cmd.points[0].positions = chosen_solution;
 
+        // SUBTRACT BACK OUT THE ERROR BETWEEN NOW AND THE PREVIOUS COMMAND
         if (is_valid_command(prev_cmd_)) {
             std::vector<double> diff;
-            msg_utils::vector_diff(prev_cmd_.positions, last_joint_state_msg_->position, diff);
+            msg_utils::vector_diff(prev_cmd_.positions, curr_joint_state_->position, diff);
             msg_utils::vector_sum(traj_cmd.points[0].positions, diff, traj_cmd.points[0].positions);
         }
 
         std::vector<double> delta_joints;
         std::vector<double> joint_velocities;
-        msg_utils::vector_diff(chosen_solution, last_joint_state_msg_->position, delta_joints);
-        msg_utils::vector_mul(delta_joints, std::vector<double>(robot_model_->joint_names().size(), dt), joint_velocities);
+        msg_utils::vector_diff(chosen_solution, curr_joint_state_->position, delta_joints);
+        msg_utils::vector_mul(delta_joints, std::vector<double>(robot_model_->joint_names().size(), 1.0 / dt), joint_velocities);
         for (double& vel : joint_velocities) { // convert velocities to speeds
             vel = fabs(vel);
         }
         traj_cmd.points[0].velocities = joint_velocities;
 
-        correct_joint_trajectory_cmd(*last_joint_state_msg_, prev_cmd_, traj_cmd.points[0], dt);
+//        correct_joint_trajectory_cmd(*curr_joint_state_, prev_cmd_, traj_cmd.points[0], dt);
 
         ROS_INFO("Publishing joint command %s @ %s",
                 to_string(msg_utils::to_degrees(traj_cmd.points[0].positions)).c_str(),
                 to_string(msg_utils::to_degrees(traj_cmd.points[0].velocities)).c_str());
 
-        last_curr_ = last_joint_state_msg_->position;
-        if (msg_utils::vector_diff(traj_cmd.points[0].positions, last_curr_, last_diff_)) {
-            ROS_INFO("Joint Command Difference: %s", to_string(msg_utils::to_degrees(last_diff_)).c_str());
-        }
-        else {
-            ROS_WARN("Failed to compute difference between two vectors?");
-        }
+        last_curr_ = curr_joint_state_->position;
+        bool res = msg_utils::vector_diff(traj_cmd.points[0].positions, last_curr_, last_diff_);
+        assert(res);
+        ROS_INFO("Joint Command Difference: %s", to_string(msg_utils::to_degrees(last_diff_)).c_str());
+
         prev_cmd_ = traj_cmd.points.front();
 
         // TODO: close the loop with the HDT PID controller here so that we can
@@ -475,6 +520,7 @@ void ViservoControlExecutor::goal_callback()
 
     prev_cmd_.positions.clear(); // indicate that we have no previous command for this goal
     prev_cmd_.velocities.clear();
+    accum_ee_vel_error = Eigen::Vector3d(0, 0, 0);
 
     // TODO: make sure that the markers are in view of the camera or catch this during executive
     // for visualization:
@@ -484,24 +530,7 @@ void ViservoControlExecutor::goal_callback()
     // TODO: dont need to bail here upon failure to update wrist? maybe this is because only visualizations follow
     update_wrist_pose_estimate();
 
-    geometry_msgs::Vector3 scale;
-    scale.x = 0.10;
-    scale.y = 0.01;
-    scale.z = 0.01;
-    visualization_msgs::MarkerArray triad_marker = msg_utils::create_triad_marker_arr(scale);
-
-    for (auto& marker : triad_marker.markers) {
-        marker.header.frame_id = camera_frame_;
-        marker.ns = "initial ee estimate";
-
-        Eigen::Affine3d triad_marker_transform;
-        tf::poseMsgToEigen(marker.pose, triad_marker_transform);
-        triad_marker_transform = wrist_transform_estimate_ * triad_marker_transform;
-
-        tf::poseEigenToMsg(triad_marker_transform, marker.pose);
-    }
-
-    corrected_wrist_goal_pub_.publish(triad_marker);
+    publish_triad_marker("initial_ee_estimate", wrist_transform_estimate_, camera_frame_);
 
     Eigen::Affine3d goal_transform;
     tf::poseMsgToEigen(current_goal_->goal_pose, goal_transform);
@@ -510,23 +539,15 @@ void ViservoControlExecutor::goal_callback()
     // TODO: derive the corrected ee goal and publish a marker to show the goal position
 
     // Obtain the current transform of the ee (using joint state data) in the frame of the camera
-    tf::StampedTransform transform;
-    try {
-        listener_.lookupTransform(camera_frame_, mount_frame_, ros::Time(0), transform);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_ERROR("Unable to lookup transform from %s to %s (%s)", mount_frame_.c_str(), camera_frame_.c_str(), ex.what());
+    Eigen::Affine3d camera_to_mount;
+    if (!lookup_transform(camera_frame_, mount_frame_, ros::Time(0), camera_to_mount)) {
         return;
     }
-
-    Eigen::Affine3d camera_to_mount =
-        Eigen::Translation3d(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z()) *
-        Eigen::Quaterniond(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
 
     ROS_DEBUG("camera -> mount: %s", to_string(camera_to_mount).c_str());
 
     Eigen::Affine3d manip_to_ee;
-    if (!robot_model_->compute_fk(last_joint_state_msg_->position, manip_to_ee)) {
+    if (!robot_model_->compute_fk(curr_joint_state_->position, manip_to_ee)) {
         ROS_ERROR("Failed to compute end effector transform from joint state");
         return;
     }
@@ -545,28 +566,15 @@ void ViservoControlExecutor::goal_callback()
     Eigen::Quaterniond corrected_goal_rot = Eigen::Quaterniond(camera_to_ee.rotation()) *
                                             Eigen::Quaterniond(error.rotation()).inverse();
 
-    // TODO: AAAAAH MASSIVE COPYPASTA HERE AND ABOVE
     Eigen::Affine3d corrected_ee_goal_transform = corrected_goal_pos * corrected_goal_rot;
 
-    triad_marker = msg_utils::create_triad_marker_arr(scale); // refresh marker transforms
-    for (auto& marker : triad_marker.markers) {
-        marker.header.frame_id = camera_frame_;
-        marker.ns = "corrected_ee_goal";
-
-        Eigen::Affine3d triad_marker_transform;
-        tf::poseMsgToEigen(marker.pose, triad_marker_transform);
-        triad_marker_transform = corrected_ee_goal_transform * triad_marker_transform;
-
-        tf::poseEigenToMsg(triad_marker_transform, marker.pose);
-    }
-
-    corrected_wrist_goal_pub_.publish(triad_marker);
+    publish_triad_marker("corrected_ee_goal", corrected_ee_goal_transform, camera_frame_);
 
     // make sure that we're able to come up with an IK solution for the target goal ee pose
 
     // TODO: to manipulator frame
     Eigen::Affine3d mount_to_corrected_goal = camera_to_mount.inverse() * corrected_goal_rot;
-    auto ikgen = robot_model_->search_all_ik_solutions(mount_to_corrected_goal, last_joint_state_msg_->position, sbpl::utils::ToRadians(1.0));
+    auto ikgen = robot_model_->search_all_ik_solutions(mount_to_corrected_goal, curr_joint_state_->position, sbpl::utils::ToRadians(1.0));
     std::vector<double> sol;
     if (!ikgen(sol)) {
         ROS_ERROR("No IK Solution exists for corrected goal position");
@@ -599,7 +607,7 @@ void ViservoControlExecutor::joint_states_cb(const sensor_msgs::JointState::Cons
             return;
         }
 
-        last_joint_state_msg_ = msg; // const everywhere else
+        curr_joint_state_ = msg; // const everywhere else
     }
 }
 
@@ -664,7 +672,7 @@ bool ViservoControlExecutor::moved_too_far() const
 
 bool ViservoControlExecutor::update_wrist_pose_estimate()
 {
-    if (!last_joint_state_msg_) {
+    if (!curr_joint_state_) {
         ROS_WARN("Have yet to receive a valid Joint State message");
         return false;
     }
@@ -690,7 +698,7 @@ bool ViservoControlExecutor::update_wrist_pose_estimate()
     ////////////////////////////////////////////////////////////////////////////////
 
     // run kinematics to the attached link
-    std::vector<double> joint_vector = last_joint_state_msg_->position;
+    std::vector<double> joint_vector = curr_joint_state_->position;
 
     KDL::Frame attached_link_frame;
     if (!kdl_robot_model_->computeFK(joint_vector, attached_marker_.attached_link.c_str(), attached_link_frame)) {
@@ -768,7 +776,10 @@ bool ViservoControlExecutor::download_marker_params()
             msg_utils::download_param(ph_, "goal_pos_tolerance_z_m", goal_pos_tolerance_(2)) &&
             msg_utils::download_param(ph_, "goal_rot_tolerance_deg", goal_rot_tolerance_) &&
             msg_utils::download_param(ph_, "deadband_joint_velocities_deg", deadband_joint_velocities_dps) &&
-            msg_utils::download_param(ph_, "minimum_joint_velocities_deg", minimum_joint_velocities_dps)
+            msg_utils::download_param(ph_, "minimum_joint_velocities_deg", minimum_joint_velocities_dps) &&
+            msg_utils::download_param(ph_, "kp", KP_) &&
+            msg_utils::download_param(ph_, "ki", KI_) &&
+            msg_utils::download_param(ph_, "kd", KD_)
     ; // LO'D!
 
     success &= deadband_joint_velocities_dps.size() == 7 && minimum_joint_velocities_dps.size() == 7;
@@ -902,10 +913,147 @@ void ViservoControlExecutor::stop_arm(int seqno)
     traj_cmd.header.stamp = ros::Time::now();
     traj_cmd.joint_names = robot_model_->joint_names();
     traj_cmd.points.resize(1);
-    traj_cmd.points[0].positions = last_joint_state_msg_->position;
+    traj_cmd.points[0].positions = curr_joint_state_->position;
     traj_cmd.points[0].velocities = std::vector<double>(robot_model_->joint_names().size(), 0.0);
 
     joint_command_pub_.publish(traj_cmd);
+}
+
+void ViservoControlExecutor::update_histogram()
+{
+    // keep track of which joints have moved in the wrong direction
+    for (std::size_t i = 0; i < last_curr_.size(); ++i) {
+        if (signf(curr_joint_state_->position[i] - last_curr_[i], sbpl::utils::ToRadians(1.0)) !=
+            signf(last_diff_[i], sbpl::utils::ToRadians(1.0)))
+        {
+            ++misbehaved_joints_histogram_[i];
+        }
+    }
+    ROS_INFO("Misbehaved joint histogram: %s", to_string(misbehaved_joints_histogram_).c_str());
+}
+
+KDL::FrameVel ViservoControlExecutor::compute_ee_velocity(const sensor_msgs::JointState& joint_state)
+{
+    KDL::JntArray q(kdl_chain_.getNrOfJoints());
+    KDL::JntArray qdot(kdl_chain_.getNrOfJoints());
+    for (int i = 0; i < kdl_chain_.getNrOfJoints(); ++i) {
+        q(i, 0) = joint_state.position[i];
+        qdot(i, 0) = joint_state.velocity[i];
+    }
+
+    KDL::JntArrayVel velocities(q, qdot);
+
+    KDL::FrameVel fv_frame;
+    fv_solver_->JntToCart(velocities, fv_frame);
+    return fv_frame;
+}
+
+void ViservoControlExecutor::publish_triad_marker(
+    const std::string& ns,
+    const Eigen::Affine3d& transform,
+    const std::string& frame)
+{
+    geometry_msgs::Vector3 scale;
+    scale.x = 0.10;
+    scale.y = 0.01;
+    scale.z = 0.01;
+    visualization_msgs::MarkerArray triad_marker = msg_utils::create_triad_marker_arr(scale);
+
+    for (auto& marker : triad_marker.markers) {
+        marker.header.frame_id = frame;
+        marker.ns = ns;
+
+        Eigen::Affine3d marker_transform;
+        tf::poseMsgToEigen(marker.pose, marker_transform);
+        marker_transform = transform * marker_transform;
+
+        tf::poseEigenToMsg(marker_transform, marker.pose);
+    }
+
+    corrected_wrist_goal_pub_.publish(triad_marker);
+}
+
+bool ViservoControlExecutor::lookup_transform(
+    const std::string& from,
+    const std::string& to,
+    const ros::Time& time,
+    Eigen::Affine3d& out)
+{
+    tf::StampedTransform transform;
+    try {
+        listener_.lookupTransform(from, to, time, transform);
+    }
+    catch (const tf::TransformException& ex) {
+        ROS_ERROR("Unable to lookup transform from %s to %s (%s)", to.c_str(), from.c_str(), ex.what());
+        return false;
+    }
+
+    const double tx = transform.getOrigin().x();
+    const double ty = transform.getOrigin().y();
+    const double tz = transform.getOrigin().z();
+
+    double qw = transform.getRotation().w();
+    double qx = transform.getRotation().x();
+    double qy = transform.getRotation().y();
+    double qz = transform.getRotation().z();
+
+    out = Eigen::Translation3d(tx, ty, tz) * Eigen::Quaterniond(qw, qx, qy, qz);
+    return true;
+}
+
+bool ViservoControlExecutor::choose_best_ik_solution(
+    const Eigen::Affine3d& ee_transform,
+    const std::vector<double>& from,
+    std::vector<double>& to,
+    std::string& why)
+{
+    double ik_search_res = sbpl::utils::ToRadians(1.0);
+    hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(ee_transform, from, ik_search_res);
+    std::vector<std::vector<double>> ik_solutions;
+    static const int max_ik_solutions = 100;
+    std::vector<double> iksol;
+
+    // gather a lot of candidate ik solutions
+    int num_solutions_found = 0;
+    while (ikgen(iksol) && num_solutions_found < max_ik_solutions) {
+        ++num_solutions_found;
+        ik_solutions.push_back(std::move(iksol));
+    }
+
+    if (num_solutions_found == 0) {
+        why = "Failed to compute IK solution";
+        return false;
+    }
+
+    ROS_INFO("Picking best IK solution out of %d", num_solutions_found);
+
+    bool found_ik = false;
+    double best_dist = -1.0;
+    std::vector<double> chosen_solution;
+    for (const std::vector<double>& sol : ik_solutions) {
+        if (safe_joint_delta(from, sol)) {
+            if (!found_ik) {
+                found_ik = true;
+                best_dist = hdt::ComputeJointStateL2NormSqrd(from, sol);
+                chosen_solution = sol;
+            }
+            else {
+                double dist = hdt::ComputeJointStateL2NormSqrd(from, sol);
+                if (dist < best_dist) {
+                    best_dist = dist;
+                    chosen_solution = sol;
+                }
+            }
+        }
+    }
+
+    if (!found_ik) {
+        why = "No safe IK solution";
+        return false;
+    }
+
+    to = std::move(chosen_solution);
+    return true;
 }
 
 int main(int argc, char* argv[])

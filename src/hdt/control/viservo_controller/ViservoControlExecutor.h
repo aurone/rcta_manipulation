@@ -5,6 +5,9 @@
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <ar_track_alvar/AlvarMarkers.h>
+#include <kdl/kdl.hpp>
+#include <kdl/chain.hpp>
+#include <kdl/chainfksolvervel_recursive.hpp>
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_listener.h>
 #include <trajectory_msgs/JointTrajectory.h>
@@ -17,6 +20,8 @@ class ViservoControlExecutor
 public:
 
     ViservoControlExecutor();
+
+    bool initialize();
 
     enum RunResult
     {
@@ -47,7 +52,7 @@ private:
 
     hdt::ViservoCommandGoal::ConstPtr current_goal_;
 
-    sensor_msgs::JointState::ConstPtr last_joint_state_msg_;
+    sensor_msgs::JointState::ConstPtr curr_joint_state_;
     ar_track_alvar::AlvarMarkers::ConstPtr last_ar_markers_msg_;
 
     double marker_validity_timeout_;
@@ -86,6 +91,14 @@ private:
 
     int cmd_seqno_;
 
+    std::vector<int> misbehaved_joints_histogram_;
+
+    KDL::Chain kdl_chain_;
+    std::unique_ptr<KDL::ChainFkSolverVel_recursive> fv_solver_;
+
+    double KI_, KP_, KD_;
+    Eigen::Vector3d accum_ee_vel_error;
+
     void goal_callback();
     void preempt_callback();
     void joint_states_cb(const sensor_msgs::JointState::ConstPtr& msg);
@@ -115,6 +128,20 @@ private:
     bool is_valid_command(const trajectory_msgs::JointTrajectoryPoint& cmd);
 
     void stop_arm(int seqno);
+
+    void update_histogram();
+
+    KDL::FrameVel compute_ee_velocity(const sensor_msgs::JointState& joint_state);
+
+    void publish_triad_marker(const std::string& ns, const Eigen::Affine3d& transform, const std::string& frame);
+
+    bool lookup_transform(const std::string& from, const std::string& to, const ros::Time& time, Eigen::Affine3d& out);
+
+    bool choose_best_ik_solution(
+            const Eigen::Affine3d& ee_transform,
+            const std::vector<double>& from,
+            std::vector<double>& to,
+            std::string& why);
 };
 
 #endif

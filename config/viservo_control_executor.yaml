@@ -12,3 +12,6 @@ goal_pos_tolerance_z_m: 0.015
 
 goal_rot_tolerance_deg: 5.0
 
+kp: 0.80
+ki: 0.01
+kd: 0.00
