@@ -1,5 +1,5 @@
-#ifndef RunOnDestruction_h
-#define RunOnDestruction_h
+#ifndef RunUponDestruction_h
+#define RunUponDestruction_h
 
 #include <functional>
 
