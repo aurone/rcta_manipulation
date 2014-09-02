@@ -21,6 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
     leatherman 
     message_generation 
     moveit_ros_planning 
+    octomap_msgs 
     pluginlib
     pr2_vfh_database
     roscpp 
@@ -74,15 +75,29 @@ include_directories(${GLUT_INCLUDE_DIR})
 # required to locate compiled headers for designer forms
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) 
 
-add_action_files(DIRECTORY action FILES ObjectDetection.action MoveArmCommand.action ViservoCommand.action)
-add_message_files(FILES
-    ControllerDiagnosticStatus.msg 
-    JointDiagnosticStatus.msg 
-    EmergencyStop.msg 
-    ClearEmergencyStop.msg
-    AcknowledgeReset.msg
-    TeleopDiagnosticStatus.msg)
-generate_messages(DEPENDENCIES actionlib_msgs sensor_msgs std_msgs geometry_msgs trajectory_msgs)
+add_action_files(
+    DIRECTORY action
+    FILES
+        ObjectDetection.action
+        MoveArmCommand.action
+        ViservoCommand.action
+        GraspObject.action)
+add_message_files(
+    FILES
+        ControllerDiagnosticStatus.msg 
+        JointDiagnosticStatus.msg 
+        EmergencyStop.msg 
+        ClearEmergencyStop.msg
+        AcknowledgeReset.msg
+        TeleopDiagnosticStatus.msg)
+generate_messages(
+    DEPENDENCIES
+        actionlib_msgs
+        geometry_msgs
+        octomap_msgs
+        sensor_msgs
+        std_msgs
+        trajectory_msgs)
 
 catkin_package(CATKIN_DEPENDS message_runtime)
 
