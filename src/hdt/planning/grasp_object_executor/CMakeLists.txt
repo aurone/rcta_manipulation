@@ -1,0 +1,4 @@
+add_executable(grasp_object_executor grasp_object_executor.cpp GraspObjectExecutor.cpp)
+target_link_libraries(grasp_object_executor ${catkin_LIBRARIES})
+add_dependencies(grasp_object_executor hdt_generate_messages_cpp)
+
