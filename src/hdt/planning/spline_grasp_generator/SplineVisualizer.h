@@ -9,7 +9,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Point.h>
 #include <visualization_msgs/Marker.h>
-#include "NURB.h"
+#include <hdt/common/geometry/nurb/NURB.h>
 
 class SplineVisualizer
 {
@@ -40,15 +40,19 @@ private:
     std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
 
     ros::Publisher marker_pub_;
+    ros::Publisher control_vertices_marker_pub_;
     ros::Publisher spline_marker_pub_;
 
     std::vector<Eigen::Vector3d> grasp_spline_control_points_;
 
-    Eigen::Affine3d gascanister_to_basefootprint_;
-    Eigen::Affine3d base_footprint_to_gascanister_;
+    Eigen::Affine3d gas_canister_to_base_footprint_;
+    Eigen::Affine3d base_footprint_to_gas_canister_;
 
     visualization_msgs::Marker canister_marker_;
+    visualization_msgs::Marker control_vertices_marker_;
     visualization_msgs::Marker spline_marker_;
+
+    double gas_can_scale_;
 
     bool load_curve();
 
@@ -64,6 +68,7 @@ private:
             const std::string& color = "red");
 
     bool init_canister_marker();
+    bool init_control_vertex_marker();
     bool init_spline_marker();
 };
 

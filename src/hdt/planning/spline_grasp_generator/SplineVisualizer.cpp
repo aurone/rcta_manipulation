@@ -27,7 +27,8 @@ SplineVisualizer::SplineVisualizer() :
         Vector3d(6, 1, 0) },
         2),
     marker_pub_(),
-    spline_marker_pub_()
+    spline_marker_pub_(),
+    gas_can_scale_(0.1)
 {
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glLoadIdentity();
@@ -41,6 +42,7 @@ SplineVisualizer::~SplineVisualizer()
 int SplineVisualizer::run()
 {
     marker_pub_ = nh_.advertise<visualization_msgs::Marker>("visualization_marker", 5, false);
+    control_vertices_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("visualization_marker", 5, false);
     spline_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("visualization_marker", 5, false);
 
     if (!load_curve()) {
@@ -53,6 +55,10 @@ int SplineVisualizer::run()
         return FAILED_TO_VISUALIZE_GAS_CANISTER;
     }
 
+    if (!init_control_vertex_marker()) {
+        return FAILED_TO_INITIALIZE;
+    }
+
     if (!init_spline_marker()) {
         ROS_ERROR("Failed to visualize grasp spline");
         return FAILED_TO_VISUALIZE_GRASP_SPLINE;
@@ -61,6 +67,7 @@ int SplineVisualizer::run()
     ros::Rate vis_rate(1.0);
     while (ros::ok()) {
         marker_pub_.publish(canister_marker_);
+        control_vertices_marker_pub_.publish(control_vertices_marker_);
         spline_marker_pub_.publish(spline_marker_);
         ros::spinOnce();
         vis_rate.sleep();
@@ -233,24 +240,49 @@ bool SplineVisualizer::init_canister_marker()
     canister_marker_.type = visualization_msgs::Marker::MESH_RESOURCE;
     canister_marker_.action = visualization_msgs::Marker::ADD;
 
-    base_footprint_to_gascanister_ =
+    base_footprint_to_gas_canister_ =
             Eigen::Translation3d(1, 0, 0.1) *
             Eigen::AngleAxisd(sbpl::utils::ToRadians(60.0), Eigen::Vector3d(0, 0, 1)) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(90.0), Eigen::Vector3d(1, 0, 0));// *
-//            Eigen::Scaling(100.0, 100.0, 100.0);
+            Eigen::AngleAxisd(sbpl::utils::ToRadians(90.0), Eigen::Vector3d(1, 0, 0));
 
-    tf::poseEigenToMsg(base_footprint_to_gascanister_, canister_marker_.pose);
+    tf::poseEigenToMsg(base_footprint_to_gas_canister_, canister_marker_.pose);
 
-    canister_marker_.scale.x = canister_marker_.scale.y = canister_marker_.scale.z = 0.1;
+    canister_marker_.scale.x = canister_marker_.scale.y = canister_marker_.scale.z = gas_can_scale_;
     canister_marker_.color.r = canister_marker_.color.g = canister_marker_.color.b = 0.5;
     canister_marker_.color.a = 0.5;
     canister_marker_.lifetime = ros::Duration(0);
     canister_marker_.frame_locked = false;
-//    canister_marker_.mesh_resource = hdt_package_path + "/resource/meshes/gastank/gastank.stl";
-//    canister_marker_.mesh_resource = "file:///home/aurone/gastank_ascii_nomodifiers.stl";
-    canister_marker_.mesh_resource = "file:///home/aurone/clean_small_gastank.obj";
+    canister_marker_.mesh_resource = "file://" + hdt_package_path + "/resource/meshes/gastank/clean_small_gastank.obj";
     canister_marker_.mesh_use_embedded_materials = false;
 
+    return true;
+}
+
+bool SplineVisualizer::init_control_vertex_marker()
+{
+    control_vertices_marker_.header.seq = 0;
+    control_vertices_marker_.header.stamp = ros::Time::now();
+    control_vertices_marker_.header.frame_id = "base_footprint";
+
+    control_vertices_marker_.ns = "control_vertices";
+    control_vertices_marker_.id = 0;
+    control_vertices_marker_.type = visualization_msgs::Marker::POINTS;
+    control_vertices_marker_.action = visualization_msgs::Marker::ADD;
+    for (const Vector3d& cv : grasp_spline_control_points_) {
+        Vector3d control_vertex_robot_frame = base_footprint_to_gas_canister_ * Eigen::Scaling(gas_can_scale_) * cv;
+        geometry_msgs::Point p;
+        p.x = control_vertex_robot_frame.x();
+        p.y = control_vertex_robot_frame.y();
+        p.z = control_vertex_robot_frame.z();
+        control_vertices_marker_.points.push_back(p);
+    }
+    control_vertices_marker_.scale.x = 0.01;
+    control_vertices_marker_.color.r = 1.0;
+    control_vertices_marker_.color.g = 0.5;
+    control_vertices_marker_.color.b = 0.0;
+    control_vertices_marker_.color.a = 1.0;
+    control_vertices_marker_.lifetime = ros::Duration(0);
+    control_vertices_marker_.frame_locked = false;
     return true;
 }
 
@@ -278,7 +310,7 @@ bool SplineVisualizer::init_spline_marker()
 
         ROS_INFO("    [canister frame]: (%0.3f, %0.3f, %0.3f)", spline_sample.x(), spline_sample.y(), spline_sample.z());
 
-        spline_sample = base_footprint_to_gascanister_.inverse() * Eigen::Scaling(0.1) * spline_sample;
+        spline_sample = base_footprint_to_gas_canister_ * Eigen::Scaling(gas_can_scale_) * spline_sample;
 
         geometry_msgs::Point sample_point;
         sample_point.x = spline_sample.x();
