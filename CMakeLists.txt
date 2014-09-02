@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
     eigen_conversions
     geometric_shapes
     geometry_msgs
+    #genmsg # The actionlib tutorial says this is required for building messages, but everything seems to be OK?
     interactive_markers
     industrial_msgs
     industrial_robot_client
