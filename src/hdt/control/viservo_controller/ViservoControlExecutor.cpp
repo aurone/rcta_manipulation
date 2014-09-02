@@ -70,7 +70,7 @@ bool ViservoControlExecutor::initialize()
 {
     as_.reset(new ViservoCommandActionServer(action_name_, false));
     if (!as_) {
-        ROS_WARN("Failed to instantiated Viservo Command Action Server");
+        ROS_ERROR("Failed to instantiate Viservo Command Action Server");
         return false;
     }
 
@@ -182,7 +182,7 @@ bool ViservoControlExecutor::initialize()
     joint_states_sub_ = nh_.subscribe("/joint_states", 10, &ViservoControlExecutor::joint_states_cb, this);
     ar_marker_sub_ = nh_.subscribe("/ar_pose_marker", 1, &ViservoControlExecutor::ar_markers_cb, this);
 
-    ROS_INFO("Starting action server 'viservo_command'...");
+    ROS_INFO("Starting action server '%s'...", action_name_.c_str());
     as_->start();
     ROS_INFO("Action server started");
 

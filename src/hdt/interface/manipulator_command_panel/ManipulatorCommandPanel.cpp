@@ -855,7 +855,7 @@ void ManipulatorCommandPanel::viservo_command_active_cb()
 
 }
 
-void ManipulatorCommandPanel::viservo_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback)
+void ManipulatorCommandPanel::viservo_command_feedback_cb(const hdt::ViservoCommandFeedback::ConstPtr& feedback)
 {
 
 }

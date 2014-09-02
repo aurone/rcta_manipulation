@@ -140,7 +140,7 @@ private:
         const hdt::MoveArmCommandResult::ConstPtr& result);
 
     void viservo_command_active_cb();
-    void viservo_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
+    void viservo_command_feedback_cb(const hdt::ViservoCommandFeedback::ConstPtr& feedback);
     void viservo_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
         const hdt::ViservoCommandResult::ConstPtr& result);
