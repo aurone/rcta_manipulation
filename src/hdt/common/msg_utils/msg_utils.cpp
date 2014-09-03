@@ -283,6 +283,50 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p)
     }
 }
 
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Quaternion& q)
+{
+    std::map<std::string, double> params;
+    if (!extract_xml_value(value, params) ||
+        params.find("w") == params.end() ||
+        params.find("x") == params.end() ||
+        params.find("y") == params.end() ||
+        params.find("z") == params.end())
+    {
+        return false;
+    }
+    else
+    {
+        q.w = params["w"];
+        q.x = params["x"];
+        q.y = params["y"];
+        q.z = params["z"];
+        return true;
+    }
+}
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Pose& p)
+{
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
+        return false;
+    }
+
+    if (!value.hasMember("position") || !value.hasMember("orientation")) {
+        return false;
+    }
+    else {
+        geometry_msgs::Pose tmp;
+        bool success = extract_xml_value(value["position"], tmp.position) &&
+                       extract_xml_value(value["orientation"], tmp.orientation);
+        if (success) {
+            p = tmp;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+}
+
 std::vector<double> to_degrees(const std::vector<double>& v)
 {
     std::vector<double> v_degs(v.size());
@@ -302,3 +346,119 @@ std::vector<double> to_radians(const std::vector<double>& v)
 }
 
 } // namespace msg_utils
+
+namespace geometry_msgs
+{
+
+Vector3 CreateVector3(double x, double y, double z)
+{
+    Vector3 v;
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    return v;
+}
+
+const Vector3 ZeroVector3()
+{
+    return CreateVector3(0.0, 0.0, 0.0);
+}
+
+Point CreatePoint(double x, double y, double z)
+{
+    Point p;
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    return p;
+}
+
+const Point ZeroPoint()
+{
+    return CreatePoint(0.0, 0.0, 0.0);
+}
+
+Quaternion CreateQuaternion(double w, double x, double y, double z)
+{
+    Quaternion q;
+    q.w = w;
+    q.x = x;
+    q.y = y;
+    q.z = z;
+    return q;
+}
+
+const Quaternion IdentityQuaternion()
+{
+    return CreateQuaternion(1.0, 0.0, 0.0, 0.0);
+}
+
+Pose CreatePose(const Point& position, const Quaternion& orientation)
+{
+    Pose p;
+    p.position = position;
+    p.orientation = orientation;
+    return p;
+}
+
+const Pose IdentityPose()
+{
+    return CreatePose(ZeroPoint(), IdentityQuaternion());
+}
+
+} // namespace geometry_msgs
+
+namespace std_msgs
+{
+
+ColorRGBA CreateColorRGBA(float r, float g, float b, float a)
+{
+    ColorRGBA color;
+    color.r = r;
+    color.g = g;
+    color.b = b;
+    color.a = a;
+    return color;
+}
+
+const ColorRGBA BlackColorRGBA(float a)
+{
+    return CreateColorRGBA(0.0f, 0.0f, 0.0f, a);
+}
+
+const ColorRGBA RedColorRGBA(float a)
+{
+    return CreateColorRGBA(1.0f, 0.0f, 0.0f, a);
+}
+
+const ColorRGBA GreenColorRGBA(float a)
+{
+    return CreateColorRGBA(0.0f, 1.0f, 0.0f, a);
+}
+
+const ColorRGBA BlueColorRGBA(float a)
+{
+    return CreateColorRGBA(0.0f, 0.0f, 1.0f, a);
+}
+
+const ColorRGBA YellowColorRGBA(float a)
+{
+    return CreateColorRGBA(1.0f, 1.0f, 0.0f, a);
+}
+
+const ColorRGBA CyanColorRGBA(float a)
+{
+    return CreateColorRGBA(0.0f, 1.0f, 1.0f, a);
+}
+
+const ColorRGBA MagentaColorRGBA(float a)
+{
+    return CreateColorRGBA(1.0f, 0.0f, 1.0f, a);
+}
+
+const ColorRGBA WhiteColorRGBA(float a)
+{
+    return CreateColorRGBA(1.0f, 1.0f, 1.0f, a);
+}
+
+}

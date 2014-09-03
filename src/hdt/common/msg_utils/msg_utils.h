@@ -7,9 +7,13 @@
 #include <unordered_map>
 #include <vector>
 #include <Eigen/Dense>
+#include <geometry_msgs/Point.h>
+#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Vector3.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
+#include <std_msgs/ColorRGBA.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -56,6 +60,8 @@ template <typename T>
 bool download_param(const ros::NodeHandle& nh, const std::string& param_name, T& tout);
 
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Point& p);
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Quaternion& q);
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, geometry_msgs::Pose& p);
 
 template <typename T, typename Op>
 bool vector_pwiseop(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>& uv, const Op& op);
@@ -210,5 +216,40 @@ bool vector_mul(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>
 }
 
 } // namespace msg_utils
+
+namespace geometry_msgs
+{
+
+// Because messages don't come with real constructors
+Vector3 CreateVector3(double x, double y, double z);
+const Vector3 ZeroVector3();
+
+Point CreatePoint(double x, double y, double z);
+const Point ZeroPoint();
+
+Quaternion CreateQuaternion(double w, double x, double y, double z);
+const Quaternion IdentityQuaternion();
+
+Pose CreatePose(const Point& position, const Quaternion& orientation);
+const Pose IdentityPose();
+
+} // namespace geometry_msgs
+
+namespace std_msgs
+{
+
+ColorRGBA CreateColorRGBA(float r, float g, float b, float a);
+
+const ColorRGBA BlackColorRGBA(float a = 1.0f);
+const ColorRGBA RedColorRGBA(float a = 1.0f);
+const ColorRGBA GreenColorRGBA(float a = 1.0f);
+const ColorRGBA BlueColorRGBA(float a = 1.0f);
+const ColorRGBA YellowColorRGBA(float a = 1.0f);
+const ColorRGBA CyanColorRGBA(float a = 1.0f);
+const ColorRGBA MagentaColorRGBA(float a = 1.0f);
+const ColorRGBA WhiteColorRGBA(float a = 1.0f);
+
+} // namespace std_msgs
+
 
 #endif
