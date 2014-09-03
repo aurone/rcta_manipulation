@@ -80,10 +80,19 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
 
     ROS_INFO("Connecting to gripper...");
 
-    std::string why;
-    if (!connection_->connect(why)) {
-        ROS_ERROR("Failed to connect to Robotiq Gripper (%s)", why.c_str());
-        return FAILED_TO_INITIALIZE;
+    ros::Duration poll_duration(1.0);
+
+    while (ros::ok())
+    {
+        std::string why;
+        if (!connection_->connect(why)) {
+            ROS_WARN("Failed to connect to Robotiq Gripper (%s)", why.c_str());
+        }
+        else {
+            break;
+        }
+
+        poll_duration.sleep();
     }
 
     // create an interface to the gripper
@@ -149,6 +158,10 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
         double gripper_pos = gripper_->get_position();
         double gripper_speed = gripper_->get_speed();
         double gripper_force = gripper_->get_force();
+
+//        ROS_INFO("Gripper Position: %0.3f", gripper_pos);
+//        ROS_INFO("Gripper Speed: %0.3f", gripper_speed);
+//        ROS_INFO("Gripper Force: %0.3f", gripper_force);
 
         if (gripper_pos != -1.0) {
             sensor_msgs::JointState joint_state;
