@@ -22,12 +22,13 @@
         </include>
     </group>
 
-    <!-- LAUNCH GRIPPER DRIVER (CURRENTLY BROKEN) -->
-    <!-- <node name="robotiq_controller" pkg="hdt" type="robotiq_controller" args="live" output="screen"/> -->
+    <!-- LAUNCH GRIPPER DRIVER -->
+    <include file="$(find hdt)/launch/robotiq_gripper.launch">
+        <arg name="sim" value="$(arg sim)"/>
+    </include>
 
     <!-- SURROGATE PROVIDERS OF /joint_states -->
     <include file="$(find hdt)/launch/husky_simulator.launch"/>
-    <include file="$(find hdt)/launch/gripper_simulator.launch"/>
     <include file="$(find hdt)/launch/tilt_mount_simulator.launch"/>
 
     <group if="$(arg kinect_sensor)">
