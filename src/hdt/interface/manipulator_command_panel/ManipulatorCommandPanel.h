@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 #include <QtGui>
+#include <rospack/rospack.h>
 #include <actionlib/client/simple_action_client.h>
 #include <hdt_description/RobotModel.h>
 #include <interactive_markers/interactive_marker_server.h>
@@ -23,6 +24,7 @@
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
+#include <hdt/GraspObjectAction.h>
 
 class QPushButton;
 
@@ -55,6 +57,7 @@ public Q_SLOTS:
     void change_joint_7(int value);
 
     void send_viservo_command();
+    void send_grasp_object_command();
 
 private:
 
@@ -69,6 +72,10 @@ private:
     typedef actionlib::SimpleActionClient<hdt::ViservoCommandAction> ViservoCommandActionClient;
     std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
     bool pending_viservo_command_;
+
+    typedef actionlib::SimpleActionClient<hdt::GraspObjectAction> GraspObjectCommandActionClient;
+    std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
+    bool pending_grasp_object_command_;
 
     hdt::RobotModelPtr robot_model_;
 
@@ -93,6 +100,7 @@ private:
     QPushButton* send_joint_goal_button_;
     QPushButton* cycle_ik_solutions_button_;
     QPushButton* send_viservo_command_button_;
+    QPushButton* send_grasp_object_command_button_;
     QSlider* joint_1_slider_;
     QSlider* joint_2_slider_;
     QSlider* joint_3_slider_;
@@ -110,6 +118,7 @@ private:
     bool check_robot_model_consistency();
 
     void do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback);
+    void process_gas_canister_marker_feedback(const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback);
 
     void publish_transform_network();
     void publish_joint_states();
@@ -136,23 +145,29 @@ private:
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
     void move_arm_command_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const hdt::MoveArmCommandResult::ConstPtr& result);
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::MoveArmCommandResult::ConstPtr& result);
 
     void viservo_command_active_cb();
     void viservo_command_feedback_cb(const hdt::ViservoCommandFeedback::ConstPtr& feedback);
     void viservo_command_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const hdt::ViservoCommandResult::ConstPtr& result);
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::ViservoCommandResult::ConstPtr& result);
+
+    void grasp_object_command_active_cb();
+    void grasp_object_command_feeback_cb(const hdt::GraspObjectFeedback::ConstPtr& feedback);
+    void grasp_object_command_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::GraspObjectResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
-        const robot_state::RobotState& robot_state,
-        const std::vector<std::string>& link_names,
-        const std_msgs::ColorRGBA& color,
-        const std::string& ns,
-        const ros::Duration& d,
-        visualization_msgs::MarkerArray& markers,
-        bool include_attached = false);
+            const robot_state::RobotState& robot_state,
+            const std::vector<std::string>& link_names,
+            const std_msgs::ColorRGBA& color,
+            const std::string& ns,
+            const ros::Duration& d,
+            visualization_msgs::MarkerArray& markers,
+            bool include_attached = false);
 
     static void joint_state_to_joint_array(const sensor_msgs::JointState&);
 

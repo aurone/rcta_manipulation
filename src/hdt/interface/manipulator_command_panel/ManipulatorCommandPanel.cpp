@@ -16,9 +16,8 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <geometric_shapes/shape_operations.h>
-#include <stringifier/stringifier.h>
-
-using namespace std;
+#include <hdt/common/stringifier/stringifier.h>
+#include <hdt/common/msg_utils/msg_utils.h>
 
 namespace hdt
 {
@@ -43,6 +42,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     send_joint_goal_button_(nullptr),
     cycle_ik_solutions_button_(nullptr),
     send_viservo_command_button_(nullptr),
+    send_grasp_object_command_button_(nullptr),
     joint_1_slider_(nullptr),
     joint_2_slider_(nullptr),
     joint_3_slider_(nullptr),
@@ -60,6 +60,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     send_joint_goal_button_ = new QPushButton(tr("Send Joint Goal"));
     cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
     send_viservo_command_button_ = new QPushButton(tr("Send Visual Servo Command"));
+    send_grasp_object_command_button_ = new QPushButton(tr("Send Grasp Object Command"));
 
     joint_1_slider_ = new QSlider(Qt::Horizontal);
     joint_2_slider_ = new QSlider(Qt::Horizontal);
@@ -76,6 +77,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     layout->addWidget(send_joint_goal_button_);
     layout->addWidget(cycle_ik_solutions_button_);
     layout->addWidget(send_viservo_command_button_);
+    layout->addWidget(send_grasp_object_command_button_);
     layout->addWidget(joint_1_slider_);
     layout->addWidget(joint_2_slider_);
     layout->addWidget(joint_3_slider_);
@@ -94,6 +96,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
     connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
     connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
+    connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
     connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
     connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
     connect(joint_3_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_3(int)));
@@ -447,6 +450,55 @@ void ManipulatorCommandPanel::send_viservo_command()
     update_gui();
 }
 
+void ManipulatorCommandPanel::send_grasp_object_command()
+{
+    if (!grasp_object_command_client_) {
+        ROS_WARN("Grasp Object Command Client has not yet been instantiated");
+        return;
+    }
+
+    if (!grasp_object_command_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Viservo Command (server is not connected)"));
+
+        // try and reset the action client to grab a fresh connection
+        grasp_object_command_client_.reset(new GraspObjectCommandActionClient("grasp_object_command", false));
+        if (!grasp_object_command_client_) {
+            ROS_WARN("Failed to instantiate Grasp Object Command Action Client");
+            return;
+        }
+
+        return;
+    }
+
+    const std::string gas_can_interactive_marker_name = "gas_canister_fixture";
+    visualization_msgs::InteractiveMarker gas_can_interactive_marker;
+    if (!server_.get(gas_can_interactive_marker_name, gas_can_interactive_marker)) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (no interactive marker named 'gas_canister_fixture'"));
+        return;
+    }
+
+    hdt::GraspObjectGoal grasp_object_goal;
+
+    // TODO: remove this constraint?
+    if (gas_can_interactive_marker.header.frame_id != rm_->getRootLinkName()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (interactive marker has frame other than robot model root frame"));
+        return;
+    }
+
+    static int grasp_object_goal_id = 0;
+    grasp_object_goal.id = grasp_object_goal_id++;
+    grasp_object_goal.retryCount = 0;
+    grasp_object_goal.gas_can_in_base_link.pose = gas_can_interactive_marker.pose;
+    grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
+    // TODO: octomap
+
+    auto result_callback = boost::bind(&ManipulatorCommandPanel::grasp_object_command_result_cb, this, _1, _2);
+    grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
+
+    pending_grasp_object_command_ = true;
+    update_gui();
+}
+
 bool ManipulatorCommandPanel::do_init()
 {
     if (!reinit_robot()) {
@@ -462,6 +514,12 @@ bool ManipulatorCommandPanel::do_init()
     viservo_command_client_.reset(new ViservoCommandActionClient("viservo_command", false));
     if (!viservo_command_client_) {
         ROS_WARN("Failed to instantiate Viservo Command Action Client");
+        return false;
+    }
+
+    grasp_object_command_client_.reset(new GraspObjectCommandActionClient("grasp_object_command", false));
+    if (!grasp_object_command_client_) {
+        ROS_WARN("Failed to instantiate Grasp Object Command Action Client");
         return false;
     }
 
@@ -498,7 +556,8 @@ bool ManipulatorCommandPanel::check_robot_model_consistency()
     return true;
 }
 
-void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback)
+void ManipulatorCommandPanel::do_process_feedback(
+    const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback)
 {
     if (!initialized_) {
         return;
@@ -539,6 +598,14 @@ void ManipulatorCommandPanel::do_process_feedback(const visualization_msgs::Inte
 
     publish_phantom_robot_visualizations();
     update_sliders();
+}
+
+void ManipulatorCommandPanel::process_gas_canister_marker_feedback(
+    const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback)
+{
+    if (!initialized_) {
+        return;
+    }
 }
 
 void ManipulatorCommandPanel::publish_phantom_robot_visualizations()
@@ -798,6 +865,72 @@ bool ManipulatorCommandPanel::reinit_robot()
         }
     }
 
+    ROS_INFO("Inserting marker 'gas_canister_fixture'");
+    rospack::Rospack rpack;
+    std::vector<std::string> search_path;
+    rpack.getSearchPathFromEnv(search_path);
+    rpack.crawl(search_path, false);
+    std::string hdt_package_path = "";
+    rpack.find("hdt", hdt_package_path);
+
+    // initializer an interactive marker for the gas canister object
+    visualization_msgs::InteractiveMarker gas_canister_interactive_marker;
+    gas_canister_interactive_marker.header.seq = 0;
+    gas_canister_interactive_marker.header.stamp = ros::Time(0);
+    gas_canister_interactive_marker.header.frame_id = rm_->getRootLinkName();
+    gas_canister_interactive_marker.pose.position.x = 0.0;
+    gas_canister_interactive_marker.pose.position.y = 0.0;
+    gas_canister_interactive_marker.pose.position.z = 0.0;
+    gas_canister_interactive_marker.pose.orientation.w = 1.0;
+    gas_canister_interactive_marker.pose.orientation.x = 0.0;
+    gas_canister_interactive_marker.pose.orientation.y = 0.0;
+    gas_canister_interactive_marker.pose.orientation.z = 0.0;
+    gas_canister_interactive_marker.name = "gas_canister_fixture";
+    gas_canister_interactive_marker.description = "Gas Canister Positioning";
+    gas_canister_interactive_marker.scale = 0.25f;
+    gas_canister_interactive_marker.menu_entries.clear();
+    gas_canister_interactive_marker.controls.clear();
+
+    gas_canister_interactive_marker.controls = create_sixdof_controls();
+
+    // Construct mesh control
+    visualization_msgs::InteractiveMarkerControl gas_can_mesh_control;
+    gas_can_mesh_control.name = "mesh_control";
+    gas_can_mesh_control.orientation = geometry_msgs::IdentityQuaternion();
+    gas_can_mesh_control.orientation_mode = visualization_msgs::InteractiveMarkerControl::INHERIT;
+    gas_can_mesh_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::NONE; // TODO: change this to button?
+    gas_can_mesh_control.always_visible = true;
+
+    visualization_msgs::Marker mesh_marker;
+    mesh_marker.header.seq = 0;
+    mesh_marker.header.stamp = ros::Time(0);
+    mesh_marker.header.frame_id = "";
+    mesh_marker.ns = "gas_can_mesh_marker";
+    mesh_marker.id = 0;
+    mesh_marker.type = visualization_msgs::Marker::MESH_RESOURCE;
+    mesh_marker.action = visualization_msgs::Marker::ADD;
+    mesh_marker.pose = geometry_msgs::IdentityPose();
+    mesh_marker.scale = geometry_msgs::CreateVector3(0.1, 0.1, 0.1);
+    mesh_marker.color = std_msgs::WhiteColorRGBA(0.5f);
+    mesh_marker.lifetime = ros::Duration(0);
+    mesh_marker.frame_locked = false;
+    mesh_marker.points.clear();
+    mesh_marker.colors.clear();
+    mesh_marker.text = "";
+    mesh_marker.mesh_resource = "file://" + hdt_package_path + "/resource/meshes/gastank/clean_small_gastank.obj";
+    mesh_marker.mesh_use_embedded_materials = false;
+    gas_can_mesh_control.markers.push_back(mesh_marker);
+    gas_canister_interactive_marker.controls.push_back(gas_can_mesh_control);
+
+    gas_can_mesh_control.independent_marker_orientation = false;
+    gas_can_mesh_control.description = "";
+    //
+
+    server_.insert(gas_canister_interactive_marker);
+    auto gascan_feedback_cb = boost::bind(&ManipulatorCommandPanel::process_gas_canister_marker_feedback, this, _1);
+    server_.setCallback(gas_canister_interactive_marker.name, gascan_feedback_cb);
+    ROS_INFO("Inserted marker 'gas_canister_fixture'");
+
     server_.applyChanges();
 
     joint_1_slider_->setRange(
@@ -866,6 +999,25 @@ void ManipulatorCommandPanel::viservo_command_result_cb(
 {
     ROS_INFO("Received Result from Viservo Command Action");
     pending_viservo_command_ = false;
+    update_gui();
+}
+
+void ManipulatorCommandPanel::grasp_object_command_active_cb()
+{
+
+}
+
+void ManipulatorCommandPanel::grasp_object_command_feeback_cb(const hdt::GraspObjectFeedback::ConstPtr& feedback)
+{
+
+}
+
+void ManipulatorCommandPanel::grasp_object_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::GraspObjectResult::ConstPtr& result)
+{
+    ROS_INFO("Received Result from Grasp Object Command Action");
+    pending_grasp_object_command_ = false;
     update_gui();
 }
 
@@ -968,12 +1120,13 @@ void ManipulatorCommandPanel::update_sliders()
 
 void ManipulatorCommandPanel::update_gui()
 {
-    bool pending_motion_command = pending_move_arm_command_ || pending_viservo_command_;
+    bool pending_motion_command = pending_move_arm_command_ || pending_viservo_command_ || !pending_grasp_object_command_;
     ROS_INFO("Updating gui. pending move arm command: %s, pending viservo command: %s",
             pending_move_arm_command_ ? "TRUE" : "FALSE",
                     pending_viservo_command_ ? "TRUE" : "FALSE");
     send_move_arm_command_button_->setEnabled(!pending_motion_command);
     send_viservo_command_button_->setEnabled(!pending_motion_command);
+    send_grasp_object_command_button_->setEnabled(!pending_motion_command);
     send_joint_goal_button_->setEnabled(!pending_motion_command);
 }
 
