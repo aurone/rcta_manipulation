@@ -39,18 +39,31 @@ std::string to_string(Status status)
 GraspObjectExecutor::GraspObjectExecutor() :
     nh_(),
     ph_("~"),
-    action_name_("grasp_object"),
+    action_name_("grasp_object_command"),
     as_(),
+
     move_arm_command_action_name_("move_arm_command"),
-    viservo_command_action_name_("viservo_command"),
-    gripper_command_action_name_("gripper_controller/gripper_command_action"),
     move_arm_command_client_(),
     sent_move_arm_goal_(false),
     pending_move_arm_command_(false),
+
+    viservo_command_action_name_("viservo_command"),
     viservo_command_client_(),
+    sent_viservo_command_(false),
     pending_viservo_command_(false),
+
+    gripper_command_action_name_("gripper_controller/gripper_command_action"),
+    gripper_command_client_(),
+    sent_gripper_command_(false),
+    pending_gripper_command_(false),
+
+    current_goal_(),
     status_(GraspObjectExecutionStatus::INVALID),
-    last_status_(GraspObjectExecutionStatus::INVALID)
+    last_status_(GraspObjectExecutionStatus::INVALID),
+    grasp_spline_(),
+    gas_can_scale_(0.1),
+    wrist_to_tool_(),
+    pregrasp_to_grasp_offset_m_(0.0)
 {
 }
 
@@ -68,7 +81,7 @@ bool GraspObjectExecutor::initialize()
     std::vector<Eigen::Vector3d> grasp_spline_control_points(control_points.size());
     for (std::size_t i = 0; i < control_points.size(); ++i) {
         const geometry_msgs::Point& p = control_points[i];
-        grasp_spline_control_points.push_back(Eigen::Vector3d(p.x, p.y, p.z));
+        grasp_spline_control_points[i] = Eigen::Vector3d(p.x, p.y, p.z);
     }
 
     grasp_spline_.reset(new Nurb<Eigen::Vector3d>(grasp_spline_control_points, degree));
@@ -84,6 +97,20 @@ bool GraspObjectExecutor::initialize()
 
     ROS_INFO("Knot Vector: %s", to_string(grasp_spline_->knots()).c_str());
     ROS_INFO("Degree: %s", std::to_string(grasp_spline_->degree()).c_str());
+
+    geometry_msgs::Pose tool_pose_wrist_frame;
+    if (!msg_utils::download_param(ph_, "wrist_to_tool_transform", tool_pose_wrist_frame)) {
+        ROS_ERROR("Failed to retrieve 'wrist_to_tool_transform' from the param server");
+        return false;
+    }
+
+    tf::poseMsgToEigen(tool_pose_wrist_frame, wrist_to_tool_);
+    ROS_INFO("Wrist-to-Tool Transform: %s", to_string(wrist_to_tool_).c_str());
+
+    if (!msg_utils::download_param(ph_, "pregrasp_to_grasp_offset_m", pregrasp_to_grasp_offset_m_)) {
+        ROS_ERROR("Failed to retrieve 'pregrasp_to_grasp_offset_m' from the param server");
+        return false;
+    }
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
@@ -134,9 +161,9 @@ int GraspObjectExecutor::run()
         ros::spinOnce();
 
         if (status_ != last_status_) {
-            ROS_INFO("Grasp Job Executor Transitioning: %s -> %s", to_string(last_status_).c_str(), to_string(last_status_).c_str());
+            ROS_INFO("Grasp Job Executor Transitioning: %s -> %s", to_string(last_status_).c_str(), to_string(status_).c_str());
+            last_status_ = status_;
         }
-        last_status_ = status_;
 
         switch (status_) {
         case GraspObjectExecutionStatus::IDLE:
@@ -144,11 +171,15 @@ int GraspObjectExecutor::run()
             if (as_->isActive()) {
                 status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
             }
-        } break;
+        }   break;
         case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
         {
             if (!sent_move_arm_goal_) {
                 ROS_INFO("Sending Move Arm Goal to pregrasp pose");
+                hdt::GraspObjectFeedback feedback;
+                feedback.status = execution_status_to_feedback_status(status_);
+                as_->publishFeedback(feedback);
+#if !TEST_STATE_MACHINE
 
                 Eigen::Affine3d base_link_to_gas_canister;
                 tf::poseMsgToEigen(current_goal_->gas_can_in_base_link.pose, base_link_to_gas_canister);
@@ -157,25 +188,44 @@ int GraspObjectExecutor::run()
                 std::vector<Eigen::Affine3d> grasp_candidates(num_candidates);
                 const double min_u = 0.0;
                 const double max_u = 1.0;
+
+                // sample uniformly the position and derivative of the gas canister grasp spline
                 for (int i = 0; i < num_candidates; ++i) {
                     double u = (max_u - min_u) * i / (num_candidates - 1);
                     Eigen::Vector3d sample_spline_point = (*grasp_spline_)(u);
                     Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
 
-                    // TODO: transform the spline point and derivative from the gas canister frame into the robot frame
+                    Eigen::Vector3d sample_spline_point_robot_frame =
+                            base_link_to_gas_canister * Eigen::Scaling(gas_can_scale_) * sample_spline_point;
 
+                    Eigen::Vector3d sample_spline_deriv_robot_frame =
+                            base_link_to_gas_canister.rotation() * sample_spline_deriv.normalized();
+
+                    // compute the normal to the grasp spline that most points "up" in the robot frame
                     Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
-
-                    Eigen::Vector3d grasp_dir = up_bias - up_bias.dot(sample_spline_deriv) * sample_spline_deriv;
+                    Eigen::Vector3d grasp_dir = up_bias - up_bias.dot(sample_spline_deriv_robot_frame) * sample_spline_deriv_robot_frame;
                     grasp_dir.normalize();
+                    grasp_dir *= -1.0;
 
-                    const double tool_frame_offset = 0.2; // offset from the tool frame of the gripper to the wrist
-                    //
+                    Eigen::Vector3d grasp_candidate_dir_x = grasp_dir;
+                    Eigen::Vector3d grasp_candidate_dir_y = sample_spline_deriv_robot_frame;
+                    Eigen::Vector3d grasp_candidate_dir_z = grasp_dir.cross(sample_spline_deriv_robot_frame);
 
-                    Eigen::Vector3d grasp_candidate = sample_spline_point + grasp_dir;
-                    Eigen::Vector3d grasp_candidate_dir = -grasp_dir;
+                    Eigen::Matrix3d grasp_rotation_matrix;
+                    grasp_rotation_matrix(0, 0) = grasp_candidate_dir_x.x();
+                    grasp_rotation_matrix(1, 0) = grasp_candidate_dir_x.y();
+                    grasp_rotation_matrix(2, 0) = grasp_candidate_dir_x.z();
+                    grasp_rotation_matrix(0, 1) = grasp_candidate_dir_y.x();
+                    grasp_rotation_matrix(1, 1) = grasp_candidate_dir_y.y();
+                    grasp_rotation_matrix(2, 1) = grasp_candidate_dir_y.z();
+                    grasp_rotation_matrix(0, 2) = grasp_candidate_dir_z.x();
+                    grasp_rotation_matrix(1, 2) = grasp_candidate_dir_z.y();
+                    grasp_rotation_matrix(2, 2) = grasp_candidate_dir_z.z();
 
-//                    grasp_candidates[i] = Eigen::Scaling(0.1);
+                    // robot_frame -> candidate tool frame pose
+                    Eigen::Affine3d grasp_candidate_rotation = Eigen::Translation3d(sample_spline_point_robot_frame) * grasp_rotation_matrix;
+
+                    Eigen::Affine3d candidate_wrist_transform = grasp_candidate_rotation * wrist_to_tool_.inverse();
                 }
 
                 // TODO:
@@ -200,6 +250,8 @@ int GraspObjectExecutor::run()
                 move_arm_goal.goal_pose; // FIXME: fill me out
 
                 pending_move_arm_command_ = true;
+#endif
+                sent_move_arm_goal_ = true;
             }
             else if (!pending_move_arm_command_) {
                 ROS_INFO("Move Arm Goal is no longer pending");
@@ -217,9 +269,12 @@ int GraspObjectExecutor::run()
         {
             if (!sent_viservo_command_) {
                 ROS_INFO("Sending Viservo Goal to pregrasp pose");
+#if !TEST_STATE_MACHINE
                 // TODO:
                 //     send viservo goal to successful pregrasp from PLANNIG_ARM_MOTION_TO_PREGRASP phase
                 pending_viservo_command_ = true;
+#endif
+                sent_viservo_command_ = true;
             }
             else if (!pending_viservo_command_) {
                 ROS_INFO("Viservo Goal to pregrasp is no longer pending");
@@ -231,9 +286,12 @@ int GraspObjectExecutor::run()
         {
             if (!sent_viservo_command_) {
                 ROS_INFO("Sending Viservo Goal to grasp pose");
+#if !TEST_STATE_MACHINE
                 // TODO:
                 //     send viservo goal to grasp associated with pregrasp from previous phase
                 pending_viservo_command_ = true;
+#endif
+                sent_viservo_command_ = true;
             }
             else if (!pending_viservo_command_) {
                 ROS_INFO("Viservo Goal to grasp is no longer pending");
@@ -243,20 +301,27 @@ int GraspObjectExecutor::run()
         }   break;
         case GraspObjectExecutionStatus::GRASPING_OBJECT:
         {
-            if (!sent_close_gripper_command_) {
+            if (!sent_gripper_command_) {
+                ROS_INFO("Sending Gripper Goal to close gripper");
+#if !TEST_STATE_MACHINE
                 pending_gripper_command_ = true;
+#endif
+                sent_gripper_command_ = true;
             }
             else if (!pending_gripper_command_) {
                 ROS_INFO("Gripper Goal to close gripper is no longer pending");
                 status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
-                sent_close_gripper_command_ = false; // reset for future close gripper goals
+                sent_gripper_command_ = false; // reset for future close gripper goals
             }
         }   break;
         case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
         {
             if (!sent_move_arm_goal_) {
                 ROS_INFO("Sending Move Arm Goal to stow position");
+#if !TEST_STATE_MACHINE
                 pending_move_arm_command_ = true;
+#endif
+                sent_move_arm_goal_ = true;
             }
             else if (!pending_move_arm_command_) {
                 // NOTE: short-circuiting
@@ -301,7 +366,7 @@ void GraspObjectExecutor::goal_callback()
     sent_viservo_command_ = false;
     pending_viservo_command_ = false;
 
-    sent_close_gripper_command_ = false;
+    sent_gripper_command_ = false;
     pending_gripper_command_ = false;
 }
 
@@ -358,4 +423,30 @@ void GraspObjectExecutor::gripper_command_result_cb(
     const control_msgs::GripperCommandResult& result)
 {
     pending_gripper_command_ = false;
+}
+
+uint8_t GraspObjectExecutor::execution_status_to_feedback_status(GraspObjectExecutionStatus::Status status)
+{
+    switch (status) {
+    case GraspObjectExecutionStatus::IDLE:
+        return -1;
+    case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
+        return hdt::GraspObjectFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
+    case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP:
+        return hdt::GraspObjectFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
+    case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP:
+        return hdt::GraspObjectFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
+    case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP:
+        return hdt::GraspObjectFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP;
+    case GraspObjectExecutionStatus::GRASPING_OBJECT:
+        return hdt::GraspObjectFeedback::GRASPING_OBJECT;
+    case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
+        return hdt::GraspObjectFeedback::PLANNING_ARM_MOTION_TO_STOW;
+    case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION:
+        return hdt::GraspObjectFeedback::EXECUTING_ARM_MOTION_TO_STOW;
+    case GraspObjectExecutionStatus::COMPLETING_GOAL:
+        return -1;
+    default:
+        return -1;
+    }
 }

@@ -1,6 +1,7 @@
 #ifndef ObjectPickupExecutor_h
 #define ObjectPickupExecutor_h
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <Eigen/Dense>
@@ -12,6 +13,8 @@
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/common/geometry/nurb/NURB.h>
+
+#define TEST_STATE_MACHINE 0
 
 namespace GraspObjectExecutionStatus
 {
@@ -74,7 +77,7 @@ private:
     typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
     std::string gripper_command_action_name_;
     std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
-    bool sent_close_gripper_command_;
+    bool sent_gripper_command_;
     bool pending_gripper_command_;
 
     hdt::GraspObjectGoal::ConstPtr current_goal_;
@@ -83,6 +86,11 @@ private:
     GraspObjectExecutionStatus::Status last_status_;
 
     std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
+
+    const double gas_can_scale_;
+
+    Eigen::Affine3d wrist_to_tool_;
+    double pregrasp_to_grasp_offset_m_;
 
     void goal_callback();
     void preempt_callback();
@@ -135,6 +143,8 @@ private:
 
         return false;
     }
+
+    uint8_t execution_status_to_feedback_status(GraspObjectExecutionStatus::Status status);
 };
 
 #endif
