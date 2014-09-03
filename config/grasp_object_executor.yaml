@@ -9,4 +9,4 @@ wrist_to_tool_transform:
         y: 0.0
         z: 0.0
 
-pregrasp_to_grasp_offset_m: 0.20
+pregrasp_to_grasp_offset_m: 0.08
