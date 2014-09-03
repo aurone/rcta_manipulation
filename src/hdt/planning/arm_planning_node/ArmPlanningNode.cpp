@@ -276,7 +276,9 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // fill start state
     if (!get_initial_configuration(ph_, scene->robot_state)) {
         ROS_ERROR("Failed to get initial configuration.");
-        move_command_server_->setAborted();
+        hdt::MoveArmCommandResult result;
+        result.success = false;
+        move_command_server_->setAborted(result);
         return;
     }
 
@@ -315,14 +317,25 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
         bool interp_res = add_interpolation_to_plan(result_traj);
         if (!interp_res) {
             ROS_ERROR("Failed to interpolate joint trajectory");
-            move_command_server_->setAborted();
+            hdt::MoveArmCommandResult result;
+            result.success = false;
+            move_command_server_->setAborted(result);
             return;
         }
 
         publish_trajectory(result_traj);
-    }
 
-    move_command_server_->setSucceeded();
+        hdt::MoveArmCommandResult result;
+        result.success = true;
+        result.trajectory = result_traj;
+        move_command_server_->setSucceeded(result);
+    }
+    else {
+        hdt::MoveArmCommandResult result;
+        result.success = false;
+        result.trajectory;
+        move_command_server_->setAborted(result);
+    }
 }
 
 void ArmPlanningNode::fill_constraint(const std::vector<double>& pose,
