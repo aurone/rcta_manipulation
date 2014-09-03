@@ -21,55 +21,8 @@ struct Nurb
     int degree() const { return degree_; }
     const std::vector<int> knots() const { return knots_; }
 
-    PointType operator()(double u)
-    {
-        std::vector<double> weights(control_points_.size(), 1.0); // TODO: all weights are 1 currently for simplicity
-
-        PointType agg = PointType::Zero();
-
-        double normalizer = 0.0;
-        for (int n = 0; n < control_points_.size(); ++n) {
-            double tmp = basis_func(n, degree_, u) * weights[n];
-            agg += tmp * control_points_[n];
-            normalizer += tmp;
-        }
-
-        if (normalizer == 0) {
-            if (u == 0) {
-                return control_points_.front();
-            }
-            else if (u == 1) {
-                return control_points_.back();
-            }
-            else {
-                fprintf(stderr, "Normalizer is 0\n");
-                return agg;
-            }
-        }
-
-        return (agg / normalizer);
-    }
-
-    PointType deriv(double u)
-    {
-        std::vector<double> weights(control_points_.size(), 1.0);
-
-        PointType agg = PointType::Zero();
-
-        double normalizer = 0.0;
-        for (int n = 0; n < control_points_.size(); ++n) {
-            double tmp = dbasis(n, degree_, u);
-            agg += tmp * control_points_[n];
-            normalizer += tmp;
-        }
-
-//        if (normalizer == 0) {
-//            fprintf(stderr, "Normalizer is 0\n");
-            return agg;
-//        }
-
-//        return (agg / normalizer);
-    }
+    PointType operator()(double u);
+    PointType deriv(double u);
 
 public:
 
@@ -154,6 +107,58 @@ bool Nurb<PointType>::initialize(const std::vector<PointType>& control_points, i
 
     assert(knots_.size() == control_points_.size() + order);
     return true;
+}
+
+template <typename PointType>
+PointType Nurb<PointType>::operator()(double u)
+{
+    std::vector<double> weights(control_points_.size(), 1.0); // TODO: all weights are 1 currently for simplicity
+
+    PointType agg = PointType::Zero();
+
+    double normalizer = 0.0;
+    for (int n = 0; n < control_points_.size(); ++n) {
+        double tmp = basis_func(n, degree_, u) * weights[n];
+        agg += tmp * control_points_[n];
+        normalizer += tmp;
+    }
+
+    if (normalizer == 0) {
+        if (u == 0) {
+            return control_points_.front();
+        }
+        else if (u == 1) {
+            return control_points_.back();
+        }
+        else {
+            fprintf(stderr, "Normalizer is 0\n");
+            return agg;
+        }
+    }
+
+    return (agg / normalizer);
+}
+
+template <typename PointType>
+PointType Nurb<PointType>::deriv(double u)
+{
+    std::vector<double> weights(control_points_.size(), 1.0);
+
+    PointType agg = PointType::Zero();
+
+    double normalizer = 0.0;
+    for (int n = 0; n < control_points_.size(); ++n) {
+        double tmp = dbasis(n, degree_, u);
+        agg += tmp * control_points_[n];
+        normalizer += tmp;
+    }
+
+//        if (normalizer == 0) {
+//            fprintf(stderr, "Normalizer is 0\n");
+        return agg;
+//        }
+
+//        return (agg / normalizer);
 }
 
 template <typename PointType>
