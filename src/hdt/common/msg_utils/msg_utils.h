@@ -13,6 +13,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
+#include <tf/transform_datatypes.h>
 #include <std_msgs/ColorRGBA.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/Marker.h>
@@ -83,6 +84,8 @@ bool vector_mul(const std::vector<T>& u, const std::vector<T>& v, std::vector<T>
 
 std::vector<double> to_degrees(const std::vector<double>& v);
 std::vector<double> to_radians(const std::vector<double>& v);
+
+void convert(const tf::Transform& from, Eigen::Affine3d& to);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation

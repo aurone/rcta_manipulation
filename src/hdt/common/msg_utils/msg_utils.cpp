@@ -345,6 +345,20 @@ std::vector<double> to_radians(const std::vector<double>& v)
     return v_rads;
 }
 
+void convert(const tf::Transform& from, Eigen::Affine3d& to)
+{
+    const double tx = from.getOrigin().x();
+    const double ty = from.getOrigin().y();
+    const double tz = from.getOrigin().z();
+
+    double qw = from.getRotation().w();
+    double qx = from.getRotation().x();
+    double qy = from.getRotation().y();
+    double qz = from.getRotation().z();
+
+    to = Eigen::Translation3d(tx, ty, tz) * Eigen::Quaterniond(qw, qx, qy, qz);
+}
+
 } // namespace msg_utils
 
 namespace geometry_msgs
