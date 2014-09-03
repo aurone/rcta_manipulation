@@ -24,7 +24,7 @@
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
-#include <hdt/GraspObjectAction.h>
+#include <hdt/GraspObjectCommandAction.h>
 
 class QPushButton;
 
@@ -73,7 +73,7 @@ private:
     std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
     bool pending_viservo_command_;
 
-    typedef actionlib::SimpleActionClient<hdt::GraspObjectAction> GraspObjectCommandActionClient;
+    typedef actionlib::SimpleActionClient<hdt::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
     bool pending_grasp_object_command_;
 
@@ -155,10 +155,10 @@ private:
             const hdt::ViservoCommandResult::ConstPtr& result);
 
     void grasp_object_command_active_cb();
-    void grasp_object_command_feeback_cb(const hdt::GraspObjectFeedback::ConstPtr& feedback);
+    void grasp_object_command_feeback_cb(const hdt::GraspObjectCommandFeedback::ConstPtr& feedback);
     void grasp_object_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const hdt::GraspObjectResult::ConstPtr& result);
+            const hdt::GraspObjectCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
             const robot_state::RobotState& robot_state,

@@ -477,7 +477,7 @@ void ManipulatorCommandPanel::send_grasp_object_command()
         return;
     }
 
-    hdt::GraspObjectGoal grasp_object_goal;
+    hdt::GraspObjectCommandGoal grasp_object_goal;
 
     // TODO: remove this constraint?
     if (gas_can_interactive_marker.header.frame_id != rm_->getRootLinkName()) {
@@ -489,7 +489,9 @@ void ManipulatorCommandPanel::send_grasp_object_command()
     grasp_object_goal.id = grasp_object_goal_id++;
     grasp_object_goal.retryCount = 0;
     grasp_object_goal.gas_can_in_base_link.pose = gas_can_interactive_marker.pose;
+    grasp_object_goal.gas_can_in_base_link.header.frame_id = rm_->getRootLinkName();
     grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
+    grasp_object_goal.gas_can_in_map.header.frame_id = rm_->getRootLinkName();
     // TODO: octomap
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::grasp_object_command_result_cb, this, _1, _2);
@@ -1007,14 +1009,14 @@ void ManipulatorCommandPanel::grasp_object_command_active_cb()
 
 }
 
-void ManipulatorCommandPanel::grasp_object_command_feeback_cb(const hdt::GraspObjectFeedback::ConstPtr& feedback)
+void ManipulatorCommandPanel::grasp_object_command_feeback_cb(const hdt::GraspObjectCommandFeedback::ConstPtr& feedback)
 {
 
 }
 
 void ManipulatorCommandPanel::grasp_object_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const hdt::GraspObjectResult::ConstPtr& result)
+    const hdt::GraspObjectCommandResult::ConstPtr& result)
 {
     ROS_INFO("Received Result from Grasp Object Command Action");
     pending_grasp_object_command_ = false;
@@ -1120,14 +1122,16 @@ void ManipulatorCommandPanel::update_sliders()
 
 void ManipulatorCommandPanel::update_gui()
 {
-    bool pending_motion_command = pending_move_arm_command_ || pending_viservo_command_ || !pending_grasp_object_command_;
-    ROS_INFO("Updating gui. pending move arm command: %s, pending viservo command: %s",
-            pending_move_arm_command_ ? "TRUE" : "FALSE",
-                    pending_viservo_command_ ? "TRUE" : "FALSE");
+    ROS_INFO("    Pending Move Arm Command: %s", pending_move_arm_command_ ? "TRUE" : "FALSE");
+    ROS_INFO("    Pending Viservo Command: %s", pending_viservo_command_ ? "TRUE": "FALSE");
+    ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
+
+    bool pending_motion_command = pending_move_arm_command_ || pending_viservo_command_ || pending_grasp_object_command_;
+
     send_move_arm_command_button_->setEnabled(!pending_motion_command);
+    send_joint_goal_button_->setEnabled(!pending_motion_command);
     send_viservo_command_button_->setEnabled(!pending_motion_command);
     send_grasp_object_command_button_->setEnabled(!pending_motion_command);
-    send_joint_goal_button_->setEnabled(!pending_motion_command);
 }
 
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const

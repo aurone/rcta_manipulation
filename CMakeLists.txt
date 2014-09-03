@@ -82,7 +82,7 @@ add_action_files(
         ObjectDetection.action
         MoveArmCommand.action
         ViservoCommand.action
-        GraspObject.action)
+        GraspObjectCommand.action)
 add_message_files(
     FILES
         ControllerDiagnosticStatus.msg 
