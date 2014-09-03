@@ -260,9 +260,10 @@ int ViservoControlExecutor::run()
         // Note: this could probably be done with another simple call to tf but for some reason I hate tf
         Eigen::Affine3d manip_to_ee;
         if (!robot_model_->compute_fk(curr_joint_state_->position, manip_to_ee)) {
-            ROS_ERROR("Failed to compute end effector transform from joint state");
+            std::string error = "Failed to compute end effector transform from joint state";
+            ROS_ERROR("%s", error.c_str());
             result.result = hdt::ViservoCommandResult::STUCK;
-            as_->setAborted(result);
+            as_->setAborted(result, error);
             stop_arm(cmd_seqno_++);
             continue;
         }
@@ -318,18 +319,20 @@ int ViservoControlExecutor::run()
 
         // 2. lost track of the marker
         if (lost_marker()) {
-            ROS_WARN("Marker has been lost. Aborting Viservo action...");
+            std::string error = "Marker has been lost. Aborting Viservo action...";
+            ROS_WARN("%s", error.c_str());
             result.result = hdt::ViservoCommandResult::LOST_MARKER;
-            as_->setAborted(result);
+            as_->setAborted(result, error);
             stop_arm(cmd_seqno_++);
             continue;
         }
 
         // 3. check whether the wrist has moved too far from the goal (and the canonical path follower should retry)
         if (moved_too_far()) {
-            ROS_INFO("Arm has moved too far from the goal. Aborting Viservo action...");
+            std::string error = "Arm has moved too far from the goal. Aborting Viservo action...";
+            ROS_INFO("%s", error.c_str());
             result.result = hdt::ViservoCommandResult::MOVED_TOO_FAR;
-            as_->setAborted(result);
+            as_->setAborted(result, error);
             stop_arm(cmd_seqno_++);
             continue;
         }
@@ -457,10 +460,13 @@ int ViservoControlExecutor::run()
         std::vector<double> chosen_solution;
         std::string why;
         if (!choose_best_ik_solution(mount_to_target_wrist, curr_joint_state_->position, chosen_solution, why)) {
-            ROS_WARN("Failed to find target joint state (%s). Aborting Viservo action...", why.c_str());
+            std::stringstream ss;
+            ss << "Failed to find target joint state (" << why << "). Aborting Viservo action...";
+            ROS_WARN("%s", ss.str().c_str());
             result.result = hdt::ViservoCommandResult::STUCK;
-            as_->setAborted(result);
+            as_->setAborted(result, ss.str());
             stop_arm(cmd_seqno_++);
+            continue;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
