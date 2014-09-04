@@ -399,7 +399,7 @@ void GripperSimulator::handle_state_updates(double time_delta)
                 position_ = target_position; // don't overshoot target_position
             }
             position_ = clampedf(position_, model_.minimum_width(), model_.maximum_width());
-            printf("x(t+1) = %0.3f", position_);
+            printf("x(t+1) = %0.3f\n", position_);
         }
 
     }   break;
@@ -466,7 +466,7 @@ void GripperSimulator::handle_output_registers()
 
     rinput_registers_[3] = rPR();
 
-    double target_position = model_.pos_value_to_width(target_pos_);
+//    double target_position = model_.pos_value_to_width(target_pos_);
     uint8_t cpos = model_.width_to_pos_value(position_);
     rinput_registers_[4] = cpos;
 

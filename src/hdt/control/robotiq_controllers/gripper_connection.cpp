@@ -44,7 +44,7 @@ bool GripperConnection::connect(std::string& why)
         return true;
     }
     catch (std::exception& e) {
-        why = std::string("Boost Exception (") + std::string(e.what()) + std::string(")");
+        why = std::string("std::exception encountered trying to connect to gripper (") + std::string(e.what()) + std::string(")");
         return false;
     }
 }
@@ -84,7 +84,7 @@ bool GripperConnection::send_request(const GripperRequest& req, GripperResponse&
         }
     }
     catch (boost::system::system_error& e) {
-        fprintf(stderr, "Boost Exception (%s)\n", e.what());
+        fprintf(stderr, "Failed to write request message to socket (%s)\n", e.what());
         return false;
     }
 
@@ -97,7 +97,7 @@ bool GripperConnection::send_request(const GripperRequest& req, GripperResponse&
         }
     }
     catch (boost::system::system_error& e) {
-        fprintf(stderr, "Boost Exception (%s)\n", e.what());
+        fprintf(stderr, "Failed to read response header from socket (%s)\n", e.what());
         return false;
     }
 
@@ -116,7 +116,7 @@ bool GripperConnection::send_request(const GripperRequest& req, GripperResponse&
         }
     }
     catch (boost::system::system_error& e) {
-        fprintf(stderr, "Boost Exception (%s)\n", e.what());
+        fprintf(stderr, "Failed to read response payload from socket (%s)\n", e.what());
         return false;
     }
 
