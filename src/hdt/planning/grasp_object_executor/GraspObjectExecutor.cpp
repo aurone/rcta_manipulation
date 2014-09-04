@@ -448,6 +448,8 @@ int GraspObjectExecutor::run()
 
                 pending_move_arm_command_ = true;
                 sent_move_arm_goal_ = true;
+
+                reachable_grasp_candidates_.pop_back();
             }
             else if (!pending_move_arm_command_) {
                 // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
