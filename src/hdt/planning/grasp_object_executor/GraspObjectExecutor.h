@@ -86,6 +86,7 @@ private:
     hdt::MoveArmCommandResult::ConstPtr move_arm_command_result_;
 
     hdt::MoveArmCommandGoal last_move_arm_pregrasp_goal_;
+    hdt::MoveArmCommandGoal last_move_arm_stow_goal_;
 
     typedef actionlib::SimpleActionClient<hdt::ViservoCommandAction> ViservoCommandActionClient;
     std::string viservo_command_action_name_;

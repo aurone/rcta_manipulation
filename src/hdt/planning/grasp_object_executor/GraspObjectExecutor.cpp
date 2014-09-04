@@ -717,17 +717,71 @@ int GraspObjectExecutor::run()
         }   break;
         case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
         {
+            ////////////////////////////////////////////////////////////////////////////////
+            // Main loop of PLANNING_ARM_MOTION_TO_PREGRASP
+            ////////////////////////////////////////////////////////////////////////////////
+
             if (!sent_move_arm_goal_) {
+                hdt::GraspObjectCommandFeedback feedback;
+                feedback.status = execution_status_to_feedback_status(status_);
+                as_->publishFeedback(feedback);
+
                 ROS_INFO("Sending Move Arm Goal to stow position");
-//                pending_move_arm_command_ = true;
+                if (!wait_for_action_server(
+                        move_arm_command_client_,
+                        move_arm_command_action_name_,
+                        ros::Duration(0.1),
+                        ros::Duration(5.0)))
+                {
+                    std::stringstream ss; ss << "Failed to connect to '" << move_arm_command_action_name_ << "' action server";
+                    ROS_WARN("%s", ss.str().c_str());
+                    hdt::GraspObjectCommandResult result;
+                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    as_->setAborted(result, ss.str());
+                    status_ = GraspObjectExecutionStatus::FAULT;
+                    break;
+                }
+
+                // 4. send a move arm goal for the best grasp
+                last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
+
+                double stow_x = 0.0;
+                double stow_y = -0.382;
+                double stow_z = 0.514;
+                double stow_qw = 0.084;
+                double stow_qx = 0.147;
+                double stow_qy = 0.594;
+                double stow_qz = 0.787;
+
+                const Eigen::Affine3d HARDCODED_STOW_POSE =
+                        Eigen::Translation3d(stow_x, stow_y, stow_z) * Eigen::Quaterniond(stow_qw, stow_qx, stow_qy, stow_qz);
+                tf::poseEigenToMsg(HARDCODED_STOW_POSE, last_move_arm_stow_goal_.goal_pose);
+
+                auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
+                move_arm_command_client_->sendGoal(last_move_arm_stow_goal_, result_cb);
+
+                pending_move_arm_command_ = true;
                 sent_move_arm_goal_ = true;
             }
             else if (!pending_move_arm_command_) {
-                // NOTE: short-circuiting
-                // "EXECUTING_ARM_MOTION_TO_STOW_POSITION" for now since hte
-                // move arm action handles execution and there is presently no
-                // feedback to distinguish planning vs. execution
-                status_ = GraspObjectExecutionStatus::COMPLETING_GOAL;
+                // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
+                // now since the move_arm action handles execution and there is
+                // presently no feedback to distinguish planning vs. execution
+
+                ROS_INFO("Move Arm Goal is no longer pending");
+                if (move_arm_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
+                    move_arm_command_result_ && move_arm_command_result_->success)
+                {
+                    ROS_INFO("Move Arm Command succeeded");
+                    status_ = GraspObjectExecutionStatus::COMPLETING_GOAL;
+                }
+                else {
+                    ROS_INFO("Move Arm Command failed");
+                    ROS_INFO("    Simple Client Goal State: %s", move_arm_command_goal_state_.toString().c_str());
+                    ROS_INFO("    Error Text: %s", move_arm_command_goal_state_.getText().c_str());
+                    ROS_INFO("    result.success = %s", move_arm_command_result_ ? (move_arm_command_result_->success ? "TRUE" : "FALSE") : "null");
+                }
+
                 sent_move_arm_goal_ = false; // reset for future move arm goals
             }
         }   break;
