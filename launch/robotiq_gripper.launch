@@ -5,10 +5,8 @@
         <arg name="sim" value="$(arg sim)"/>
     </include>
 
-    <!--
     <group if="$(arg sim)">
-        <node name="robotiq_simulator" pkg="hdt" type="robotiq_simulator" output="screen"/>
+        <node name="robotiq_simulator" pkg="hdt" type="robotiq_simulator"/>
     </group>
-    -->
 </launch>
 
