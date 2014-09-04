@@ -25,6 +25,7 @@
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/GraspObjectCommandAction.h>
+#include <hdt/RepositionBaseCommandAction.h>
 
 class QPushButton;
 
@@ -44,8 +45,13 @@ public Q_SLOTS:
 
     void copy_current_state();
     void refresh_robot_description();
+
     void send_move_arm_command();
     void send_joint_goal();
+    void send_viservo_command();
+    void send_grasp_object_command();
+    void send_reposition_base_command();
+
     void cycle_ik_solutions();
 
     void change_joint_1(int value);
@@ -55,9 +61,6 @@ public Q_SLOTS:
     void change_joint_5(int value);
     void change_joint_6(int value);
     void change_joint_7(int value);
-
-    void send_viservo_command();
-    void send_grasp_object_command();
 
 private:
 
@@ -76,6 +79,10 @@ private:
     typedef actionlib::SimpleActionClient<hdt::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
     bool pending_grasp_object_command_;
+
+    typedef actionlib::SimpleActionClient<hdt::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
+    std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
+    bool pending_reposition_base_command_;
 
     hdt::RobotModelPtr robot_model_;
 
@@ -101,6 +108,7 @@ private:
     QPushButton* cycle_ik_solutions_button_;
     QPushButton* send_viservo_command_button_;
     QPushButton* send_grasp_object_command_button_;
+    QPushButton* send_reposition_base_command_button_;
     QSlider* joint_1_slider_;
     QSlider* joint_2_slider_;
     QSlider* joint_3_slider_;
@@ -140,7 +148,7 @@ private:
 
     bool reinit_robot();
 
-    void monitor_move_command();
+//    void monitor_move_command();
 
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
@@ -159,6 +167,12 @@ private:
     void grasp_object_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::GraspObjectCommandResult::ConstPtr& result);
+
+    void reposition_base_command_active_cb();
+    void reposition_base_command_feedback_cb(const hdt::RepositionBaseCommandFeedback::ConstPtr& feedback);
+    void reposition_base_command_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::RepositionBaseCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
             const robot_state::RobotState& robot_state,

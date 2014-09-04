@@ -808,7 +808,7 @@ void GraspObjectExecutor::goal_callback()
     ROS_INFO("Received a new goal");
     current_goal_ = as_->acceptNewGoal();
     ROS_INFO("    Goal ID: %u", current_goal_->id);
-    ROS_INFO("    Retry Count: %d", current_goal_->retryCount);
+    ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
     ROS_INFO("    Gas Can Pose [map]", to_string(current_goal_->gas_can_in_map.pose).c_str());
     ROS_INFO("    Gas Can Pose [base_link]", to_string(current_goal_->gas_can_in_base_link.pose).c_str());
     ROS_INFO("    Octomap ID: %s", current_goal_->octomap.id.c_str());

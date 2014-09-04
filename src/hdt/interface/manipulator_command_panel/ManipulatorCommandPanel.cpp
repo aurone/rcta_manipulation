@@ -30,6 +30,10 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     pending_move_arm_command_(false),
     viservo_command_client_(),
     pending_viservo_command_(false),
+    grasp_object_command_client_(),
+    pending_grasp_object_command_(false),
+    reposition_base_command_client_(),
+    pending_reposition_base_command_(false),
     rm_loader_(),
     rm_(),
     rs_(),
@@ -43,6 +47,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     cycle_ik_solutions_button_(nullptr),
     send_viservo_command_button_(nullptr),
     send_grasp_object_command_button_(nullptr),
+    send_reposition_base_command_button_(nullptr),
     joint_1_slider_(nullptr),
     joint_2_slider_(nullptr),
     joint_3_slider_(nullptr),
@@ -61,6 +66,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
     send_viservo_command_button_ = new QPushButton(tr("Send Visual Servo Command"));
     send_grasp_object_command_button_ = new QPushButton(tr("Send Grasp Object Command"));
+    send_reposition_base_command_button_ = new QPushButton(tr("Send Reposition Base Command"));
 
     joint_1_slider_ = new QSlider(Qt::Horizontal);
     joint_2_slider_ = new QSlider(Qt::Horizontal);
@@ -78,6 +84,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     layout->addWidget(cycle_ik_solutions_button_);
     layout->addWidget(send_viservo_command_button_);
     layout->addWidget(send_grasp_object_command_button_);
+    layout->addWidget(send_reposition_base_command_button_);
     layout->addWidget(joint_1_slider_);
     layout->addWidget(joint_2_slider_);
     layout->addWidget(joint_3_slider_);
@@ -97,6 +104,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
     connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
+    connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
     connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
     connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
     connect(joint_3_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_3(int)));
@@ -487,7 +495,7 @@ void ManipulatorCommandPanel::send_grasp_object_command()
 
     static int grasp_object_goal_id = 0;
     grasp_object_goal.id = grasp_object_goal_id++;
-    grasp_object_goal.retryCount = 0;
+    grasp_object_goal.retry_count = 0;
     grasp_object_goal.gas_can_in_base_link.pose = gas_can_interactive_marker.pose;
     grasp_object_goal.gas_can_in_base_link.header.frame_id = rm_->getRootLinkName();
     grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
@@ -498,6 +506,60 @@ void ManipulatorCommandPanel::send_grasp_object_command()
     grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
 
     pending_grasp_object_command_ = true;
+    update_gui();
+}
+
+void ManipulatorCommandPanel::send_reposition_base_command()
+{
+    if (!reposition_base_command_client_) {
+        ROS_WARN("Reposition Base Command Client has not yet been instantiated");
+        return;
+    }
+
+    if (!reposition_base_command_client_->isServerConnected()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (server is not connected)"));
+
+        // try and reset the action client to grab a fresh connection
+        reposition_base_command_client_.reset(new RepositionBaseCommandActionClient("reposition_base_command", false));
+        if (!reposition_base_command_client_) {
+            ROS_WARN("Failed to instantiate Reposition Base Command Action Client");
+            return;
+        }
+
+        return;
+    }
+
+    const std::string gas_can_interactive_marker_name = "gas_canister_fixture";
+    visualization_msgs::InteractiveMarker gas_can_interactive_marker;
+    if (!server_.get(gas_can_interactive_marker_name, gas_can_interactive_marker)) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (no interactive marker named 'gas_canister_fixture'"));
+        return;
+    }
+
+    hdt::RepositionBaseCommandGoal reposition_base_goal;
+
+    // TODO: remove this constraint? Yes, Yes remove it
+    if (gas_can_interactive_marker.header.frame_id != rm_->getRootLinkName()) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (interactive marker has frame other than robot model root frame"));
+        return;
+    }
+
+    static int reposition_base_goal_id = 0;
+    reposition_base_goal.id = reposition_base_goal_id++;
+    reposition_base_goal.retry_count = 0;
+    reposition_base_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
+    reposition_base_goal.gas_can_in_map.header.frame_id = "map"; //rm_->getRootLinkName();
+    reposition_base_goal.base_link_in_map.pose = gas_can_interactive_marker.pose;
+    reposition_base_goal.base_link_in_map.header.frame_id = "map";
+
+//    grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
+//    grasp_object_goal.gas_can_in_map.header.frame_id = rm_->getRootLinkName();
+    // TODO: octomap
+
+    auto result_callback = boost::bind(&ManipulatorCommandPanel::reposition_base_command_result_cb, this, _1, _2);
+    reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
+
+    pending_reposition_base_command_ = true;
     update_gui();
 }
 
@@ -522,6 +584,12 @@ bool ManipulatorCommandPanel::do_init()
     grasp_object_command_client_.reset(new GraspObjectCommandActionClient("grasp_object_command", false));
     if (!grasp_object_command_client_) {
         ROS_WARN("Failed to instantiate Grasp Object Command Action Client");
+        return false;
+    }
+
+    reposition_base_command_client_.reset(new RepositionBaseCommandActionClient("reposition_base_command", false));
+    if (!reposition_base_command_client_) {
+        ROS_WARN("Failed to instantiate Reposition Base Command Action Client");
         return false;
     }
 
@@ -900,7 +968,7 @@ bool ManipulatorCommandPanel::reinit_robot()
     gas_can_mesh_control.name = "mesh_control";
     gas_can_mesh_control.orientation = geometry_msgs::IdentityQuaternion();
     gas_can_mesh_control.orientation_mode = visualization_msgs::InteractiveMarkerControl::INHERIT;
-    gas_can_mesh_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::NONE; // TODO: change this to button?
+    gas_can_mesh_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::NONE;
     gas_can_mesh_control.always_visible = true;
 
     visualization_msgs::Marker mesh_marker;
@@ -1024,6 +1092,24 @@ void ManipulatorCommandPanel::grasp_object_command_result_cb(
     update_gui();
 }
 
+
+void ManipulatorCommandPanel::reposition_base_command_active_cb()
+{
+
+}
+
+void ManipulatorCommandPanel::reposition_base_command_feedback_cb(const hdt::RepositionBaseCommandFeedback::ConstPtr& feedback)
+{
+
+}
+
+void ManipulatorCommandPanel::reposition_base_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const hdt::RepositionBaseCommandResult::ConstPtr& result)
+{
+
+}
+
 bool ManipulatorCommandPanel::gatherRobotMarkers(
     const robot_state::RobotState& robot_state,
     const std::vector<std::string>& link_names,
@@ -1126,13 +1212,16 @@ void ManipulatorCommandPanel::update_gui()
     ROS_INFO("    Pending Move Arm Command: %s", pending_move_arm_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Viservo Command: %s", pending_viservo_command_ ? "TRUE": "FALSE");
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
+    ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
 
-    bool pending_motion_command = pending_move_arm_command_ || pending_viservo_command_ || pending_grasp_object_command_;
+    bool pending_motion_command =
+        pending_move_arm_command_ || pending_viservo_command_ || pending_grasp_object_command_ || pending_reposition_base_command_;
 
     send_move_arm_command_button_->setEnabled(!pending_motion_command);
     send_joint_goal_button_->setEnabled(!pending_motion_command);
     send_viservo_command_button_->setEnabled(!pending_motion_command);
     send_grasp_object_command_button_->setEnabled(!pending_motion_command);
+    send_reposition_base_command_button_->setEnabled(!pending_motion_command);
 }
 
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const

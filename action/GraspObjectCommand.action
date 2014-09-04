@@ -1,6 +1,6 @@
 # goal
 uint32 id
-int32 retryCount
+int32 retry_count
 geometry_msgs/PoseStamped gas_can_in_map
 geometry_msgs/PoseStamped gas_can_in_base_link
 octomap_msgs/Octomap octomap
