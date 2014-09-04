@@ -76,7 +76,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     status_(GraspObjectExecutionStatus::INVALID),
     last_status_(GraspObjectExecutionStatus::INVALID),
     grasp_spline_(),
-    gas_can_scale_(0.1),
+    gas_can_scale_(0.12905),
     wrist_to_tool_(),
     pregrasp_to_grasp_offset_m_(0.0),
     listener_()
@@ -509,9 +509,12 @@ int GraspObjectExecutor::run()
                 ROS_INFO("Gripper Goal to open gripper is no longer pending");
 
                 if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
-                    gripper_command_result_->reached_goal)
+                    (gripper_command_result_->reached_goal || gripper_command_result_->stalled))
                 {
                     ROS_INFO("Gripper Command Succeeded");
+                    if (gripper_command_result_->stalled) {
+                        ROS_WARN("    Open Gripper Command Succeeded but Stalled During Execution");
+                    }
                     status_ = GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
                 }
                 else {
@@ -520,6 +523,8 @@ int GraspObjectExecutor::run()
                     ROS_INFO("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
                     ROS_INFO("    result.reached_goal = %s",
                             gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
+                    ROS_INFO("    result.stalled = %s",
+                            gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
                 }
 
                 sent_gripper_command_ = false; // reset for future gripper goals
@@ -692,7 +697,7 @@ int GraspObjectExecutor::run()
                 ROS_INFO("Gripper Goal to close gripper is no longer pending");
 
                 if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
-                    gripper_command_result_->reached_goal)
+                    (gripper_command_result_->reached_goal || gripper_command_result_->stalled))
                 {
                     ROS_INFO("Gripper Command Succeeded");
                     status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
@@ -703,6 +708,8 @@ int GraspObjectExecutor::run()
                     ROS_INFO("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
                     ROS_INFO("    result.reached_goal = %s",
                             gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
+                    ROS_INFO("    result.stalled = %s",
+                            gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
                 }
 
                 sent_gripper_command_ = false; // reset for future gripper goals

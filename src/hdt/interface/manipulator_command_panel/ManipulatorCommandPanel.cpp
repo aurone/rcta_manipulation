@@ -912,7 +912,8 @@ bool ManipulatorCommandPanel::reinit_robot()
     mesh_marker.type = visualization_msgs::Marker::MESH_RESOURCE;
     mesh_marker.action = visualization_msgs::Marker::ADD;
     mesh_marker.pose = geometry_msgs::IdentityPose();
-    mesh_marker.scale = geometry_msgs::CreateVector3(0.1, 0.1, 0.1);
+    const double gas_can_mesh_scale = 0.12905;
+    mesh_marker.scale = geometry_msgs::CreateVector3(gas_can_mesh_scale, gas_can_mesh_scale, gas_can_mesh_scale);
     mesh_marker.color = std_msgs::WhiteColorRGBA(0.5f);
     mesh_marker.lifetime = ros::Duration(0);
     mesh_marker.frame_locked = false;
