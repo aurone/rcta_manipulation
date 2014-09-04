@@ -748,10 +748,10 @@ int GraspObjectExecutor::run()
                 double stow_x = 0.0;
                 double stow_y = -0.382;
                 double stow_z = 0.514;
-                double stow_qw = 0.084;
-                double stow_qx = 0.147;
-                double stow_qy = 0.594;
-                double stow_qz = 0.787;
+                double stow_qx = 0.084;
+                double stow_qy = 0.147;
+                double stow_qz = -0.594;
+                double stow_qw = 0.787;
 
                 const Eigen::Affine3d HARDCODED_STOW_POSE =
                         Eigen::Translation3d(stow_x, stow_y, stow_z) * Eigen::Quaterniond(stow_qw, stow_qx, stow_qy, stow_qz);
