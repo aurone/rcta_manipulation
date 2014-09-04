@@ -21,6 +21,8 @@ std::string to_string(Status status)
         return "PlanningArmMotionToPregrasp";
     case EXECUTING_ARM_MOTION_TO_PREGRASP:
         return "ExecutingArmMotionToPregrasp";
+    case OPENING_GRIPPER:
+        return "OpeningGripper";
     case EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP:
         return "ExecutingVisualServoMotionToPregrasp";
     case EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP:
@@ -494,8 +496,8 @@ int GraspObjectExecutor::run()
                 }
 
                 control_msgs::GripperCommandGoal gripper_goal;
-                gripper_goal.command.max_effort = GripperModel().maximum_force();
                 gripper_goal.command.position = GripperModel().maximum_width();
+                gripper_goal.command.max_effort = GripperModel().maximum_force();
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::gripper_command_result_cb, this, _1, _2);
                 gripper_command_client_->sendGoal(gripper_goal, result_cb);
@@ -693,7 +695,7 @@ int GraspObjectExecutor::run()
                     gripper_command_result_->reached_goal)
                 {
                     ROS_INFO("Gripper Command Succeeded");
-                    status_ = GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
+                    status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
                 }
                 else {
                     ROS_INFO("Gripper Command failed");
