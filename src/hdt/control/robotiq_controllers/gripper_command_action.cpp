@@ -97,8 +97,10 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
 
     // create an interface to the gripper
     ROS_INFO("Connected to gripper");
+    last_gripper_connect_attempt_time_ = ros::Time::now();
 
-    // don't allow this node to rely on sending gripper commands faster than 30hz (force gripper interface to throttle attempts)
+    // don't allow this node to rely on sending gripper commands faster than
+    // 30hz (force gripper interface to throttle attempts)
     gripper_.reset(new GripperInterface(connection_, gripper_throttle_rate_hz_));
     if (!gripper_) {
         ROS_ERROR("Failed to instantiate Gripper Interface");
@@ -149,19 +151,53 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
     {
         ros::spinOnce();
 
-        gripper_->update();
+        if (!gripper_->update()) {
+            // note: updates can fail either from memory allocation errors or
+            // from connection errors; try to reconnect to the gripper here
+
+            // try at 1hz to reconnect to the gripper
+            if (ros::Time::now() > last_gripper_connect_attempt_time_ + ros::Duration(1.0)) {
+                ROS_WARN("Failed to update gripper. Refreshing connection...");
+                // shouldn't need to reinstantiate the connection
+                connection_.reset(new GripperConnection(ops));
+                if (!connection_) {
+                    ROS_ERROR("Failed to instantiate Gripper Connection");
+                    ros::shutdown();
+                }
+
+                last_gripper_connect_attempt_time_ = ros::Time::now();
+                std::string why;
+                if (connection_->connect(why)) {
+
+                    gripper_.reset(new GripperInterface(connection_, gripper_throttle_rate_hz_));
+                    if (!gripper_) {
+                        ROS_ERROR("Failed to instantiate Gripper Interface");
+                        ros::shutdown();
+                    }
+
+                    gripper_->set_speed(gripper_->model().minimum_speed());
+                }
+                else {
+                    ROS_WARN("Failed to connect to Robotiq Gripper (%s)", why.c_str());
+                }
+            }
+
+            continue; // skip publishing state and working on goals until the next cycle
+        }
 
         ////////////////////////////////////////////////////////////////////////////////
         // Publish gripper state
         ////////////////////////////////////////////////////////////////////////////////
 
-        double gripper_pos = gripper_->get_position();
+        double gripper_width = gripper_->get_position();
         double gripper_speed = gripper_->get_speed();
         double gripper_force = gripper_->get_force();
 
 //        ROS_INFO("Gripper Position: %0.3f", gripper_pos);
 //        ROS_INFO("Gripper Speed: %0.3f", gripper_speed);
 //        ROS_INFO("Gripper Force: %0.3f", gripper_force);
+
+        double gripper_pos = gripper_model_.maximum_width() - gripper_width;
 
         if (gripper_pos != -1.0) {
             sensor_msgs::JointState joint_state;

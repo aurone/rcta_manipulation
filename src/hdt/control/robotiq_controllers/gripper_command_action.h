@@ -8,6 +8,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <ros/ros.h>
+#include <hdt/control/robotiq_controllers/gripper_model.h>
 
 class GripperInterface;
 class GripperConnection;
@@ -54,6 +55,10 @@ private:
     std::mutex gripper_mutex_;
 
     control_msgs::GripperCommandGoal::ConstPtr curr_goal_;
+
+    ros::Time last_gripper_connect_attempt_time_;
+
+    GripperModel gripper_model_;
 
     void execute_callback(const control_msgs::GripperCommandGoalConstPtr& goal);
 
