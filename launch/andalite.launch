@@ -22,6 +22,11 @@
         </include>
     </group>
 
+    <!-- LAUNCH ARM STATE FILTER -->
+    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter" output="screen">
+        <rosparam command="load" file="$(find hdt)/config/joint_states_filter.yaml"/>
+    </node>
+
     <!-- LAUNCH GRIPPER DRIVER -->
     <include file="$(find hdt)/launch/robotiq_gripper.launch">
         <arg name="sim" value="$(arg sim)"/>
