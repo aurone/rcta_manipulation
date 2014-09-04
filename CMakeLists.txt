@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
     leatherman 
     message_generation 
     moveit_ros_planning 
+    nav_msgs 
     octomap_msgs 
     pluginlib
     pr2_vfh_database
@@ -81,6 +82,7 @@ add_action_files(
     FILES
         ObjectDetection.action
         MoveArmCommand.action
+        RepositionBaseCommand.action
         ViservoCommand.action
         GraspObjectCommand.action)
 add_message_files(
@@ -95,6 +97,7 @@ generate_messages(
     DEPENDENCIES
         actionlib_msgs
         geometry_msgs
+        nav_msgs
         octomap_msgs
         sensor_msgs
         std_msgs
