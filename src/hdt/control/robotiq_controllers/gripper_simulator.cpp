@@ -1,4 +1,7 @@
 #include <cstdio>
+#include <iomanip>
+#include <sstream>
+#include <string>
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include "gripper_simulator.h"
@@ -68,7 +71,24 @@ void GripperSimulator::update()
 
 std::vector<uint8_t> GripperSimulator::read_registers(int offset, int num_registers) const
 {
-    return std::vector<uint8_t>(&rinput_registers_[offset], &rinput_registers_[offset + num_registers]);
+    printf("Robot Input Registers (%d read): [ ", num_registers);
+
+    for (int i = 0; i < 2 * offset; ++i) {
+        printf("%02x ", (unsigned)rinput_registers_[i]);
+    }
+
+    for (int i = 2 * offset; i < 2 * offset + 2 * num_registers; ++i) {
+        printf("\x1b[36;1m%02x\x1b[m ", (unsigned)rinput_registers_[i]);
+    }
+
+    for (int i = 2 * offset + 2 * num_registers; i < NUM_ROBOT_INPUT_REGISTERS_; ++i) {
+        printf("%02x ", (unsigned)rinput_registers_[i]);
+    }
+
+    printf("]\n");
+    fflush(stdout);
+
+    return std::vector<uint8_t>(&rinput_registers_[2 * offset], &rinput_registers_[2 * offset + 2 * num_registers]);
 }
 
 static std::string to_string(std::vector<uint8_t>::const_iterator b, std::vector<uint8_t>::const_iterator e)
@@ -86,9 +106,23 @@ static std::string to_string(std::vector<uint8_t>::const_iterator b, std::vector
 
 void GripperSimulator::write_registers(int offset, const std::vector<uint8_t>& data)
 {
-    std::string register_data_string = ::to_string(data.cbegin(), data.cend());
-    printf("Wrote %s\n", register_data_string.c_str());
-    memcpy((void *)&routput_registers_[offset], (const void*)data.data(), data.size());
+    memcpy((void *)&routput_registers_[2 * offset], (const void*)data.data(), data.size());
+
+    printf("Robot Output Registers (%zd written): [ ", data.size() >> 1);
+    for (int i = 0; i < 2 * offset; ++i) {
+        printf("%02x ", (unsigned)routput_registers_[i]);
+    }
+
+    for (int i = 2 * offset; i < 2 * offset + (int)data.size(); ++i) {
+        printf("\x1b[32;1m%02x\x1b[m ", (unsigned)routput_registers_[i]);
+    }
+
+    for (int i = 2 * offset + (int)data.size(); i < NUM_ROBOT_OUTPUT_REGISTERS_; ++i) {
+        printf("%02x ", (unsigned)routput_registers_[i]);
+    }
+
+    printf("]\n");
+    fflush(stdout);
 }
 
 std::string GripperSimulator::to_string(ActivationStatus s)
@@ -365,6 +399,7 @@ void GripperSimulator::handle_state_updates(double time_delta)
                 position_ = target_position; // don't overshoot target_position
             }
             position_ = clampedf(position_, model_.minimum_width(), model_.maximum_width());
+            printf("x(t+1) = %0.3f", position_);
         }
 
     }   break;
@@ -408,8 +443,14 @@ void GripperSimulator::handle_output_registers()
         break;
     }
 
-    set_bit(rinput_registers_[0], 6, false);
-    set_bit(rinput_registers_[0], 7, false);
+    if (rGTO() && position_ == model_.pos_value_to_width(target_pos_)) {
+        set_bit(rinput_registers_[0], 6, true);
+        set_bit(rinput_registers_[0], 7, true);
+    }
+    else {
+        set_bit(rinput_registers_[0], 6, false);
+        set_bit(rinput_registers_[0], 7, false);
+    }
 
     rinput_registers_[1] = 0x00;
 
