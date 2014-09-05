@@ -1,3 +1,7 @@
+#ifndef RepositionBaseExecutor_h
+#define RepositionBaseExecutor_h
+
+
 #include <ros/ros.h>
 #include <signal.h>
 #include <visualization_msgs/Marker.h>
@@ -8,6 +12,72 @@
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/planning/arm_planning_node/HDTRobotModel.h>
+
+#include <hdt/RepositionBaseCommandAction.h>
+#include <actionlib/server/simple_action_server.h>
+
+
+namespace RepositionBaseExecutionStatus
+{
+
+enum Status
+{
+	INVALID = -1,
+	IDLE = 0,
+	FAULT,
+	COMPUTING_REPOSITION_BASE
+// 	GENERATING_SEARCH_SPACE
+// 	CHECKING_COLLISION
+// 	CHECKING_KINEMATICS
+// 	SELECTING_CANDIDATES
+};
+
+std::string to_string(Status status);
+
+}
+
+
+class RepositionBaseExecutor
+{
+public:
+	RepositionBaseExecutor();
+// 	bool initialize();
+// 	enum MainResult
+// 	{
+// 		SUCCESS = 0,
+// 		FAILED_TO_INITIALIZE		
+// 	};
+	int run();
+
+private:
+
+
+
+
+
+    uint8_t execution_status_to_feedback_status(RepositionBaseExecutionStatus::Status status);
+};
+
+
+/*
+typedef actionlib::SimpleActionServer<hdt::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+
+
+// # goal
+// uint32 id
+// int32 retry_count
+// geometry_msgs/PoseStamped gas_can_in_map
+// geometry_msgs/PoseStamped base_link_in_map
+// nav_msgs/OccupancyGrid map 
+// ---
+// # result
+// uint8 SUCCESS=0
+// uint8 PLANNING_FAILURE_OBJECT_UNREACHABLE=1
+// uint8 result
+// geometry_msgs/PoseStamped[] candidate_base_poses
+// ---
+// # feedback
+// float64 planning_time_s
 
 
 double wrapAngle(double ang)
@@ -375,6 +445,14 @@ void computeRobPose(double objx, double objy, double objY,  double robx0, double
 
 }
 
+void goal_callback()
+{
+}
+
+void preempt_callback()
+{
+}
+
 
 int main(int argc, char** argv)
 {
@@ -396,6 +474,25 @@ int main(int argc, char** argv)
 		objY *= M_PI/180.0;			// when "objY" is in [deg]
 	}
 // 	ROS_INFO("Object Pose: %f %f %f",objx,objy,objY*180/M_PI);
+
+
+	// action server initialization
+	std::string action_name_ = "reposition base command";
+	std::unique_ptr<RepositionBaseCommandActionServer> as_;
+	as_.reset(new RepositionBaseCommandActionServer(action_name_, false));
+	if (!as_) {
+		ROS_ERROR("Failed to instantiate Reposition Base Command Action Server");
+		return false;
+	}   
+
+	as_->registerGoalCallback(boost::bind(&goal_callback));
+	as_->registerPreemptCallback(boost::bind(&preempt_callback));
+
+	ROS_INFO("Starting action server '%s'...", action_name_.c_str());
+	as_->start();
+	ROS_INFO("Action server started");
+
+
 
 	
 	// visualization marker for gastank
@@ -534,3 +631,6 @@ int main(int argc, char** argv)
 
 	return 0;
 }
+*/
+
+#endif
