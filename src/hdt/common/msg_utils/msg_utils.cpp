@@ -359,6 +359,13 @@ void convert(const tf::Transform& from, Eigen::Affine3d& to)
     to = Eigen::Translation3d(tx, ty, tz) * Eigen::Quaterniond(qw, qx, qy, qz);
 }
 
+void convert(const Eigen::Affine3d& from, tf::Transform& to)
+{
+    Eigen::Vector3d p(from.translation());
+    Eigen::Quaterniond q(from.rotation());
+    to = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(p.x(), p.y(), p.z()));
+}
+
 } // namespace msg_utils
 
 namespace geometry_msgs

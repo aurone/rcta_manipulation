@@ -86,6 +86,7 @@ std::vector<double> to_degrees(const std::vector<double>& v);
 std::vector<double> to_radians(const std::vector<double>& v);
 
 void convert(const tf::Transform& from, Eigen::Affine3d& to);
+void convert(const Eigen::Affine3d& from, tf::Transform& to);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementation
