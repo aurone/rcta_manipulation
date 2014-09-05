@@ -40,8 +40,9 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     server_("hdt_control"),
     interactive_markers_(),
     tip_link_(),
-    copy_current_state_button_(nullptr),
+    robot_description_line_edit_(nullptr),
     refresh_robot_desc_button_(nullptr),
+    copy_current_state_button_(nullptr),
     send_move_arm_command_button_(nullptr),
     send_joint_goal_button_(nullptr),
     cycle_ik_solutions_button_(nullptr),
@@ -59,59 +60,11 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
 {
     ROS_INFO("Instantiating Manipulator Command Panel");
 
-    copy_current_state_button_ = new QPushButton(tr("Copy Current State"));
-    refresh_robot_desc_button_ = new QPushButton(tr("Refresh Robot Description"));
-    send_move_arm_command_button_ = new QPushButton(tr("Send Move Arm Command"));
-    send_joint_goal_button_ = new QPushButton(tr("Send Joint Goal"));
-    cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
-    send_viservo_command_button_ = new QPushButton(tr("Send Visual Servo Command"));
-    send_grasp_object_command_button_ = new QPushButton(tr("Send Grasp Object Command"));
-    send_reposition_base_command_button_ = new QPushButton(tr("Send Reposition Base Command"));
-
-    joint_1_slider_ = new QSlider(Qt::Horizontal);
-    joint_2_slider_ = new QSlider(Qt::Horizontal);
-    joint_3_slider_ = new QSlider(Qt::Horizontal);
-    joint_4_slider_ = new QSlider(Qt::Horizontal);
-    joint_5_slider_ = new QSlider(Qt::Horizontal);
-    joint_6_slider_ = new QSlider(Qt::Horizontal);
-    joint_7_slider_ = new QSlider(Qt::Horizontal);
-
-    QVBoxLayout* layout = new QVBoxLayout;
-    layout->addWidget(copy_current_state_button_);
-    layout->addWidget(refresh_robot_desc_button_);
-    layout->addWidget(send_move_arm_command_button_);
-    layout->addWidget(send_joint_goal_button_);
-    layout->addWidget(cycle_ik_solutions_button_);
-    layout->addWidget(send_viservo_command_button_);
-    layout->addWidget(send_grasp_object_command_button_);
-    layout->addWidget(send_reposition_base_command_button_);
-    layout->addWidget(joint_1_slider_);
-    layout->addWidget(joint_2_slider_);
-    layout->addWidget(joint_3_slider_);
-    layout->addWidget(joint_4_slider_);
-    layout->addWidget(joint_5_slider_);
-    layout->addWidget(joint_6_slider_);
-    layout->addWidget(joint_7_slider_);
-    setLayout(layout);
+    setup_gui();
 
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
-    connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
-    connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
-    connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
-    connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
-    connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
-    connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
-    connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
-    connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
-    connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
-    connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
-    connect(joint_3_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_3(int)));
-    connect(joint_4_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_4(int)));
-    connect(joint_5_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_5(int)));
-    connect(joint_6_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_6(int)));
-    connect(joint_7_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_7(int)));
 
     ROS_INFO("Initializing Manipulator Command Panel");
     if (!do_init())
@@ -563,6 +516,138 @@ void ManipulatorCommandPanel::send_reposition_base_command()
     update_gui();
 }
 
+void ManipulatorCommandPanel::setup_gui()
+{
+    QVBoxLayout* main_layout = new QVBoxLayout;
+
+    // general settings
+    QGroupBox* general_settings_group = new QGroupBox(tr("General Settings"));
+        QVBoxLayout* general_settings_layout = new QVBoxLayout;
+            QHBoxLayout* robot_description_layout = new QHBoxLayout;
+                robot_description_label_ = new QLabel(tr("Robot Description:"));
+                robot_description_line_edit_ = new QLineEdit;
+                refresh_robot_desc_button_ = new QPushButton(tr("Refresh"));
+            robot_description_layout->addWidget(robot_description_label_);
+            robot_description_layout->addWidget(robot_description_line_edit_);
+            robot_description_layout->addWidget(refresh_robot_desc_button_);
+            QHBoxLayout* global_frame_layout = new QHBoxLayout;
+                global_frame_label_ = new QLabel(tr("Global Frame:"));
+                global_frame_line_edit_ = new QLineEdit;
+            global_frame_layout->addWidget(global_frame_label_);
+            global_frame_layout->addWidget(global_frame_line_edit_);
+        general_settings_layout->addLayout(robot_description_layout);
+        general_settings_layout->addLayout(global_frame_layout);
+    general_settings_group->setLayout(general_settings_layout);
+
+    // base commands
+    QGroupBox* base_commands_group = new QGroupBox(tr("Base Commands"));
+        QVBoxLayout* base_commands_layout = new QVBoxLayout;
+            copy_current_base_pose_ = new QPushButton(tr("Copy Current Base Pose"));
+            QHBoxLayout* base_pose_spinbox_layout = new QHBoxLayout;
+                QLabel* x_label = new QLabel(tr("X:"));
+                teleport_base_command_x_box_ = new QDoubleSpinBox;
+                QLabel* y_label = new QLabel(tr("Y:"));
+                teleport_base_command_y_box_ = new QDoubleSpinBox;
+                QLabel* z_label = new QLabel(tr("Z:"));
+                teleport_base_command_z_box_ = new QDoubleSpinBox;
+            base_pose_spinbox_layout->addWidget(x_label);
+            base_pose_spinbox_layout->addWidget(teleport_base_command_x_box_);
+            base_pose_spinbox_layout->addWidget(y_label);
+            base_pose_spinbox_layout->addWidget(teleport_base_command_y_box_);
+            base_pose_spinbox_layout->addWidget(z_label);
+            base_pose_spinbox_layout->addWidget(teleport_base_command_z_box_);
+            send_teleport_andalite_command_button_ = new QPushButton(tr("Teleport Andalite"));
+        base_commands_layout->addWidget(copy_current_base_pose_);
+        base_commands_layout->addLayout(base_pose_spinbox_layout);
+        base_commands_layout->addWidget(send_teleport_andalite_command_button_);
+    base_commands_group->setLayout(base_commands_layout);
+
+    // arm commands
+    QGroupBox* arm_commands_group = new QGroupBox(tr("Arm Commands"));
+        QVBoxLayout* arm_commands_layout = new QVBoxLayout;
+            copy_current_state_button_ = new QPushButton(tr("Copy Arm State"));
+            cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
+            send_move_arm_command_button_ = new QPushButton(tr("Move Arm to End Effector Pose"));
+            QGridLayout* joint_state_spinbox_layout = new QGridLayout;
+                QLabel* j1_label = new QLabel(tr("J1"));
+                j1_spinbox_ = new QDoubleSpinBox;
+                QLabel* j2_label = new QLabel(tr("J2"));
+                j2_spinbox_ = new QDoubleSpinBox;
+                QLabel* j3_label = new QLabel(tr("J3"));
+                j3_spinbox_ = new QDoubleSpinBox;
+                QLabel* j4_label = new QLabel(tr("J4"));
+                j4_spinbox_ = new QDoubleSpinBox;
+                QLabel* j5_label = new QLabel(tr("J5"));
+                j5_spinbox_ = new QDoubleSpinBox;
+                QLabel* j6_label = new QLabel(tr("J6"));
+                j6_spinbox_ = new QDoubleSpinBox;
+                QLabel* j7_label = new QLabel(tr("J7"));
+                j7_spinbox_ = new QDoubleSpinBox;
+            joint_state_spinbox_layout->addWidget(j1_label, 0, 0);
+            joint_state_spinbox_layout->addWidget(j1_spinbox_, 0, 1);
+            joint_state_spinbox_layout->addWidget(j2_label, 0, 2);
+            joint_state_spinbox_layout->addWidget(j2_spinbox_, 0, 3);
+            joint_state_spinbox_layout->addWidget(j3_label, 0, 4);
+            joint_state_spinbox_layout->addWidget(j3_spinbox_, 0, 5);
+            joint_state_spinbox_layout->addWidget(j4_label, 0, 6);
+            joint_state_spinbox_layout->addWidget(j4_spinbox_, 0, 7);
+            joint_state_spinbox_layout->addWidget(j5_label, 1, 0);
+            joint_state_spinbox_layout->addWidget(j5_spinbox_, 1, 1);
+            joint_state_spinbox_layout->addWidget(j6_label, 1, 2);
+            joint_state_spinbox_layout->addWidget(j6_spinbox_, 1, 3);
+            joint_state_spinbox_layout->addWidget(j7_label, 1, 4);
+            joint_state_spinbox_layout->addWidget(j7_spinbox_, 1, 5);
+            send_joint_goal_button_ = new QPushButton(tr("Move Arm to Joint State"));
+            send_viservo_command_button_ = new QPushButton(tr("Visual Servo"));
+        arm_commands_layout->addWidget(copy_current_state_button_);
+        arm_commands_layout->addWidget(cycle_ik_solutions_button_);
+        arm_commands_layout->addWidget(send_move_arm_command_button_);
+        arm_commands_layout->addLayout(joint_state_spinbox_layout);
+        arm_commands_layout->addWidget(send_joint_goal_button_);
+        arm_commands_layout->addWidget(send_viservo_command_button_);
+    arm_commands_group->setLayout(arm_commands_layout);
+
+    // high-level commands
+    QGroupBox* high_level_commands_group = new QGroupBox(tr("High-Level Commands"));
+        QVBoxLayout* high_level_commands_layout = new QVBoxLayout;
+            send_grasp_object_command_button_ = new QPushButton(tr("Grasp Object"));
+            send_reposition_base_command_button_ = new QPushButton(tr("Reposition Base"));
+        high_level_commands_layout->addWidget(send_grasp_object_command_button_);
+        high_level_commands_layout->addWidget(send_reposition_base_command_button_);
+    high_level_commands_group->setLayout(high_level_commands_layout);
+
+    main_layout->addWidget(general_settings_group);
+    main_layout->addWidget(base_commands_group);
+    main_layout->addWidget(arm_commands_group);
+    main_layout->addWidget(high_level_commands_group);
+    setLayout(main_layout);
+
+    connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
+    connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
+    connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
+    connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
+    connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
+    connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
+    connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
+    connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
+    connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
+    connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
+    connect(joint_3_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_3(int)));
+    connect(joint_4_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_4(int)));
+    connect(joint_5_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_5(int)));
+    connect(joint_6_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_6(int)));
+    connect(joint_7_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_7(int)));
+
+    // instantiate for now but deprecate and phase out
+    joint_1_slider_ = new QSlider(Qt::Horizontal);
+    joint_2_slider_ = new QSlider(Qt::Horizontal);
+    joint_3_slider_ = new QSlider(Qt::Horizontal);
+    joint_4_slider_ = new QSlider(Qt::Horizontal);
+    joint_5_slider_ = new QSlider(Qt::Horizontal);
+    joint_6_slider_ = new QSlider(Qt::Horizontal);
+    joint_7_slider_ = new QSlider(Qt::Horizontal);
+}
+
 bool ManipulatorCommandPanel::do_init()
 {
     if (!reinit_robot()) {
@@ -590,6 +675,12 @@ bool ManipulatorCommandPanel::do_init()
     reposition_base_command_client_.reset(new RepositionBaseCommandActionClient("reposition_base_command", false));
     if (!reposition_base_command_client_) {
         ROS_WARN("Failed to instantiate Reposition Base Command Action Client");
+        return false;
+    }
+
+    teleport_andalite_command_client_.reset(new TeleportAndaliteCommandActionClient("teleport_andalite_command", false));
+    if (!teleport_andalite_command_client_) {
+        ROS_WARN("Failed to instantiate Teleport Andalite Command Action Client");
         return false;
     }
 
@@ -1110,6 +1201,23 @@ void ManipulatorCommandPanel::reposition_base_command_result_cb(
 
 }
 
+void ManipulatorCommandPanel::teleport_andalite_command_active_cb()
+{
+
+}
+
+void ManipulatorCommandPanel::teleport_andalite_command_feedback_cb(const hdt::TeleportAndaliteCommandFeedback::ConstPtr& feedback)
+{
+
+}
+
+void ManipulatorCommandPanel::teleport_andalite_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::TeleportAndaliteCommandResult::ConstPtr& result)
+{
+
+}
+
 bool ManipulatorCommandPanel::gatherRobotMarkers(
     const robot_state::RobotState& robot_state,
     const std::vector<std::string>& link_names,
@@ -1261,7 +1369,6 @@ bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>
 
     return true;
 }
-
 
 } // namespace hdt
 

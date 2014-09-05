@@ -26,8 +26,7 @@
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/GraspObjectCommandAction.h>
 #include <hdt/RepositionBaseCommandAction.h>
-
-class QPushButton;
+#include <hdt/TeleportAndaliteCommandAction.h>
 
 namespace hdt
 {
@@ -41,6 +40,9 @@ public:
     ManipulatorCommandPanel(QWidget *parent = 0);
     ~ManipulatorCommandPanel();
 
+    virtual void load(const rviz::Config& config);
+    virtual void save(rviz::Config config) const;
+
 public Q_SLOTS:
 
     void copy_current_state();
@@ -51,6 +53,7 @@ public Q_SLOTS:
     void send_viservo_command();
     void send_grasp_object_command();
     void send_reposition_base_command();
+    void send_teleport_andalite_command();
 
     void cycle_ik_solutions();
 
@@ -84,6 +87,10 @@ private:
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool pending_reposition_base_command_;
 
+    typedef actionlib::SimpleActionClient<hdt::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
+    std::unique_ptr<TeleportAndaliteCommandActionClient> teleport_andalite_command_client_;
+    bool pending_teleport_andalite_command_;
+
     hdt::RobotModelPtr robot_model_;
 
     std::unique_ptr<robot_model_loader::RobotModelLoader> rm_loader_;
@@ -101,8 +108,15 @@ private:
     std::string tip_link_;
     std::string base_link_;
 
-    QPushButton* copy_current_state_button_;
+    QLabel* robot_description_label_;
+    QLineEdit* robot_description_line_edit_;
     QPushButton* refresh_robot_desc_button_;
+
+    QLabel* global_frame_label_;
+    QLineEdit* global_frame_line_edit_;
+
+    QPushButton* copy_current_state_button_;
+    QPushButton* copy_current_base_pose_;
     QPushButton* send_move_arm_command_button_;
     QPushButton* send_joint_goal_button_;
     QPushButton* cycle_ik_solutions_button_;
@@ -116,11 +130,25 @@ private:
     QSlider* joint_5_slider_;
     QSlider* joint_6_slider_;
     QSlider* joint_7_slider_;
+    QDoubleSpinBox* j1_spinbox_;
+    QDoubleSpinBox* j2_spinbox_;
+    QDoubleSpinBox* j3_spinbox_;
+    QDoubleSpinBox* j4_spinbox_;
+    QDoubleSpinBox* j5_spinbox_;
+    QDoubleSpinBox* j6_spinbox_;
+    QDoubleSpinBox* j7_spinbox_;
+
+    QDoubleSpinBox* teleport_base_command_x_box_;
+    QDoubleSpinBox* teleport_base_command_y_box_;
+    QDoubleSpinBox* teleport_base_command_z_box_;
+    QPushButton* send_teleport_andalite_command_button_;
 
     Eigen::Affine3d root_to_first_link_;
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
 
     tf::TransformListener listener_;
+
+    void setup_gui();
 
     bool do_init();
     bool check_robot_model_consistency();
@@ -148,8 +176,6 @@ private:
 
     bool reinit_robot();
 
-//    void monitor_move_command();
-
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);
     void move_arm_command_result_cb(
@@ -173,6 +199,12 @@ private:
     void reposition_base_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::RepositionBaseCommandResult::ConstPtr& result);
+
+    void teleport_andalite_command_active_cb();
+    void teleport_andalite_command_feedback_cb(const hdt::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
+    void teleport_andalite_command_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::TeleportAndaliteCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
             const robot_state::RobotState& robot_state,
