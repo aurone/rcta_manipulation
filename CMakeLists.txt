@@ -83,6 +83,7 @@ add_action_files(
         ObjectDetection.action
         MoveArmCommand.action
         RepositionBaseCommand.action
+        TeleportAndaliteCommand.action
         ViservoCommand.action
         GraspObjectCommand.action)
 add_message_files(

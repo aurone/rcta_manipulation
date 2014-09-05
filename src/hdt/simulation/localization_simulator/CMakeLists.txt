@@ -1,0 +1,3 @@
+add_executable(localization_simulator localization_simulator.cpp)
+target_link_libraries(localization_simulator ${catkin_LIBRARIES} msg_utils)
+

@@ -1,4 +1,5 @@
 add_subdirectory(depth_sensor_simulator)
+add_subdirectory(localization_simulator)
 add_subdirectory(kinect_simulator)
 add_subdirectory(static_world_publisher)
 add_subdirectory(tilt_mount_simulator)
