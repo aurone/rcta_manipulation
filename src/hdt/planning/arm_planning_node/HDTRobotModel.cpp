@@ -104,13 +104,11 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
     eef_transform = robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
     ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
 
-    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, 1.0 * M_PI / 180.0);
-    if (res)
-    {
+    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
+    if (res) {
         ROS_INFO("IK Succeeded");
     }
-    else
-    {
+    else {
         ROS_WARN("IK Failed");
     }
     return res;
