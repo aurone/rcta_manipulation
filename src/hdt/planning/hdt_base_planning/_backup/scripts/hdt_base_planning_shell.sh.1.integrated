@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# rosrun tf static_transform_publisher 04 03 -0.7 -0.3 0 0 kinect_frame_dummy camera_link 100 &
+# rosrun tf static_transform_publisher $1 $2 $3 $4 $5 $6 kinect_frame_dummy camera_link 100 &
+# rosrun tf static_transform_publisher $1 $2 $3 $4 $5 $6 kinect_base_link camera_link 20 &
+# rosrun tf static_transform_publisher $1 $2 $3 $4 $5 $6 kinect_tilt_frame camera_link 2 &
+# rosrun tf static_transform_publisher $1 $2 $3 $4 $5 $6 kinect_frame camera_link 2 &
+rosrun tf static_transform_publisher $1 $2 $3 $4 $5 $6 top_shelf camera_link 20 &
+sleep 1
+pgrep static_transfor | xargs kill
+
+
+# set +m
+# # rosrun tf static_transform_publisher 04 03 -0.7 -0.3 0 0 kinect_frame_dummy camera_link 100 &
+# rosrun tf static_transform_publisher $1 $2 $3 $4 $5 $6 kinect_frame_dummy camera_link 100 &
+# sleep 1
+# # (pgrep static_transfor | xargs kill) 2>&1 >/dev/null
+# (pgrep static_transfor | xargs kill) >/dev/null 2>&1
+
