@@ -51,8 +51,8 @@ LocalizationSimulator::LocalizationSimulator() :
     nh_(),
     ph_("~"),
     action_name_("teleport_andalite_command"),
-    world_frame_nwu_name_("abs_ned"),
-    world_frame_ned_name_("abs_nwu"),
+    world_frame_nwu_name_("abs_nwu"),
+    world_frame_ned_name_("abs_ned"),
     robot_frame_nwu_name_("base_footprint"),
     robot_frame_ned_name_("robot_ned"),
     broadcaster_(),
@@ -80,17 +80,17 @@ int LocalizationSimulator::run()
         tf::Transform ned_to_nwu(ned_to_nwu_rotation, tf::Vector3(0.0, 0.0, 0.0));
 
         // publish robot coordinate frame using NED conventions for convenience
-        tf::StampedTransform robot_nwu_to_ned_stamped(ned_to_nwu, now, robot_frame_nwu_name_, robot_frame_ned_name_);
-        broadcaster_.sendTransform(robot_nwu_to_ned_stamped);
+        tf::StampedTransform robot_ned_to_nwu_stamped(ned_to_nwu, now, robot_frame_ned_name_, robot_frame_nwu_name_);
+        broadcaster_.sendTransform(robot_ned_to_nwu_stamped);
 
         // publish world coordinate frame to robot coordinate frame transform (global pose)
         tf::Transform world_ned_to_robot_ned;
         msg_utils::convert(world_to_robot_, world_ned_to_robot_ned);
         tf::StampedTransform world_ned_to_robot_ned_stamped(world_ned_to_robot_ned, now, world_frame_ned_name_, robot_frame_ned_name_);
-        broadcaster_.sendTransform(robot_nwu_to_ned_stamped);
+        broadcaster_.sendTransform(world_ned_to_robot_ned_stamped);
 
         // publish world coordinate frame using NWU conventions for convenience
-        tf::StampedTransform world_ned_to_nwu_stamped(ned_to_nwu, now, world_frame_ned_name_, robot_frame_nwu_name_);
+        tf::StampedTransform world_ned_to_nwu_stamped(ned_to_nwu, now, world_frame_ned_name_, world_frame_nwu_name_);
         broadcaster_.sendTransform(world_ned_to_nwu_stamped);
 
         // TODO: publish /laser transform?
@@ -131,5 +131,6 @@ void LocalizationSimulator::preempt_callback()
 
 int main(int argc, char* argv[])
 {
+    ros::init(argc, argv, "localization_simulator");
     return LocalizationSimulator().run();
 }
