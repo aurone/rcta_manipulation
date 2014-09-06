@@ -24,7 +24,6 @@ namespace hdt
 
 ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
-    initialized_(false),
     nh_(),
     move_arm_client_(),
     pending_move_arm_command_(false),
@@ -34,51 +33,210 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     pending_grasp_object_command_(false),
     reposition_base_command_client_(),
     pending_reposition_base_command_(false),
+    teleport_andalite_command_client_(),
+    pending_teleport_andalite_command_(false),
+    robot_description_line_edit_(nullptr),
+    refresh_robot_desc_button_(nullptr),
+    global_frame_line_edit_(nullptr),
+    refresh_global_frame_button_(nullptr),
+    copy_current_base_pose_button_(nullptr),
+    teleport_base_command_x_box_(nullptr),
+    teleport_base_command_y_box_(nullptr),
+    teleport_base_command_z_box_(nullptr),
+    teleport_base_command_yaw_box_(nullptr),
+    send_teleport_andalite_command_button_(nullptr),
+    copy_current_state_button_(nullptr),
+    cycle_ik_solutions_button_(nullptr),
+    send_move_arm_command_button_(nullptr),
+    send_joint_goal_button_(nullptr),
+    j1_spinbox_(nullptr),
+    j2_spinbox_(nullptr),
+    j3_spinbox_(nullptr),
+    j4_spinbox_(nullptr),
+    j5_spinbox_(nullptr),
+    j6_spinbox_(nullptr),
+    j7_spinbox_(nullptr),
+    send_viservo_command_button_(nullptr),
+    send_grasp_object_command_button_(nullptr),
+    send_reposition_base_command_button_(nullptr),
+    world_to_robot_(Eigen::Affine3d::Identity()),
+    robot_model_(),
     rm_loader_(),
     rm_(),
     rs_(),
     server_("hdt_control"),
-    interactive_markers_(),
+    joint_states_sub_(),
+    robot_markers_pub_(),
+    last_joint_state_(),
     tip_link_(),
-    robot_description_line_edit_(nullptr),
-    refresh_robot_desc_button_(nullptr),
-    copy_current_state_button_(nullptr),
-    send_move_arm_command_button_(nullptr),
-    send_joint_goal_button_(nullptr),
-    cycle_ik_solutions_button_(nullptr),
-    send_viservo_command_button_(nullptr),
-    send_grasp_object_command_button_(nullptr),
-    send_reposition_base_command_button_(nullptr),
-    joint_1_slider_(nullptr),
-    joint_2_slider_(nullptr),
-    joint_3_slider_(nullptr),
-    joint_4_slider_(nullptr),
-    joint_5_slider_(nullptr),
-    joint_6_slider_(nullptr),
-    joint_7_slider_(nullptr),
+    base_link_(),
+    mount_frame_to_manipulator_frame_(Eigen::Affine3d::Identity()),
     listener_()
 {
-    ROS_INFO("Instantiating Manipulator Command Panel");
-
     setup_gui();
-
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
-
-
-    ROS_INFO("Initializing Manipulator Command Panel");
-    if (!do_init())
-    {
-        ROS_ERROR("Failed to initialize ManipulatorCommandPanel");
-    }
-    else
-    {
-        ROS_INFO("Successfully initialized ManipulatorCommandPanel");
-    }
 }
 
 ManipulatorCommandPanel::~ManipulatorCommandPanel()
 {
+}
+
+void ManipulatorCommandPanel::load(const rviz::Config& config)
+{
+    // non-config-based initialization
+    // TODO: get rid of this initialization step and lazily initialize all
+    // action clients, providing message box errors when commands fail because
+    // action clients cannot be hooked up; akin to the GraspObjectExecutor
+    ROS_INFO("Initializing Manipulator Command Panel");
+    if (!init()) {
+        ROS_ERROR("Failed to initialize ManipulatorCommandPanel");
+    }
+    else {
+        ROS_INFO("Successfully initialized ManipulatorCommandPanel");
+    }
+
+    rviz::Panel::load(config);
+
+    ROS_INFO("Loading config for '%s'", this->getName().toStdString().c_str());
+
+    QString global_frame, robot_description;
+    config.mapGetString("global_frame", &global_frame);
+    config.mapGetString("robot_description", &robot_description);
+
+    ROS_INFO("Global Frame: %s", global_frame.toStdString().c_str());
+    ROS_INFO("Robot Description: %s", robot_description.toStdString().c_str());
+
+    if (!robot_description.isEmpty()) {
+        // attempt to initalize the robot via this robot description
+        std::string why;
+        if (!set_robot_description(robot_description.toStdString(), why)) {
+            QMessageBox::warning(
+                    this,
+                    tr("Config Failure"),
+                    tr("Failed to load 'robot_description' from panel config (%1)").arg(QString::fromStdString(why)));
+        }
+    }
+
+    if (!global_frame.isEmpty()) {
+        std::string why;
+        if (!set_global_frame(global_frame.toStdString(), why)) {
+            QMessageBox::warning(
+                    this,
+                    tr("Config Failure"),
+                    tr("Failed to load 'global_frame' from panel config (%1)").arg(QString::fromStdString(why)));
+        }
+    }
+
+    update_gui();
+}
+
+void ManipulatorCommandPanel::save(rviz::Config config) const
+{
+    rviz::Panel::save(config);
+
+    ROS_INFO("Saving config for '%s'", this->getName().toStdString().c_str());
+
+    config.mapSetValue("global_frame", QString::fromStdString(this->get_global_frame()));
+    config.mapSetValue("robot_description", QString::fromStdString(this->get_robot_description()));
+}
+
+void ManipulatorCommandPanel::refresh_robot_description()
+{
+    std::string user_robot_description = robot_description_line_edit_->text().toStdString();
+    if (user_robot_description.empty()) {
+        QMessageBox::information(this, tr("Robot Description"), tr("Please enter a valid ROS parameter for the URDF"));
+        return;
+    }
+
+    std::string why;
+    if (!set_robot_description(user_robot_description, why)) {
+        QMessageBox::warning(
+                this,
+                tr("Robot Description"),
+                tr("Failed to set the robot description to '%1' (%2)")
+                    .arg(QString::fromStdString(user_robot_description), QString::fromStdString(why)));
+    }
+
+    update_gui();
+}
+
+void ManipulatorCommandPanel::refresh_global_frame()
+{
+    std::vector<std::string> strings;
+    listener_.getFrameStrings(strings);
+
+    std::string user_global_frame = global_frame_line_edit_->text().toStdString();
+    bool internal_frame = std::find(
+            rm_->getLinkModelNames().begin(),
+            rm_->getLinkModelNames().end(),
+            user_global_frame) != rm_->getLinkModelNames().end();
+
+    if (internal_frame) {
+        user_global_frame = rm_->getModelFrame();
+    }
+
+    std::string why;
+    if (!set_global_frame(user_global_frame, why)) {
+        QMessageBox::warning(
+                this,
+                tr("Global Frame"),
+                tr("Failed to set the global frame to  '%1' (%2)")
+                    .arg(QString::fromStdString(user_global_frame), QString::fromStdString(why)));
+    }
+
+    update_gui();
+}
+
+void ManipulatorCommandPanel::copy_current_base_pose()
+{
+    tf::StampedTransform world_to_robot;
+    listener_.lookupTransform(get_global_frame(), rm_->getModelFrame(), ros::Time(0), world_to_robot);
+    msg_utils::convert(world_to_robot, world_to_robot_);
+    double roll, pitch, yaw;
+    msg_utils::get_euler_ypr(world_to_robot_, yaw, pitch, roll);
+    Eigen::Vector3d robot_pos(world_to_robot_.translation());
+    teleport_base_command_x_box_->setValue(robot_pos.x());
+    teleport_base_command_y_box_->setValue(robot_pos.y());
+    teleport_base_command_z_box_->setValue(robot_pos.z());
+    teleport_base_command_yaw_box_->setValue(yaw);
+    publish_phantom_robot_visualizations();
+}
+
+void ManipulatorCommandPanel::update_base_pose_x(double x)
+{
+    world_to_robot_.translation()(0, 0) = x;
+    update_manipulator_marker_pose();
+    publish_phantom_robot_visualizations();
+}
+
+void ManipulatorCommandPanel::update_base_pose_y(double y)
+{
+    world_to_robot_.translation()(1, 0) = y;
+    update_manipulator_marker_pose();
+    publish_phantom_robot_visualizations();
+}
+
+void ManipulatorCommandPanel::update_base_pose_z(double z)
+{
+    world_to_robot_.translation()(2, 0) = z;
+    update_manipulator_marker_pose();
+    publish_phantom_robot_visualizations();
+}
+
+void ManipulatorCommandPanel::update_base_pose_yaw(double yaw_deg)
+{
+    double yaw_rad = sbpl::utils::ToRadians(yaw_deg);
+    world_to_robot_ =
+            Eigen::Translation3d(world_to_robot_.translation()) *
+            Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d(0.0, 0.0, 1.0));
+    update_manipulator_marker_pose();
+    publish_phantom_robot_visualizations();
+}
+
+void ManipulatorCommandPanel::send_teleport_andalite_command()
+{
+    QMessageBox::information(this, tr("Teleport Andalite"), tr("Teleport Andalite Unimplemented"));
 }
 
 void ManipulatorCommandPanel::copy_current_state()
@@ -89,27 +247,57 @@ void ManipulatorCommandPanel::copy_current_state()
         return;
     }
 
-    rs_->updateLinkTransforms();
-
-    // update the position of the marker (in case of ik failure and for synchronization)
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-
+    update_manipulator_marker_pose();
+    update_spinboxes();
     publish_phantom_robot_visualizations();
-    update_sliders();
 }
 
-void ManipulatorCommandPanel::refresh_robot_description()
+void ManipulatorCommandPanel::cycle_ik_solutions()
 {
-    if (!reinit_robot()){
-        ROS_ERROR("Failed to refresh robot description");
-    }
+   Eigen::Affine3d new_eef_pose;
+   new_eef_pose = rs_->getLinkState(tip_link_)->getGlobalLinkTransform();
+
+   // manipulator -> eef = manipulator -> base * base -> root * root -> eef
+   new_eef_pose = mount_frame_to_manipulator_frame_.inverse() * rs_->getFrameTransform(base_link_).inverse() * new_eef_pose;
+
+   // get the current joint configuration to use as a seed for picking a nearby ik solution
+   std::vector<double> curr_joint_angles(7);
+   curr_joint_angles[0] = rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0];
+   curr_joint_angles[1] = rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0];
+   curr_joint_angles[2] = rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0];
+   curr_joint_angles[3] = rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0];
+   curr_joint_angles[4] = rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0];
+   curr_joint_angles[5] = rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0];
+   curr_joint_angles[6] = rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0];
+
+   const double ik_search_res = sbpl::utils::ToRadians(1.0);
+
+   std::vector<std::vector<double>> ik_solutions;
+   SimpleIKSolutionGenerator solgen = robot_model_->compute_all_ik_solutions(new_eef_pose, curr_joint_angles);
+
+   std::vector<double> iksol;
+   while (solgen(iksol)) {
+        ik_solutions.push_back(std::move(iksol));
+   }
+
+   std::sort(ik_solutions.begin(), ik_solutions.end(), [&curr_joint_angles](const std::vector<double>& j1, const std::vector<double>& j2)
+   {
+       return ComputeJointStateL2NormSqrd(j1, curr_joint_angles) < ComputeJointStateL2NormSqrd(j2, curr_joint_angles);
+   });
+
+   if (ik_solutions.size() > 1) {
+       ROS_INFO("BAM, %zd solutions", ik_solutions.size());
+       std::vector<std::vector<double>>::const_iterator next = ++ik_solutions.cbegin();
+       if (!set_phantom_joint_angles(*next)) {
+           QMessageBox::warning(this, tr("Cycle IK Solutions"), tr("Failed to set phantom state from ik solution"));
+           return;
+       }
+       rs_->updateLinkTransforms();
+       publish_phantom_robot_visualizations();
+   }
+   else {
+       ROS_WARN("Not enough IK solutions to cycle");
+   }
 }
 
 void ManipulatorCommandPanel::send_move_arm_command()
@@ -182,170 +370,39 @@ void ManipulatorCommandPanel::send_joint_goal()
     update_gui();
 }
 
-void ManipulatorCommandPanel::cycle_ik_solutions()
+void ManipulatorCommandPanel::update_j1_position(double value)
 {
-    if (!initialized_) {
-        return;
-    }
-
-   Eigen::Affine3d new_eef_pose;
-   new_eef_pose = rs_->getLinkState(tip_link_)->getGlobalLinkTransform();
-
-   // manipulator -> eef = manipulator -> base * base -> root * root -> eef
-   new_eef_pose = mount_frame_to_manipulator_frame_.inverse() * rs_->getFrameTransform(base_link_).inverse() * new_eef_pose;
-
-   // get the current joint configuration to use as a seed for picking a nearby ik solution
-   std::vector<double> curr_joint_angles(7);
-   curr_joint_angles[0] = rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0];
-   curr_joint_angles[1] = rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0];
-   curr_joint_angles[2] = rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0];
-   curr_joint_angles[3] = rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0];
-   curr_joint_angles[4] = rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0];
-   curr_joint_angles[5] = rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0];
-   curr_joint_angles[6] = rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0];
-
-   const double ik_search_res = sbpl::utils::ToRadians(1.0);
-
-   std::vector<std::vector<double>> ik_solutions;
-   SimpleIKSolutionGenerator solgen = robot_model_->compute_all_ik_solutions(new_eef_pose, curr_joint_angles);
-
-   std::vector<double> iksol;
-   while (solgen(iksol)) {
-        ik_solutions.push_back(std::move(iksol));
-   }
-
-   std::sort(ik_solutions.begin(), ik_solutions.end(), [&curr_joint_angles](const std::vector<double>& j1, const std::vector<double>& j2)
-   {
-       return ComputeJointStateL2NormSqrd(j1, curr_joint_angles) < ComputeJointStateL2NormSqrd(j2, curr_joint_angles);
-   });
-
-   if (ik_solutions.size() > 1) {
-       ROS_INFO("BAM, %zd solutions", ik_solutions.size());
-       std::vector<std::vector<double>>::const_iterator next = ++ik_solutions.cbegin();
-       if (!set_phantom_joint_angles(*next)) {
-           QMessageBox::warning(this, tr("Cycle IK Solutions"), tr("Failed to set phantom state from ik solution"));
-           return;
-       }
-       rs_->updateLinkTransforms();
-       publish_phantom_robot_visualizations();
-   }
-   else {
-       ROS_WARN("Not enough IK solutions to cycle");
-   }
-
-    update_sliders();
+    update_joint_position(0, value);
 }
 
-void ManipulatorCommandPanel::change_joint_1(int value)
+void ManipulatorCommandPanel::update_j2_position(double value)
 {
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
+    update_joint_position(1, value);
 }
 
-void ManipulatorCommandPanel::change_joint_2(int value)
+void ManipulatorCommandPanel::update_j3_position(double value)
 {
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
+    update_joint_position(2, value);
 }
 
-void ManipulatorCommandPanel::change_joint_3(int value)
+void ManipulatorCommandPanel::update_j4_position(double value)
 {
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
+    update_joint_position(3, value);
 }
 
-void ManipulatorCommandPanel::change_joint_4(int value)
+void ManipulatorCommandPanel::update_j5_position(double value)
 {
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
+    update_joint_position(4, value);
 }
 
-void ManipulatorCommandPanel::change_joint_5(int value)
+void ManipulatorCommandPanel::update_j6_position(double value)
 {
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
+    update_joint_position(5, value);
 }
 
-void ManipulatorCommandPanel::change_joint_6(int value)
+void ManipulatorCommandPanel::update_j7_position(double value)
 {
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
-}
-
-void ManipulatorCommandPanel::change_joint_7(int value)
-{
-    double joint_val = sbpl::utils::ToRadians((double)value);
-    rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&joint_val);
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
-    publish_phantom_robot_visualizations();
+    update_joint_position(6, value);
 }
 
 void ManipulatorCommandPanel::send_viservo_command()
@@ -524,17 +581,19 @@ void ManipulatorCommandPanel::setup_gui()
     QGroupBox* general_settings_group = new QGroupBox(tr("General Settings"));
         QVBoxLayout* general_settings_layout = new QVBoxLayout;
             QHBoxLayout* robot_description_layout = new QHBoxLayout;
-                robot_description_label_ = new QLabel(tr("Robot Description:"));
+                QLabel* robot_description_label = new QLabel(tr("Robot Description:"));
                 robot_description_line_edit_ = new QLineEdit;
                 refresh_robot_desc_button_ = new QPushButton(tr("Refresh"));
-            robot_description_layout->addWidget(robot_description_label_);
+            robot_description_layout->addWidget(robot_description_label);
             robot_description_layout->addWidget(robot_description_line_edit_);
             robot_description_layout->addWidget(refresh_robot_desc_button_);
             QHBoxLayout* global_frame_layout = new QHBoxLayout;
-                global_frame_label_ = new QLabel(tr("Global Frame:"));
+                QLabel* global_frame_label = new QLabel(tr("Global Frame:"));
                 global_frame_line_edit_ = new QLineEdit;
-            global_frame_layout->addWidget(global_frame_label_);
+                refresh_global_frame_button_ = new QPushButton(tr("Refresh"));
+            global_frame_layout->addWidget(global_frame_label);
             global_frame_layout->addWidget(global_frame_line_edit_);
+            global_frame_layout->addWidget(refresh_global_frame_button_);
         general_settings_layout->addLayout(robot_description_layout);
         general_settings_layout->addLayout(global_frame_layout);
     general_settings_group->setLayout(general_settings_layout);
@@ -542,22 +601,36 @@ void ManipulatorCommandPanel::setup_gui()
     // base commands
     QGroupBox* base_commands_group = new QGroupBox(tr("Base Commands"));
         QVBoxLayout* base_commands_layout = new QVBoxLayout;
-            copy_current_base_pose_ = new QPushButton(tr("Copy Current Base Pose"));
+            copy_current_base_pose_button_ = new QPushButton(tr("Copy Current Base Pose"));
             QHBoxLayout* base_pose_spinbox_layout = new QHBoxLayout;
                 QLabel* x_label = new QLabel(tr("X:"));
                 teleport_base_command_x_box_ = new QDoubleSpinBox;
+                teleport_base_command_x_box_->setMinimum(-100.0);
+                teleport_base_command_x_box_->setMaximum(100.0);
+                teleport_base_command_x_box_->setSingleStep(0.05);
                 QLabel* y_label = new QLabel(tr("Y:"));
                 teleport_base_command_y_box_ = new QDoubleSpinBox;
+                teleport_base_command_y_box_->setMinimum(-100.0);
+                teleport_base_command_y_box_->setMaximum(100.0);
+                teleport_base_command_y_box_->setSingleStep(0.05);
                 QLabel* z_label = new QLabel(tr("Z:"));
                 teleport_base_command_z_box_ = new QDoubleSpinBox;
+                QLabel* yaw_label = new QLabel(tr("Yaw:"));
+                teleport_base_command_yaw_box_ = new QDoubleSpinBox;
+                teleport_base_command_yaw_box_->setMinimum(0.0);
+                teleport_base_command_yaw_box_->setMaximum(360.0);
+                teleport_base_command_yaw_box_->setSingleStep(1.0);
+                teleport_base_command_yaw_box_->setWrapping(true);
             base_pose_spinbox_layout->addWidget(x_label);
             base_pose_spinbox_layout->addWidget(teleport_base_command_x_box_);
             base_pose_spinbox_layout->addWidget(y_label);
             base_pose_spinbox_layout->addWidget(teleport_base_command_y_box_);
-            base_pose_spinbox_layout->addWidget(z_label);
-            base_pose_spinbox_layout->addWidget(teleport_base_command_z_box_);
+//            base_pose_spinbox_layout->addWidget(z_label);
+//            base_pose_spinbox_layout->addWidget(teleport_base_command_z_box_);
+            base_pose_spinbox_layout->addWidget(yaw_label);
+            base_pose_spinbox_layout->addWidget(teleport_base_command_yaw_box_);
             send_teleport_andalite_command_button_ = new QPushButton(tr("Teleport Andalite"));
-        base_commands_layout->addWidget(copy_current_base_pose_);
+        base_commands_layout->addWidget(copy_current_base_pose_button_);
         base_commands_layout->addLayout(base_pose_spinbox_layout);
         base_commands_layout->addWidget(send_teleport_andalite_command_button_);
     base_commands_group->setLayout(base_commands_layout);
@@ -622,38 +695,48 @@ void ManipulatorCommandPanel::setup_gui()
     main_layout->addWidget(high_level_commands_group);
     setLayout(main_layout);
 
-    connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
+    // note: do not connect any outgoing signals from general settings line edits; force users to use refresh button
     connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
+    connect(refresh_global_frame_button_, SIGNAL(clicked()), this, SLOT(refresh_global_frame()));
+
+    // base commands
+    connect(copy_current_base_pose_button_, SIGNAL(clicked()), this, SLOT(copy_current_base_pose()));
+    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
+    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
+    connect(teleport_base_command_z_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_z(double)));
+    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
+    connect(send_teleport_andalite_command_button_, SIGNAL(clicked()), this, SLOT(send_teleport_andalite_command()));
+
+    // arm commands
+    connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
+    connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
     connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
     connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
-    connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
+    connect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
+    connect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
+    connect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
+    connect(j4_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j4_position(double)));
+    connect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
+    connect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
+    connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
     connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
+
+    // high-level commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
     connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
-    connect(joint_1_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_1(int)));
-    connect(joint_2_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_2(int)));
-    connect(joint_3_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_3(int)));
-    connect(joint_4_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_4(int)));
-    connect(joint_5_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_5(int)));
-    connect(joint_6_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_6(int)));
-    connect(joint_7_slider_, SIGNAL(valueChanged(int)), this, SLOT(change_joint_7(int)));
-
-    // instantiate for now but deprecate and phase out
-    joint_1_slider_ = new QSlider(Qt::Horizontal);
-    joint_2_slider_ = new QSlider(Qt::Horizontal);
-    joint_3_slider_ = new QSlider(Qt::Horizontal);
-    joint_4_slider_ = new QSlider(Qt::Horizontal);
-    joint_5_slider_ = new QSlider(Qt::Horizontal);
-    joint_6_slider_ = new QSlider(Qt::Horizontal);
-    joint_7_slider_ = new QSlider(Qt::Horizontal);
 }
 
-bool ManipulatorCommandPanel::do_init()
+bool ManipulatorCommandPanel::init()
 {
-    if (!reinit_robot()) {
-        return false;
+    if (!create_action_clients()) {
+        return false; // errors printed within
     }
 
+    return true;
+}
+
+bool ManipulatorCommandPanel::create_action_clients()
+{
     move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
     if (!move_arm_client_) {
         ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
@@ -684,25 +767,26 @@ bool ManipulatorCommandPanel::do_init()
         return false;
     }
 
-    initialized_ = true;
-    return initialized_;
+    return true;
 }
 
-bool ManipulatorCommandPanel::check_robot_model_consistency()
+bool ManipulatorCommandPanel::check_robot_model_consistency(
+    const hdt::RobotModel& hdt_model,
+    const robot_model::RobotModel& moveit_model) const
 {
-    for (const std::string& joint_name : robot_model_->joint_names()) {
-        if (!rm_->hasJointModel(joint_name)) {
+    for (const std::string& joint_name : hdt_model.joint_names()) {
+        if (!moveit_model.hasJointModel(joint_name)) {
             ROS_ERROR("MoveIt Robot Model does not contain joint %s", joint_name.c_str());
             return false;
         }
     }
 
-    for (std::size_t i = 1; i < robot_model_->joint_names().size(); ++i) {
-        const std::string& parent_joint_name = robot_model_->joint_names()[i - 1];
-        const std::string& child_joint_name = robot_model_->joint_names()[i];
+    for (std::size_t i = 1; i < hdt_model.joint_names().size(); ++i) {
+        const std::string& parent_joint_name = hdt_model.joint_names()[i - 1];
+        const std::string& child_joint_name = hdt_model.joint_names()[i];
 
         std::vector<robot_model::JointModel*> child_joints;
-        child_joints = rm_->getJointModel(parent_joint_name)->getChildLinkModel()->getChildJointModels();
+        child_joints = moveit_model.getJointModel(parent_joint_name)->getChildLinkModel()->getChildJointModels();
         if (child_joints.size() != 1) {
             ROS_ERROR("Unexpected number of child joints (%zd)", child_joints.size());
             return false;
@@ -717,24 +801,140 @@ bool ManipulatorCommandPanel::check_robot_model_consistency()
     return true;
 }
 
+bool ManipulatorCommandPanel::set_robot_description(const std::string& robot_description, std::string& why)
+{
+    // attempt to reinitialize the robot from this robot description
+    if (reinit(robot_description, why)) {
+        ROS_INFO("Successfully reinitialized robot from '%s'", robot_description.c_str());
+
+        if (robot_description_ != robot_description) {
+            Q_EMIT(configChanged());
+        }
+
+        robot_description_ = robot_description;
+        robot_description_line_edit_->setText(QString::fromStdString(robot_description_));
+
+        ROS_INFO("Robot Description set to '%s'", robot_description.c_str());
+        return true;
+    }
+    else {
+        QMessageBox::warning(
+                this, tr("Refresh Robot Description"), tr("Failed to Reinitialize (%1)").arg(QString::fromStdString(why)));
+        robot_description_line_edit_->setText(QString::fromStdString(robot_description_));
+        return false;
+    }
+}
+
+bool ManipulatorCommandPanel::set_global_frame(const std::string& global_frame, std::string& why)
+{
+    if (valid_global_frame(global_frame)) {
+        // update the world to robot transform
+        if (!get_global_frame().empty()) {
+            tf::StampedTransform transform;
+            try {
+                listener_.lookupTransform(global_frame, global_frame_, ros::Time(0), transform);
+            }
+            catch (const tf::TransformException& ex) {
+                ROS_ERROR("Failed to lookup transform '%s' -> '%s'", global_frame.c_str(), global_frame_.c_str());
+                return false;
+            }
+
+            Eigen::Affine3d new_world_to_world;
+            msg_utils::convert(transform, new_world_to_world);
+            world_to_robot_ = new_world_to_world * world_to_robot_;
+        }
+
+        // update the manipulator interactive marker to put it into the new global frame
+        visualization_msgs::InteractiveMarker manipulator_marker;
+        if (server_.get("hdt_arm_control", manipulator_marker)) {
+            std_msgs::Header header;
+            header.seq = 0;
+            header.stamp = ros::Time(0);
+            header.frame_id = global_frame;
+            Eigen::Affine3d new_marker_pose = world_to_robot_ * rs_->getLinkState(tip_link_)->getGlobalLinkTransform();
+            geometry_msgs::Pose new_pose;
+            tf::poseEigenToMsg(new_marker_pose, new_pose);
+            server_.setPose("hdt_arm_control", new_pose, header);
+            server_.applyChanges();
+        }
+
+        // TODO: update the object interactive marker
+
+        if (global_frame != global_frame_) {
+            Q_EMIT(configChanged());
+        }
+
+        global_frame_ = global_frame;
+        global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
+
+        ROS_INFO("Global Frame set to %s", global_frame.c_str());
+        return true;
+    }
+    else {
+        why = global_frame + " is not a valid frame";
+        global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
+        return false;
+    }
+}
+
+const std::string& ManipulatorCommandPanel::get_robot_description() const
+{
+    return robot_description_;
+}
+
+const std::string& ManipulatorCommandPanel::get_global_frame() const
+{
+    return global_frame_;
+}
+
+bool ManipulatorCommandPanel::valid_global_frame(const std::string& frame) const
+{
+    static std::vector<std::string> valid_global_frames = {
+            "base_footprint",
+            "robot_ned",
+            "abs_nwu",
+            "abs_ned",
+            "/base_footprint",
+            "/robot_ned",
+            "/abs_nwu",
+            "/abs_ned"
+
+    }; // TODO: please do something more intelligent
+    return std::find(valid_global_frames.begin(), valid_global_frames.end(), frame) != valid_global_frames.end();
+}
+
+bool ManipulatorCommandPanel::initialized() const
+{
+    return (bool)(robot_model_);
+}
+
 void ManipulatorCommandPanel::do_process_feedback(
     const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback)
 {
-    if (!initialized_) {
-        return;
-    }
+    ROS_INFO("Feedback!");
 
     Eigen::Affine3d new_eef_pose;
     tf::poseMsgToEigen(feedback->pose, new_eef_pose);
 
-    // manipulator -> eef = manipulator -> base * base -> root * root -> eef
-    new_eef_pose = mount_frame_to_manipulator_frame_.inverse() * rs_->getFrameTransform(base_link_).inverse() * new_eef_pose;
+    ROS_DEBUG("Marker is in frame %s", feedback->header.frame_id.c_str());
 
-    // ROS_INFO("Manipulator -> EndEffector: (%s)", to_string(new_eef_pose).c_str());
+    ROS_DEBUG("Manipulator -> Base: %s", to_string(mount_frame_to_manipulator_frame_.inverse()).c_str());
+    ROS_DEBUG("Base -> Robot: %s", to_string(rs_->getFrameTransform(base_link_).inverse()).c_str());
+    ROS_DEBUG("Robot -> World: %s", to_string(world_to_robot_.inverse()).c_str());
+    ROS_DEBUG("World -> End Effector: %s", to_string(new_eef_pose).c_str());
+
+    // manipulator -> eef =
+    //     manipulator -> mount * mount -> root * root -> global * global -> eef
+    new_eef_pose =
+            mount_frame_to_manipulator_frame_.inverse() *
+            rs_->getFrameTransform(base_link_).inverse() *
+            world_to_robot_.inverse() *
+            new_eef_pose;
+
+    ROS_DEBUG("Manipulator -> EndEffector: %s", to_string(new_eef_pose).c_str());
 
     // get the current joint configuration to use as a seed for picking a nearby ik solution
     std::vector<double> curr_joint_angles = get_phantom_joint_angles();
-
     const double ik_search_res = sbpl::utils::ToRadians(1.0);
     std::vector<double> iksol;
 
@@ -744,47 +944,44 @@ void ManipulatorCommandPanel::do_process_feedback(
             QMessageBox::warning(this, tr("Interactive Marker Feedback"), tr("Failed to set phantom state from interactive marker-driven IK"));
             return;
         }
-        rs_->updateLinkTransforms();
     }
 
     // update the position of the marker (in case of ik failure and for synchronization)
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = rm_->getRootLinkName();
-    header.stamp = ros::Time(0);
-    server_.setPose(feedback->marker_name, new_marker_pose, header);
-    server_.applyChanges();
-
+    update_manipulator_marker_pose();
+    update_spinboxes();
     publish_phantom_robot_visualizations();
-    update_sliders();
 }
 
 void ManipulatorCommandPanel::process_gas_canister_marker_feedback(
     const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback)
 {
-    if (!initialized_) {
-        return;
-    }
 }
 
 void ManipulatorCommandPanel::publish_phantom_robot_visualizations()
 {
+    rs_->updateLinkTransforms();
+
     const std::vector<std::string>& link_names = rm_->getLinkModelNames();
-
-    std_msgs::ColorRGBA color;
-    color.a = 1.0;
-    color.r = 0.94;
-    color.g = 0.44;
-    color.b = 0.44;
-
+    std_msgs::ColorRGBA color = std_msgs::CreateColorRGBA(0.94, 0.44, 0.44, 1.0);
     std::string ns = "phantom_robot_link";
-
     ros::Duration d(0);
 
     visualization_msgs::MarkerArray marker_array;
     gatherRobotMarkers(*rs_, link_names, color, ns, d, marker_array);
+
+    if (get_global_frame() != rm_->getModelFrame()) {
+        // transform all markers from the robot frame into the global frame
+        for (visualization_msgs::Marker& marker : marker_array.markers) {
+            Eigen::Affine3d root_to_marker;
+            tf::poseMsgToEigen(marker.pose, root_to_marker);
+            // world -> marker = world -> robot * robot -> marker
+            Eigen::Affine3d world_to_marker = world_to_robot_ * root_to_marker;
+            tf::poseEigenToMsg(world_to_marker, marker.pose);
+            marker.header.frame_id = get_global_frame();
+            marker.header.stamp = ros::Time(0);
+        }
+    }
+
     robot_markers_pub_.publish(marker_array);
 }
 
@@ -903,8 +1100,20 @@ bool ManipulatorCommandPanel::get_joint_value(
     return false;
 }
 
+void ManipulatorCommandPanel::update_joint_position(int joint_index, double joint_position)
+{
+    double joint_val = sbpl::utils::ToRadians(joint_position);
+    rs_->getJointState(robot_model_->joint_names()[joint_index])->setVariableValues(&joint_val);
+    update_manipulator_marker_pose();
+    publish_phantom_robot_visualizations();
+}
+
 void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
+    if (!initialized()) {
+        return;
+    }
+
     const std::vector<std::string>& joint_names = rm_->getJointModelNames();
 
     sensor_msgs::JointState last_joint_state_copy = last_joint_state_;
@@ -932,40 +1141,82 @@ void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointStat
     }
 }
 
-bool ManipulatorCommandPanel::reinit_robot()
+bool ManipulatorCommandPanel::reinit(const std::string& robot_description, std::string& why)
 {
-    if (!nh_.hasParam("robot_description") || !nh_.hasParam("robot_description_semantic")) {
-        ROS_ERROR("Failed to initialize Manipulator Command Panel; requires \"robot_description\" and \"robot_description_semantic\" parameters");
+    if (!reinit_robot_models(robot_description, why)) {
+        return false;
+    }
+
+    if (!reinit_interactive_marker_server()) {
+        return false;
+    }
+
+    // TODO: The following must be done after the interactive marker server has
+    // been reinitialized, which is what identifies the base and tip links. It
+    // probably makes more sense for this step to be done when the robot is
+    // reinitialized
+
+    // compute the transform to the frame that kinematics is done in, which is required for sending arm goals
+    const Eigen::Affine3d& root_to_manipulator_frame = rs_->getFrameTransform("arm_1_shoulder_twist_link");
+    const Eigen::Affine3d& root_to_base_frame = rs_->getFrameTransform(base_link_);
+    mount_frame_to_manipulator_frame_ = root_to_base_frame.inverse() * root_to_manipulator_frame;
+    ROS_INFO("Mount Frame -> Manipulator Frame: %s", to_string(mount_frame_to_manipulator_frame_).c_str());
+
+    publish_phantom_robot_visualizations();
+    return true;
+}
+
+bool ManipulatorCommandPanel::reinit_robot_models(const std::string& robot_description, std::string& why)
+{
+    if (!nh_.hasParam(robot_description) || !nh_.hasParam(robot_description + "_semantic")) {
+        std::stringstream ss;
+        ss << "Failed to retrieve '" << robot_description << "' and '" << (robot_description + "_semantic") << "' from the param server";
+        why = ss.str();
         return false;
     }
 
     std::string urdf_string;
-    if (!nh_.getParam("robot_description", urdf_string)) {
-        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
+    if (!nh_.getParam(robot_description, urdf_string)) {
+        std::stringstream ss;
+        ss << "Failed to retrieve '" << robot_description << "' from the param server";
+        why = ss.str();
         return false;
     }
 
-    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
-        ROS_ERROR("Failed to load robot model from the URDF");
+    hdt::RobotModelPtr robot_model = hdt::RobotModel::LoadFromURDF(urdf_string);
+    if (!robot_model) {
+        why = "Failed to load robot model from the URDF";
         return false;
     }
 
-    rm_loader_.reset(new robot_model_loader::RobotModelLoader);
-    if (!rm_loader_) {
-        ROS_ERROR("Failed to instantiate Robot Model Loader");
+    robot_model_loader::RobotModelLoaderPtr rm_loader(new robot_model_loader::RobotModelLoader(robot_description, true));
+    if (!rm_loader) {
+        why = "Failed to instantiate Robot Model Loader";
         return false;
     }
 
-    rm_ = rm_loader_->getModel();
-    if (!rm_) {
-        ROS_ERROR("Robot Model Loader was unable to construct Robot Model");
+    robot_model::RobotModelPtr rm = rm_loader->getModel();
+    if (!rm) {
+        why = ("Robot Model Loader was unable to construct Robot Model");
         return false;
     }
 
-    if (!check_robot_model_consistency()) {
-        ROS_ERROR("Robot models are not consistent");
+    if (!check_robot_model_consistency(*robot_model, *rm)) {
+        why = "Robot models are not consistent";
         return false;
     }
+
+    robot_state::RobotStatePtr rs(new robot_state::RobotState(rm));
+    if (!rs) {
+        why = "Failed to instantiate Robot State";
+        return false;
+    }
+
+    // All lights are green from above
+    robot_model_ = robot_model;
+    rm_loader_ = rm_loader;
+    rm_ = rm;
+    rs_ =  rs;
 
     ROS_INFO("MoveIt model is consistent with HDT Robot Model");
 
@@ -975,18 +1226,60 @@ bool ManipulatorCommandPanel::reinit_robot()
         ROS_INFO("    %s", joint_name.c_str());
     }
 
-    rs_.reset(new robot_state::RobotState(rm_));
-    if (!rs_) {
-        ROS_ERROR("Failed to instantiate Robot State");
-        return false;
-    }
-
     rs_->setToDefaultValues();
     rs_->setRootTransform(Eigen::Affine3d::Identity());
     rs_->updateLinkTransforms();
 
+    // update gui parameters to reflect robot
+    j1_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[0]));
+    j2_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[1]));
+    j3_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[2]));
+    j4_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[3]));
+    j5_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[4]));
+    j6_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[5]));
+    j7_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[6]));
+
+    j1_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[0]));
+    j2_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[1]));
+    j3_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[2]));
+    j4_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[3]));
+    j5_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[4]));
+    j6_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[5]));
+    j7_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[6]));
+
+    j1_spinbox_->setSingleStep(1.0);
+    j2_spinbox_->setSingleStep(1.0);
+    j3_spinbox_->setSingleStep(1.0);
+    j4_spinbox_->setSingleStep(1.0);
+    j5_spinbox_->setSingleStep(1.0);
+    j6_spinbox_->setSingleStep(1.0);
+    j7_spinbox_->setSingleStep(1.0);
+
+    std::string global_frame = get_global_frame();
+    if (!valid_global_frame(global_frame)) {
+        std::string another_why;
+        if (!set_global_frame(rm_->getModelFrame(), another_why)) {
+            why = "Failed to set global frame to the frame of the robot model (" + another_why + ")";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool ManipulatorCommandPanel::reinit_interactive_marker_server()
+{
+    return reinit_manipulator_interactive_marker() && reinit_object_interactive_marker();
+}
+
+bool ManipulatorCommandPanel::reinit_manipulator_interactive_marker()
+{
+    if (!rm_) {
+        ROS_ERROR("Failed to reinitialize manipulator interactive marker. Robot Model is null");
+        return false;
+    }
+
     // initialize an interactive marker for the first joint group that's a kinematic chain
-    interactive_markers_.reserve(rm_->getJointModelGroupNames().size());
     for (const auto& joint_model_group_name : rm_->getJointModelGroupNames()) {
         const robot_model::JointModelGroup* jmg = rm_->getJointModelGroup(joint_model_group_name);
         if (jmg->isChain()) {
@@ -995,22 +1288,29 @@ bool ManipulatorCommandPanel::reinit_robot()
             base_link_ = get_base_link(*jmg);
             ROS_INFO("Found manipulator attached to %s with tip link %s", base_link_.c_str(), tip_link_.c_str());
 
-            ROS_INFO("Joint Group %s:", jmg->getName().c_str());
-            ROS_INFO("    Joints:");
+            ROS_DEBUG("Joint Group %s:", jmg->getName().c_str());
+            ROS_DEBUG("    Joints:");
             for (const std::string& joint_name : jmg->getJointModelNames()) {
-                ROS_INFO("        %s", joint_name.c_str());
+                ROS_DEBUG("        %s", joint_name.c_str());
             }
-            ROS_INFO("    Links:");
+            ROS_DEBUG("    Links:");
             for (const std::string& link_name : jmg->getLinkModelNames()) {
-                ROS_INFO("        %s", link_name.c_str());
+                ROS_DEBUG("        %s", link_name.c_str());
             }
 
             // insert an interactive marker for the tip link of the arm
             visualization_msgs::InteractiveMarker interactive_marker;
             interactive_marker.header.seq = 0;
             interactive_marker.header.stamp = ros::Time(0);
-            interactive_marker.header.frame_id = rm_->getRootLinkName();
-            tf::poseEigenToMsg(rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), interactive_marker.pose);
+            interactive_marker.header.frame_id = global_frame_;
+            robot_state::LinkState* tip_link_state = rs_->getLinkState(tip_link_);
+            if (!tip_link_state) {
+                ROS_ERROR("Failed to get Link State for tip link '%s'", tip_link_.c_str());
+                return false;
+            }
+
+            Eigen::Affine3d world_to_marker = world_to_robot_ * tip_link_state->getGlobalLinkTransform();
+            tf::poseEigenToMsg(world_to_marker, interactive_marker.pose);
             interactive_marker.name = jmg->getName() + "_control";
             interactive_marker.description = std::string("Control of ") + tip_link_ + std::string(" of manipulator ") + jmg->getName();
             interactive_marker.scale = 0.25f;
@@ -1018,14 +1318,19 @@ bool ManipulatorCommandPanel::reinit_robot()
             interactive_marker.controls.clear();
             interactive_marker.controls = create_sixdof_controls();
 
-            ROS_INFO("Inserting interactive marker \"%s\"", interactive_marker.name.c_str());
+            ROS_INFO("Inserting interactive marker '%s'", interactive_marker.name.c_str());
             server_.insert(interactive_marker);
             server_.setCallback(interactive_marker.name, boost::bind(&ManipulatorCommandPanel::do_process_feedback, this, _1));
-            interactive_markers_.push_back(interactive_marker);
             break;
         }
     }
 
+    server_.applyChanges();
+    return true;
+}
+
+bool ManipulatorCommandPanel::reinit_object_interactive_marker()
+{
     ROS_INFO("Inserting marker 'gas_canister_fixture'");
     rospack::Rospack rpack;
     std::vector<std::string> search_path;
@@ -1038,7 +1343,7 @@ bool ManipulatorCommandPanel::reinit_robot()
     visualization_msgs::InteractiveMarker gas_canister_interactive_marker;
     gas_canister_interactive_marker.header.seq = 0;
     gas_canister_interactive_marker.header.stamp = ros::Time(0);
-    gas_canister_interactive_marker.header.frame_id = rm_->getRootLinkName();
+    gas_canister_interactive_marker.header.frame_id = global_frame_;
     gas_canister_interactive_marker.pose.position.x = 0.0;
     gas_canister_interactive_marker.pose.position.y = 0.0;
     gas_canister_interactive_marker.pose.position.z = 0.0;
@@ -1094,37 +1399,7 @@ bool ManipulatorCommandPanel::reinit_robot()
     ROS_INFO("Inserted marker 'gas_canister_fixture'");
 
     server_.applyChanges();
-
-    joint_1_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[0])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[0])));
-    joint_2_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[1])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[1])));
-    joint_3_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[2])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[2])));
-    joint_4_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[3])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[3])));
-    joint_5_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[4])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[4])));
-    joint_6_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[5])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[5])));
-    joint_7_slider_->setRange(
-            (int)round(sbpl::utils::ToDegrees(robot_model_->min_limits()[6])),
-            (int)round(sbpl::utils::ToDegrees(robot_model_->max_limits()[6])));
-
-    update_sliders();
-
-    const Eigen::Affine3d& root_to_manipulator_frame = rs_->getFrameTransform("arm_1_shoulder_twist_link");
-    const Eigen::Affine3d& root_to_base_frame = rs_->getFrameTransform(base_link_);
-    mount_frame_to_manipulator_frame_ = root_to_base_frame.inverse() * root_to_manipulator_frame;
-
-    initialized_ = true;
-    return initialized_;
+    return true;
 }
 
 void ManipulatorCommandPanel::move_arm_command_active_cb()
@@ -1304,15 +1579,32 @@ bool ManipulatorCommandPanel::gatherRobotMarkers(
     return true;
 }
 
-void ManipulatorCommandPanel::update_sliders()
+void ManipulatorCommandPanel::update_spinboxes()
 {
-    joint_1_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0])));
-    joint_2_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0])));
-    joint_3_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0])));
-    joint_4_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0])));
-    joint_5_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0])));
-    joint_6_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0])));
-    joint_7_slider_->setValue((int)round(sbpl::utils::ToDegrees(rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0])));
+    // note: temporarily disable this guys so that spinboxes can be updated in
+    // response to interactive marker changes without publishing a fuckton of
+    // display markers from triggering one slot for each joint
+    disconnect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
+    disconnect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
+    disconnect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
+    disconnect(j4_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j4_position(double)));
+    disconnect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
+    disconnect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
+    disconnect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
+    j1_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[0])->getVariableValues()[0]));
+    j2_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[1])->getVariableValues()[0]));
+    j3_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[2])->getVariableValues()[0]));
+    j4_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[3])->getVariableValues()[0]));
+    j5_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[4])->getVariableValues()[0]));
+    j6_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[5])->getVariableValues()[0]));
+    j7_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[6])->getVariableValues()[0]));
+    connect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
+    connect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
+    connect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
+    connect(j4_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j4_position(double)));
+    connect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
+    connect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
+    connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
 }
 
 void ManipulatorCommandPanel::update_gui()
@@ -1325,11 +1617,29 @@ void ManipulatorCommandPanel::update_gui()
     bool pending_motion_command =
         pending_move_arm_command_ || pending_viservo_command_ || pending_grasp_object_command_ || pending_reposition_base_command_;
 
-    send_move_arm_command_button_->setEnabled(!pending_motion_command);
-    send_joint_goal_button_->setEnabled(!pending_motion_command);
-    send_viservo_command_button_->setEnabled(!pending_motion_command);
-    send_grasp_object_command_button_->setEnabled(!pending_motion_command);
-    send_reposition_base_command_button_->setEnabled(!pending_motion_command);
+    bool have_global_frame = !get_global_frame().empty(); // TODO: global frame == local frame?
+    copy_current_base_pose_button_->setEnabled(have_global_frame && initialized());
+    teleport_base_command_x_box_->setEnabled(have_global_frame && initialized());
+    teleport_base_command_y_box_->setEnabled(have_global_frame && initialized());
+    teleport_base_command_z_box_->setEnabled(have_global_frame && initialized());
+    teleport_base_command_yaw_box_->setEnabled(have_global_frame && initialized());
+    send_teleport_andalite_command_button_->setEnabled(have_global_frame && initialized() && !pending_motion_command);
+
+    copy_current_state_button_->setEnabled(initialized());
+    cycle_ik_solutions_button_->setEnabled(initialized());
+    send_move_arm_command_button_->setEnabled(initialized() && !pending_motion_command);
+    send_joint_goal_button_->setEnabled(initialized() && !pending_motion_command);
+    j1_spinbox_->setEnabled(initialized());
+    j2_spinbox_->setEnabled(initialized());
+    j3_spinbox_->setEnabled(initialized());
+    j4_spinbox_->setEnabled(initialized());
+    j5_spinbox_->setEnabled(initialized());
+    j6_spinbox_->setEnabled(initialized());
+    j7_spinbox_->setEnabled(initialized());
+    send_viservo_command_button_->setEnabled(initialized() && !pending_motion_command);
+
+    send_grasp_object_command_button_->setEnabled(initialized() && !pending_motion_command);
+    send_reposition_base_command_button_->setEnabled(initialized() && !pending_motion_command);
 }
 
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const
@@ -1368,6 +1678,19 @@ bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>
     }
 
     return true;
+}
+
+void ManipulatorCommandPanel::update_manipulator_marker_pose()
+{
+    rs_->updateLinkTransforms();
+    geometry_msgs::Pose new_marker_pose;
+    tf::poseEigenToMsg(world_to_robot_ * rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
+    std_msgs::Header header;
+    header.seq = 0;
+    header.frame_id = global_frame_;
+    header.stamp = ros::Time(0);
+    server_.setPose("hdt_arm_control", new_marker_pose, header);
+    server_.applyChanges();
 }
 
 } // namespace hdt
