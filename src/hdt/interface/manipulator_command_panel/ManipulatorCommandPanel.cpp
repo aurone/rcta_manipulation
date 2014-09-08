@@ -565,19 +565,13 @@ void ManipulatorCommandPanel::send_reposition_base_command()
 
     hdt::RepositionBaseCommandGoal reposition_base_goal;
 
-    // TODO: remove this constraint? Yes, Yes remove it
-    if (gas_can_interactive_marker.header.frame_id != rm_->getRootLinkName()) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (interactive marker has frame other than robot model root frame"));
-        return;
-    }
-
     static int reposition_base_goal_id = 0;
     reposition_base_goal.id = reposition_base_goal_id++;
     reposition_base_goal.retry_count = 0;
     reposition_base_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
-    reposition_base_goal.gas_can_in_map.header.frame_id = "map"; //rm_->getRootLinkName();
-    reposition_base_goal.base_link_in_map.pose = gas_can_interactive_marker.pose;
-    reposition_base_goal.base_link_in_map.header.frame_id = "map";
+    reposition_base_goal.gas_can_in_map.header.frame_id = get_global_frame();
+    tf::poseEigenToMsg(world_to_robot_, reposition_base_goal.base_link_in_map.pose);
+    reposition_base_goal.base_link_in_map.header.frame_id = get_global_frame();
 
 //    grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
 //    grasp_object_goal.gas_can_in_map.header.frame_id = rm_->getRootLinkName();
@@ -1500,6 +1494,7 @@ void ManipulatorCommandPanel::reposition_base_command_result_cb(
 
     if (result->result == hdt::RepositionBaseCommandResult::SUCCESS) {
         base_pose_candidates_ = result->candidate_base_poses;
+        ROS_INFO("Reposition Base Command returned %zd candidate poses", base_pose_candidates_.size());
 
         std::string num_candidates_label_text =
                 "of " + std::to_string((int)result->candidate_base_poses.size()) + " Candidates";
