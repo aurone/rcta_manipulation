@@ -39,10 +39,17 @@ std::string to_string(Status status);
 
 }
 
-
 class GraspObjectExecutor
 {
+    struct StowPosition
+    {
+        std::string name;
+        std::vector<double> joint_positions;
+    };
+
 public:
+
+    friend bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition&);
 
     GraspObjectExecutor();
 
@@ -108,6 +115,8 @@ private:
 
     hdt::ViservoCommandGoal last_viservo_grasp_goal_;
 
+    int next_stow_position_to_attempt_;
+
     hdt::GraspObjectCommandGoal::ConstPtr current_goal_;
 
     GraspObjectExecutionStatus::Status status_;
@@ -125,6 +134,8 @@ private:
     std::vector<GraspCandidate> reachable_grasp_candidates_;
 
     ros::Publisher marker_arr_pub_;
+
+    std::vector<StowPosition> stow_positions_;
 
     void goal_callback();
     void preempt_callback();

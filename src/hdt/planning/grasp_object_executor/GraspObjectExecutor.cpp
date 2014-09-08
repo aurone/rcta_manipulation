@@ -42,6 +42,25 @@ std::string to_string(Status status)
 
 } // namespace GraspObjectExecutionStatus
 
+bool extract_xml_value(
+    XmlRpc::XmlRpcValue& value,
+    GraspObjectExecutor::StowPosition& stow_position)
+{
+    if (!value.hasMember("name") || !value.hasMember("joint_vector_degs")) {
+        return false;
+    }
+
+    GraspObjectExecutor::StowPosition tmp;
+    bool success =
+            msg_utils::extract_xml_value(value["name"], tmp.name) &&
+            msg_utils::extract_xml_value(value["joint_vector_degs"], tmp.joint_positions);
+
+    if (success) {
+        stow_position = tmp;
+    }
+    return success;
+}
+
 GraspObjectExecutor::GraspObjectExecutor() :
     nh_(),
     ph_("~"),
@@ -141,6 +160,18 @@ bool GraspObjectExecutor::initialize()
     }
 
     grasp_to_pregrasp_ = Eigen::Translation3d(-pregrasp_to_grasp_offset_m_, 0, 0);
+
+    // read in stow positions
+    if (!msg_utils::download_param(ph_, "stow_positions", stow_positions_)) {
+        ROS_ERROR("Failed to retrieve 'stow_positions' from the param server");
+        return false;
+    }
+
+    ROS_INFO("Stow Positions:");
+    for (StowPosition& position : stow_positions_) {
+        ROS_INFO("    %s: %s", position.name.c_str(), to_string(position.joint_positions).c_str());
+        position.joint_positions = msg_utils::to_radians(position.joint_positions);
+    }
 
     marker_arr_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
 
@@ -767,20 +798,34 @@ int GraspObjectExecutor::run()
                     break;
                 }
 
+                if (next_stow_position_to_attempt_ >= stow_positions_.size()) {
+                    hdt::GraspObjectCommandResult result;
+                    std::string error = "Ran out of stow positions to attempt";
+                    ROS_ERROR("%s", error.c_str());
+                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    as_->setAborted(result, error);
+                    status_ = GraspObjectExecutionStatus::FAULT;
+                    break;
+                }
+
                 // 4. send a move arm goal for the best grasp
+
+                const StowPosition& next_stow_position = stow_positions_[next_stow_position_to_attempt_++];
+
                 last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
-
-                double stow_x = 0.0;
-                double stow_y = -0.382;
-                double stow_z = 0.514;
-                double stow_qx = 0.084;
-                double stow_qy = 0.147;
-                double stow_qz = -0.594;
-                double stow_qw = 0.787;
-
-                const Eigen::Affine3d HARDCODED_STOW_POSE =
-                        Eigen::Translation3d(stow_x, stow_y, stow_z) * Eigen::Quaterniond(stow_qw, stow_qx, stow_qy, stow_qz);
-                tf::poseEigenToMsg(HARDCODED_STOW_POSE, last_move_arm_stow_goal_.goal_pose);
+                Eigen::Affine3d stow_eef_pose;
+                robot_model_->compute_fk(next_stow_position.joint_positions, stow_eef_pose);
+//                double stow_x = 0.0;
+//                double stow_y = -0.382;
+//                double stow_z = 0.514;
+//                double stow_qx = 0.084;
+//                double stow_qy = 0.147;
+//                double stow_qz = -0.594;
+//                double stow_qw = 0.787;
+//
+//                const Eigen::Affine3d HARDCODED_STOW_POSE =
+//                        Eigen::Translation3d(stow_x, stow_y, stow_z) * Eigen::Quaterniond(stow_qw, stow_qx, stow_qy, stow_qz);
+                tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
                 move_arm_command_client_->sendGoal(last_move_arm_stow_goal_, result_cb);
@@ -847,6 +892,8 @@ void GraspObjectExecutor::goal_callback()
 
     sent_gripper_command_ = false;
     pending_gripper_command_ = false;
+
+    next_stow_position_to_attempt_ = 0;
 }
 
 void GraspObjectExecutor::preempt_callback()
