@@ -42,7 +42,8 @@
 
     <!-- Global Frame Functionality -->
     <node name="localization_simulator" pkg="hdt" type="localization_simulator"/>
-    <node name="reposition_base_simulator" pkg="hdt" type="reposition_base_simulator"/>
+    <!-- <node name="reposition_base_simulator" pkg="hdt" type="reposition_base_simulator"/> -->
+    <!-- <node name="reposition_base_executor" pkg="hdt" type="hdt_base_planning_node"/> -->
 
     <!-- launch robot_state_publisher to translate urdf + /joint_states to /tf -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
