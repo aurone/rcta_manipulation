@@ -51,7 +51,6 @@ bool RepositionBaseExecutor::initialize()
 
 	// action server initialization
 	std::string action_name_ = "reposition_base_command";
-	std::unique_ptr<RepositionBaseCommandActionServer> as_;
 	as_.reset(new RepositionBaseCommandActionServer(action_name_, false));
 	if (!as_) {
 		ROS_ERROR("Failed to instantiate Reposition Base Command Action Server");
@@ -191,12 +190,16 @@ int RepositionBaseExecutor::run()
 	while (ros::ok()) {
 		RunUponDestruction rod([&](){ loop_rate.sleep(); });
 
+		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
+
 		ros::spinOnce();
 
 		if (status_ != last_status_) {
 			ROS_INFO("Reposition Base Executor Transitioning: %s -> %s", to_string(last_status_).c_str(), to_string(status_).c_str());
 			last_status_ = status_;
 		}
+
+		assert((bool)as_);
 
 		switch (status_) {
 			case RepositionBaseExecutionStatus::IDLE:
@@ -242,6 +245,7 @@ int RepositionBaseExecutor::run()
 // 							status_ = RepositionBaseExecutionStatus::COMPLETING_GOAL;
 
 							std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
+							candidate_base_poses.resize(1);
 							candidate_base_poses[0].pose.position.x = robxf;
 							candidate_base_poses[0].pose.position.y = robyf;
 							candidate_base_poses[0].pose.position.z = robzf;
@@ -285,8 +289,8 @@ void RepositionBaseExecutor::goal_callback()
 	current_goal_ = as_->acceptNewGoal();
 	ROS_INFO("    Goal ID: %u", current_goal_->id);
 	ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
-	ROS_INFO("    Gas Can Pose [map]", to_string(current_goal_->gas_can_in_map.pose).c_str());
-	ROS_INFO("    Base Link Pose [map]", to_string(current_goal_->base_link_in_map.pose).c_str());
+	ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
+	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
 // 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
 
 	bComputedRobPose_ = false;	
