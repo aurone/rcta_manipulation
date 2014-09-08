@@ -79,7 +79,7 @@ private:
     /// @{ Action Clients
 
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
-    std::unique_ptr<MoveArmCommandActionClient> move_arm_client_;
+    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
     bool pending_move_arm_command_;
 
     typedef actionlib::SimpleActionClient<hdt::ViservoCommandAction> ViservoCommandActionClient;
@@ -166,9 +166,6 @@ private:
     std::vector<geometry_msgs::PoseStamped> base_pose_candidates_;
 
     void setup_gui();
-
-    bool init();
-    bool create_action_clients();
 
     // The set utilities have the effect of changing the text in the line edit
     // box as well as applying the same action as the corresponding refresh
@@ -257,6 +254,40 @@ private:
     void update_base_pose_spinboxes();
     void update_spinboxes();
     void update_gui();
+
+    template <typename ActionType>
+    bool reconnect_client(
+            std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& client,
+            const std::string& action_name)
+    {
+        if (!client) {
+            ROS_INFO("Instantiating action client '%s'", action_name.c_str());
+            client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
+        }
+
+        // should have a non-null client by this point
+        if (!client) {
+            ROS_ERROR("Failed to instantiate action client");
+            return false;
+        }
+
+        if (!client->isServerConnected()) {
+            // attempt to reconnect by reinstantiation
+            ROS_INFO("Attempting to reconnect action client");
+            client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
+            if (!client) {
+                ROS_INFO("Failed to reinstantiate action client");
+                return false;
+            }
+        }
+
+        if (!client->isServerConnected()) {
+            ROS_WARN("Failed to reconnect action client '%s'", action_name.c_str());
+            return false;
+        }
+
+        return true;
+    }
 };
 
 } // namespace hdt

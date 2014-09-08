@@ -25,7 +25,7 @@ namespace hdt
 ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
     nh_(),
-    move_arm_client_(),
+    move_arm_command_client_(),
     pending_move_arm_command_(false),
     viservo_command_client_(),
     pending_viservo_command_(false),
@@ -87,18 +87,6 @@ ManipulatorCommandPanel::~ManipulatorCommandPanel()
 
 void ManipulatorCommandPanel::load(const rviz::Config& config)
 {
-    // non-config-based initialization
-    // TODO: get rid of this initialization step and lazily initialize all
-    // action clients, providing message box errors when commands fail because
-    // action clients cannot be hooked up; akin to the GraspObjectExecutor
-    ROS_INFO("Initializing Manipulator Command Panel");
-    if (!init()) {
-        ROS_ERROR("Failed to initialize ManipulatorCommandPanel");
-    }
-    else {
-        ROS_INFO("Successfully initialized ManipulatorCommandPanel");
-    }
-
     rviz::Panel::load(config);
 
     ROS_INFO("Loading config for '%s'", this->getName().toStdString().c_str());
@@ -253,7 +241,18 @@ void ManipulatorCommandPanel::update_base_pose_candidate(int index)
 
 void ManipulatorCommandPanel::send_teleport_andalite_command()
 {
-    QMessageBox::information(this, tr("Teleport Andalite"), tr("Teleport Andalite Unimplemented"));
+    if (!reconnect_client(teleport_andalite_command_client_, "teleport_andalite_command")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Teleport Andalite Command (server is not connected)"));
+        return;
+    }
+
+    hdt::TeleportAndaliteCommandGoal teleport_andalite_goal;
+    tf::poseEigenToMsg(world_to_robot_, teleport_andalite_goal.global_pose);
+
+    auto result_cb = boost::bind(&ManipulatorCommandPanel::teleport_andalite_command_result_cb, this, _1, _2);
+    teleport_andalite_command_client_->sendGoal(teleport_andalite_goal, result_cb);
+
+    pending_teleport_andalite_command_ = true;
 }
 
 void ManipulatorCommandPanel::copy_current_state()
@@ -319,14 +318,8 @@ void ManipulatorCommandPanel::cycle_ik_solutions()
 
 void ManipulatorCommandPanel::send_move_arm_command()
 {
-    if (!move_arm_client_) {
-        ROS_WARN("Move Arm Client has not yet been instantiated");
-        return;
-    }
-
-    if (!move_arm_client_->isServerConnected()) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
-        move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
+    if (!reconnect_client(move_arm_command_client_, "move_arm_command")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
         return;
     }
 
@@ -351,7 +344,7 @@ void ManipulatorCommandPanel::send_move_arm_command()
     ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
-    move_arm_client_->sendGoal(move_arm_goal, result_callback);
+    move_arm_command_client_->sendGoal(move_arm_goal, result_callback);
 
     pending_move_arm_command_ = true;
     update_gui();
@@ -359,14 +352,8 @@ void ManipulatorCommandPanel::send_move_arm_command()
 
 void ManipulatorCommandPanel::send_joint_goal()
 {
-    if (!move_arm_client_) {
-        ROS_WARN("Move Arm Client has not yet been instantiated");
-        return;
-    }
-
-    if (!move_arm_client_->isServerConnected()) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
-        move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
+    if (!reconnect_client(move_arm_command_client_, "move_arm_command")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
         return;
     }
 
@@ -381,7 +368,7 @@ void ManipulatorCommandPanel::send_joint_goal()
     }
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
-    move_arm_client_->sendGoal(move_arm_goal, result_callback);
+    move_arm_command_client_->sendGoal(move_arm_goal, result_callback);
 
     pending_move_arm_command_ = true;
     update_gui();
@@ -424,21 +411,8 @@ void ManipulatorCommandPanel::update_j7_position(double value)
 
 void ManipulatorCommandPanel::send_viservo_command()
 {
-    if (!viservo_command_client_) {
-        ROS_WARN("Viservo Command Client has not yet been instantiated");
-        return;
-    }
-
-    if (!viservo_command_client_->isServerConnected()) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Viservo Command (server is not connected)"));
-
-        // try and reset the action client to grab a fresh connection
-        viservo_command_client_.reset(new ViservoCommandActionClient("viservo_command", false));
-        if (!viservo_command_client_) {
-            ROS_WARN("Failed to instantiate Viservo Command Action Client");
-            return;
-        }
-
+    if (!reconnect_client(viservo_command_client_, "viservo_command")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Viservo Command (server is not connected)"));
         return;
     }
 
@@ -487,21 +461,8 @@ void ManipulatorCommandPanel::send_viservo_command()
 
 void ManipulatorCommandPanel::send_grasp_object_command()
 {
-    if (!grasp_object_command_client_) {
-        ROS_WARN("Grasp Object Command Client has not yet been instantiated");
-        return;
-    }
-
-    if (!grasp_object_command_client_->isServerConnected()) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Viservo Command (server is not connected)"));
-
-        // try and reset the action client to grab a fresh connection
-        grasp_object_command_client_.reset(new GraspObjectCommandActionClient("grasp_object_command", false));
-        if (!grasp_object_command_client_) {
-            ROS_WARN("Failed to instantiate Grasp Object Command Action Client");
-            return;
-        }
-
+    if (!reconnect_client(grasp_object_command_client_, "grasp_object_command")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not connected)"));
         return;
     }
 
@@ -538,21 +499,8 @@ void ManipulatorCommandPanel::send_grasp_object_command()
 
 void ManipulatorCommandPanel::send_reposition_base_command()
 {
-    if (!reposition_base_command_client_) {
-        ROS_WARN("Reposition Base Command Client has not yet been instantiated");
-        return;
-    }
-
-    if (!reposition_base_command_client_->isServerConnected()) {
+    if (!reconnect_client(reposition_base_command_client_, "reposition_base_command")) {
         QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (server is not connected)"));
-
-        // try and reset the action client to grab a fresh connection
-        reposition_base_command_client_.reset(new RepositionBaseCommandActionClient("reposition_base_command", false));
-        if (!reposition_base_command_client_) {
-            ROS_WARN("Failed to instantiate Reposition Base Command Action Client");
-            return;
-        }
-
         return;
     }
 
@@ -649,7 +597,6 @@ void ManipulatorCommandPanel::setup_gui()
         QVBoxLayout* arm_commands_layout = new QVBoxLayout;
             copy_current_state_button_ = new QPushButton(tr("Copy Arm State"));
             cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
-            send_move_arm_command_button_ = new QPushButton(tr("Move Arm to End Effector Pose"));
             QGridLayout* joint_state_spinbox_layout = new QGridLayout;
                 QLabel* j1_label = new QLabel(tr("J1"));
                 j1_spinbox_ = new QDoubleSpinBox;
@@ -679,12 +626,13 @@ void ManipulatorCommandPanel::setup_gui()
             joint_state_spinbox_layout->addWidget(j6_spinbox_, 1, 3);
             joint_state_spinbox_layout->addWidget(j7_label, 1, 4);
             joint_state_spinbox_layout->addWidget(j7_spinbox_, 1, 5);
+            send_move_arm_command_button_ = new QPushButton(tr("Move Arm to End Effector Pose"));
             send_joint_goal_button_ = new QPushButton(tr("Move Arm to Joint State"));
             send_viservo_command_button_ = new QPushButton(tr("Visual Servo"));
         arm_commands_layout->addWidget(copy_current_state_button_);
         arm_commands_layout->addWidget(cycle_ik_solutions_button_);
-        arm_commands_layout->addWidget(send_move_arm_command_button_);
         arm_commands_layout->addLayout(joint_state_spinbox_layout);
+        arm_commands_layout->addWidget(send_move_arm_command_button_);
         arm_commands_layout->addWidget(send_joint_goal_button_);
         arm_commands_layout->addWidget(send_viservo_command_button_);
     arm_commands_group->setLayout(arm_commands_layout);
@@ -741,50 +689,6 @@ void ManipulatorCommandPanel::setup_gui()
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
     connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
     connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(update_base_pose_candidate(int)));
-}
-
-bool ManipulatorCommandPanel::init()
-{
-    if (!create_action_clients()) {
-        return false; // errors printed within
-    }
-
-    return true;
-}
-
-bool ManipulatorCommandPanel::create_action_clients()
-{
-    move_arm_client_.reset(new MoveArmCommandActionClient("move_arm_command", false));
-    if (!move_arm_client_) {
-        ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
-        return false;
-    }
-
-    viservo_command_client_.reset(new ViservoCommandActionClient("viservo_command", false));
-    if (!viservo_command_client_) {
-        ROS_WARN("Failed to instantiate Viservo Command Action Client");
-        return false;
-    }
-
-    grasp_object_command_client_.reset(new GraspObjectCommandActionClient("grasp_object_command", false));
-    if (!grasp_object_command_client_) {
-        ROS_WARN("Failed to instantiate Grasp Object Command Action Client");
-        return false;
-    }
-
-    reposition_base_command_client_.reset(new RepositionBaseCommandActionClient("reposition_base_command", false));
-    if (!reposition_base_command_client_) {
-        ROS_WARN("Failed to instantiate Reposition Base Command Action Client");
-        return false;
-    }
-
-    teleport_andalite_command_client_.reset(new TeleportAndaliteCommandActionClient("teleport_andalite_command", false));
-    if (!teleport_andalite_command_client_) {
-        ROS_WARN("Failed to instantiate Teleport Andalite Command Action Client");
-        return false;
-    }
-
-    return true;
 }
 
 bool ManipulatorCommandPanel::check_robot_model_consistency(
@@ -876,6 +780,18 @@ bool ManipulatorCommandPanel::set_global_frame(const std::string& global_frame, 
         }
 
         // TODO: update the object interactive marker
+//        visualization_msgs::InteractiveMarker object_marker;
+//        if (server_.get("gas_canister_fixture", object_marker)) {
+//            std_msgs::Header header;
+//            header.seq = 0;
+//            header.stamp = ros::Time(0);
+//            header.frame_id = global_frame;
+//            Eigen::Affine3d new_marker_pose; // world_to_object
+//            geometry_msgs::Pose new_pose;
+//            tf::poseEigenToMsg(new_marker_pose, new_pose);
+//            server_.setPose("gas_canister_fixture", new_pose, header);
+//            server_.applyChanges();
+//        }
 
         if (global_frame != global_frame_) {
             Q_EMIT(configChanged());
@@ -1529,7 +1445,8 @@ void ManipulatorCommandPanel::teleport_andalite_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::TeleportAndaliteCommandResult::ConstPtr& result)
 {
-
+    ROS_INFO("Received Result from Teleport Andalite Command Action Client");
+    pending_teleport_andalite_command_ = false;
 }
 
 bool ManipulatorCommandPanel::gatherRobotMarkers(
