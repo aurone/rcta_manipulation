@@ -47,6 +47,7 @@ public Q_SLOTS:
 
     void refresh_robot_description();
     void refresh_global_frame();
+    void check_use_global_frame(int);
 
     void copy_current_base_pose();
     void update_base_pose_x(double x);
@@ -107,6 +108,7 @@ private:
     QPushButton* refresh_robot_desc_button_;
     QLineEdit* global_frame_line_edit_;
     QPushButton* refresh_global_frame_button_;
+    QCheckBox* global_frame_checkbox_;
 
     // Base Command Widgets
     QPushButton* copy_current_base_pose_button_;
@@ -139,6 +141,7 @@ private:
     /// @}
 
     Eigen::Affine3d world_to_robot_;
+    Eigen::Affine3d world_to_object_;
 
     hdt::RobotModelPtr robot_model_;
 
@@ -161,9 +164,11 @@ private:
     tf::TransformListener listener_;
 
     std::string robot_description_;
+    bool use_global_frame_;
     std::string global_frame_;
 
-    std::vector<geometry_msgs::PoseStamped> base_pose_candidates_;
+    std::size_t base_candidate_idx_;
+    std::vector<geometry_msgs::PoseStamped> candidate_base_poses_;
 
     void setup_gui();
 
@@ -175,7 +180,19 @@ private:
     const std::string& get_robot_description() const;
     const std::string& get_global_frame() const;
 
+    bool use_global_frame() const;
+    void set_use_global_frame(bool use);
+
+    bool global_frame_active() const;
+    std::string interactive_marker_frame() const;
+
     bool valid_global_frame(const std::string& frame) const;
+
+    // @ brief Return the global transform of the robot. If operating in local
+    // frame mode, this will be identity; otherwise this will be the transform
+    // from the global frame to the robot
+    const Eigen::Affine3d robot_transform() const;
+    const Eigen::Affine3d object_transform() const;
 
     bool reinit(const std::string& robot_description, std::string& why);
     bool reinit_robot_models(const std::string& robot_description, std::string& why);
@@ -251,6 +268,7 @@ private:
     bool set_phantom_joint_angles(const std::vector<double>& joint_angles);
 
     void update_manipulator_marker_pose();
+    void update_object_marker_pose();
     void update_base_pose_spinboxes();
     void update_spinboxes();
     void update_gui();

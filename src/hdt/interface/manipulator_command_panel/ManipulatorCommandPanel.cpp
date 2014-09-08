@@ -60,6 +60,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     send_grasp_object_command_button_(nullptr),
     send_reposition_base_command_button_(nullptr),
     world_to_robot_(Eigen::Affine3d::Identity()),
+    world_to_object_(Eigen::Affine3d::Identity()),
     robot_model_(),
     rm_loader_(),
     rm_(),
@@ -74,7 +75,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     listener_(),
     robot_description_(),
     global_frame_(),
-    base_pose_candidates_()
+    candidate_base_poses_()
 {
     setup_gui();
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
@@ -92,11 +93,18 @@ void ManipulatorCommandPanel::load(const rviz::Config& config)
     ROS_INFO("Loading config for '%s'", this->getName().toStdString().c_str());
 
     QString global_frame, robot_description;
+    bool use_global_frame;
+    float base_x, base_y, base_yaw;
     config.mapGetString("global_frame", &global_frame);
     config.mapGetString("robot_description", &robot_description);
+    config.mapGetBool("use_global_frame", &use_global_frame);
+    config.mapGetFloat("base_x", &base_x);
+    config.mapGetFloat("base_y", &base_y);
+    config.mapGetFloat("base_yaw", &base_yaw);
 
-    ROS_INFO("Global Frame: %s", global_frame.toStdString().c_str());
     ROS_INFO("Robot Description: %s", robot_description.toStdString().c_str());
+    ROS_INFO("Use Global Frame: %s", use_global_frame ? "true" : "false");
+    ROS_INFO("Global Frame: %s", global_frame.toStdString().c_str());
 
     if (!robot_description.isEmpty()) {
         // attempt to initalize the robot via this robot description
@@ -109,6 +117,13 @@ void ManipulatorCommandPanel::load(const rviz::Config& config)
         }
     }
 
+    // Update checkbox without firing off signals
+    disconnect(global_frame_checkbox_, SIGNAL(stateChanged(int)), this, SLOT(check_use_global_frame(int)));
+    global_frame_checkbox_->setChecked(use_global_frame);
+    connect(global_frame_checkbox_, SIGNAL(stateChanged(int)), this, SLOT(check_use_global_frame(int)));
+
+    set_use_global_frame(use_global_frame);
+
     if (!global_frame.isEmpty()) {
         std::string why;
         if (!set_global_frame(global_frame.toStdString(), why)) {
@@ -119,6 +134,11 @@ void ManipulatorCommandPanel::load(const rviz::Config& config)
         }
     }
 
+    world_to_robot_ = Eigen::Translation3d(base_x, base_y, 0.0) * Eigen::AngleAxisd(base_yaw, Eigen::Vector3d(0, 0, 1));
+    update_manipulator_marker_pose();
+    update_object_marker_pose();
+
+    update_base_pose_spinboxes();
     update_gui();
 }
 
@@ -128,8 +148,14 @@ void ManipulatorCommandPanel::save(rviz::Config config) const
 
     ROS_INFO("Saving config for '%s'", this->getName().toStdString().c_str());
 
-    config.mapSetValue("global_frame", QString::fromStdString(this->get_global_frame()));
     config.mapSetValue("robot_description", QString::fromStdString(this->get_robot_description()));
+    config.mapSetValue("use_global_frame", use_global_frame());
+    config.mapSetValue("global_frame", QString::fromStdString(this->get_global_frame()));
+    config.mapSetValue("base_x", robot_transform().translation()(0, 0));
+    config.mapSetValue("base_y", robot_transform().translation()(1, 0));
+    double yaw, pitch, roll;
+    msg_utils::get_euler_ypr(robot_transform(), yaw, pitch, roll);
+    config.mapSetValue("base_yaw", yaw);
 }
 
 void ManipulatorCommandPanel::refresh_robot_description()
@@ -154,18 +180,7 @@ void ManipulatorCommandPanel::refresh_robot_description()
 
 void ManipulatorCommandPanel::refresh_global_frame()
 {
-    std::vector<std::string> strings;
-    listener_.getFrameStrings(strings);
-
     std::string user_global_frame = global_frame_line_edit_->text().toStdString();
-    bool internal_frame = std::find(
-            rm_->getLinkModelNames().begin(),
-            rm_->getLinkModelNames().end(),
-            user_global_frame) != rm_->getLinkModelNames().end();
-
-    if (internal_frame) {
-        user_global_frame = rm_->getModelFrame();
-    }
 
     std::string why;
     if (!set_global_frame(user_global_frame, why)) {
@@ -176,6 +191,12 @@ void ManipulatorCommandPanel::refresh_global_frame()
                     .arg(QString::fromStdString(user_global_frame), QString::fromStdString(why)));
     }
 
+    update_gui();
+}
+
+void ManipulatorCommandPanel::check_use_global_frame(int state)
+{
+    set_use_global_frame(state);
     update_gui();
 }
 
@@ -228,10 +249,10 @@ void ManipulatorCommandPanel::update_base_pose_yaw(double yaw_deg)
 void ManipulatorCommandPanel::update_base_pose_candidate(int index)
 {
     if (index > 0) {
-        int candidate_idx = index - 1;
-        assert(candidate_idx >= 0 && candidate_idx < base_pose_candidates_.size());
+        base_candidate_idx_ = index - 1;
+        assert(base_candidate_idx_ >= 0 && base_candidate_idx_ < candidate_base_poses_.size());
 
-        tf::poseMsgToEigen(base_pose_candidates_[candidate_idx].pose, world_to_robot_);
+        tf::poseMsgToEigen(candidate_base_poses_[base_candidate_idx_].pose, world_to_robot_);
 
         update_base_pose_spinboxes();
         update_manipulator_marker_pose();
@@ -247,7 +268,10 @@ void ManipulatorCommandPanel::send_teleport_andalite_command()
     }
 
     hdt::TeleportAndaliteCommandGoal teleport_andalite_goal;
-    tf::poseEigenToMsg(world_to_robot_, teleport_andalite_goal.global_pose);
+    teleport_andalite_goal.global_pose.header.seq = 0;
+    teleport_andalite_goal.global_pose.header.stamp = ros::Time::now();
+    teleport_andalite_goal.global_pose.header.frame_id = interactive_marker_frame();
+    tf::poseEigenToMsg(world_to_robot_, teleport_andalite_goal.global_pose.pose);
 
     auto result_cb = boost::bind(&ManipulatorCommandPanel::teleport_andalite_command_result_cb, this, _1, _2);
     teleport_andalite_command_client_->sendGoal(teleport_andalite_goal, result_cb);
@@ -475,19 +499,18 @@ void ManipulatorCommandPanel::send_grasp_object_command()
 
     hdt::GraspObjectCommandGoal grasp_object_goal;
 
-    // TODO: remove this constraint?
-    if (gas_can_interactive_marker.header.frame_id != rm_->getRootLinkName()) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (interactive marker has frame other than robot model root frame"));
-        return;
-    }
-
     static int grasp_object_goal_id = 0;
     grasp_object_goal.id = grasp_object_goal_id++;
     grasp_object_goal.retry_count = 0;
-    grasp_object_goal.gas_can_in_base_link.pose = gas_can_interactive_marker.pose;
-    grasp_object_goal.gas_can_in_base_link.header.frame_id = rm_->getRootLinkName();
-    grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
-    grasp_object_goal.gas_can_in_map.header.frame_id = rm_->getRootLinkName();
+
+    // robot -> object = robot -> marker * marker -> object
+    Eigen::Affine3d robot_to_object = robot_transform().inverse() * object_transform();
+    grasp_object_goal.gas_can_in_base_link.header.frame_id = rm_->getModelFrame();
+    tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
+
+    grasp_object_goal.gas_can_in_map.header.frame_id = interactive_marker_frame();
+    tf::poseEigenToMsg(object_transform(), grasp_object_goal.gas_can_in_map.pose);
+
     // TODO: octomap
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::grasp_object_command_result_cb, this, _1, _2);
@@ -504,26 +527,19 @@ void ManipulatorCommandPanel::send_reposition_base_command()
         return;
     }
 
-    const std::string gas_can_interactive_marker_name = "gas_canister_fixture";
-    visualization_msgs::InteractiveMarker gas_can_interactive_marker;
-    if (!server_.get(gas_can_interactive_marker_name, gas_can_interactive_marker)) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (no interactive marker named 'gas_canister_fixture'"));
-        return;
-    }
-
     hdt::RepositionBaseCommandGoal reposition_base_goal;
 
     static int reposition_base_goal_id = 0;
     reposition_base_goal.id = reposition_base_goal_id++;
     reposition_base_goal.retry_count = 0;
-    reposition_base_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
-    reposition_base_goal.gas_can_in_map.header.frame_id = get_global_frame();
-    tf::poseEigenToMsg(world_to_robot_, reposition_base_goal.base_link_in_map.pose);
-    reposition_base_goal.base_link_in_map.header.frame_id = get_global_frame();
 
-//    grasp_object_goal.gas_can_in_map.pose = gas_can_interactive_marker.pose;
-//    grasp_object_goal.gas_can_in_map.header.frame_id = rm_->getRootLinkName();
-    // TODO: octomap
+    tf::poseEigenToMsg(world_to_object_, reposition_base_goal.gas_can_in_map.pose);
+    reposition_base_goal.gas_can_in_map.header.frame_id = interactive_marker_frame();
+
+    tf::poseEigenToMsg(world_to_robot_, reposition_base_goal.base_link_in_map.pose);
+    reposition_base_goal.base_link_in_map.header.frame_id = interactive_marker_frame();
+
+    // TODO: occupancy grid
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::reposition_base_command_result_cb, this, _1, _2);
     reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
@@ -547,9 +563,13 @@ void ManipulatorCommandPanel::setup_gui()
             robot_description_layout->addWidget(robot_description_line_edit_);
             robot_description_layout->addWidget(refresh_robot_desc_button_);
             QHBoxLayout* global_frame_layout = new QHBoxLayout;
+                global_frame_checkbox_ = new QCheckBox(tr("Use Global Frame"));
+                global_frame_checkbox_->setChecked(false);
                 QLabel* global_frame_label = new QLabel(tr("Global Frame:"));
                 global_frame_line_edit_ = new QLineEdit;
+                global_frame_line_edit_->setEnabled(false);
                 refresh_global_frame_button_ = new QPushButton(tr("Refresh"));
+            global_frame_layout->addWidget(global_frame_checkbox_);
             global_frame_layout->addWidget(global_frame_label);
             global_frame_layout->addWidget(global_frame_line_edit_);
             global_frame_layout->addWidget(refresh_global_frame_button_);
@@ -577,7 +597,7 @@ void ManipulatorCommandPanel::setup_gui()
                 QLabel* yaw_label = new QLabel(tr("Yaw:"));
                 teleport_base_command_yaw_box_ = new QDoubleSpinBox;
                 teleport_base_command_yaw_box_->setMinimum(0.0);
-                teleport_base_command_yaw_box_->setMaximum(360.0);
+                teleport_base_command_yaw_box_->setMaximum(359.0);
                 teleport_base_command_yaw_box_->setSingleStep(1.0);
                 teleport_base_command_yaw_box_->setWrapping(true);
             base_pose_spinbox_layout->addWidget(x_label);
@@ -662,6 +682,7 @@ void ManipulatorCommandPanel::setup_gui()
     // note: do not connect any outgoing signals from general settings line edits; force users to use refresh button
     connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
     connect(refresh_global_frame_button_, SIGNAL(clicked()), this, SLOT(refresh_global_frame()));
+    connect(global_frame_checkbox_, SIGNAL(stateChanged(int)), this, SLOT(check_use_global_frame(int)));
 
     // base commands
     connect(copy_current_base_pose_button_, SIGNAL(clicked()), this, SLOT(copy_current_base_pose()));
@@ -728,11 +749,12 @@ bool ManipulatorCommandPanel::set_robot_description(const std::string& robot_des
     if (reinit(robot_description, why)) {
         ROS_INFO("Successfully reinitialized robot from '%s'", robot_description.c_str());
 
-        if (robot_description_ != robot_description) {
+        if (robot_description_ != robot_description) { // robot description changed to something different, not just refreshed
             Q_EMIT(configChanged());
         }
 
         robot_description_ = robot_description;
+        // note: ok to do this here without disabling signals since set_robot_description is invoked via refresh button callback
         robot_description_line_edit_->setText(QString::fromStdString(robot_description_));
 
         ROS_INFO("Robot Description set to '%s'", robot_description.c_str());
@@ -748,66 +770,26 @@ bool ManipulatorCommandPanel::set_robot_description(const std::string& robot_des
 
 bool ManipulatorCommandPanel::set_global_frame(const std::string& global_frame, std::string& why)
 {
-    if (valid_global_frame(global_frame)) {
-        // update the world to robot transform
-        if (!get_global_frame().empty()) {
-            tf::StampedTransform transform;
-            try {
-                listener_.lookupTransform(global_frame, global_frame_, ros::Time(0), transform);
-            }
-            catch (const tf::TransformException& ex) {
-                ROS_ERROR("Failed to lookup transform '%s' -> '%s'", global_frame.c_str(), global_frame_.c_str());
-                return false;
-            }
-
-            Eigen::Affine3d new_world_to_world;
-            msg_utils::convert(transform, new_world_to_world);
-            world_to_robot_ = new_world_to_world * world_to_robot_;
-        }
-
-        // update the manipulator interactive marker to put it into the new global frame
-        visualization_msgs::InteractiveMarker manipulator_marker;
-        if (server_.get("hdt_arm_control", manipulator_marker)) {
-            std_msgs::Header header;
-            header.seq = 0;
-            header.stamp = ros::Time(0);
-            header.frame_id = global_frame;
-            Eigen::Affine3d new_marker_pose = world_to_robot_ * rs_->getLinkState(tip_link_)->getGlobalLinkTransform();
-            geometry_msgs::Pose new_pose;
-            tf::poseEigenToMsg(new_marker_pose, new_pose);
-            server_.setPose("hdt_arm_control", new_pose, header);
-            server_.applyChanges();
-        }
-
-        // TODO: update the object interactive marker
-//        visualization_msgs::InteractiveMarker object_marker;
-//        if (server_.get("gas_canister_fixture", object_marker)) {
-//            std_msgs::Header header;
-//            header.seq = 0;
-//            header.stamp = ros::Time(0);
-//            header.frame_id = global_frame;
-//            Eigen::Affine3d new_marker_pose; // world_to_object
-//            geometry_msgs::Pose new_pose;
-//            tf::poseEigenToMsg(new_marker_pose, new_pose);
-//            server_.setPose("gas_canister_fixture", new_pose, header);
-//            server_.applyChanges();
-//        }
-
-        if (global_frame != global_frame_) {
-            Q_EMIT(configChanged());
-        }
-
-        global_frame_ = global_frame;
-        global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
-
-        ROS_INFO("Global Frame set to %s", global_frame.c_str());
-        return true;
-    }
-    else {
+    if (!valid_global_frame(global_frame)) {
         why = global_frame + " is not a valid frame";
         global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
         return false;
     }
+
+    // TODO: consider transforming the robot and object transforms so that they remain in the same positions
+
+    if (global_frame != global_frame_) {
+        Q_EMIT(configChanged());
+    }
+
+    global_frame_ = global_frame;
+    global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
+
+    update_manipulator_marker_pose();
+    update_object_marker_pose();
+
+    ROS_INFO("Global Frame set to %s", global_frame.c_str());
+    return true;
 }
 
 const std::string& ManipulatorCommandPanel::get_robot_description() const
@@ -820,20 +802,63 @@ const std::string& ManipulatorCommandPanel::get_global_frame() const
     return global_frame_;
 }
 
+bool ManipulatorCommandPanel::use_global_frame() const
+{
+    return use_global_frame_;
+}
+
+void ManipulatorCommandPanel::set_use_global_frame(bool use)
+{
+    use_global_frame_ = use;
+    update_manipulator_marker_pose();
+    update_object_marker_pose();
+    publish_phantom_robot_visualizations();
+    ROS_INFO("Use Global Frame set to %s", use ? "true" : "false");
+}
+
+bool ManipulatorCommandPanel::global_frame_active() const
+{
+    return use_global_frame() && !get_global_frame().empty();
+}
+
+std::string ManipulatorCommandPanel::interactive_marker_frame() const
+{
+    if (global_frame_active()) {
+        return get_global_frame();
+    }
+    else if (rm_) {
+        return rm_->getModelFrame();
+    }
+    else {
+        return std::string("");
+    }
+}
+
 bool ManipulatorCommandPanel::valid_global_frame(const std::string& frame) const
 {
     static std::vector<std::string> valid_global_frames = {
-            "base_footprint",
-            "robot_ned",
             "abs_nwu",
             "abs_ned",
-            "/base_footprint",
-            "/robot_ned",
             "/abs_nwu",
             "/abs_ned"
 
-    }; // TODO: please do something more intelligent
+    }; // TODO: please do something more intelligent like look for possible global frames
     return std::find(valid_global_frames.begin(), valid_global_frames.end(), frame) != valid_global_frames.end();
+}
+
+const Eigen::Affine3d ManipulatorCommandPanel::robot_transform() const
+{
+    if (global_frame_active()) {
+        return world_to_robot_;
+    }
+    else {
+        return Eigen::Affine3d::Identity();
+    }
+}
+
+const Eigen::Affine3d ManipulatorCommandPanel::object_transform() const
+{
+    return world_to_object_;
 }
 
 bool ManipulatorCommandPanel::initialized() const
@@ -859,7 +884,7 @@ void ManipulatorCommandPanel::do_process_feedback(
     new_eef_pose =
             mount_frame_to_manipulator_frame_.inverse() *
             rs_->getFrameTransform(base_link_).inverse() *
-            world_to_robot_.inverse() *
+            robot_transform().inverse() *
             new_eef_pose;
 
     ROS_DEBUG("Manipulator -> EndEffector: %s", to_string(new_eef_pose).c_str());
@@ -886,10 +911,17 @@ void ManipulatorCommandPanel::do_process_feedback(
 void ManipulatorCommandPanel::process_gas_canister_marker_feedback(
     const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback)
 {
+    if (feedback->event_type == visualization_msgs::InteractiveMarkerFeedback::POSE_UPDATE) {
+        tf::poseMsgToEigen(feedback->pose, world_to_object_);
+    }
 }
 
 void ManipulatorCommandPanel::publish_phantom_robot_visualizations()
 {
+    if (!initialized()) {
+        return;
+    }
+
     rs_->updateLinkTransforms();
 
     const std::vector<std::string>& link_names = rm_->getLinkModelNames();
@@ -900,17 +932,15 @@ void ManipulatorCommandPanel::publish_phantom_robot_visualizations()
     visualization_msgs::MarkerArray marker_array;
     gatherRobotMarkers(*rs_, link_names, color, ns, d, marker_array);
 
-    if (get_global_frame() != rm_->getModelFrame()) {
-        // transform all markers from the robot frame into the global frame
-        for (visualization_msgs::Marker& marker : marker_array.markers) {
-            Eigen::Affine3d root_to_marker;
-            tf::poseMsgToEigen(marker.pose, root_to_marker);
-            // world -> marker = world -> robot * robot -> marker
-            Eigen::Affine3d world_to_marker = world_to_robot_ * root_to_marker;
-            tf::poseEigenToMsg(world_to_marker, marker.pose);
-            marker.header.frame_id = get_global_frame();
-            marker.header.stamp = ros::Time(0);
-        }
+    // transform all markers from the robot frame into the global frame
+    for (visualization_msgs::Marker& marker : marker_array.markers) {
+        Eigen::Affine3d root_to_marker;
+        tf::poseMsgToEigen(marker.pose, root_to_marker);
+        // world -> marker = world -> robot * robot -> marker
+        Eigen::Affine3d world_to_marker = robot_transform() * root_to_marker;
+        tf::poseEigenToMsg(world_to_marker, marker.pose);
+        marker.header.frame_id = interactive_marker_frame();
+        marker.header.stamp = ros::Time(0);
     }
 
     robot_markers_pub_.publish(marker_array);
@@ -1186,15 +1216,6 @@ bool ManipulatorCommandPanel::reinit_robot_models(const std::string& robot_descr
     j6_spinbox_->setSingleStep(1.0);
     j7_spinbox_->setSingleStep(1.0);
 
-    std::string global_frame = get_global_frame();
-    if (!valid_global_frame(global_frame)) {
-        std::string another_why;
-        if (!set_global_frame(rm_->getModelFrame(), another_why)) {
-            why = "Failed to set global frame to the frame of the robot model (" + another_why + ")";
-            return false;
-        }
-    }
-
     return true;
 }
 
@@ -1233,14 +1254,14 @@ bool ManipulatorCommandPanel::reinit_manipulator_interactive_marker()
             visualization_msgs::InteractiveMarker interactive_marker;
             interactive_marker.header.seq = 0;
             interactive_marker.header.stamp = ros::Time(0);
-            interactive_marker.header.frame_id = global_frame_;
+            interactive_marker.header.frame_id = interactive_marker_frame();
             robot_state::LinkState* tip_link_state = rs_->getLinkState(tip_link_);
             if (!tip_link_state) {
                 ROS_ERROR("Failed to get Link State for tip link '%s'", tip_link_.c_str());
                 return false;
             }
 
-            Eigen::Affine3d world_to_marker = world_to_robot_ * tip_link_state->getGlobalLinkTransform();
+            Eigen::Affine3d world_to_marker = robot_transform() * tip_link_state->getGlobalLinkTransform();
             tf::poseEigenToMsg(world_to_marker, interactive_marker.pose);
             interactive_marker.name = jmg->getName() + "_control";
             interactive_marker.description = std::string("Control of ") + tip_link_ + std::string(" of manipulator ") + jmg->getName();
@@ -1274,7 +1295,7 @@ bool ManipulatorCommandPanel::reinit_object_interactive_marker()
     visualization_msgs::InteractiveMarker gas_canister_interactive_marker;
     gas_canister_interactive_marker.header.seq = 0;
     gas_canister_interactive_marker.header.stamp = ros::Time(0);
-    gas_canister_interactive_marker.header.frame_id = global_frame_;
+    gas_canister_interactive_marker.header.frame_id = interactive_marker_frame();
     gas_canister_interactive_marker.pose.position.x = 0.0;
     gas_canister_interactive_marker.pose.position.y = 0.0;
     gas_canister_interactive_marker.pose.position.z = 0.0;
@@ -1409,23 +1430,8 @@ void ManipulatorCommandPanel::reposition_base_command_result_cb(
     pending_reposition_base_command_ = false;
 
     if (result->result == hdt::RepositionBaseCommandResult::SUCCESS) {
-        base_pose_candidates_ = result->candidate_base_poses;
-        ROS_INFO("Reposition Base Command returned %zd candidate poses", base_pose_candidates_.size());
-
-        std::string num_candidates_label_text =
-                "of " + std::to_string((int)result->candidate_base_poses.size()) + " Candidates";
-
-        if (result->candidate_base_poses.empty()) {
-            update_candidate_spinbox_->setEnabled(false);
-        }
-        else {
-            update_candidate_spinbox_->setMinimum(1);
-            update_candidate_spinbox_->setMaximum((int)result->candidate_base_poses.size());
-            update_candidate_spinbox_->setValue(1);
-            update_candidate_spinbox_->setEnabled(true);
-        }
-
-        num_candidates_label_->setText(QString::fromStdString(num_candidates_label_text));
+        candidate_base_poses_ = result->candidate_base_poses;
+        ROS_INFO("Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
     }
 
     update_gui();
@@ -1446,6 +1452,10 @@ void ManipulatorCommandPanel::teleport_andalite_command_result_cb(
     const hdt::TeleportAndaliteCommandResult::ConstPtr& result)
 {
     ROS_INFO("Received Result from Teleport Andalite Command Action Client");
+    if (state != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Teleport Andalite Command goal was not successful"));
+    }
+
     pending_teleport_andalite_command_ = false;
 }
 
@@ -1584,18 +1594,23 @@ void ManipulatorCommandPanel::update_gui()
     ROS_INFO("    Pending Viservo Command: %s", pending_viservo_command_ ? "TRUE": "FALSE");
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
+    ROS_INFO("    Pending Teleport Andalite Command: %s", pending_teleport_andalite_command_ ? "TRUE" : "FALSE");
 
     bool pending_motion_command =
-        pending_move_arm_command_ || pending_viservo_command_ || pending_grasp_object_command_ || pending_reposition_base_command_;
+        pending_move_arm_command_        ||
+        pending_viservo_command_         ||
+        pending_grasp_object_command_    ||
+        pending_reposition_base_command_ ||
+        pending_teleport_andalite_command_;
 
-    bool have_global_frame = !get_global_frame().empty() && get_global_frame() != rm_->getModelFrame();
+    global_frame_line_edit_->setEnabled(use_global_frame());
 
-    copy_current_base_pose_button_->setEnabled(have_global_frame && initialized());
-    teleport_base_command_x_box_->setEnabled(have_global_frame && initialized());
-    teleport_base_command_y_box_->setEnabled(have_global_frame && initialized());
-    teleport_base_command_z_box_->setEnabled(have_global_frame && initialized());
-    teleport_base_command_yaw_box_->setEnabled(have_global_frame && initialized());
-    send_teleport_andalite_command_button_->setEnabled(have_global_frame && initialized() && !pending_motion_command);
+    copy_current_base_pose_button_->setEnabled(global_frame_active() && initialized());
+    teleport_base_command_x_box_->setEnabled(global_frame_active() && initialized());
+    teleport_base_command_y_box_->setEnabled(global_frame_active() && initialized());
+    teleport_base_command_z_box_->setEnabled(global_frame_active() && initialized());
+    teleport_base_command_yaw_box_->setEnabled(global_frame_active() && initialized());
+    send_teleport_andalite_command_button_->setEnabled(global_frame_active() && initialized() && !pending_motion_command);
 
     copy_current_state_button_->setEnabled(initialized());
     cycle_ik_solutions_button_->setEnabled(initialized());
@@ -1611,7 +1626,24 @@ void ManipulatorCommandPanel::update_gui()
     send_viservo_command_button_->setEnabled(initialized() && !pending_motion_command);
 
     send_grasp_object_command_button_->setEnabled(initialized() && !pending_motion_command);
-    send_reposition_base_command_button_->setEnabled(initialized() && !pending_motion_command);
+    send_reposition_base_command_button_->setEnabled(global_frame_active() && initialized() && !pending_motion_command);
+
+    std::string num_candidates_label_text =
+            "of " + std::to_string((int)candidate_base_poses_.size()) + " Candidates";
+
+    if (candidate_base_poses_.empty()) {
+        update_candidate_spinbox_->setMinimum(0);
+        update_candidate_spinbox_->setMaximum(0);
+        update_candidate_spinbox_->setValue(0);
+        update_candidate_spinbox_->setEnabled(false);
+    }
+    else {
+        update_candidate_spinbox_->setMinimum(1);
+        update_candidate_spinbox_->setMaximum((int)candidate_base_poses_.size());
+        update_candidate_spinbox_->setEnabled(true);
+    }
+
+    num_candidates_label_->setText(QString::fromStdString(num_candidates_label_text));
 }
 
 std::vector<double> ManipulatorCommandPanel::get_current_joint_angles() const
@@ -1654,15 +1686,34 @@ bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>
 
 void ManipulatorCommandPanel::update_manipulator_marker_pose()
 {
-    rs_->updateLinkTransforms();
-    geometry_msgs::Pose new_marker_pose;
-    tf::poseEigenToMsg(world_to_robot_ * rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
-    std_msgs::Header header;
-    header.seq = 0;
-    header.frame_id = global_frame_;
-    header.stamp = ros::Time(0);
-    server_.setPose("hdt_arm_control", new_marker_pose, header);
-    server_.applyChanges();
+    visualization_msgs::InteractiveMarker manipulator_marker;
+    if (server_.get("hdt_arm_control", manipulator_marker))
+    {
+        rs_->updateLinkTransforms();
+        geometry_msgs::Pose new_marker_pose;
+        tf::poseEigenToMsg(robot_transform() * rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
+        std_msgs::Header header;
+        header.seq = 0;
+        header.frame_id = interactive_marker_frame();
+        header.stamp = ros::Time(0);
+        server_.setPose("hdt_arm_control", new_marker_pose, header);
+        server_.applyChanges();
+    }
+}
+
+void ManipulatorCommandPanel::update_object_marker_pose()
+{
+    visualization_msgs::InteractiveMarker object_marker;
+    if (server_.get("gas_canister_fixture", object_marker)) {
+        std_msgs::Header header;
+        header.seq = 0;
+        header.stamp = ros::Time(0);
+        header.frame_id = interactive_marker_frame();
+        geometry_msgs::Pose new_pose;
+        tf::poseEigenToMsg(object_transform(), new_pose);
+        server_.setPose("gas_canister_fixture", new_pose, header);
+        server_.applyChanges();
+    }
 }
 
 } // namespace hdt

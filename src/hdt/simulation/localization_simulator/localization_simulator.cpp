@@ -5,6 +5,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <hdt/common/utils/RunUponDestruction.h>
 #include <hdt/TeleportAndaliteCommandAction.h>
 #include <hdt/common/msg_utils/msg_utils.h>
@@ -37,6 +38,7 @@ private:
     std::string robot_frame_ned_name_;
 
     tf::TransformBroadcaster broadcaster_;
+    tf::TransformListener listener_;
 
     Eigen::Affine3d world_to_robot_;
 
@@ -45,6 +47,8 @@ private:
 
     void goal_callback();
     void preempt_callback();
+
+    bool transform(const std::string& target, const std::string& source, Eigen::Affine3d& transform);
 };
 
 LocalizationSimulator::LocalizationSimulator() :
@@ -56,6 +60,7 @@ LocalizationSimulator::LocalizationSimulator() :
     robot_frame_nwu_name_("base_footprint"),
     robot_frame_ned_name_("robot_ned"),
     broadcaster_(),
+    listener_(),
     world_to_robot_(Eigen::Affine3d::Identity()),
     as_()
 {
@@ -120,8 +125,29 @@ bool LocalizationSimulator::initialize()
 void LocalizationSimulator::goal_callback()
 {
     auto current_goal = as_->acceptNewGoal();
-    tf::poseMsgToEigen(current_goal->global_pose, world_to_robot_);
-    as_->setSucceeded();
+
+    try {
+        geometry_msgs::PoseStamped robot_pose_ned_frame;
+        robot_pose_ned_frame.header.stamp = ros::Time(0);
+        robot_pose_ned_frame.header.seq = 0;
+
+        geometry_msgs::PoseStamped goal_pose = current_goal->global_pose;
+        goal_pose.header.stamp = ros::Time(0);
+
+        listener_.transformPose(world_frame_ned_name_, goal_pose, robot_pose_ned_frame);
+
+        Eigen::Affine3d world_ned_to_robot_nwu;
+        tf::poseMsgToEigen(robot_pose_ned_frame.pose, world_ned_to_robot_nwu);
+
+        // world_ned -> robot_ned = world_ned -> robot_nwu * robot_nwu -> robot_ned
+        world_to_robot_ = world_ned_to_robot_nwu * Eigen::AngleAxisd(M_PI, Eigen::Vector3d(1, 0, 0));
+        as_->setSucceeded();
+    }
+    catch (const tf::TransformException& ex) {
+        ROS_WARN("Unable to transform from '%s' to '%s' (%s)",
+                current_goal->global_pose.header.frame_id.c_str(), world_frame_ned_name_.c_str(), ex.what());
+        as_->setAborted();
+    }
 }
 
 void LocalizationSimulator::preempt_callback()

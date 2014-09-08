@@ -1,5 +1,5 @@
 # goal
-geometry_msgs/Pose global_pose
+geometry_msgs/PoseStamped global_pose
 ---
 # result
 ---
