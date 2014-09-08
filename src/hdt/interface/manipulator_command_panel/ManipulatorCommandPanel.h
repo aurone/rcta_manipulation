@@ -53,6 +53,7 @@ public Q_SLOTS:
     void update_base_pose_y(double y);
     void update_base_pose_z(double z);
     void update_base_pose_yaw(double yaw);
+    void update_base_pose_candidate(int index);
     void send_teleport_andalite_command();
 
     void copy_current_state();
@@ -129,9 +130,11 @@ private:
     QDoubleSpinBox* j7_spinbox_;
     QPushButton* send_viservo_command_button_;
 
-    // High-Level Command Widgets
+    // Object Interaction Command Widgets
     QPushButton* send_grasp_object_command_button_;
     QPushButton* send_reposition_base_command_button_;
+    QSpinBox* update_candidate_spinbox_;
+    QLabel* num_candidates_label_;
 
     /// @}
 
@@ -159,6 +162,8 @@ private:
 
     std::string robot_description_;
     std::string global_frame_;
+
+    std::vector<geometry_msgs::PoseStamped> base_pose_candidates_;
 
     void setup_gui();
 
@@ -249,6 +254,7 @@ private:
     bool set_phantom_joint_angles(const std::vector<double>& joint_angles);
 
     void update_manipulator_marker_pose();
+    void update_base_pose_spinboxes();
     void update_spinboxes();
     void update_gui();
 };

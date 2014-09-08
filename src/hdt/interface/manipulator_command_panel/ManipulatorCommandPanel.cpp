@@ -71,7 +71,10 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     tip_link_(),
     base_link_(),
     mount_frame_to_manipulator_frame_(Eigen::Affine3d::Identity()),
-    listener_()
+    listener_(),
+    robot_description_(),
+    global_frame_(),
+    base_pose_candidates_()
 {
     setup_gui();
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
@@ -232,6 +235,20 @@ void ManipulatorCommandPanel::update_base_pose_yaw(double yaw_deg)
             Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d(0.0, 0.0, 1.0));
     update_manipulator_marker_pose();
     publish_phantom_robot_visualizations();
+}
+
+void ManipulatorCommandPanel::update_base_pose_candidate(int index)
+{
+    if (index > 0) {
+        int candidate_idx = index - 1;
+        assert(candidate_idx >= 0 && candidate_idx < base_pose_candidates_.size());
+
+        tf::poseMsgToEigen(base_pose_candidates_[candidate_idx].pose, world_to_robot_);
+
+        update_base_pose_spinboxes();
+        update_manipulator_marker_pose();
+        publish_phantom_robot_visualizations();
+    }
 }
 
 void ManipulatorCommandPanel::send_teleport_andalite_command()
@@ -625,8 +642,6 @@ void ManipulatorCommandPanel::setup_gui()
             base_pose_spinbox_layout->addWidget(teleport_base_command_x_box_);
             base_pose_spinbox_layout->addWidget(y_label);
             base_pose_spinbox_layout->addWidget(teleport_base_command_y_box_);
-//            base_pose_spinbox_layout->addWidget(z_label);
-//            base_pose_spinbox_layout->addWidget(teleport_base_command_z_box_);
             base_pose_spinbox_layout->addWidget(yaw_label);
             base_pose_spinbox_layout->addWidget(teleport_base_command_yaw_box_);
             send_teleport_andalite_command_button_ = new QPushButton(tr("Teleport Andalite"));
@@ -680,19 +695,26 @@ void ManipulatorCommandPanel::setup_gui()
         arm_commands_layout->addWidget(send_viservo_command_button_);
     arm_commands_group->setLayout(arm_commands_layout);
 
-    // high-level commands
-    QGroupBox* high_level_commands_group = new QGroupBox(tr("High-Level Commands"));
-        QVBoxLayout* high_level_commands_layout = new QVBoxLayout;
+    // object interaction commands
+    QGroupBox* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
+        QVBoxLayout* object_interaction_commands_layout = new QVBoxLayout;
             send_grasp_object_command_button_ = new QPushButton(tr("Grasp Object"));
             send_reposition_base_command_button_ = new QPushButton(tr("Reposition Base"));
-        high_level_commands_layout->addWidget(send_grasp_object_command_button_);
-        high_level_commands_layout->addWidget(send_reposition_base_command_button_);
-    high_level_commands_group->setLayout(high_level_commands_layout);
+            QHBoxLayout* candidates_layout = new QHBoxLayout;
+                update_candidate_spinbox_ = new QSpinBox;
+                update_candidate_spinbox_->setEnabled(false);
+                num_candidates_label_ = new QLabel(tr("of 0 Candidates"));
+            candidates_layout->addWidget(update_candidate_spinbox_);
+            candidates_layout->addWidget(num_candidates_label_);
+        object_interaction_commands_layout->addWidget(send_grasp_object_command_button_);
+        object_interaction_commands_layout->addWidget(send_reposition_base_command_button_);
+        object_interaction_commands_layout->addLayout(candidates_layout);
+    object_interaction_commands_group->setLayout(object_interaction_commands_layout);
 
     main_layout->addWidget(general_settings_group);
     main_layout->addWidget(base_commands_group);
     main_layout->addWidget(arm_commands_group);
-    main_layout->addWidget(high_level_commands_group);
+    main_layout->addWidget(object_interaction_commands_group);
     setLayout(main_layout);
 
     // note: do not connect any outgoing signals from general settings line edits; force users to use refresh button
@@ -721,9 +743,10 @@ void ManipulatorCommandPanel::setup_gui()
     connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
     connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
 
-    // high-level commands
+    // object interaction commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
     connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
+    connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(update_base_pose_candidate(int)));
 }
 
 bool ManipulatorCommandPanel::init()
@@ -911,8 +934,6 @@ bool ManipulatorCommandPanel::initialized() const
 void ManipulatorCommandPanel::do_process_feedback(
     const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback)
 {
-    ROS_INFO("Feedback!");
-
     Eigen::Affine3d new_eef_pose;
     tf::poseMsgToEigen(feedback->pose, new_eef_pose);
 
@@ -1474,6 +1495,29 @@ void ManipulatorCommandPanel::reposition_base_command_result_cb(
         const hdt::RepositionBaseCommandResult::ConstPtr& result)
 {
 
+    ROS_INFO("Received Result from Reposition Base Command Action");
+    pending_reposition_base_command_ = false;
+
+    if (result->result == hdt::RepositionBaseCommandResult::SUCCESS) {
+        base_pose_candidates_ = result->candidate_base_poses;
+
+        std::string num_candidates_label_text =
+                "of " + std::to_string((int)result->candidate_base_poses.size()) + " Candidates";
+
+        if (result->candidate_base_poses.empty()) {
+            update_candidate_spinbox_->setEnabled(false);
+        }
+        else {
+            update_candidate_spinbox_->setMinimum(1);
+            update_candidate_spinbox_->setMaximum((int)result->candidate_base_poses.size());
+            update_candidate_spinbox_->setValue(1);
+            update_candidate_spinbox_->setEnabled(true);
+        }
+
+        num_candidates_label_->setText(QString::fromStdString(num_candidates_label_text));
+    }
+
+    update_gui();
 }
 
 void ManipulatorCommandPanel::teleport_andalite_command_active_cb()
@@ -1607,6 +1651,21 @@ void ManipulatorCommandPanel::update_spinboxes()
     connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
 }
 
+void ManipulatorCommandPanel::update_base_pose_spinboxes()
+{
+    disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
+    disconnect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
+    disconnect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
+    teleport_base_command_x_box_->setValue(world_to_robot_.translation()(0, 0));
+    teleport_base_command_y_box_->setValue(world_to_robot_.translation()(1, 0));
+    double yaw, pitch, roll;
+    msg_utils::get_euler_ypr(world_to_robot_, yaw, pitch, roll);
+    teleport_base_command_yaw_box_->setValue(sbpl::utils::ToDegrees(yaw));
+    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
+    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
+    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
+}
+
 void ManipulatorCommandPanel::update_gui()
 {
     ROS_INFO("    Pending Move Arm Command: %s", pending_move_arm_command_ ? "TRUE" : "FALSE");
@@ -1617,7 +1676,8 @@ void ManipulatorCommandPanel::update_gui()
     bool pending_motion_command =
         pending_move_arm_command_ || pending_viservo_command_ || pending_grasp_object_command_ || pending_reposition_base_command_;
 
-    bool have_global_frame = !get_global_frame().empty(); // TODO: global frame == local frame?
+    bool have_global_frame = !get_global_frame().empty() && get_global_frame() != rm_->getModelFrame();
+
     copy_current_base_pose_button_->setEnabled(have_global_frame && initialized());
     teleport_base_command_x_box_->setEnabled(have_global_frame && initialized());
     teleport_base_command_y_box_->setEnabled(have_global_frame && initialized());
