@@ -220,7 +220,7 @@ int RepositionBaseExecutor::run()
 						
 						// COMPUTE ROBOT POSE HERE
 						double objx=0, objy=0, objz=0, objY=0, objP=0, objR=0;
-						double robx0=0, roby0=0, robz0=-0.65, robY0=0, robP0=0, robR0=0;						// initial robot pose	// z-offset for /camera_link frame
+						double robx0=0, roby0=0, robz0=0, robY0=0, robP0=0, robR0=0;						// initial robot pose	// z-offset for /camera_link frame
 						double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
 
 						objx = current_goal_->gas_can_in_map.pose.position.x;	
