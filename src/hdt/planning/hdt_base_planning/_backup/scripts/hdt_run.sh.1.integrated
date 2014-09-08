@@ -1,0 +1,52 @@
+#!/bin/bash
+
+## startup ros
+roscore&
+sleep 2
+
+# source ~/ros/hdt_ws/devel/setup.bash
+
+## upload husky + side-mounted arm + gripper urdf to parameter server
+# roslaunch hdt_description upload_andalite.launch&
+# sleep 1
+roslaunch hdt upload_andalite.launch sim:=true kinect_sensor:=false&
+# roslaunch hdt andalite.launch sim:=true kinect_sensor:=false&
+sleep 1
+
+## bringup simulated hdt arm and ros service for moving the arm; also provides /joint_states
+# roslaunch hdt_arm_driver hdt_arm_driver.launch sim:=true&
+# sleep 1
+roslaunch hdt hdt_arm_driver.launch sim:=true&
+sleep 1
+
+## bring up fake joint states for husky and the fake gripper
+# roslaunch hdt_simulator husky_simulator.launch&
+# sleep 1
+# roslaunch hdt_simulator gripper_simulator.launch&
+# sleep 1
+# roslaunch /home/kimsk/ros/hdt_ws/src/hdt_simulator/launch/husky_simulator.launch&
+roslaunch hdt husky_simulator.launch&
+sleep 1
+# roslaunch /home/kimsk/ros/hdt_ws/src/hdt_simulator/launch/gripper_simulator.launch&
+roslaunch hdt gripper_simulator.launch&
+sleep 1
+
+## translate joint states to tf frames (make sure you uploaded the urdf from before)
+rosrun robot_state_publisher robot_state_publisher&
+sleep 1
+
+rosrun rviz rviz
+
+    #1. set fixed_frame to base_link
+    #2. add RobotModel display topic to see robot
+
+# relevant code examples:
+# 
+#     RViz interface for sending plan commands to the HDT arm
+#         hdt_command_plugins/src/ManipulatorCommandPanel.cpp
+# 
+#     Arm Planner with Collision Checking Setup:
+#         hdt_arm_planning/src/ArmPlanningNode.cpp @ ~line 222
+# 
+#     static transform publisher example:
+#         roslaunch hdt_simulator fake_camera_calibration.launch
