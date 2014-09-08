@@ -527,6 +527,14 @@ int GraspObjectExecutor::run()
                             gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
                     ROS_INFO("    result.stalled = %s",
                             gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
+
+                    hdt::GraspObjectCommandResult result;
+                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    const char* error_text = "Failed to open gripper";
+                    as_->setAborted(result, error_text);
+                    ROS_WARN("%s", error_text);
+                    status_ = GraspObjectExecutionStatus::FAULT;
+                    break;
                 }
 
                 sent_gripper_command_ = false; // reset for future gripper goals
@@ -603,8 +611,15 @@ int GraspObjectExecutor::run()
                     ROS_INFO("    Error Text: %s", viservo_command_goal_state_.getText().c_str());
                     ROS_INFO("    result.result = %s",
                             viservo_command_result_ ?
-                                (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS (lol)") :
+                                (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS") :
                                 "null");
+
+                    hdt::GraspObjectCommandResult result;
+                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    const char* error_text = "Failed to complte visual servo motion to pregrasp";
+                    as_->setAborted(result, error_text);
+                    ROS_WARN("%s", error_text);
+                    status_ = GraspObjectExecutionStatus::FAULT;
                 }
 
                 sent_viservo_command_ = false; // reset for future viservo goals
@@ -661,6 +676,14 @@ int GraspObjectExecutor::run()
                             viservo_command_result_ ?
                                 (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS (lol)") :
                                 "null");
+
+                    hdt::GraspObjectCommandResult result;
+                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    const char* error_text = "Failed to complete visual servo motion to grasp";
+                    as_->setAborted(result, error_text);
+                    ROS_WARN("%s", error_text);
+                    status_ = GraspObjectExecutionStatus::FAULT;
+                    break;
                 }
 
                 sent_viservo_command_ = false; // reset for future viservo goals
