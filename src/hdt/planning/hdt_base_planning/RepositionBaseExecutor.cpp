@@ -190,7 +190,7 @@ int RepositionBaseExecutor::run()
 	while (ros::ok()) {
 		RunUponDestruction rod([&](){ loop_rate.sleep(); });
 
-		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
+// 		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
 
 		ros::spinOnce();
 
@@ -218,22 +218,24 @@ int RepositionBaseExecutor::run()
 				{
 					if (!bComputedRobPose_) {
 						
-						// COMPUTE ROBOT POSE HERE
-						double objx=0, objy=0, objz=0, objY=0, objP=0, objR=0;
-						double robx0=0, roby0=0, robz0=0, robY0=0, robP0=0, robR0=0;						// initial robot pose	// z-offset for /camera_link frame
+						// given object pose (x-axis is aligned to canister hose)
+						double objx = current_goal_->gas_can_in_map.pose.position.x;	
+						double objy = current_goal_->gas_can_in_map.pose.position.y;	
+						double objz = current_goal_->gas_can_in_map.pose.position.z;
+						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
+						double objP0 = 0.0;
+						double objR0 = 0.0;
+						
+						// initial robot pose
+						double robx0 = current_goal_->base_link_in_map.pose.position.x;	
+						double roby0 = current_goal_->base_link_in_map.pose.position.y;	
+						double robz0 = current_goal_->base_link_in_map.pose.position.z;
+						double robY0 = 2.0*acos(current_goal_->base_link_in_map.pose.orientation.w)*sign(current_goal_->base_link_in_map.pose.orientation.z);	// assuming that rotation axis is parallel to z-axis
+						double robP0 = 0.0;
+						double robR0 = 0.0;
+						
+						// desired robot pose
 						double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
-
-						objx = current_goal_->gas_can_in_map.pose.position.x;	
-						objy = current_goal_->gas_can_in_map.pose.position.y;	
-						objz = current_goal_->gas_can_in_map.pose.position.z;
-						
-						robx0 = current_goal_->base_link_in_map.pose.position.x;	
-						roby0 = current_goal_->base_link_in_map.pose.position.y;	
-						robz0 = current_goal_->base_link_in_map.pose.position.z;
-						robY0 = 2.0*acos(current_goal_->base_link_in_map.pose.orientation.w);		// assuming that rotation axis is parallel to z-axis
-						robP0 = 0.0;
-						robR0 = 0.0;
-						
 						bool ret = computeRobPose(objx,objy,objY, robx0,roby0,robY0, robxf,robyf,robYf, hdt_robot_model_); 
 						if (ret)
 						{
@@ -245,15 +247,26 @@ int RepositionBaseExecutor::run()
 // 							status_ = RepositionBaseExecutionStatus::COMPLETING_GOAL;
 
 							std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
-							candidate_base_poses.resize(1);
-							candidate_base_poses[0].pose.position.x = robxf;
-							candidate_base_poses[0].pose.position.y = robyf;
-							candidate_base_poses[0].pose.position.z = robzf;
-							tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
-							candidate_base_poses[0].pose.orientation.x = robqf[0]; 
-							candidate_base_poses[0].pose.orientation.y = robqf[1]; 
-							candidate_base_poses[0].pose.orientation.z = robqf[2]; 
-							candidate_base_poses[0].pose.orientation.w = robqf[3]; 
+							geometry_msgs::PoseStamped candidate_base_pose;
+							candidate_base_pose.header.frame_id = "/abs_nwu";
+							candidate_base_pose.header.seq = 0;
+							candidate_base_pose.header.stamp = ros::Time::now();
+							candidate_base_pose.pose.position.x = robxf;
+							candidate_base_pose.pose.position.y = robyf;
+							candidate_base_pose.pose.position.z = robzf;
+// 							tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+// 							candidate_base_pose.pose.orientation.x = robqf[0]; 
+// 							candidate_base_pose.pose.orientation.y = robqf[1]; 
+// 							candidate_base_pose.pose.orientation.z = robqf[2]; 
+// 							candidate_base_pose.pose.orientation.w = robqf[3];
+							candidate_base_pose.pose.orientation.x = 0.0; 
+							candidate_base_pose.pose.orientation.y = 0.0; 
+							candidate_base_pose.pose.orientation.z = sin(0.5*robYf); 
+							candidate_base_pose.pose.orientation.w = cos(0.5*robYf);	// rotation about (0.0, 0.0, 1.0) by robYf
+							candidate_base_poses.push_back(candidate_base_pose);
+// std::cerr << "robqf: " << robqf[0] << " " << robqf[1] << " " << robqf[2] << " " << robqf[3] << std::endl;
+
+std::cerr << "robqf.z: " << sin(0.5*robYf) << "  robqf.w: " << cos(0.5*robYf) << std::endl;
 
 							hdt::RepositionBaseCommandResult result;
 							result.result = hdt::RepositionBaseCommandResult::SUCCESS;
@@ -312,6 +325,11 @@ uint8_t RepositionBaseExecutor::execution_status_to_feedback_status(RepositionBa
 	}
 }
 
+
+double RepositionBaseExecutor::sign(double val)
+{
+	return (val >=0) ? 1.0 : -1.0;
+}
 
 double RepositionBaseExecutor::wrapAngle(double ang)
 {
@@ -383,7 +401,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			{
 				robx[i][j][k] = objx + cos(objY + angMin + angStep*j)*(distMin + distStep*i);
 				roby[i][j][k] = objy + sin(objY + angMin + angStep*j)*(distMin + distStep*i);
-				robY[i][j][k] = objY + (angMin + angStep*j) - M_PI + (yawMin + yawStep*k);		// angular coordinate of x-axis (frontal direction) of the robot with respect to global frame
+// 				robY[i][j][k] = objY + (angMin + angStep*j) - M_PI + (yawMin + yawStep*k);		// angular coordinate of x-axis (frontal direction) of the robot with respect to global frame
+				robY[i][j][k] = objY + (angMin + angStep*j) - M_PI - (yawMin + yawStep*k);		// angular coordinate of x-axis (frontal direction) of the robot with respect to global frame
 			}
 
 
@@ -418,7 +437,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 		double secAngYaw = { 0, 30, 60 };
 		int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
 		double secAngYaw[2];	// accept object orientations between these two values 
-		double secSide = 0.0;	// divide left and right-hand side	// [rad]
+// 		double secSide = 0.0;	// divide left and right-hand side	// [rad]
+        double secSide[2] = {0.0, M_PI/4.0};    // divide left and right-hand side  // [rad]
 		for (int i=0; i<nDist; i++)
 		{
 			// c) set acceptable object orientation range
@@ -445,7 +465,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 					// a) object position at left-hand side to the robot
 					double rob2obj = atan2(objy-roby[i][j][k], objx-robx[i][j][k]);	// angular coordinate of a vector from robot position to object position (not orientation)
 					double diffAng = wrapAngle( rob2obj-robY[i][j][k] );
-					if ( diffAng >= secSide )	// left-hand side
+// 					if ( diffAng >= secSide )	// left-hand side
+					if ( diffAng >= secSide[0] && diffAng < secSide[1] )    // left-hand side and angle of view
 					{
 						// b) object handle orientation to the right of the robot
 						double diffY = wrapAngle( objY-robY[i][j][k] );
@@ -662,11 +683,35 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	ROS_INFO("iMax: %d,    jMax: %d    kMax: %d",iMax,jMax,kMax);
 
 	// computing final desired robot pose with maximum pTot
-	robxf = objx + cos(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);
-	robyf = objy + sin(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);
-	robYf = objY + (angMin + angStep*jMax) - M_PI + (yawMin + yawStep*kMax);
+// 	robxf = objx + cos(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);
+// 	robyf = objy + sin(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);
+// 	robYf = objY + (angMin + angStep*jMax) - M_PI - (yawMin + yawStep*kMax);
+	robxf = robx[iMax][jMax][kMax];
+	robyf = roby[iMax][jMax][kMax];
+	robYf = robY[iMax][jMax][kMax];
 	ROS_INFO("Object Pose: %f %f %f",objx,objy,objY*180/M_PI);
 	ROS_INFO("Robot Pose: %f %f %f", robxf,robyf,robYf*180/M_PI);
+
+	
+	
+	int i = iMax;
+	int j = jMax;
+	int k = kMax;
+	double rob2obj = atan2(objy-roby[i][j][k], objx-robx[i][j][k]); // angular coordinate of a vector from robot position to object position (not orientation)
+	double diffAng = wrapAngle( rob2obj-robY[i][j][k] );
+	double diffY = wrapAngle( objY-robY[i][j][k] );
+	printf("objx: %f\n",objx);
+	printf("objy: %f\n",objy);
+	printf("objY: %f\n",objY*180/M_PI);
+	printf("robx0: %f\n",robx0);
+	printf("roby0: %f\n",roby0);
+	printf("robY0: %f\n",robY0*180/M_PI);
+	printf("robxf: %f\n",robx[i][j][k]);
+	printf("robyf: %f\n",roby[i][j][k]);
+	printf("robYf: %f\n",robY[i][j][k]*180/M_PI);
+	printf("rob2obj: %f\n",rob2obj*180/M_PI);
+	printf("diffAng: %f\n",diffAng*180/M_PI);
+	printf("diffY: %f\n",diffY*180/M_PI);
 
 
 // 	// 6) conversion for /camera_link frame
