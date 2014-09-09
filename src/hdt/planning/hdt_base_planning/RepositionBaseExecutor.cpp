@@ -10,24 +10,30 @@
 
 nav_msgs::OccupancyGrid::ConstPtr map_;
 geometry_msgs::PoseStamped::ConstPtr rob0_;
-bool bMapReceived_ = false;
-bool bRobPoseReceived_ = false;
+int bMapReceived_ = 0;			// 0: ready to receive, 1: received, -1: blocked (in processing)
+int bRobPoseReceived_ = 0;
 
 void subMapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
-	map_ = msg;
-	bMapReceived_ = true;
-	printf("map received!\n");
-	std::cerr << msg->header << std::endl;
-	std::cerr << msg->info << std::endl;
+	if (bMapReceived_!=-1)
+	{
+		map_ = msg;
+		bMapReceived_ = 1;
+// 		printf("map received!\n");
+// 		std::cerr << msg->header << std::endl;
+// 		std::cerr << msg->info << std::endl;
+	}
 }
 
 void subRobPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-	rob0_ = msg;
-	bRobPoseReceived_ = true;
-	printf("robot pose received!\n");
-	std::cerr << msg->header << std::endl;
+	if (bRobPoseReceived_!=-1)
+	{
+		rob0_ = msg;
+		bRobPoseReceived_ = 1;
+// 		printf("robot pose received!\n");
+// 		std::cerr << msg->header << std::endl;
+	}
 }
 ///////////////////////////////////////////////////////////
 
@@ -296,8 +302,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 	bool bCheckGrasp = false;
 
 	// B) flag for pObs operation
-// 	bool bCheckObs = true;
-	bool bCheckObs = false;
+	bool bCheckObs = true;
+// 	bool bCheckObs = false;
 
 	// C) flag for pWork operation
 // 	bool bCheckWork = true;
@@ -327,8 +333,6 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// (Y): orientation about z-axis
 	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /top_shelf)
 	double distMin = 0.5, distStep = 0.1;
-// 	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /base_link)
-// 	double distMin = 0.8, distStep = 0.1;
 	int nAng = 12;		// th in [0:30:330]
 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
 	int nYaw = 9;		// Y in [-20:5:20]
@@ -426,6 +430,54 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 		printf("Printing map data...\n");
 // 		printf("map data: %d\n",current_goal_->map.data[width*(i-1)+j]);
 
+		if (bMapReceived_==1 && bRobPoseReceived_==1)
+		{
+			bMapReceived_ = -1;
+			bRobPoseReceived_ = -1;
+
+			double resolution = map_->info.resolution;
+			int width = map_->info.width;
+			int height = map_->info.height;
+			geometry_msgs::Pose origin = map_->info.origin;
+			printf("width: %d   height: %d   resolution: %f\n", width,height,resolution);
+
+			printf("Printing map data...\n");
+			double datax, datay;
+			int i=100;
+				for (int j=0; j<height; j+=10)
+				{
+					datax = origin.position.x + resolution*i;
+					datay = origin.position.y + resolution*j;
+					printf("map data (%d,%d): %f %f %d\n", i,j,datax,datay,map_->data[width*(j-1)+i]);
+				}
+			int j=100;
+			for (int i=0; i<width; i+=10)
+				{
+					datax = origin.position.x + resolution*i;
+					datay = origin.position.y + resolution*j;
+					printf("map data (%d,%d): %f %f %d\n", i,j,datax,datay,map_->data[width*(j-1)+i]);
+				}
+
+// 			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
+// 			for (int i=0; i<nDist; i++)
+// 				for (int j=0; j<nAng; j++)
+// 					for (int k=0; k<nYaw; k++)
+// 						if (bTotMax[i][j][k]==true)
+// 						{
+// 							armx = robx[i][j][k] - sin(robY[i][j][k])*armOffsety;
+// 							army = roby[i][j][k] + cos(robY[i][j][k])*armOffsety;
+// 
+// 							map_->data[]
+// 
+// 
+// 
+// 
+// 
+// 							if (collision)
+// 								bTotMax[i][j][k] = false;
+// 						}
+
+
 // 		double obsxMin = -5, obsxMax = 5;
 // 		double obsyMin = -5, obsyMax = 5;
 // 		double distR2W;				// distance from robot to wall (obstacle)
@@ -443,6 +495,15 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 
 // 				pObs[i][j][k] = std::min(1.0, std::pow(distR2W/distR2Wthr,orderDistR2W));
 // 			}
+
+
+
+
+
+
+			bMapReceived_ = 0;
+			bRobPoseReceived_ = 0;
+		}
 
 	}
 
