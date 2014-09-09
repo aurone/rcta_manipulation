@@ -310,9 +310,11 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	bool bCheckWork = false;
 
 	// D) arm position offset for computing pObs
-// 	double armOffsety = 0.0;
-// 	double armOffsety = 0.5;
-	double armOffsety = 1.0;
+// 	double armOffsety = -0.0;
+// 	double armOffsety = -0.5;
+	double armOffsety = -1.1;	// center of arm (when straightend)
+//	double armLength = 1.0;
+	double armLength = 1.5;		// workspace radius about the center of arm
 
 	// E) /base_link offset from /top_shelf for final robot pose return
 	double baseOffsetx = -0.3;
@@ -438,44 +440,49 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			double resolution = map_->info.resolution;
 			int width = map_->info.width;
 			int height = map_->info.height;
-			geometry_msgs::Pose origin = map_->info.origin;
-			printf("width: %d   height: %d   resolution: %f\n", width,height,resolution);
+            geometry_msgs::Pose origin = map_->info.origin;
+			// OccupancyGrid index usage
+			//	mapx = origin.position.x + resolution*ii;	// x-position in world_frame 
+			//	mapy = origin.position.y + resolution*jj;	// y-position in world_frame
+			//	mapObs = map_->data[width*(jj-1)+ii];		// probability of occupancy in this (x,y) position 	// -1: unknown, 0: clear, 1-100: higher probability
 
-			printf("Printing map data...\n");
-			double datax, datay;
-			int i=100;
-				for (int j=0; j<height; j+=10)
-				{
-					datax = origin.position.x + resolution*i;
-					datay = origin.position.y + resolution*j;
-					printf("map data (%d,%d): %f %f %d\n", i,j,datax,datay,map_->data[width*(j-1)+i]);
-				}
-			int j=100;
-			for (int i=0; i<width; i+=10)
-				{
-					datax = origin.position.x + resolution*i;
-					datay = origin.position.y + resolution*j;
-					printf("map data (%d,%d): %f %f %d\n", i,j,datax,datay,map_->data[width*(j-1)+i]);
-				}
+			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
+			int patchSize2 = (int)(armLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
+			int mapObsThr = 1;
+			int armi, armj;				// index for patch center
+			bool tmpInit = false;
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k]==true)
+						{
+							armx = robx[i][j][k] - sin(robY[i][j][k])*armOffsety;
+							army = roby[i][j][k] + cos(robY[i][j][k])*armOffsety;
 
-// 			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
-// 			for (int i=0; i<nDist; i++)
-// 				for (int j=0; j<nAng; j++)
-// 					for (int k=0; k<nYaw; k++)
-// 						if (bTotMax[i][j][k]==true)
-// 						{
-// 							armx = robx[i][j][k] - sin(robY[i][j][k])*armOffsety;
-// 							army = roby[i][j][k] + cos(robY[i][j][k])*armOffsety;
-// 
-// 							map_->data[]
-// 
-// 
-// 
-// 
-// 
-// 							if (collision)
-// 								bTotMax[i][j][k] = false;
-// 						}
+							armi = (int)((armx-origin.position.x)/resolution);
+							armj = (int)((army-origin.position.y)/resolution);
+
+							bool bCollided = false;
+							for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+								for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+								{
+									try {
+										if (map_->data[width*(armj+jj-1)+armi+ii] >= mapObsThr)		// including unknown region
+// 										if (map_->data[width*(armj+jj-1)+armi+ii] != 0)				// only in clear region
+										{
+											bTotMax[i][j][k] = false;
+											bCollided = true;
+										}
+										if (tmpInit==false) {
+											printf("mapObs: %d\n",map_->data[width*(armj+jj-1)+armi+ii]);
+										}
+									}
+									catch(int exception) {
+										ROS_ERROR("\tPatch for obstacle check is out of the map");
+									}
+								}
+							tmpInit = true;
+						}
 
 
 // 		double obsxMin = -5, obsxMax = 5;
