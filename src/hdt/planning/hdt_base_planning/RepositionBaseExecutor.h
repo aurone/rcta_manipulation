@@ -71,6 +71,11 @@ private:
 	bool bComputedRobPose_;
 
 
+	// TODO: remove the followings when actionlib works with /map
+	ros::Subscriber subMap_;
+	ros::Subscriber subRobPose_;
+
+
 	hdt::RepositionBaseCommandGoal::ConstPtr current_goal_;
 
 	RepositionBaseExecutionStatus::Status status_;
