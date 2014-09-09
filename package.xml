@@ -39,6 +39,7 @@
   <build_depend>urdf_parser</build_depend>
   <build_depend>visualization_msgs</build_depend>
 
+  <build_depend>clearpath-husky</build_depend>
   <build_depend>libblas-dev</build_depend>
   <build_depend>libglew-dev</build_depend>
   <build_depend>liblapack-dev</build_depend>
@@ -77,6 +78,7 @@
   <run_depend>visualization_msgs</run_depend>
   <run_depend>xacro</run_depend>
 
+  <run_depend>clearpath-husky</run_depend>
   <run_depend>libblas-dev</run_depend>
   <run_depend>libglew-dev</run_depend>
   <run_depend>liblapack-dev</run_depend>

@@ -15,3 +15,7 @@ lua5.2:
     ubuntu:
         precise: liblua5.2-dev
 
+clearpath-husky:
+    ubuntu:
+        precise: ros-groovy-clearpath-husky
+
