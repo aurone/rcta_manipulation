@@ -1,0 +1,43 @@
+Package: libHDT
+Version: 0.1
+Architecture: amd64
+Maintainer: anthony.cascone@qinetiq-na.com
+Depends: ntcansckplugin
+Filename: ./libhdt_0.1_amd64.deb
+Size: 384506
+MD5sum: 69c4a0b06e4d9587a1e7405155ae1c4c
+SHA1: cd73f8f4209ccea7616b2a9e65d4d668df9535d4
+SHA256: 402bf02855def2db6819fc9a9622408c238bea10ebe87d8194a9e4e636dcb9c8
+Section: base
+Priority: optional
+Description: HDT Interface Library written by QinetiQ-NA
+
+Package: ntcanSckPlugin
+Version: 2.0.6
+Architecture: amd64
+Maintainer: anthony.cascone@qinetiq-na.com
+Depends: linux-image-generic (>= 2.6.39) | linux-image-generic-pae (>= 2.6.39) | linux-image-server (>= 2.6.39)
+Filename: ./ntcansckplugin_2.0.6_amd64.deb
+Size: 57522
+MD5sum: a337384383e5a8ed7f52aa4740569a38
+SHA1: cbe2a2e646b157669a826fb02f5f169637928baf
+SHA256: a5d18439f1ff336385267bbc744e757f3f2629c81d7b929b4b15ee8ca19bbe35
+Section: base
+Priority: optional
+Description: ntcanSckPlugin from Electronic System Design
+
+Package: sdl2
+Version: 2.0.3-1
+Architecture: amd64
+Maintainer: root@vanaheim
+Installed-Size: 13252
+Provides: sdl2
+Filename: ./sdl2_2.0.3-1_amd64.deb
+Size: 3438424
+MD5sum: 463a9b8f5b474aecf69cd6f165cf542b
+SHA1: e5b818129754fc33ae95bd43a780174ffbce8826
+SHA256: 9dded442ecb172fe8e30e6b858aa8b88f7bd078050abb6dfd2b719d97ee9bfb8
+Section: checkinstall
+Priority: extra
+Description: Package created with checkinstall 1.6.2
+

@@ -1,0 +1,17 @@
+ntcansckplugin:
+    ubuntu:
+        precise: ntcansckplugin
+libhdt:
+    ubuntu:
+        precise: libhdt
+xacro:
+    ubuntu:
+        precise: ros-groovy-xacro
+sdl2:
+    ubuntu:
+        precise: sdl2
+
+lua5.2:
+    ubuntu:
+        precise: liblua5.2-dev
+

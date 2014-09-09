@@ -85,7 +85,6 @@ bool JointTrajectoryExecutor::initialize()
     pub_controller_command_ = node_.advertise<trajectory_msgs::JointTrajectory>("joint_path_command", 1);
 
     sub_controller_state_ = node_.subscribe("feedback_states", 1, &JointTrajectoryExecutor::controller_state_callback, this);
-    sub_robot_status_ = node_.subscribe("robot_status", 1, &JointTrajectoryExecutor::robot_status_callback, this);
 
     ROS_INFO("Action server started");
 
@@ -157,11 +156,6 @@ JointTrajectoryExecutor::~JointTrajectoryExecutor()
 
     pub_controller_command_.shutdown();
     sub_controller_state_.shutdown();
-}
-
-void JointTrajectoryExecutor::robot_status_callback(const industrial_msgs::RobotStatusConstPtr &msg)
-{
-    last_robot_status_ = *msg; // caching robot status for later use.
 }
 
 static std::vector<double> ToDegrees(const std::vector<double>& angles_rad)
@@ -429,16 +423,7 @@ bool JointTrajectoryExecutor::advance()
             // be moving.  The current robot driver calls a motion stop if it receives
             // a new trajectory while it is still moving.  If the driver is not publishing
             // the motion state (i.e. old driver), this will still work, but it warns you.
-            if (last_robot_status_.in_motion.val == industrial_msgs::TriState::FALSE) {
-                ROS_INFO("Inside goal constraints, stopped moving, return success for action");
-            }
-            else if (last_robot_status_.in_motion.val == industrial_msgs::TriState::UNKNOWN) {
-                ROS_INFO("Inside goal constraints, return success for action");
-                ROS_WARN("Robot status: in motion unknown, the robot driver node and controller code should be updated");
-            }
-            else {
-                ROS_INFO("Within goal constraints but robot is still moving");
-            }
+            ROS_INFO("Within goal constraints but robot is still moving");
             complete_curr_goal();
             return true;
         }

@@ -17,8 +17,6 @@ find_package(catkin REQUIRED COMPONENTS
     geometry_msgs
     #genmsg # The actionlib tutorial says this is required for building messages, but everything seems to be OK?
     interactive_markers
-    industrial_msgs
-    industrial_robot_client
     leatherman 
     message_generation 
     moveit_ros_planning 
@@ -32,7 +30,6 @@ find_package(catkin REQUIRED COMPONENTS
     sbpl_geometry_utils 
     sbpl_manipulation
     sensor_msgs 
-    simple_message
     std_msgs 
     tf 
     trajectory_msgs

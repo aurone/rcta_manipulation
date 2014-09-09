@@ -19,8 +19,6 @@
   <build_depend>geometric_shapes</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>interactive_markers</build_depend>
-  <build_depend>industrial_msgs</build_depend>
-  <build_depend>industrial_robot_client</build_depend>
   <build_depend>leatherman</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>moveit_ros_planning</build_depend>
@@ -34,13 +32,21 @@
   <build_depend>sbpl_geometry_utils</build_depend>
   <build_depend>sbpl_manipulation</build_depend>
   <build_depend>sensor_msgs</build_depend>
-  <build_depend>simple_message</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>tf</build_depend>
   <build_depend>trajectory_msgs</build_depend>
   <build_depend>urdf</build_depend>
   <build_depend>urdf_parser</build_depend>
   <build_depend>visualization_msgs</build_depend>
+
+  <build_depend>libblas-dev</build_depend>
+  <build_depend>libglew-dev</build_depend>
+  <build_depend>liblapack-dev</build_depend>
+  <build_depend>libopenni-dev</build_depend>
+  <build_depend>lua5.2</build_depend>
+  <build_depend>libhdt</build_depend>
+  <build_depend>ntcansckplugin</build_depend>
+  <build_depend>sdl2</build_depend>
 
   <run_depend>ar_track_alvar</run_depend>
   <run_depend>actionlib</run_depend>
@@ -50,8 +56,6 @@
   <run_depend>geometric_shapes</run_depend>
   <run_depend>geometry_msgs</run_depend>
   <run_depend>interactive_markers</run_depend>
-  <run_depend>industrial_msgs</run_depend>
-  <run_depend>industrial_robot_client</run_depend>
   <run_depend>leatherman</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>moveit_ros_planning</run_depend>
@@ -65,7 +69,6 @@
   <run_depend>sbpl_geometry_utils</run_depend>
   <run_depend>sbpl_manipulation</run_depend>
   <run_depend>sensor_msgs</run_depend>
-  <run_depend>simple_message</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>trajectory_msgs</run_depend>
@@ -73,6 +76,15 @@
   <run_depend>urdf_parser</run_depend>
   <run_depend>visualization_msgs</run_depend>
   <run_depend>xacro</run_depend>
+
+  <run_depend>libblas-dev</run_depend>
+  <run_depend>libglew-dev</run_depend>
+  <run_depend>liblapack-dev</run_depend>
+  <run_depend>libopenni-dev</run_depend>
+  <run_depend>lua5.2</run_depend>
+  <run_depend>libhdt</run_depend>
+  <run_depend>ntcansckplugin</run_depend>
+  <run_depend>sdl2</run_depend>
 
   <export>
     <rviz plugin="${prefix}/config/plugin_description.xml"/>

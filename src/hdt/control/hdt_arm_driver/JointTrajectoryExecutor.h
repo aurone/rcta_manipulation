@@ -36,7 +36,6 @@
 #include <actionlib/server/action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
-#include <industrial_msgs/RobotStatus.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <hdt/common/hdt_description/RobotModel.h>
@@ -74,7 +73,6 @@ private:
     JTAS action_server_;
     ros::Publisher pub_controller_command_;
     ros::Subscriber sub_controller_state_;
-    ros::Subscriber sub_robot_status_;
     // ros::Timer watchdog_timer_;
 
     bool has_active_goal_;
@@ -93,7 +91,6 @@ private:
     double stopped_velocity_tolerance_;
 
     control_msgs::FollowJointTrajectoryFeedback::ConstPtr last_controller_state_;
-    industrial_msgs::RobotStatus last_robot_status_;
 
     hdt::RobotModelPtr robot_model_;
 
@@ -111,7 +108,6 @@ private:
 
     bool within_goal_ee_constraints(const Eigen::Affine3d& current, const Eigen::Affine3d& target) const;
 
-    void robot_status_callback(const industrial_msgs::RobotStatusConstPtr& msg);
     void controller_state_callback(const control_msgs::FollowJointTrajectoryFeedbackConstPtr &msg);
 
     bool set_new_goal(GoalHandle handle);
