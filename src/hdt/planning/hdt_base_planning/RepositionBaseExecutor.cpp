@@ -1,6 +1,38 @@
 #include "RepositionBaseExecutor.h"
-#include <hdt/common/utils/RunUponDestruction.h>
+// #include <hdt/common/utils/RunUponDestruction.h>
 #include <hdt/common/stringifier/stringifier.h>
+
+
+// TODO: remove the followings when actionlib works with /map
+///////////////////////////////////////////////////////////
+#include <nav_msgs/OccupancyGrid.h>
+#include <geometry_msgs/PoseStamped.h>
+
+nav_msgs::OccupancyGrid::ConstPtr map_;
+geometry_msgs::PoseStamped::ConstPtr rob0_;
+bool bMapReceived_ = false;
+bool bRobPoseReceived_ = false;
+
+void subMapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+	map_ = msg;
+	bMapReceived_ = true;
+	printf("map received!\n");
+	std::cerr << msg->header << std::endl;
+	std::cerr << msg->info << std::endl;
+}
+
+void subRobPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+{
+	rob0_ = msg;
+	bRobPoseReceived_ = true;
+	printf("robot pose received!\n");
+	std::cerr << msg->header << std::endl;
+}
+///////////////////////////////////////////////////////////
+
+
+
 
 namespace RepositionBaseExecutionStatus
 {
@@ -91,6 +123,11 @@ bool RepositionBaseExecutor::initialize()
 		return false;
 	}   
 
+
+// TODO: remove the followings when actionlib works with /map
+	subMap_ = nh_.subscribe("/local_costmap/costmap/costmap",1,subMapCallback);   // TODO: frame_id: /abs_nwu (but identical to /abs_ned)
+	subRobPose_ = nh_.subscribe("/rrnav/absPose",1,subRobPoseCallback);           // TODO: frame_id: /abs_ned
+
 }
 
 
@@ -104,8 +141,7 @@ int RepositionBaseExecutor::run()
 
 	ros::Rate loop_rate(1);
 	while (ros::ok()) {
-		RunUponDestruction rod([&](){ loop_rate.sleep(); });
-
+// 		RunUponDestruction rod([&](){ loop_rate.sleep(); });
 // 		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
 
 		ros::spinOnce();
@@ -263,14 +299,17 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 	bool bCheckObs = true;
 	bool bCheckObs = false;
 
-	// C) arm position offset for computing pObs
+	// C) flag for pWork operation
+// 	bool bCheckWork = true;
+	bool bCheckWork = false;
+
+	// D) arm position offset for computing pObs
 // 	double armOffsety = 0.0;
 // 	double armOffsety = 0.5;
 	double armOffsety = 1.0;
 
-	// D) flag for pWork operation
-// 	bool bCheckWork = true;
-	bool bCheckWork = false;
+	// E) /base_link offset from /top_shelf for final robot pose return
+	double baseOffsetx = -0.3;
 
 
 	// policy for robot pose selection
@@ -286,10 +325,10 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// 0) set search space (r,th,Y)
 	// (r,th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
 	// (Y): orientation about z-axis
-// 	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /top_shelf)
-// 	double distMin = 0.5, distStep = 0.1;
-	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /base_link)
-	double distMin = 0.8, distStep = 0.1;
+	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /top_shelf)
+	double distMin = 0.5, distStep = 0.1;
+// 	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /base_link)
+// 	double distMin = 0.8, distStep = 0.1;
 	int nAng = 12;		// th in [0:30:330]
 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
 	int nYaw = 9;		// Y in [-20:5:20]
@@ -377,6 +416,16 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// depends on distance to obstacles considering the position offset wrt orientation
 	if (bCheckObs == true)
 	{
+		// TODO: not working with actionlib yet...
+// 		double resolution = current_goal_->map.info.resolution;
+// 		int width = current_goal_->map.info.width;
+// 		int height = current_goal_->map.info.height;
+// 		printf("width: %d   height: %d",width,height);
+// 		geometry_msgs::Pose origin = current_goal_->map.info.origin;
+// 		int i=0, j=0;
+// 		printf("Printing map data...\n");
+// 		printf("map data: %d\n",current_goal_->map.data[width*(i-1)+j]);
+
 // 		double obsxMin = -5, obsxMax = 5;
 // 		double obsyMin = -5, obsyMax = 5;
 // 		double distR2W;				// distance from robot to wall (obstacle)
@@ -393,20 +442,6 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 				distR2W = std::min( std::min( std::max(0.0,obsxMax-robxoff), std::max(0.0,-(obsxMin-robxoff)) ), std::min( std::max(0.0,obsyMax-robyoff), std::max(0.0,-(obsyMin-robyoff)) ) );
 // 
 // 				pObs[i][j][k] = std::min(1.0, std::pow(distR2W/distR2Wthr,orderDistR2W));
-// 			}
-		double resolution = current_goal_->map.info.resolution;
-		int width = current_goal_->map.info.width;
-		int height = current_goal_->map.info.height;
-		printf("width: %d   height: %d",width,height);
-		geometry_msgs::Pose origin = current_goal_->map.info.origin;
-		int i=0, j=0;
-		printf("Printing map data...\n");
-		printf("map data: %d\n",current_goal_->map.data[width*(i-1)+j]);
-		
-// 		for (int i=0; i<height; i++)
-// 			for (int j=0; j<width; j++)
-// 			{
-// 				std::cerr << "map data: \n" << current_goal_->map.data[width*(i-1)+j] << std::endl;
 // 			}
 
 	}
@@ -573,9 +608,13 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	}
 
 	// computing final desired robot pose with maximum pTot
+	// /top_shelf pose
 	robxf = robx[iMax][jMax][kMax];
 	robyf = roby[iMax][jMax][kMax];
 	robYf = robY[iMax][jMax][kMax];
+	// /base_link pose
+	robxf += cos(robYf)*baseOffsetx;
+	robyf += sin(robYf)*baseOffsetx;
 	ROS_INFO("Reposition Base Command Result:");
 	ROS_INFO("\tObject Pose (initial): %f %f %f",objx,objy,wrapAngle(objY)*180/M_PI);
 	ROS_INFO("\tRobot Pose (intial):   %f %f %f", robx0,roby0,wrapAngle(robY0)*180/M_PI);
