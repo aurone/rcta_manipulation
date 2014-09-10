@@ -383,8 +383,8 @@ int GraspObjectExecutor::run()
                     listener_.lookupTransform(robot_frame, kinematics_frame, ros::Time(0), tf_transform);
                 }
                 catch (const tf::TransformException& ex) {
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     std::stringstream ss;
                     ss << "Failed to lookup transform " << robot_frame << " -> " << kinematics_frame << "; Unable to determine grasp reachability";
                     as_->setAborted(result, ss.str());
@@ -416,8 +416,8 @@ int GraspObjectExecutor::run()
 
                 if (reachable_grasp_candidates_.empty()) {
                     ROS_WARN("No reachable grasp candidates available");
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
                     as_->setAborted(result, "No reachable grasp candidates available");
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
@@ -439,14 +439,14 @@ int GraspObjectExecutor::run()
             ////////////////////////////////////////////////////////////////////////////////
 
             if (!sent_move_arm_goal_) {
-                hdt::GraspObjectCommandFeedback feedback;
+                hdt_msgs::GraspObjectCommandFeedback feedback;
                 feedback.status = execution_status_to_feedback_status(status_);
                 as_->publishFeedback(feedback);
 
                 if (reachable_grasp_candidates_.empty()) {
                     ROS_WARN("Failed to plan to all reachable grasps");
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, "Failed to plan to all reachable grasps");
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
@@ -461,8 +461,8 @@ int GraspObjectExecutor::run()
                 {
                     std::stringstream ss; ss << "Failed to connect to '" << move_arm_command_action_name_ << "' action server";
                     ROS_WARN("%s", ss.str().c_str());
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, ss.str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
@@ -519,8 +519,8 @@ int GraspObjectExecutor::run()
                         ros::Duration(0.1),
                         ros::Duration(5.0)))
                 {
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << gripper_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
                     ROS_WARN("%s", ss.str().c_str());
@@ -559,8 +559,8 @@ int GraspObjectExecutor::run()
                     ROS_INFO("    result.stalled = %s",
                             gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
 
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     const char* error_text = "Failed to open gripper";
                     as_->setAborted(result, error_text);
                     ROS_WARN("%s", error_text);
@@ -582,8 +582,8 @@ int GraspObjectExecutor::run()
                         ros::Duration(0.1),
                         ros::Duration(5.0)))
                 {
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << viservo_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
                     ROS_WARN("%s", ss.str().c_str());
@@ -599,8 +599,8 @@ int GraspObjectExecutor::run()
                     listener_.lookupTransform(camera_frame, kinematics_frame, ros::Time(0), tf_transform);
                 }
                 catch (const tf::TransformException& ex) {
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss;
                     ss << "Failed to lookup transform " << kinematics_frame << " -> " << camera_frame << "; Unable to determine viservo goal";
                     as_->setAborted(result, ss.str());
@@ -645,8 +645,8 @@ int GraspObjectExecutor::run()
                                 (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS") :
                                 "null");
 
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     const char* error_text = "Failed to complte visual servo motion to pregrasp";
                     as_->setAborted(result, error_text);
                     ROS_WARN("%s", error_text);
@@ -667,8 +667,8 @@ int GraspObjectExecutor::run()
                         ros::Duration(0.1),
                         ros::Duration(5.0)))
                 {
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << viservo_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
                     ROS_WARN("%s", ss.str().c_str());
@@ -708,8 +708,8 @@ int GraspObjectExecutor::run()
                                 (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS (lol)") :
                                 "null");
 
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     const char* error_text = "Failed to complete visual servo motion to grasp";
                     as_->setAborted(result, error_text);
                     ROS_WARN("%s", error_text);
@@ -730,8 +730,8 @@ int GraspObjectExecutor::run()
                         ros::Duration(0.1),
                         ros::Duration(5.0)))
                 {
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::EXECUTION_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << gripper_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
                     ROS_WARN("%s", ss.str().c_str());
@@ -778,7 +778,7 @@ int GraspObjectExecutor::run()
             ////////////////////////////////////////////////////////////////////////////////
 
             if (!sent_move_arm_goal_) {
-                hdt::GraspObjectCommandFeedback feedback;
+                hdt_msgs::GraspObjectCommandFeedback feedback;
                 feedback.status = execution_status_to_feedback_status(status_);
                 as_->publishFeedback(feedback);
 
@@ -791,18 +791,18 @@ int GraspObjectExecutor::run()
                 {
                     std::stringstream ss; ss << "Failed to connect to '" << move_arm_command_action_name_ << "' action server";
                     ROS_WARN("%s", ss.str().c_str());
-                    hdt::GraspObjectCommandResult result;
-                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, ss.str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
 
                 if (next_stow_position_to_attempt_ >= stow_positions_.size()) {
-                    hdt::GraspObjectCommandResult result;
+                    hdt_msgs::GraspObjectCommandResult result;
                     std::string error = "Ran out of stow positions to attempt";
                     ROS_ERROR("%s", error.c_str());
-                    result.result = hdt::GraspObjectCommandResult::PLANNING_FAILED;
+                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, error);
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
@@ -860,8 +860,8 @@ int GraspObjectExecutor::run()
         }   break;
         case GraspObjectExecutionStatus::COMPLETING_GOAL:
         {
-            hdt::GraspObjectCommandResult result;
-            result.result = hdt::GraspObjectCommandResult::SUCCESS;
+            hdt_msgs::GraspObjectCommandResult result;
+            result.result = hdt_msgs::GraspObjectCommandResult::SUCCESS;
             as_->setSucceeded(result);
             status_ = GraspObjectExecutionStatus::IDLE;
         }   break;
@@ -963,19 +963,19 @@ uint8_t GraspObjectExecutor::execution_status_to_feedback_status(GraspObjectExec
     case GraspObjectExecutionStatus::IDLE:
         return -1;
     case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
-        return hdt::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
+        return hdt_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
     case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP:
-        return hdt::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
+        return hdt_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
     case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP:
-        return hdt::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
+        return hdt_msgs::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
     case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP:
-        return hdt::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP;
+        return hdt_msgs::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP;
     case GraspObjectExecutionStatus::GRASPING_OBJECT:
-        return hdt::GraspObjectCommandFeedback::GRASPING_OBJECT;
+        return hdt_msgs::GraspObjectCommandFeedback::GRASPING_OBJECT;
     case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
-        return hdt::GraspObjectCommandFeedback::PLANNING_ARM_MOTION_TO_STOW;
+        return hdt_msgs::GraspObjectCommandFeedback::PLANNING_ARM_MOTION_TO_STOW;
     case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION:
-        return hdt::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_STOW;
+        return hdt_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_STOW;
     case GraspObjectExecutionStatus::COMPLETING_GOAL:
         return -1;
     default:

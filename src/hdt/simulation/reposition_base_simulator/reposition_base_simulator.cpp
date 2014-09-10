@@ -6,7 +6,7 @@
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
-#include <hdt/RepositionBaseCommandAction.h>
+#include <hdt_msgs/RepositionBaseCommandAction.h>
 #include <hdt/common/msg_utils/msg_utils.h>
 
 class RepositionBaseSimulator
@@ -32,7 +32,7 @@ private:
 
     std::string world_frame_name_;
 
-    typedef actionlib::SimpleActionServer<hdt::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+    typedef actionlib::SimpleActionServer<hdt_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
     std::unique_ptr<RepositionBaseCommandActionServer> as_;
     std::string action_name_;
 
@@ -149,8 +149,8 @@ void RepositionBaseSimulator::goal_callback()
 
     std::sort(candidate_base_poses.begin(), candidate_base_poses.end(), compare_poses);
 
-    hdt::RepositionBaseCommandResult result;
-    result.result = hdt::RepositionBaseCommandResult::SUCCESS;
+    hdt_msgs::RepositionBaseCommandResult result;
+    result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
     result.candidate_base_poses = std::move(candidate_base_poses);
     as_->setSucceeded(result);
 }

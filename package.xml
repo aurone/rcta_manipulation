@@ -18,6 +18,7 @@
   <build_depend>eigen_conversions</build_depend>
   <build_depend>geometric_shapes</build_depend>
   <build_depend>geometry_msgs</build_depend>
+  <build_depend>hdt_msgs</build_depend>
   <build_depend>interactive_markers</build_depend>
   <build_depend>leatherman</build_depend>
   <build_depend>message_generation</build_depend>
@@ -57,6 +58,7 @@
   <run_depend>eigen_conversions</run_depend>
   <run_depend>geometric_shapes</run_depend>
   <run_depend>geometry_msgs</run_depend>
+  <run_depend>hdt_msgs</run_depend>
   <run_depend>interactive_markers</run_depend>
   <run_depend>leatherman</run_depend>
   <run_depend>message_runtime</run_depend>

@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
     geometric_shapes
     geometry_msgs
     #genmsg # The actionlib tutorial says this is required for building messages, but everything seems to be OK?
+    hdt_msgs
     interactive_markers
     leatherman 
     message_generation 
@@ -79,10 +80,8 @@ add_action_files(
     FILES
         ObjectDetection.action
         MoveArmCommand.action
-        RepositionBaseCommand.action
         TeleportAndaliteCommand.action
-        ViservoCommand.action
-        GraspObjectCommand.action)
+        ViservoCommand.action)
 add_message_files(
     FILES
         ControllerDiagnosticStatus.msg 

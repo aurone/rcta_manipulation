@@ -1,3 +1,4 @@
+- git: {local-name: ../hdt_msgs, uri: 'git@sbpl.pc.cs.cmu.edu:robots/hdt/hdt-msgs.git' }
 - git: {local-name: ../pviz, uri: 'https://github.com/aurone/pviz.git'}
 - git: {local-name: ../sbpl_manipulation, uri: 'https://github.com/aurone/sbpl_manipulation.git', version: groovy}
 - git: {local-name: ../sbpl_geometry_utils, uri: 'https://github.com/sbpl/sbpl_geometry_utils.git'}

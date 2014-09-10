@@ -497,7 +497,7 @@ void ManipulatorCommandPanel::send_grasp_object_command()
         return;
     }
 
-    hdt::GraspObjectCommandGoal grasp_object_goal;
+    hdt_msgs::GraspObjectCommandGoal grasp_object_goal;
 
     static int grasp_object_goal_id = 0;
     grasp_object_goal.id = grasp_object_goal_id++;
@@ -527,7 +527,7 @@ void ManipulatorCommandPanel::send_reposition_base_command()
         return;
     }
 
-    hdt::RepositionBaseCommandGoal reposition_base_goal;
+    hdt_msgs::RepositionBaseCommandGoal reposition_base_goal;
 
     static int reposition_base_goal_id = 0;
     reposition_base_goal.id = reposition_base_goal_id++;
@@ -1396,14 +1396,14 @@ void ManipulatorCommandPanel::grasp_object_command_active_cb()
 
 }
 
-void ManipulatorCommandPanel::grasp_object_command_feeback_cb(const hdt::GraspObjectCommandFeedback::ConstPtr& feedback)
+void ManipulatorCommandPanel::grasp_object_command_feeback_cb(const hdt_msgs::GraspObjectCommandFeedback::ConstPtr& feedback)
 {
 
 }
 
 void ManipulatorCommandPanel::grasp_object_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const hdt::GraspObjectCommandResult::ConstPtr& result)
+    const hdt_msgs::GraspObjectCommandResult::ConstPtr& result)
 {
     ROS_INFO("Received Result from Grasp Object Command Action");
     pending_grasp_object_command_ = false;
@@ -1416,20 +1416,20 @@ void ManipulatorCommandPanel::reposition_base_command_active_cb()
 
 }
 
-void ManipulatorCommandPanel::reposition_base_command_feedback_cb(const hdt::RepositionBaseCommandFeedback::ConstPtr& feedback)
+void ManipulatorCommandPanel::reposition_base_command_feedback_cb(const hdt_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
 {
 
 }
 
 void ManipulatorCommandPanel::reposition_base_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
-        const hdt::RepositionBaseCommandResult::ConstPtr& result)
+        const hdt_msgs::RepositionBaseCommandResult::ConstPtr& result)
 {
 
     ROS_INFO("Received Result from Reposition Base Command Action");
     pending_reposition_base_command_ = false;
 
-    if (result->result == hdt::RepositionBaseCommandResult::SUCCESS) {
+    if (result->result == hdt_msgs::RepositionBaseCommandResult::SUCCESS) {
         candidate_base_poses_ = result->candidate_base_poses;
         ROS_INFO("Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
     }

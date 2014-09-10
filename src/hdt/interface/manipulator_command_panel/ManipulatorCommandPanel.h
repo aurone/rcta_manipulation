@@ -24,8 +24,8 @@
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
-#include <hdt/GraspObjectCommandAction.h>
-#include <hdt/RepositionBaseCommandAction.h>
+#include <hdt_msgs/GraspObjectCommandAction.h>
+#include <hdt_msgs/RepositionBaseCommandAction.h>
 #include <hdt/TeleportAndaliteCommandAction.h>
 
 namespace hdt
@@ -87,11 +87,11 @@ private:
     std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
     bool pending_viservo_command_;
 
-    typedef actionlib::SimpleActionClient<hdt::GraspObjectCommandAction> GraspObjectCommandActionClient;
+    typedef actionlib::SimpleActionClient<hdt_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
     bool pending_grasp_object_command_;
 
-    typedef actionlib::SimpleActionClient<hdt::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
+    typedef actionlib::SimpleActionClient<hdt_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool pending_reposition_base_command_;
 
@@ -236,16 +236,16 @@ private:
             const hdt::ViservoCommandResult::ConstPtr& result);
 
     void grasp_object_command_active_cb();
-    void grasp_object_command_feeback_cb(const hdt::GraspObjectCommandFeedback::ConstPtr& feedback);
+    void grasp_object_command_feeback_cb(const hdt_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
     void grasp_object_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const hdt::GraspObjectCommandResult::ConstPtr& result);
+            const hdt_msgs::GraspObjectCommandResult::ConstPtr& result);
 
     void reposition_base_command_active_cb();
-    void reposition_base_command_feedback_cb(const hdt::RepositionBaseCommandFeedback::ConstPtr& feedback);
+    void reposition_base_command_feedback_cb(const hdt_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback);
     void reposition_base_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const hdt::RepositionBaseCommandResult::ConstPtr& result);
+            const hdt_msgs::RepositionBaseCommandResult::ConstPtr& result);
 
     void teleport_andalite_command_active_cb();
     void teleport_andalite_command_feedback_cb(const hdt::TeleportAndaliteCommandFeedback::ConstPtr& feedback);

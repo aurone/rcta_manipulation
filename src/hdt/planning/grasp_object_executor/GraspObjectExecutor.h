@@ -10,7 +10,7 @@
 #include <control_msgs/GripperCommandAction.h>
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
-#include <hdt/GraspObjectCommandAction.h>
+#include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/common/geometry/nurb/NURB.h>
@@ -80,7 +80,7 @@ private:
     hdt::RobotModelConstPtr robot_model_;
 
     std::string action_name_;
-    typedef actionlib::SimpleActionServer<hdt::GraspObjectCommandAction> GraspObjectCommandActionServer;
+    typedef actionlib::SimpleActionServer<hdt_msgs::GraspObjectCommandAction> GraspObjectCommandActionServer;
     std::unique_ptr<GraspObjectCommandActionServer> as_;
 
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
@@ -117,7 +117,7 @@ private:
 
     int next_stow_position_to_attempt_;
 
-    hdt::GraspObjectCommandGoal::ConstPtr current_goal_;
+    hdt_msgs::GraspObjectCommandGoal::ConstPtr current_goal_;
 
     GraspObjectExecutionStatus::Status status_;
     GraspObjectExecutionStatus::Status last_status_;
