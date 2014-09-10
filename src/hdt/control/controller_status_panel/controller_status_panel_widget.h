@@ -53,7 +53,7 @@ private:
     ros::Subscriber hdt_diagnostics_sub_;
     rospack::Rospack rospack_;
 
-    hdt::RobotModelPtr robot_model_;
+    mutable hdt::RobotModelPtr robot_model_;
 
     std::mutex msg_mutex_;
     hdt::ControllerDiagnosticStatus::ConstPtr last_msg_;
@@ -103,6 +103,10 @@ private:
     void watchdog_thread();
 
     int get_joint_index(const std::string& joint_name) const;
+
+    hdt::RobotModelPtr lazy_robot_model() const;
+
+    void initialize_gui();
 };
 
 } // namespace hdt

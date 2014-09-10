@@ -1,3 +1,4 @@
+#include <cassert>
 #include <functional>
 #include <boost/algorithm/string.hpp>
 #include <sbpl_geometry_utils/utils.h>
@@ -84,84 +85,6 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     set_inactive("have_comms_icon");
 
     watchdog_ = std::thread(std::bind(&ControllerStatusPanelWidget::watchdog_thread, this));
-
-    // initialize joint state plots
-
-    std::string urdf_string;
-    if (!nh_.getParam("robot_description", urdf_string)) {
-        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
-        return;
-    }
-
-    if (!(robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string))) {
-        ROS_ERROR("Failed to initialize Robot Model from URDF string");
-        return;
-    }
-
-    const int buffer_size = 1000;
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Set up raw joint states visualization
-    ////////////////////////////////////////////////////////////////////////////////
-
-    std::vector<Qt::GlobalColor> brushes = { Qt::white, Qt::red, Qt::yellow, Qt::green, Qt::cyan, Qt::blue, Qt::magenta };
-
-    ui->raw_joint_states_plot->setTitle(tr("Raw Joint States"));
-
-    past_raw_joint_states_.resize(robot_model_->joint_names().size());
-    raw_joint_states_curves_.resize(robot_model_->joint_names().size());
-    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
-        const std::string& joint_name = robot_model_->joint_names()[i];
-
-        // create a circular buffer of size
-        boost::circular_buffer<double>& past_raw_joint_state = past_raw_joint_states_[i];
-
-        past_raw_joint_state.resize(buffer_size, 0.0);
-
-        // create curves for raw joint states
-        raw_joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Raw Joint State").arg(QString::fromStdString(joint_name)));
-        raw_joint_states_curves_[i]->setPen(QColor(brushes[i]));
-        raw_joint_states_curves_[i]->attach(ui->raw_joint_states_plot);
-    }
-
-    ui->raw_joint_states_plot->setCanvasBackground(QBrush(Qt::black));
-    ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::yLeft, false);
-    ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
-    ui->raw_joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
-    ui->raw_joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
-    ui->raw_joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Set up joint states visualization
-    ////////////////////////////////////////////////////////////////////////////////
-
-    ui->joint_states_plot->setTitle(tr("Joint States"));
-
-    past_joint_states_.resize(robot_model_->joint_names().size());
-    joint_states_curves_.resize(robot_model_->joint_names().size());
-    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
-        const std::string& joint_name = robot_model_->joint_names()[i];
-
-        // create a circular buffer of size
-        boost::circular_buffer<double>& past_joint_state = past_joint_states_[i];
-
-        past_joint_state.resize(buffer_size, 0.0);
-
-        // create curves for filtered joint states
-        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
-        joint_states_curves_[i]->attach(ui->joint_states_plot);
-
-        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
-        joint_states_curves_[i]->setPen(QColor(brushes[i]));
-        joint_states_curves_[i]->attach(ui->joint_states_plot);
-    }
-
-    ui->joint_states_plot->setCanvasBackground(QBrush(Qt::black));
-    ui->joint_states_plot->setAxisAutoScale(QwtPlot::yLeft, false);
-    ui->joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
-    ui->joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
-    ui->joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
-    ui->joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
 }
 
 ControllerStatusPanelWidget::~ControllerStatusPanelWidget()
@@ -207,6 +130,11 @@ void ControllerStatusPanelWidget::staleness_callback(const std_msgs::Empty::Cons
 
 void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
+    hdt::RobotModelPtr robot_model = lazy_robot_model();
+    if (!robot_model) {
+        return;
+    }
+
     // update the buffers
     for (std::size_t i = 0; i < msg->name.size(); ++i) {
         const std::string& joint_name = msg->name[i];
@@ -220,8 +148,9 @@ void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::Joint
         past_joint_states_[jidx].push_back(sbpl::utils::ToDegrees(joint_val));
     }
 
+
     // update the data associated with the curves and refresh the joint state plots
-    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+    for (std::size_t i = 0; i < robot_model->joint_names().size(); ++i) {
         // convert circular buffer to
         QVector<QPointF> plot_data;
         plot_data.reserve(past_joint_states_.size());
@@ -238,6 +167,11 @@ void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::Joint
 
 void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
+    hdt::RobotModelPtr robot_model = lazy_robot_model();
+    if (!robot_model) {
+        return;
+    }
+
     // update the buffers
     for (std::size_t i = 0; i < msg->name.size(); ++i) {
         const std::string& joint_name = msg->name[i];
@@ -252,7 +186,7 @@ void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::J
     }
 
     // update the data associated with the curves and refresh the joint state plots
-    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+    for (std::size_t i = 0; i < robot_model->joint_names().size(); ++i) {
         // convert circular buffer to
         QVector<QPointF> plot_data;
         plot_data.reserve(past_raw_joint_states_.size());
@@ -384,8 +318,13 @@ void ControllerStatusPanelWidget::watchdog_thread()
 
 int ControllerStatusPanelWidget::get_joint_index(const std::string& joint_name) const
 {
-    for (int i = 0; i < (int)robot_model_->joint_names().size(); ++i) {
-        if (robot_model_->joint_names()[i] == joint_name) {
+    hdt::RobotModelPtr robot_model = lazy_robot_model();
+    if (!robot_model) {
+        return -1;
+    }
+
+    for (int i = 0; i < (int)robot_model->joint_names().size(); ++i) {
+        if (robot_model->joint_names()[i] == joint_name) {
             return i;
         }
     }
@@ -409,5 +348,96 @@ void hdt::ControllerStatusPanelWidget::on_clear_emergency_stop_button_clicked()
     ROS_INFO("Clearing Emergency Stop");
     hdt::ClearEmergencyStop clear_estop_msg;
     clear_estop_pub_.publish(clear_estop_msg);
+}
+
+hdt::RobotModelPtr hdt::ControllerStatusPanelWidget::lazy_robot_model() const
+{
+    if (!robot_model_) {
+        std::string urdf_string;
+        if (!nh_.getParam("robot_description", urdf_string)) {
+            ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
+            return hdt::RobotModelPtr();
+        }
+
+        robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
+        if (!robot_model_) {
+            ROS_ERROR("Failed to initialize Robot Model from URDF string");
+        }
+
+        const_cast<hdt::ControllerStatusPanelWidget*>(this)->initialize_gui();
+    }
+
+    return robot_model_;
+}
+
+void hdt::ControllerStatusPanelWidget::initialize_gui()
+{
+    assert((bool)robot_model_);
+
+    // initialize joint state plots
+    const int buffer_size = 1000;
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Set up raw joint states visualization
+    ////////////////////////////////////////////////////////////////////////////////
+
+    std::vector<Qt::GlobalColor> brushes = { Qt::white, Qt::red, Qt::yellow, Qt::green, Qt::cyan, Qt::blue, Qt::magenta };
+
+    ui->raw_joint_states_plot->setTitle(tr("Raw Joint States"));
+
+    past_raw_joint_states_.resize(robot_model_->joint_names().size());
+    raw_joint_states_curves_.resize(robot_model_->joint_names().size());
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_->joint_names()[i];
+
+        // create a circular buffer of size
+        boost::circular_buffer<double>& past_raw_joint_state = past_raw_joint_states_[i];
+
+        past_raw_joint_state.resize(buffer_size, 0.0);
+
+        // create curves for raw joint states
+        raw_joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Raw Joint State").arg(QString::fromStdString(joint_name)));
+        raw_joint_states_curves_[i]->setPen(QColor(brushes[i]));
+        raw_joint_states_curves_[i]->attach(ui->raw_joint_states_plot);
+    }
+
+    ui->raw_joint_states_plot->setCanvasBackground(QBrush(Qt::black));
+    ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::yLeft, false);
+    ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
+    ui->raw_joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
+    ui->raw_joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
+    ui->raw_joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Set up joint states visualization
+    ////////////////////////////////////////////////////////////////////////////////
+
+    ui->joint_states_plot->setTitle(tr("Joint States"));
+
+    past_joint_states_.resize(robot_model_->joint_names().size());
+    joint_states_curves_.resize(robot_model_->joint_names().size());
+    for (std::size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& joint_name = robot_model_->joint_names()[i];
+
+        // create a circular buffer of size
+        boost::circular_buffer<double>& past_joint_state = past_joint_states_[i];
+
+        past_joint_state.resize(buffer_size, 0.0);
+
+        // create curves for filtered joint states
+        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
+        joint_states_curves_[i]->attach(ui->joint_states_plot);
+
+        joint_states_curves_[i] = new QwtPlotCurve(QString("%1 Joint State").arg(QString::fromStdString(joint_name)));
+        joint_states_curves_[i]->setPen(QColor(brushes[i]));
+        joint_states_curves_[i]->attach(ui->joint_states_plot);
+    }
+
+    ui->joint_states_plot->setCanvasBackground(QBrush(Qt::black));
+    ui->joint_states_plot->setAxisAutoScale(QwtPlot::yLeft, false);
+    ui->joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
+    ui->joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
+    ui->joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
+    ui->joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
 }
 
