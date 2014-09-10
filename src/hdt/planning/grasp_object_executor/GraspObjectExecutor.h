@@ -137,6 +137,8 @@ private:
 
     std::vector<StowPosition> stow_positions_;
 
+    int max_grasp_candidates_;
+
     void goal_callback();
     void preempt_callback();
 

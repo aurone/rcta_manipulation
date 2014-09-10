@@ -173,6 +173,14 @@ bool GraspObjectExecutor::initialize()
         position.joint_positions = msg_utils::to_radians(position.joint_positions);
     }
 
+    // read in max grasps
+    if (!msg_utils::download_param(ph_, "max_grasp_candidates", max_grasp_candidates_) ||
+        max_grasp_candidates_ < 0)
+    {
+        ROS_ERROR("Failed to retrieve 'max_grasp_candidates' from the param server or 'max_grasp_candidates' is negative");
+        return false;
+    }
+
     marker_arr_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
@@ -263,7 +271,6 @@ int GraspObjectExecutor::run()
                     // sample uniformly the position and derivative of the gas canister grasp spline
                     double u = (max_u - min_u) * i / (max_num_candidates - 1);
 
-                    // TODO: skip the first "degree" (or order) knots at the beginning and end
                     int knot_num = -1;
                     for (int j = 0; j < grasp_spline_->knots().size() - 1; ++j) {
                         double curr_knot = grasp_spline_->knot(j);
@@ -430,6 +437,15 @@ int GraspObjectExecutor::run()
                               double mid_u = 0.5 * (min_u + max_u);
                               return fabs(a.u - mid_u) > fabs(b.u - mid_u);
                           });
+
+                // limit the number of grasp attempts by the configured amount
+                std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
+                while (reachable_grasp_candidates_.size() > max_grasp_candidates_) {
+                    reachable_grasp_candidates_.pop_back();
+                }
+                std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
+
+                ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
 
                 generated_grasps_ = true;
             }
