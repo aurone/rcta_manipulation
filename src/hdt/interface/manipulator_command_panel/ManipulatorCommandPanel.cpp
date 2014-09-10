@@ -35,6 +35,8 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     pending_reposition_base_command_(false),
     teleport_andalite_command_client_(),
     pending_teleport_andalite_command_(false),
+    teleport_hdt_command_client_(),
+    pending_teleport_hdt_command_(false),
     robot_description_line_edit_(nullptr),
     refresh_robot_desc_button_(nullptr),
     global_frame_line_edit_(nullptr),
@@ -45,6 +47,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     teleport_base_command_z_box_(nullptr),
     teleport_base_command_yaw_box_(nullptr),
     send_teleport_andalite_command_button_(nullptr),
+    send_teleport_hdt_command_button_(nullptr),
     copy_current_state_button_(nullptr),
     cycle_ik_solutions_button_(nullptr),
     send_move_arm_command_button_(nullptr),
@@ -211,7 +214,7 @@ void ManipulatorCommandPanel::copy_current_base_pose()
     teleport_base_command_x_box_->setValue(robot_pos.x());
     teleport_base_command_y_box_->setValue(robot_pos.y());
     teleport_base_command_z_box_->setValue(robot_pos.z());
-    teleport_base_command_yaw_box_->setValue(yaw);
+    teleport_base_command_yaw_box_->setValue(sbpl::utils::ToDegrees(yaw));
     publish_phantom_robot_visualizations();
 }
 
@@ -277,6 +280,25 @@ void ManipulatorCommandPanel::send_teleport_andalite_command()
     teleport_andalite_command_client_->sendGoal(teleport_andalite_goal, result_cb);
 
     pending_teleport_andalite_command_ = true;
+}
+
+void ManipulatorCommandPanel::send_teleport_hdt_command()
+{
+    if (!reconnect_client(teleport_hdt_command_client_, "teleport_hdt_command")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Teleport HDT Command (server is not connected)"));
+        return;
+    }
+
+    hdt::TeleportHDTCommandGoal teleport_hdt_goal;
+    teleport_hdt_goal.joint_state.header.seq = 0;
+    teleport_hdt_goal.joint_state.header.stamp = ros::Time(0);
+    teleport_hdt_goal.joint_state.header.frame_id = "";
+    teleport_hdt_goal.joint_state.name = robot_model_->joint_names();
+    teleport_hdt_goal.joint_state.position = get_phantom_joint_angles();
+
+    auto result_cb = boost::bind(&ManipulatorCommandPanel::teleport_hdt_command_result_cb, this, _1, _2);
+    teleport_hdt_command_client_->sendGoal(teleport_hdt_goal, result_cb);
+    pending_teleport_hdt_command_ = true;
 }
 
 void ManipulatorCommandPanel::copy_current_state()
@@ -648,12 +670,14 @@ void ManipulatorCommandPanel::setup_gui()
             joint_state_spinbox_layout->addWidget(j7_spinbox_, 1, 5);
             send_move_arm_command_button_ = new QPushButton(tr("Move Arm to End Effector Pose"));
             send_joint_goal_button_ = new QPushButton(tr("Move Arm to Joint State"));
+            send_teleport_hdt_command_button_ = new QPushButton(tr("Teleport HDT"));
             send_viservo_command_button_ = new QPushButton(tr("Visual Servo"));
         arm_commands_layout->addWidget(copy_current_state_button_);
         arm_commands_layout->addWidget(cycle_ik_solutions_button_);
         arm_commands_layout->addLayout(joint_state_spinbox_layout);
         arm_commands_layout->addWidget(send_move_arm_command_button_);
         arm_commands_layout->addWidget(send_joint_goal_button_);
+        arm_commands_layout->addWidget(send_teleport_hdt_command_button_);
         arm_commands_layout->addWidget(send_viservo_command_button_);
     arm_commands_group->setLayout(arm_commands_layout);
 
@@ -697,6 +721,7 @@ void ManipulatorCommandPanel::setup_gui()
     connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
     connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
     connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
+    connect(send_teleport_hdt_command_button_, SIGNAL(clicked()), this, SLOT(send_teleport_hdt_command()));
     connect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
     connect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
     connect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
@@ -1459,6 +1484,28 @@ void ManipulatorCommandPanel::teleport_andalite_command_result_cb(
     pending_teleport_andalite_command_ = false;
 }
 
+void ManipulatorCommandPanel::teleport_hdt_command_active_cb()
+{
+
+}
+
+void ManipulatorCommandPanel::teleport_hdt_command_feedback_cb(const hdt::TeleportHDTCommandFeedback::ConstPtr& feedback)
+{
+
+}
+
+void ManipulatorCommandPanel::teleport_hdt_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const hdt::TeleportHDTCommandResult::ConstPtr& result)
+{
+    ROS_INFO("Received Result from Teleport HDT Command Action Client");
+    if (state != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Teleport HDT Command goal was not successful"));
+    }
+
+    pending_teleport_hdt_command_ = false;
+}
+
 bool ManipulatorCommandPanel::gatherRobotMarkers(
     const robot_state::RobotState& robot_state,
     const std::vector<std::string>& link_names,
@@ -1597,11 +1644,12 @@ void ManipulatorCommandPanel::update_gui()
     ROS_INFO("    Pending Teleport Andalite Command: %s", pending_teleport_andalite_command_ ? "TRUE" : "FALSE");
 
     bool pending_motion_command =
-        pending_move_arm_command_        ||
-        pending_viservo_command_         ||
-        pending_grasp_object_command_    ||
-        pending_reposition_base_command_ ||
-        pending_teleport_andalite_command_;
+        pending_move_arm_command_          ||
+        pending_viservo_command_           ||
+        pending_grasp_object_command_      ||
+        pending_reposition_base_command_   ||
+        pending_teleport_andalite_command_ ||
+        pending_teleport_hdt_command_;
 
     global_frame_line_edit_->setEnabled(use_global_frame());
 
@@ -1616,6 +1664,7 @@ void ManipulatorCommandPanel::update_gui()
     cycle_ik_solutions_button_->setEnabled(initialized());
     send_move_arm_command_button_->setEnabled(initialized() && !pending_motion_command);
     send_joint_goal_button_->setEnabled(initialized() && !pending_motion_command);
+    send_teleport_hdt_command_button_->setEnabled(initialized() && !pending_motion_command);
     j1_spinbox_->setEnabled(initialized());
     j2_spinbox_->setEnabled(initialized());
     j3_spinbox_->setEnabled(initialized());

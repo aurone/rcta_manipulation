@@ -2,8 +2,11 @@
 #define hdt_ManipulatorInterfaceSimROS_h
 
 #include <random>
+#include <string>
+#include <actionlib/server/simple_action_server.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
+#include <hdt/TeleportHDTCommandAction.h>
 #include "manipulator_interface_ros.h"
 
 namespace hdt
@@ -43,6 +46,10 @@ private:
 
     std::random_device rd_;
     std::mt19937 rng_;
+
+    typedef actionlib::SimpleActionServer<hdt::TeleportHDTCommandAction> TeleportHDTCommandActionServer;
+    std::unique_ptr<TeleportHDTCommandActionServer> as_;
+    std::string action_server_name_;
 
     bool init();
 
@@ -94,6 +101,9 @@ private:
             clamp(values[i], min[i], max[i]);
         }
     }
+
+    void goal_callback();
+    void preempt_callback();
 };
 
 } // namespace hdt

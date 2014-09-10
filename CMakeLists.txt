@@ -81,6 +81,7 @@ add_action_files(
         ObjectDetection.action
         MoveArmCommand.action
         TeleportAndaliteCommand.action
+        TeleportHDTCommand.action
         ViservoCommand.action)
 add_message_files(
     FILES

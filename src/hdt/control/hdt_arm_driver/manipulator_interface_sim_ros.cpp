@@ -24,7 +24,9 @@ ManipulatorInterfaceSimROS::ManipulatorInterfaceSimROS() :
     joint_velocities_(joint_names().size(), 0.0),
     manip_params_(),
     rd_(),
-    rng_(rd_())
+    rng_(rd_()),
+    as_(),
+    action_server_name_("teleport_hdt_command")
 {
     int i = 0;
     for (const std::string& joint_name : joint_names()) {
@@ -179,6 +181,21 @@ bool ManipulatorInterfaceSimROS::init()
     joint_states_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_states_raw", 1);
     diagnostic_status_pub_ = nh_.advertise<hdt::ControllerDiagnosticStatus>("hdt_diagnostics", 1);
     joint_traj_sub_ = nh_.subscribe("command", 1, &ManipulatorInterfaceSimROS::joint_trajectory_callback, this);
+
+    as_.reset(new TeleportHDTCommandActionServer(action_server_name_, false));
+    if (!as_) {
+        ROS_ERROR("Failed to instantiate action server '%s'", action_server_name_.c_str());
+        return false;
+    }
+
+    auto goal_cb = boost::bind(&ManipulatorInterfaceSimROS::goal_callback, this);
+    auto preempt_cb = boost::bind(&ManipulatorInterfaceSimROS::preempt_callback, this);
+    as_->registerGoalCallback(goal_cb);
+    as_->registerPreemptCallback(preempt_cb);
+
+    ROS_INFO("Starting action server '%s", action_server_name_.c_str());
+    as_->start();
+    ROS_INFO("Started action server");
 
     return true;
 }
@@ -351,6 +368,20 @@ const std::vector<double>& ManipulatorInterfaceSimROS::max_velocity_limits() con
         }
     }
     return limits;
+}
+
+void ManipulatorInterfaceSimROS::goal_callback()
+{
+    auto current_goal = as_->acceptNewGoal();
+    true_joint_positions_ = current_goal->joint_state.position;
+    noisy_joint_positions_ = current_goal->joint_state.position;
+    joint_velocities_ = std::vector<double>(7, 0.0);
+    joint_position_command_ = current_goal->joint_state.position;
+    as_->setSucceeded();
+}
+
+void ManipulatorInterfaceSimROS::preempt_callback()
+{
 }
 
 } // namespace hdt

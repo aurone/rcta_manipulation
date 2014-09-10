@@ -27,6 +27,7 @@
 #include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt_msgs/RepositionBaseCommandAction.h>
 #include <hdt/TeleportAndaliteCommandAction.h>
+#include <hdt/TeleportHDTCommandAction.h>
 
 namespace hdt
 {
@@ -56,6 +57,7 @@ public Q_SLOTS:
     void update_base_pose_yaw(double yaw);
     void update_base_pose_candidate(int index);
     void send_teleport_andalite_command();
+    void send_teleport_hdt_command();
 
     void copy_current_state();
     void cycle_ik_solutions();
@@ -99,6 +101,10 @@ private:
     std::unique_ptr<TeleportAndaliteCommandActionClient> teleport_andalite_command_client_;
     bool pending_teleport_andalite_command_;
 
+    typedef actionlib::SimpleActionClient<hdt::TeleportHDTCommandAction> TeleportHDTCommandActionClient;
+    std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
+    bool pending_teleport_hdt_command_;
+
     /// @}
 
     ///@{ GUI Interface
@@ -123,6 +129,7 @@ private:
     QPushButton* cycle_ik_solutions_button_;
     QPushButton* send_move_arm_command_button_;
     QPushButton* send_joint_goal_button_;
+    QPushButton* send_teleport_hdt_command_button_;
     QDoubleSpinBox* j1_spinbox_;
     QDoubleSpinBox* j2_spinbox_;
     QDoubleSpinBox* j3_spinbox_;
@@ -252,6 +259,12 @@ private:
     void teleport_andalite_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::TeleportAndaliteCommandResult::ConstPtr& result);
+
+    void teleport_hdt_command_active_cb();
+    void teleport_hdt_command_feedback_cb(const hdt::TeleportHDTCommandFeedback::ConstPtr& feedback);
+    void teleport_hdt_command_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::TeleportHDTCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
             const robot_state::RobotState& robot_state,
