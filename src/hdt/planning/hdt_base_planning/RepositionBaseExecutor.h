@@ -59,7 +59,7 @@ private:
 
 	double sign(double val);
 	double wrapAngle(double ang);
-	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model);
+	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
 	
 	ros::NodeHandle nh_;
