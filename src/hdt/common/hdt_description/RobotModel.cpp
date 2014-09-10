@@ -323,7 +323,7 @@ bool RobotModel::search_nearest_ik(
             if (sbpl::utils::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
                 in_bounds = true;
                 cseed[free_angle_index_] = up_free_angle;
-                if (compute_nearest_ik(eef_transform, seed, solution_out)) {
+                if (compute_nearest_ik(eef_transform, cseed, solution_out)) {
                     found_solution = true;
                 }
             }
@@ -331,7 +331,7 @@ bool RobotModel::search_nearest_ik(
             if (!found_solution && sbpl::utils::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
                 in_bounds = true;
                 cseed[free_angle_index_] = down_free_angle;
-                if (compute_nearest_ik(eef_transform, seed, solution_out)) {
+                if (compute_nearest_ik(eef_transform, cseed, solution_out)) {
                     found_solution = true;
                 }
             }
@@ -339,7 +339,7 @@ bool RobotModel::search_nearest_ik(
         else {
             // use the free angle seed
             cseed[free_angle_index_] = free_angle_seed;
-            if (compute_nearest_ik(eef_transform, seed, solution_out)) {
+            if (compute_nearest_ik(eef_transform, cseed, solution_out)) {
                 found_solution = true;
             }
         }
