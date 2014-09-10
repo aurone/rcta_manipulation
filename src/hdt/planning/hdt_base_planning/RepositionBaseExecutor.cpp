@@ -285,55 +285,74 @@ double RepositionBaseExecutor::wrapAngle(double ang)
 
 bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses) 
 {
-	// desired robot pose
-	double robz0 = 0.0, robP0 = 0.0, robR0 = 0.0;
-	double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
-
-
-	// COMPARISON OPTIONS
-	// A) flag for pGrasp operation
-	bool bCheckGrasp = true;
-// 	bool bCheckGrasp = false;
-
-	// B) flag for pObs operation
-	bool bCheckObs = true;		// TODO: sometimes map data is corrupted and NO candidate_base_pose can be found!
-// 	bool bCheckObs = false;
-
-	// C) flag for pWork operation
-// 	bool bCheckWork = true;
-	bool bCheckWork = false;
-
-	// D) arm position offset for computing pObs
-// 	double armOffsety = -0.0;
-// 	double armOffsety = -0.5;
-	double armOffsety = -1.1;	// center of arm (when straightend)
-//	double armLength = 1.0;
-	double armLength = 1.5;		// workspace radius about the center of arm
-
-	// E) /base_link offset from /top_shelf for final robot pose return
-	double baseOffsetx = -0.3;
-
 
 	// policy for robot pose selection
 	// 0) set search space
-	// 1) probability of successul grasping
+	// 1) candidate pose validity for grasing 
 	// 2) distance to obstacles
-	// 3) (workspace of hdt arm)
+	// 3) kinematics of hdt arm
 	// 4) multiplication of 1~3)
-	// 5) if tied, one with minimum distance from robot
-	// 6) conversion for /camera_link frame
+	// 5) candidate sorting by some metrics
+	// 6) generate final candidate base poses
 
 
-	// 0) set search space (r,th,Y)
-	// (r,th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
-	// (Y): orientation about z-axis
-	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 			// TODO: define adequate sample range (frame_id: /top_shelf)
+	// PARAMETER SETTING
+
+	// 1) flag for pGrasp operation
+	bool bCheckGrasp = true;
+// 	bool bCheckGrasp = false;
+
+	// 2) flag for pObs operation
+	bool bCheckObs = true;		// TODO: sometimes map data is corrupted and NO candidate_base_pose can be found!
+// 	bool bCheckObs = false;
+
+	// 3) flag for pWork operation
+// 	bool bCheckWork = true;
+	bool bCheckWork = false;
+
+	// 5) flag for candidate sorting
+	bool bSortAng = true;		// sort by difference of angular coordinates 	// (default)
+// 	bool bSortAng = false;
+// 	bool bSortAngDist = true;	// sort by difference of angular coordinates and position
+	bool bSortAngDist = false;	// (default)
+
+
+	// 0) search space
+	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
 	double distMin = 0.5, distStep = 0.1;
 	int nAng = 12;		// th in [0:30:330]
 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
 	int nYaw = 9;		// Y in [-20:5:20]
 	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
 
+	// 1) grasp achievable zone 	// TODO: tune these parameters
+	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
+	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1)) 
+	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
+//	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
+	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+
+	// 2) arm position offset for computing pObs
+// 	double armOffsety = -0.0;
+// 	double armOffsety = -0.5;
+	double armOffsety = -1.1;	// center of arm (when straightend)
+//	double armLength = 1.0;
+	double armLength = 1.5;		// workspace radius about the center of arm
+	int mapObsThr = 1;			// threshold for classifying clear and occupied regions
+
+	// 6) /base_link offset from /top_shelf for final robot pose return
+	double baseOffsetx = -0.3;
+
+
+
+////////////////////////////////////////////////////////////////////////////////////
+
+
+
+	// 0) set search space (r,th,Y)
+	// (r,th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
+	// (Y): orientation about z-axis
+	
 	double pTot[nDist][nAng][nYaw], pGrasp[nDist][nAng][nYaw], pObs[nDist][nAng][nYaw], pWork[nDist][nAng][nYaw];
 	bool bTotMax[nDist][nAng][nYaw];
 	for (int i=0; i<nDist; i++)
@@ -348,6 +367,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 											//			 2) select the one with maximum pTot (process 5~6)
 			}
 
+	double robz0 = 0.0, robP0 = 0.0, robR0 = 0.0;
+	double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
+
 	double robx[nDist][nAng][nYaw], roby[nDist][nAng][nYaw], robY[nDist][nAng][nYaw];	// candidate robot poses
 	for (int i=0; i<nDist; i++)
 		for (int j=0; j<nAng; j++)
@@ -360,6 +382,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 
 	// 1) probability of successful grasping 
+
 	if (bCheckGrasp)
 	{
 		// heuristic probability of successful grasping
@@ -368,11 +391,6 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 		// b) orientation: the object handle should be directed to the right of the robot
 			// c) exception: allow more deviation at close distance, reject most of deviations at far distance
 	
-		// TODO: tune these parameters
-		int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
-		double secAngYaw[2];							// accept object orientations between these two values 
-//         double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-        double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 		for (int i=0; i<nDist; i++)
 		{
 			// c) set acceptable object orientation range
@@ -380,16 +398,19 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 120.0/180.0*M_PI;
+				bestAngYaw = 60.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 90.0/180.0*M_PI;
+				bestAngYaw = 45.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 30.0/180.0*M_PI;
+				bestAngYaw = 15.0/180.0*M_PI;
 			}
 
 			for (int j=0; j<nAng; j++)
@@ -403,9 +424,13 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 					{
 						// b) object handle orientation to the right of the robot
 						double diffY = wrapAngle( objY-robY[i][j][k] );
+						double diffYMax = std::max( fabs(secAngYaw[0]-bestAngYaw), fabs(secAngYaw[1]-bestAngYaw) );
 						if ( diffY >= secAngYaw[0] && diffY <= secAngYaw[1] )
 						{
 							bTotMax[i][j][k] = true;	// using bTotMax instead of pGrasp to explicitly represent candidate validity (before expensive IK test)
+
+							// higher probability around diffY==bestAngYaw
+							pGrasp[i][j][k] = std::pow( (2.0*diffYMax-fabs(diffY-bestAngYaw))/(2.0*diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, 0.25 at boarders)
 						}
 					}
 				}
@@ -416,6 +441,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	// 2) probability not to collide with obstacles
 	// depends on distance to obstacles considering the position offset wrt orientation
+	
 	if (bCheckObs == true)
 	{
 		// TODO: not working with actionlib yet...
@@ -442,9 +468,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			//	mapy = origin.position.y + resolution*jj;	// y-position in world_frame
 			//	mapObs = map_->data[width*jj+ii];			// probability of occupancy in this (x,y) position 	// -1: unknown, 0: clear, 1-100: higher probability
 
-			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
 			int patchSize2 = (int)(armLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
-			int mapObsThr = 1;
+			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
 			int armi, armj;				// index for patch center
 			for (int i=0; i<nDist; i++)
 				for (int j=0; j<nAng; j++)
@@ -511,6 +536,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 
 	// 4) total probability
+
 	for (int i=0; i<nDist; i++)
 		for (int j=0; j<nAng; j++)
 			for (int k=0; k<nYaw; k++)
@@ -523,6 +549,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// 5) select maximum probability with min distance from robot
 	// HEURISTICALLY, minimum difference in angular coordinate wrt object, then farthest from the origin of object
 	double pTotMax = 1E-10;		// to opt out the poses with pTot[i][j][k]==0	
+
 	for (int i=0; i<nDist; i++)
 		for (int j=0; j<nAng; j++)
 			for (int k=0; k<nYaw; k++)
@@ -577,98 +604,106 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	else if (cntTotMax > 1)	// if more than one candidate poses are selected
 					 	// (we can select poses with pTot higher than a THRESHOLD)
 	{
-		// a) sorting by difference of angular coordinates for current and desired poses
-		// ASSUME? backward driving is allowed for husky
-		// HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
-		double angO2Rcur = atan2(roby0-objy,robx0-objx);	// current angular coordinate from object to robot
-		double angO2Rdes, angO2Rerr, angO2RerrMin = M_PI;
-		cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
-		for (int i=0; i<nDist; i++)
-			for (int j=0; j<nAng; j++)
-				for (int k=0; k<nYaw; k++)
-				{
-					if (bTotMax[i][j][k] == true)
-					{
-						angO2Rdes = objY + angMin + angStep*j;		// desired angular coordinate from object to robot
-						angO2Rerr = wrapAngle( angO2Rdes-angO2Rcur );
+		if (bSortAng || bSortAngDist)
+		{
 
-						if (fabs(angO2Rerr) <= angO2RerrMin)
-						{
-							angO2RerrMin = fabs(angO2Rerr);
-							iMax = i;
-							jMax = j;
-							kMax = k;
-							cntTotMax++;
-						}
-						else
-							bTotMax[i][j][k] = false;
-					}
-				}
-		// update bTotMax[i][j][k]
-		for (int i=0; i<nDist; i++)
-			for (int j=0; j<nAng; j++)
-				for (int k=0; k<nYaw; k++)
-					if (bTotMax[i][j][k] == true)
+			// a) sorting by difference of angular coordinates for current and desired poses
+			// ASSUME? backward driving is allowed for husky
+			// HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
+			double angO2Rcur = atan2(roby0-objy,robx0-objx);	// current angular coordinate from object to robot
+			double angO2Rdes, angO2Rerr, angO2RerrMin = M_PI;
+			cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
 					{
-						angO2Rdes = objY + angMin + angStep*j;
-						angO2Rerr = wrapAngle( angO2Rdes-angO2Rcur );
-						if (fabs(angO2Rerr) != angO2RerrMin)
+						if (bTotMax[i][j][k] == true)
 						{
-							bTotMax[i][j][k] = false;
-							cntTotMax--;
+							angO2Rdes = objY + angMin + angStep*j;		// desired angular coordinate from object to robot
+							angO2Rerr = wrapAngle( angO2Rdes-angO2Rcur );
+
+							if (fabs(angO2Rerr) <= angO2RerrMin)
+							{
+								angO2RerrMin = fabs(angO2Rerr);
+								iMax = i;
+								jMax = j;
+								kMax = k;
+								cntTotMax++;
+							}
+							else
+								bTotMax[i][j][k] = false;
 						}
 					}
-		ROS_INFO("    cntTotMax: %d",cntTotMax);
-			
-// 		// TODO: comment these part for more candidates	
-// 		if (cntTotMax > 1)	// if more than one candidate poses are still selected
-// 		{
-// 			// b) sorting by distance from current and desired positions
-// 			double xysqerr, xysqerrMin = 1E10;		// distance from current to desired robot position
-// 			cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
-// 			for (int i=0; i<nDist; i++)
-// 				for (int j=0; j<nAng; j++)
-// 					for (int k=0; k<nYaw; k++)
-// 					{
-// 						if (bTotMax[i][j][k] == true)
-// 						{
-// 							xysqerr = std::pow(robx[i][j][k]-robx0,2.0) + std::pow(roby[i][j][k]-roby0,2.0);
-// 
-// 							if (xysqerr <= xysqerrMin)
-// 							{
-// 								xysqerrMin = xysqerr;
-// 								iMax = i;
-// 								jMax = j;
-// 								kMax = k;
-// 								cntTotMax++;
-// 							}
-// 							else
-// 								bTotMax[i][j][k] = false;
-// 						}
-// 					}
-// 
-// 			// OPTIONAL: update bTotMax[i][j][k]
-// 			for (int i=0; i<nDist; i++)
-// 				for (int j=0; j<nAng; j++)
-// 					for (int k=0; k<nYaw; k++)
-// 						if (bTotMax[i][j][k] == true)
-// 						{
-// 							xysqerr = std::pow(robx[i][j][k]-robx0,2.0) + std::pow(roby[i][j][k]-roby0,2.0);
-// 							if (xysqerr != xysqerrMin)
-// 							{
-// 								bTotMax[i][j][k] = false;
-// 								cntTotMax--;
-// 							}
-// 						}
-// 			ROS_INFO("    cntTotMax: %d",cntTotMax);
-// 			if (cntTotMax > 1)
-// 				ROS_WARN("    Multiple candidate poses exist!");
-// 		
-// 		}
+			// update bTotMax[i][j][k]
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k] == true)
+						{
+							angO2Rdes = objY + angMin + angStep*j;
+							angO2Rerr = wrapAngle( angO2Rdes-angO2Rcur );
+							if (fabs(angO2Rerr) != angO2RerrMin)
+							{
+								bTotMax[i][j][k] = false;
+								cntTotMax--;
+							}
+						}
+			ROS_INFO("    cntTotMax: %d",cntTotMax);
+				
+			// TODO: comment these part for more candidates	
+			if (cntTotMax > 1)	// if more than one candidate poses are still selected
+			{
+				if (bSortAngDist)
+				{
+
+					// b) sorting by distance from current and desired positions
+					double xysqerr, xysqerrMin = 1E10;		// distance from current to desired robot position
+					cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
+					for (int i=0; i<nDist; i++)
+						for (int j=0; j<nAng; j++)
+							for (int k=0; k<nYaw; k++)
+							{
+								if (bTotMax[i][j][k] == true)
+								{
+									xysqerr = std::pow(robx[i][j][k]-robx0,2.0) + std::pow(roby[i][j][k]-roby0,2.0);
+
+									if (xysqerr <= xysqerrMin)
+									{
+										xysqerrMin = xysqerr;
+										iMax = i;
+										jMax = j;
+										kMax = k;
+										cntTotMax++;
+									}
+									else
+										bTotMax[i][j][k] = false;
+								}
+							}
+
+					// OPTIONAL: update bTotMax[i][j][k]
+					for (int i=0; i<nDist; i++)
+						for (int j=0; j<nAng; j++)
+							for (int k=0; k<nYaw; k++)
+								if (bTotMax[i][j][k] == true)
+								{
+									xysqerr = std::pow(robx[i][j][k]-robx0,2.0) + std::pow(roby[i][j][k]-roby0,2.0);
+									if (xysqerr != xysqerrMin)
+									{
+										bTotMax[i][j][k] = false;
+										cntTotMax--;
+									}
+								}
+					ROS_INFO("    cntTotMax: %d",cntTotMax);
+					if (cntTotMax > 1)
+						ROS_WARN("    Multiple candidate poses exist!");
+				
+				} // if (bSortAngDist)
+			}
+		} // if (bSortAng || bSortAngDist)
 	}
 
 	
-	// generate final desired robot poses with maximum pTot
+	// 6) generate final desired robot poses with maximum pTot
 	ROS_INFO("Reposition Base Command Result:");
 	ROS_INFO("    Object Pose (initial): %f %f %f",objx,objy,wrapAngle(objY)*180/M_PI);
 	ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0,roby0,wrapAngle(robY0)*180/M_PI);
