@@ -44,9 +44,9 @@ echo "Updating rosdep..."
 rosdep update
 
 echo "Installing missing rosdep dependencies"
-#rosdep install --ignore-src hdt
-#rosdep install --ignore-src sbpl_manipulation
-#rosdep install --ignore-src pviz
-#rosdep install --ignore-src leatherman
-#rosdep install --ignore-src pr2_vfh_database
+rosdep install --ignore-src hdt
+rosdep install --ignore-src sbpl_manipulation
+rosdep install --ignore-src pviz
+rosdep install --ignore-src leatherman
+rosdep install --ignore-src pr2_vfh_database
 
