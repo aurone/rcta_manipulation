@@ -725,7 +725,7 @@ bool ArmPlanningNode::plan_to_eef_goal(
     std::vector<double> goal_vector = convert_to_sbpl_goal(goal.goal_pose);
     fill_constraint(goal_vector, planning_frame_, req.motion_plan_request.goal_constraints[0]);
     ROS_WARN("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
-    req.motion_plan_request.allowed_planning_time = 2.0;
+    req.motion_plan_request.allowed_planning_time = 10.0; //2.0;
     req.motion_plan_request.start_state = scene->robot_state;
 
     // set planning scene
