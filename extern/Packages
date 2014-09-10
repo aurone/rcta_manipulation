@@ -12,6 +12,21 @@ Section: base
 Priority: optional
 Description: HDT Interface Library written by QinetiQ-NA
 
+Package: libsbpl
+Version: 1.2.0-1
+Architecture: amd64
+Maintainer: Andrew Dornbush <andrew.dornbush@gmail.com>
+Installed-Size: 651
+Depends: libc6 (>= 2.14), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Filename: ./libsbpl_1.2.0-1_amd64.deb
+Size: 187588
+MD5sum: 7f966f4d8a6db4c4c3dafcac5abc685a
+SHA1: 0d1955e67c304ccf40953444f557fca4e549e7bf
+SHA256: eb915574fde7206908b1c1bb6f9b36b41ef87caf4600c40a040a8bc027413248
+Section: misc
+Priority: optional
+Description: A library of search-based planning algorithms and sample domains
+
 Package: ntcanSckPlugin
 Version: 2.0.6
 Architecture: amd64

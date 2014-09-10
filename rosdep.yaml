@@ -19,3 +19,7 @@ clearpath-husky:
     ubuntu:
         precise: ros-groovy-clearpath-husky
 
+libsbpl:
+    ubuntu:
+        precise: libsbpl
+

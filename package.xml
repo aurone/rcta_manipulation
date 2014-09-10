@@ -44,6 +44,7 @@
   <build_depend>libglew-dev</build_depend>
   <build_depend>liblapack-dev</build_depend>
   <build_depend>libopenni-dev</build_depend>
+  <build_depend>libsbpl</build_depend>
   <build_depend>lua5.2</build_depend>
   <build_depend>libhdt</build_depend>
   <build_depend>ntcansckplugin</build_depend>
@@ -83,6 +84,7 @@
   <run_depend>libglew-dev</run_depend>
   <run_depend>liblapack-dev</run_depend>
   <run_depend>libopenni-dev</run_depend>
+  <run_depend>libsbpl</run_depend>
   <run_depend>lua5.2</run_depend>
   <run_depend>libhdt</run_depend>
   <run_depend>ntcansckplugin</run_depend>
