@@ -25,5 +25,10 @@ inline double sqrd(double d)
     return d * d;
 }
 
+inline const char* boolstr(bool b)
+{
+    return b ? "TRUE" : "FALSE";
+}
+
 #endif
 
