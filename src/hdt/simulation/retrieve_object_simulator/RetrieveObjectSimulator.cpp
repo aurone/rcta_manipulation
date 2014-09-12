@@ -15,6 +15,7 @@ RetrieveObjectSimulator::RetrieveObjectSimulator() :
     num_disc_x_(0),
     num_disc_y_(0),
     num_disc_yaw_(0),
+    occupancy_grid_sub_(),
     reposition_base_command_client_(),
     sent_reposition_base_command_(false),
     pending_reposition_base_command_(false),
@@ -25,6 +26,8 @@ RetrieveObjectSimulator::RetrieveObjectSimulator() :
     pending_teleport_andalite_command_(false),
     last_teleport_andalite_goal_state_(actionlib::SimpleClientGoalState::ABORTED),
     last_teleport_andalite_result_(),
+    sent_teleport_hdt_command_(false),
+    pending_teleport_hdt_command_(false),
     grasp_object_command_client_(),
     sent_grasp_object_command_(false),
     pending_grasp_object_command_(false),
@@ -137,6 +140,16 @@ bool RetrieveObjectSimulator::initialize()
     initial_robot_transform = world_to_room_ * initial_robot_transform;
     tf::poseEigenToMsg(initial_robot_transform, initial_robot_pose_.pose);
 
+    ROS_WARN("Waiting for occupancy grid message...");
+    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_occupancy_grid", 5, &RetrieveObjectSimulator::occupancy_grid_cb, this);
+    while (!last_occupancy_grid_) {
+        ros::Duration(1.0).sleep();
+        ros::spinOnce();
+    }
+
+    ROS_INFO(" -> Received occupancy grid. Shutting down subscriber...");
+    occupancy_grid_sub_.shutdown();
+
     return true;
 }
 
@@ -195,7 +208,8 @@ int RetrieveObjectSimulator::run()
                 goal.gas_can_in_map.header.frame_id = world_frame_;
                 tf::poseEigenToMsg(world_to_object, goal.gas_can_in_map.pose);
                 goal.base_link_in_map = initial_robot_pose_;
-                goal.map; // TODO: as usual
+                assert((bool)last_occupancy_grid_);
+                goal.map = *last_occupancy_grid_;
 
                 if (!wait_for_action_server(
                         reposition_base_command_client_,
@@ -356,12 +370,12 @@ int RetrieveObjectSimulator::run()
                     last_grasp_object_result_->result != hdt_msgs::GraspObjectCommandResult::SUCCESS)
                 {
                     // log failure
+                    ROS_WARN("    Grasp Object Command failed");
                 }
                 else {
                     // log success
+                    ROS_INFO("    Grasp Object Command succeeded");
                 }
-
-                // TODO: reset arm?
 
                 sent_grasp_object_command_ = false;
                 status_ = RetrieveObjectExecutionStatus::EXECUTING_REPOSITION_BASE;
@@ -494,4 +508,9 @@ std::vector<geometry_msgs::PoseStamped> RetrieveObjectSimulator::create_sample_o
     std::reverse(sample_poses.begin(), sample_poses.end());
 
     return sample_poses;
+}
+
+void RetrieveObjectSimulator::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+    last_occupancy_grid_ = msg;
 }

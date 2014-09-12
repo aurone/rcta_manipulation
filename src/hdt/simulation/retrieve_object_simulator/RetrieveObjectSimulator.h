@@ -8,6 +8,7 @@
 #include <ros/ros.h>
 #include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt_msgs/RepositionBaseCommandAction.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <hdt/TeleportAndaliteCommandAction.h>
 #include <hdt/TeleportHDTCommandAction.h>
 #include <hdt/common/msg_utils/msg_utils.h>
@@ -89,6 +90,9 @@ private:
     int num_disc_yaw_;
     /// @}
 
+    ros::Subscriber occupancy_grid_sub_;
+    nav_msgs::OccupancyGrid::ConstPtr last_occupancy_grid_;
+
     /// @{ Action Clients and State
     typedef actionlib::SimpleActionClient<hdt_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
@@ -108,6 +112,7 @@ private:
 
     typedef actionlib::SimpleActionClient<hdt::TeleportHDTCommandAction> TeleportHDTCommandActionClient;
     std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
+    bool sent_teleport_hdt_command_;
     bool pending_teleport_hdt_command_;
 
     typedef actionlib::SimpleActionClient<hdt_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
@@ -194,6 +199,8 @@ private:
 
         return false;
     }
+
+    void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 };
 
 #endif
