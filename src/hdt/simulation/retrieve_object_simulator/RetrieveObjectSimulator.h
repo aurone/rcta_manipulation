@@ -25,7 +25,7 @@ enum Status
     COMPLETE
 };
 
-std::string to_string(Status status)
+inline std::string to_string(Status status)
 {
     switch (status) {
     case INVALID:
