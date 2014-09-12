@@ -36,6 +36,8 @@ private:
     std::unique_ptr<RepositionBaseCommandActionServer> as_;
     std::string action_name_;
 
+    int max_out_candidates_;
+
     void goal_callback();
     void preempt_callback();
 };
@@ -67,6 +69,16 @@ int RepositionBaseSimulator::run()
 
 bool RepositionBaseSimulator::initialize()
 {
+    if (!ph_.getParam("max_output_candidates", max_out_candidates_)) {
+        ROS_ERROR("Failed to retrieve 'max_output_candidates' from the param server");
+        return false;
+    }
+
+    if (max_out_candidates_ < 0) {
+        ROS_ERROR("Yeah, because negative numbers make sense. Who invented those guys anyway?");
+        return false;
+    }
+
     as_.reset(new RepositionBaseCommandActionServer(action_name_, false));
     if (!as_) {
         ROS_ERROR("Failed to instantiate Teleport Andalite Command Action Server");
@@ -98,7 +110,7 @@ void RepositionBaseSimulator::goal_callback()
     // sample candidate base positions uniformly in a circle around the object
     // with the heading of the base aimed directly at the object
     const double radius_m = 0.8; // canonical distance from the object
-    const int num_samples = 4;
+    const int num_samples = 32;
     for (int i = 0; i < num_samples; ++i) {
         double yaw = (2.0 * M_PI * i) / num_samples;
         double object_pos_x = current_goal->gas_can_in_map.pose.position.x;
@@ -127,27 +139,41 @@ void RepositionBaseSimulator::goal_callback()
     double object_yaw, pitch, roll;
     msg_utils::get_euler_ypr(object_transform, object_yaw, pitch, roll);
 
+    ROS_INFO("Object Yaw: %0.3f degs", sbpl::utils::ToDegrees(object_yaw));
+
     // we want the heading of the object to be offset 60 degrees from the heading of the base
     const double canonical_heading_diff_rad = sbpl::utils::ToRadians(60.0);
 
     // sort candidate base poses to get the pose whose heading is most ideally offset from the object's heading
     auto compare_poses = [&] (const geometry_msgs::PoseStamped& a, const geometry_msgs::PoseStamped& b)
     {
-                Eigen::Affine3d a_transform, b_transform;
-                tf::poseMsgToEigen(a.pose, a_transform);
-                tf::poseMsgToEigen(b.pose, b_transform);
+        Eigen::Affine3d a_transform, b_transform;
+        tf::poseMsgToEigen(a.pose, a_transform);
+        tf::poseMsgToEigen(b.pose, b_transform);
 
-                double a_yaw, b_yaw, tmp_pitch, tmp_roll;
-                msg_utils::get_euler_ypr(a_transform, a_yaw, tmp_pitch, tmp_roll);
-                msg_utils::get_euler_ypr(b_transform, b_yaw, tmp_pitch, tmp_roll);
+        double a_yaw, b_yaw, tmp_pitch, tmp_roll;
+        msg_utils::get_euler_ypr(a_transform, a_yaw, tmp_pitch, tmp_roll);
+        msg_utils::get_euler_ypr(b_transform, b_yaw, tmp_pitch, tmp_roll);
 
-                double canonical_heading_diff_a = fabs(canonical_heading_diff_rad - sbpl::utils::ShortestAngleDiff(object_yaw, a_yaw));
-                double canonical_heading_diff_b = fabs(canonical_heading_diff_rad - sbpl::utils::ShortestAngleDiff(object_yaw, b_yaw));
-                return canonical_heading_diff_a < canonical_heading_diff_b;
-        return true;
+        double canonical_heading_diff_a = fabs(canonical_heading_diff_rad - sbpl::utils::ShortestAngleDiff(object_yaw, a_yaw));
+        double canonical_heading_diff_b = fabs(canonical_heading_diff_rad - sbpl::utils::ShortestAngleDiff(object_yaw, b_yaw));
+        return canonical_heading_diff_a < canonical_heading_diff_b;
     };
 
     std::sort(candidate_base_poses.begin(), candidate_base_poses.end(), compare_poses);
+
+    ROS_INFO("Sorted Candidates (%zd):", candidate_base_poses.size());
+    for (const geometry_msgs::PoseStamped& pose : candidate_base_poses) {
+        Eigen::Affine3d candidate_transform;
+        tf::poseMsgToEigen(pose.pose, candidate_transform);
+        double r, p, y;
+        msg_utils::get_euler_ypr(candidate_transform, y, p, r);
+        ROS_INFO(" -> Yaw: %0.3f", sbpl::utils::ToDegrees(y));
+    }
+
+    while (candidate_base_poses.size() > max_out_candidates_) {
+        candidate_base_poses.pop_back();
+    }
 
     hdt_msgs::RepositionBaseCommandResult result;
     result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
