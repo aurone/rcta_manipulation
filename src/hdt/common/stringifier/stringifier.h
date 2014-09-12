@@ -125,11 +125,11 @@ inline std::string to_string(const std::array<double, N>& arr)
 inline std::string to_string(const geometry_msgs::Pose& pose)
 {
     std::stringstream ss;
-    ss << "{ position: {";
+    ss << "{ position: { ";
     ss << "x: " << pose.position.x << ", ";
     ss << "y: " << pose.position.y << ", ";
     ss << "z: " << pose.position.z << " } ";
-    ss << "orientation: {";
+    ss << "orientation: { ";
     ss << "w: " << pose.orientation.w << ", ";
     ss << "x: " << pose.orientation.x << ", ";
     ss << "y: " << pose.orientation.y << ", ";
