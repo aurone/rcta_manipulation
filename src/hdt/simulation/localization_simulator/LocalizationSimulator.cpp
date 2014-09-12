@@ -121,6 +121,8 @@ void LocalizationSimulator::publish_costmap()
             }
         }
 
+        ROS_INFO("Found topic '%s' with type nav_msgs/OccupancyGrid", occupancy_grid_topic.c_str());
+
         if (occupancy_grid_topic.empty()) {
             ROS_WARN("bagfile '%s' does not contain a topic with type nav_msgs/OccupancyGrid", costmap_bagfile_.c_str());
             return;
@@ -129,20 +131,24 @@ void LocalizationSimulator::publish_costmap()
         // create a view of the rosbag that only contains the nav_msgs/OccupancyGrid
         rosbag::View grid_only_view(bag, rosbag::TopicQuery(std::vector<std::string>({occupancy_grid_topic})));
         nav_msgs::OccupancyGrid::Ptr last_costmap_msg;
+        int tmp = 0;
         for (const rosbag::MessageInstance m : grid_only_view) {
-            nav_msgs::OccupancyGrid::Ptr s = m.instantiate<nav_msgs::OccupancyGrid>();
+            ++tmp;
+            nav_msgs::OccupancyGrid::Ptr s(m.instantiate<nav_msgs::OccupancyGrid>());
             if (s) {
                 last_costmap_msg = s;
             }
         }
 
-        if (last_costmap_msg) {
-            ROS_WARN("Failed to find a valid costmap message. Weird...");
+        if (!last_costmap_msg) {
+            ROS_WARN("Failed to find a valid costmap message. Weird... (searched %d messages)", tmp);
             return;
         }
 
         // publish costmap message on latched topic "fixed_costmap_sim"
+        ROS_INFO("Publishing costmap to latched topic 'fixed_costmap_sim'");
         costmap_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, true);
+        costmap_pub_.publish(last_costmap_msg);
     }
     catch (const rosbag::BagException& ex) {
         ROS_WARN("Failed to publish costmap from bagfile (%s)", ex.what());
