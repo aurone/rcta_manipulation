@@ -1,0 +1,5 @@
+<launch>
+    <node name="retrieve_object_simulator" pkg="hdt" type="retrieve_object_simulator" output="screen">
+        <rosparam command="load" file="$(find hdt)/config/retrieve_object_simulator.yaml"/>
+    </node>
+</launch>

@@ -9,6 +9,7 @@
 #include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt_msgs/RepositionBaseCommandAction.h>
 #include <hdt/TeleportAndaliteCommandAction.h>
+#include <hdt/TeleportHDTCommandAction.h>
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
 
@@ -60,6 +61,8 @@ public:
     };
 
     bool initialize();
+
+    /// Test suite to conduct a series of queries to the retrieve-object pipeline for robustness
     int run();
 
 private:
@@ -70,10 +73,23 @@ private:
     RetrieveObjectExecutionStatus::Status last_status_;
     RetrieveObjectExecutionStatus::Status status_;
 
+    /// @{ Configured Environment Setup
     // the initial pose of the robot in the map frame to be used for every reposition base query
-    geometry_msgs::PoseStamped initial_robot_pose_;
+    geometry_msgs::PoseStamped initial_robot_pose_; // in the world frame
     std::string world_frame_;
+    Eigen::Affine3d world_to_room_;
+    Eigen::Affine3d object_to_footprint_;
+    /// @}
 
+    /// @{ object pose sampling parameters
+    double room_length_m_;
+    double room_width_m_;
+    int num_disc_x_;
+    int num_disc_y_;
+    int num_disc_yaw_;
+    /// @}
+
+    /// @{ Action Clients and State
     typedef actionlib::SimpleActionClient<hdt_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool sent_reposition_base_command_;
@@ -90,6 +106,10 @@ private:
     actionlib::SimpleClientGoalState last_teleport_andalite_goal_state_;
     hdt::TeleportAndaliteCommandResult::ConstPtr last_teleport_andalite_result_;
 
+    typedef actionlib::SimpleActionClient<hdt::TeleportHDTCommandAction> TeleportHDTCommandActionClient;
+    std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
+    bool pending_teleport_hdt_command_;
+
     typedef actionlib::SimpleActionClient<hdt_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
     bool sent_grasp_object_command_;
@@ -97,12 +117,15 @@ private:
 
     actionlib::SimpleClientGoalState last_grasp_object_goal_state_;
     hdt_msgs::GraspObjectCommandResult::ConstPtr last_grasp_object_result_;
+    /// @}
 
-    std::vector<geometry_msgs::PoseStamped> sample_object_poses_;
-    std::vector<geometry_msgs::PoseStamped> candidate_base_poses_;
+    /// @{ Currently-being-processed samples/candidates
+    std::vector<geometry_msgs::PoseStamped> sample_object_poses_;   ///< stack of object poses in the 'room' frame
+    std::vector<geometry_msgs::PoseStamped> candidate_base_poses_;  ///< stack of base poses in the 'world' frame
 
     geometry_msgs::PoseStamped current_sample_object_pose_;
     geometry_msgs::PoseStamped current_candidate_base_pose_;
+    /// @}
 
     void reposition_base_active_cb();
     void reposition_base_feedback_cb(const hdt_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback);
@@ -116,13 +139,61 @@ private:
             const actionlib::SimpleClientGoalState& state,
             const hdt::TeleportAndaliteCommandResult::ConstPtr& result);
 
+    void teleport_hdt_active_cb();
+    void teleport_hdt_feedback_cb(const hdt::TeleportHDTCommandFeedback::ConstPtr& feedback);
+    void teleport_hdt_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const hdt::TeleportHDTCommandResult::ConstPtr& result);
+
     void grasp_object_active_cb();
     void grasp_object_feedback_cb(const hdt_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
     void grasp_object_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt_msgs::GraspObjectCommandResult::ConstPtr& result);
 
-    std::vector<geometry_msgs::PoseStamped> create_sample_object_poses();
+    std::vector<geometry_msgs::PoseStamped> create_sample_object_poses() const;
+
+    // TODO: Duplicate from GraspObjectExecutor.cpp and ManipulatorCommandPanel.cpp
+    template <typename ActionType>
+    bool wait_for_action_server(
+        std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& client,
+        const std::string& action_name,
+        const ros::Duration& poll_duration,
+        const ros::Duration& timeout)
+    {
+        if (!client) {
+            client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
+        }
+
+        ROS_DEBUG("Waiting for action server '%s'", action_name.c_str());
+
+        if (!client) {
+            ROS_WARN("Action client is null");
+            return false;
+        }
+
+        ros::Time start = ros::Time::now();
+        while (ros::ok() && (timeout == ros::Duration(0) || ros::Time::now() < start + timeout)) {
+            ros::spinOnce();
+            if (!client->isServerConnected()) {
+                client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
+                if (!client) {
+                    ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
+                    return false;
+                }
+            }
+
+            if (client->isServerConnected()) {
+                return true;
+            }
+
+            poll_duration.sleep();
+
+            ROS_DEBUG("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
+        }
+
+        return false;
+    }
 };
 
 #endif
