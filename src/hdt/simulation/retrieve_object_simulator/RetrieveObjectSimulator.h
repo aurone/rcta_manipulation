@@ -13,6 +13,7 @@
 #include <hdt/TeleportHDTCommandAction.h>
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
+#include <hdt/common/hdt_description/RobotModel.h>
 
 namespace RetrieveObjectExecutionStatus
 {
@@ -74,9 +75,12 @@ private:
     RetrieveObjectExecutionStatus::Status last_status_;
     RetrieveObjectExecutionStatus::Status status_;
 
+    hdt::RobotModelPtr robot_model_;
+
     /// @{ Configured Environment Setup
     // the initial pose of the robot in the map frame to be used for every reposition base query
     geometry_msgs::PoseStamped initial_robot_pose_; // in the world frame
+    std::vector<double> initial_robot_joint_values_;
     std::string world_frame_;
     Eigen::Affine3d world_to_room_;
     Eigen::Affine3d object_to_footprint_;
@@ -114,6 +118,9 @@ private:
     std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
     bool sent_teleport_hdt_command_;
     bool pending_teleport_hdt_command_;
+
+    actionlib::SimpleClientGoalState last_teleport_hdt_goal_state_;
+    hdt::TeleportHDTCommandResult::ConstPtr last_teleport_hdt_result_;
 
     typedef actionlib::SimpleActionClient<hdt_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;

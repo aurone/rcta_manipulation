@@ -3,6 +3,7 @@
 #include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/utils/utils.h>
+#include <hdt/common/hdt_description/RobotModel.h>
 
 RetrieveObjectSimulator::RetrieveObjectSimulator() :
     nh_(),
@@ -28,6 +29,8 @@ RetrieveObjectSimulator::RetrieveObjectSimulator() :
     last_teleport_andalite_result_(),
     sent_teleport_hdt_command_(false),
     pending_teleport_hdt_command_(false),
+    last_teleport_hdt_goal_state_(actionlib::SimpleClientGoalState::ABORTED),
+    last_teleport_hdt_result_(),
     grasp_object_command_client_(),
     sent_grasp_object_command_(false),
     pending_grasp_object_command_(false),
@@ -39,6 +42,18 @@ RetrieveObjectSimulator::RetrieveObjectSimulator() :
 
 bool RetrieveObjectSimulator::initialize()
 {
+    std::string urdf_string;
+    if (!nh_.getParam("robot_description", urdf_string)) {
+        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
+        return false;
+    }
+
+    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
+    if (!robot_model_) {
+        ROS_ERROR("Failed to load Robot Model from the URDF");
+        return false;
+    }
+
     double object_footprint_x_m;
     double object_footprint_y_m;
     double object_footprint_z_m;
@@ -74,6 +89,10 @@ bool RetrieveObjectSimulator::initialize()
     }
 
     std::vector<double> robot_initial_joint_values;
+    if (!msg_utils::download_param(ph_, "robot_initial_joint_values", robot_initial_joint_values)) {
+        ROS_ERROR("Failed to retrieve 'robot_initial_joint_values' from the param server");
+        return false;
+    }
 
     std::string world_frame_name;
     double room_frame_x_m;
@@ -139,6 +158,8 @@ bool RetrieveObjectSimulator::initialize()
             Eigen::AngleAxisd(sbpl::utils::ToRadians(robot_initial_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0));
     initial_robot_transform = world_to_room_ * initial_robot_transform;
     tf::poseEigenToMsg(initial_robot_transform, initial_robot_pose_.pose);
+
+    initial_robot_joint_values_ = robot_initial_joint_values;
 
     ROS_WARN("Waiting for occupancy grid message...");
     occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_occupancy_grid", 5, &RetrieveObjectSimulator::occupancy_grid_cb, this);
@@ -270,6 +291,10 @@ int RetrieveObjectSimulator::run()
                 current_candidate_base_pose_ = candidate_base_poses_.back();
                 candidate_base_poses_.pop_back();
 
+                ////////////////////////////////////////////////////////////////////////////////
+                // Send Teleport Andalite Command
+                ////////////////////////////////////////////////////////////////////////////////
+
                 // TODO: get the current base pose from tf instead of the ideal pose here (not that it's hardly any different)
                 static int teleport_andalite_goal_id = 0;
                 hdt::TeleportAndaliteCommandGoal goal;
@@ -295,21 +320,51 @@ int RetrieveObjectSimulator::run()
                 teleport_andalite_command_client_->sendGoal(goal, result_cb);
                 sent_teleport_andalite_command_ = true;
                 pending_teleport_andalite_command_ = true;
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // Send Teleport HDT Command
+                ////////////////////////////////////////////////////////////////////////////////
+
+                static int teleport_hdt_goal_id = 0;
+                hdt::TeleportHDTCommandGoal hdt_goal;
+                hdt_goal.joint_state.name = robot_model_->joint_names();
+                hdt_goal.joint_state.position = initial_robot_joint_values_;
+                hdt_goal.joint_state.velocity = std::vector<double>(robot_model_->joint_names().size(), 0.0);
+                hdt_goal.joint_state.effort = std::vector<double>(robot_model_->joint_names().size(), 0.0);
+
+                if (!wait_for_action_server(
+                        teleport_hdt_command_client_,
+                        "teleport_hdt_command",
+                        ros::Duration(0.5),
+                        ros::Duration(5.0)))
+                {
+                    ROS_WARN(" -> Skipping candidate base pose. Failed to connect to action server");
+                    sent_teleport_andalite_command_ = false;
+                    sent_teleport_hdt_command_ = false;
+                    break;
+                }
+
+                ROS_WARN("  Teleporting HDT to %s", to_string(initial_robot_joint_values_).c_str());
+
+                auto hdt_result_cb = boost::bind(&RetrieveObjectSimulator::teleport_hdt_result_cb, this, _1, _2);
+                teleport_hdt_command_client_->sendGoal(hdt_goal, hdt_result_cb);
+                sent_teleport_hdt_command_ = true;
+                pending_teleport_hdt_command_ = true;
+
                 break;
             }
 
-            if (!pending_teleport_andalite_command_) {
-                // command finished
-                if (last_teleport_andalite_goal_state_ != actionlib::SimpleClientGoalState::SUCCEEDED ||
-                    !last_teleport_andalite_result_)
+            if (!pending_teleport_andalite_command_ && !pending_teleport_hdt_command_) {
+                if (last_teleport_andalite_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
+                    last_teleport_andalite_result_ &&
+                    last_teleport_hdt_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
+                    last_teleport_hdt_result_)
                 {
-                    sent_teleport_andalite_command_ = false;
-                }
-                else {
                     status_ = RetrieveObjectExecutionStatus::GRASPING_OBJECT;
                 }
 
                 sent_teleport_andalite_command_ = false;
+                sent_teleport_hdt_command_ = false;
                 break;
             }
         }   break;
@@ -440,19 +495,22 @@ void RetrieveObjectSimulator::teleport_andalite_result_cb(
 
 void RetrieveObjectSimulator::teleport_hdt_active_cb()
 {
-    // TODO:
+    ROS_INFO("Teleport HDT Command Active!");
 }
 
 void RetrieveObjectSimulator::teleport_hdt_feedback_cb(const hdt::TeleportHDTCommandFeedback::ConstPtr& feedback)
 {
-    // TODO:
+    ROS_INFO("Teleport HDT Command Feedback");
 }
 
 void RetrieveObjectSimulator::teleport_hdt_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const hdt::TeleportHDTCommandResult::ConstPtr& result)
 {
-    // TODO:
+    ROS_INFO("  Teleport HDT Command Result!");
+    last_teleport_hdt_goal_state_ = state;
+    last_teleport_hdt_result_ = result;
+    pending_teleport_hdt_command_ = false;
 }
 
 void RetrieveObjectSimulator::grasp_object_active_cb()
