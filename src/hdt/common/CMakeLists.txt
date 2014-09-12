@@ -5,5 +5,6 @@ add_subdirectory(hdt_kinematics)
 add_subdirectory(matplotpp)
 add_subdirectory(msg_utils)
 add_subdirectory(repeatability)
+add_subdirectory(rosbag_utils)
 add_subdirectory(world_model)
 

@@ -36,11 +36,13 @@ private:
     std::string world_frame_ned_name_;
     std::string robot_frame_nwu_name_;
     std::string robot_frame_ned_name_;
+    std::string robot_odometry_frame_ned_name_;
 
     tf::TransformBroadcaster broadcaster_;
     tf::TransformListener listener_;
 
     Eigen::Affine3d world_to_robot_;
+    Eigen::Affine3d footprint_to_robot_;
 
     typedef actionlib::SimpleActionServer<hdt::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionServer;
     std::unique_ptr<TeleportAndaliteCommandActionServer> as_;
@@ -59,6 +61,7 @@ LocalizationSimulator::LocalizationSimulator() :
     world_frame_ned_name_("abs_ned"),
     robot_frame_nwu_name_("base_footprint"),
     robot_frame_ned_name_("robot_ned"),
+    robot_odometry_frame_ned_name_("robot"),
     broadcaster_(),
     listener_(),
     world_to_robot_(Eigen::Affine3d::Identity()),
@@ -84,6 +87,11 @@ int LocalizationSimulator::run()
         tf::Quaternion ned_to_nwu_rotation(tf::Vector3(1.0, 0.0, 0.0), M_PI);
         tf::Transform ned_to_nwu(ned_to_nwu_rotation, tf::Vector3(0.0, 0.0, 0.0));
 
+        tf::Transform footprint_ned_to_robot_ned;
+        msg_utils::convert(footprint_to_robot_.inverse(), footprint_ned_to_robot_ned);
+        tf::StampedTransform footprint_ned_to_robot_ned_stamped(footprint_ned_to_robot_ned, now, robot_odometry_frame_ned_name_, robot_frame_ned_name_);
+        broadcaster_.sendTransform(footprint_ned_to_robot_ned_stamped);
+
         // publish robot coordinate frame using NED conventions for convenience
         tf::StampedTransform robot_ned_to_nwu_stamped(ned_to_nwu, now, robot_frame_ned_name_, robot_frame_nwu_name_);
         broadcaster_.sendTransform(robot_ned_to_nwu_stamped);
@@ -92,7 +100,7 @@ int LocalizationSimulator::run()
         tf::Transform world_ned_to_robot_ned;
         msg_utils::convert(world_to_robot_, world_ned_to_robot_ned);
         tf::StampedTransform world_ned_to_robot_ned_stamped(world_ned_to_robot_ned, now, world_frame_ned_name_, robot_frame_ned_name_);
-        broadcaster_.sendTransform(world_ned_to_robot_ned_stamped);
+//        broadcaster_.sendTransform(world_ned_to_robot_ned_stamped);
 
         // publish world coordinate frame using NWU conventions for convenience
         tf::StampedTransform world_ned_to_nwu_stamped(ned_to_nwu, now, world_frame_ned_name_, world_frame_nwu_name_);
@@ -118,6 +126,15 @@ bool LocalizationSimulator::initialize()
     ROS_INFO("Starting action server '%s'...", action_name_.c_str());
     as_->start();
     ROS_INFO("Action server started");
+
+    ROS_INFO("Waiting for transform '%s' -> '%s'", robot_frame_nwu_name_.c_str(), "base_link");
+    if (!listener_.waitForTransform(robot_frame_nwu_name_, "base_link", ros::Time(0), ros::Duration(10.0))) {
+        ROS_ERROR(" -> Failed to lookup transform");
+        return false;
+    }
+    tf::StampedTransform footprint_frame_to_robot_frame;
+    listener_.lookupTransform(robot_frame_nwu_name_, "base_link", ros::Time(0), footprint_frame_to_robot_frame);
+    msg_utils::convert(footprint_frame_to_robot_frame, footprint_to_robot_);
 
     return true;
 }

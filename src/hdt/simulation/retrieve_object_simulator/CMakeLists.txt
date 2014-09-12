@@ -1,0 +1,3 @@
+add_executable(retrieve_object_simulator retrieve_object_simulator.cpp)
+target_link_libraries(retrieve_object_simulator ${catkin_LIBRARIES})
+

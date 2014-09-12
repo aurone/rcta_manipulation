@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
     octomap_msgs 
     pluginlib
     pr2_vfh_database
+    rosbag
     roscpp 
     rospack
     rviz 
