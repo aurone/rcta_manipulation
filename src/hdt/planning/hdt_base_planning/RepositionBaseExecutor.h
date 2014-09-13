@@ -17,6 +17,25 @@
 #include <actionlib/server/simple_action_server.h>
 
 
+namespace RepositionBaseCandidate
+{
+
+struct candidate
+{
+	int i;
+	int j;
+	int k;
+	double pTot;
+
+	bool operator < (const candidate& cand2) const
+	{
+		return pTot > cand2.pTot;
+	}
+};
+
+}
+
+
 namespace RepositionBaseExecutionStatus
 {
 
