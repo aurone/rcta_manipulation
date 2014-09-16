@@ -5,6 +5,7 @@
 #include <algorithm>
 
 
+
 // TODO: remove the followings when actionlib works with /map
 ///////////////////////////////////////////////////////////
 #include <nav_msgs/OccupancyGrid.h>
