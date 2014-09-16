@@ -89,10 +89,13 @@ private:
 
 	bool bComputedRobPose_;
 
-
+/*
 	// TODO: remove the followings when actionlib works with /map
 	ros::Subscriber subMap_;
 	ros::Subscriber subRobPose_;
+*/
+// 	nav_msgs::OccupancyGrid::ConstPtr map_;
+	nav_msgs::OccupancyGrid map_;
 
 
 	hdt::RepositionBaseCommandGoal::ConstPtr current_goal_;

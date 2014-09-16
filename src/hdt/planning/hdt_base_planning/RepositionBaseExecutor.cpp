@@ -5,7 +5,7 @@
 #include <algorithm>
 
 
-
+/*
 // TODO: remove the followings when actionlib works with /map
 ///////////////////////////////////////////////////////////
 #include <nav_msgs/OccupancyGrid.h>
@@ -39,7 +39,7 @@ void subRobPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 	}
 }
 ///////////////////////////////////////////////////////////
-
+*/
 
 
 
@@ -132,11 +132,11 @@ bool RepositionBaseExecutor::initialize()
 		return false;
 	}   
 
-
+/*
 // TODO: remove the followings when actionlib works with /map
 	subMap_ = nh_.subscribe("/local_costmap/costmap/costmap",1,subMapCallback);   // TODO: frame_id: /abs_nwu (but identical to /abs_ned)
 	subRobPose_ = nh_.subscribe("/rrnav/absPose",1,subRobPoseCallback);           // TODO: frame_id: /abs_ned
-
+*/
 }
 
 
@@ -463,20 +463,21 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 		int i=0, j=0;
 // 		printf("Printing map data...\n");
 // 		printf("map data: %d\n",current_goal_->map.data[width*(i-1)+j]);
+		map_ = current_goal_->map;
 
-		if (bMapReceived_==1 && bRobPoseReceived_==1)
+// 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{
-			bMapReceived_ = -1;
-			bRobPoseReceived_ = -1;
+// 			bMapReceived_ = -1;
+// 			bRobPoseReceived_ = -1;
 
-			double resolution = map_->info.resolution;
-			int width = map_->info.width;
-			int height = map_->info.height;
-            geometry_msgs::Pose origin = map_->info.origin;
+			double resolution = map_.info.resolution;
+			int width = map_.info.width;
+			int height = map_.info.height;
+            geometry_msgs::Pose origin = map_.info.origin;
 			// OccupancyGrid index usage
 			//	mapx = origin.position.x + resolution*ii;	// x-position in world_frame 
 			//	mapy = origin.position.y + resolution*jj;	// y-position in world_frame
-			//	mapObs = map_->data[width*jj+ii];			// probability of occupancy in this (x,y) position 	// -1: unknown, 0: clear, 1-100: higher probability
+			//	mapObs = map_.data[width*jj+ii];			// probability of occupancy in this (x,y) position 	// -1: unknown, 0: clear, 1-100: higher probability
 
 			int patchSize2 = (int)(armLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
 			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
@@ -497,8 +498,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 								bool bCollided = false;
 								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
 									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
-										if (map_->data[width*(armj+jj)+armi+ii] >= mapObsThr)		// including unknown region
-//										if (map_->data[width*(armj+jj)+armi+ii] != 0)				// only in clear region
+										if (map_.data[width*(armj+jj)+armi+ii] >= mapObsThr)		// including unknown region
+//										if (map_.data[width*(armj+jj)+armi+ii] != 0)				// only in clear region
 										{
 											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
 											if (distObs < armLengthCore)
@@ -517,8 +518,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							}
 						}
 
-			bMapReceived_ = 0;
-			bRobPoseReceived_ = 0;
+// 			bMapReceived_ = 0;
+// 			bRobPoseReceived_ = 0;
 		}
 	}
 
