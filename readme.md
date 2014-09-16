@@ -76,7 +76,7 @@ Launch the visual servoing executor:
 > roslaunch hdt viservo_control_executor.launch
 
 Launch fake AR Marker tracking:
-> roslaunch hdt fake_ar_marker_pub.launch
+> roslaunch hdt attached_markers.launch sim:=true
 
 Launch the grasp object executor:
 > roslaunch hdt grasp_object_executor.launch
