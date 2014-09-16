@@ -1,6 +1,17 @@
 <launch>
-    <!-- include marker tracking -->
-    <include file="$(find hdt)/launch/track_wrist_marker.launch"/>
+    <arg name="sim"/>
+
+    <group unless="$(arg sim)">
+        <!-- include marker tracking -->
+        <include file="$(find hdt)/launch/track_wrist_marker.launch"/>
+    </group>
+
+    <group if="$(arg sim)">
+        <node name="fake_ar_marker_pub" pkg="hdt" type="fake_marker_pub" output="screen">
+            <rosparam command="load" file="$(find hdt)/config/fake_ar_marker_pub.yaml"/>
+            <!-- TODO: load in the attached marker config from config/attached_markers.yaml" -->
+        </node>
+    </group>
 
     <!-- marker filter to filter markers we don't care about and correct the orientations of those we do -->
     <node name="attached_markers_filter" pkg="hdt" type="attached_markers_filter" output="screen">
