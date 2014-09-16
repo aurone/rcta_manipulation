@@ -1,5 +1,5 @@
 <launch>
-    <node name="husky_simualtor" pkg="hdt" type="joint_state_simulator">
+    <node name="husky_simulator" pkg="hdt" type="joint_state_simulator">
         <rosparam>
             joint_names: [ "joint_front_right_wheel",
                            "joint_front_left_wheel",
