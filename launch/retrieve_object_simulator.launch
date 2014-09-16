@@ -1,5 +1,5 @@
 <launch>
-    <node name="retrieve_object_simulator" pkg="hdt" type="retrieve_object_simulator" output="screen">
+    <node name="retrieve_object_simulator" pkg="hdt" type="retrieve_object_simulator">
         <rosparam command="load" file="$(find hdt)/config/retrieve_object_simulator.yaml"/>
         <remap from="fixed_occupancy_grid" to="fixed_costmap_sim"/>
     </node>

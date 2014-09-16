@@ -1,5 +1,5 @@
 <launch>
-    <node name="grasp_object_executor" pkg="hdt" type="grasp_object_executor" output="screen">
+    <node name="grasp_object_executor" pkg="hdt" type="grasp_object_executor">
         <rosparam command="load" file="$(find hdt)/config/gas_canister_grasp_spline.yaml"/>
         <rosparam command="load" file="$(find hdt)/config/grasp_object_executor.yaml"/>
     </node>

@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find hdt)/launch/manipulation/hdt_arm_planner.launch"/>
+    <include file="$(find hdt)/launch/manipulation/joint_trajectory_action.launch"/>
+    <include file="$(find hdt)/launch/manipulation/viservo_control_executor.launch"/>
+    <include file="$(find hdt)/launch/manipulation/grasp_object_executor.launch"/>
+</launch>

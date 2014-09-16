@@ -3,7 +3,7 @@
 
     <group unless="$(arg sim)">
         <!-- include marker tracking -->
-        <include file="$(find hdt)/launch/track_wrist_marker.launch"/>
+        <include file="$(find hdt)/launch/perception/track_wrist_marker.launch"/>
     </group>
 
     <group if="$(arg sim)">

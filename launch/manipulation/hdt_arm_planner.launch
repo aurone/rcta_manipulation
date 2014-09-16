@@ -1,5 +1,5 @@
 <launch>
-    <node name="hdt_arm_planning_node" pkg="hdt" type="hdt_arm_planning_node" output="screen">
+    <node name="hdt_arm_planning_node" pkg="hdt" type="hdt_arm_planning_node">
         <rosparam command="load" file="$(find hdt)/config/hdt_arm_planner.yaml"/>
         <rosparam command="load" file="$(find hdt)/config/hdt_collision_checking.yaml"/>
         <param name="action_set_filename" value="$(find hdt)/config/pr2.mprim"/>

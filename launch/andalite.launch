@@ -10,7 +10,7 @@
 
     <!-- LAUNCH OPENNI IN LIVE MODE -->
     <group unless="$(arg sim)">
-        <include file="$(find hdt)/launch/openni.launch">
+        <include file="$(find hdt)/launch/perception/openni.launch">
             <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
         </include>
     </group>
@@ -23,7 +23,7 @@
     </group>
 
     <!-- LAUNCH ARM STATE FILTER -->
-    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter" output="screen">
+    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter">
         <rosparam command="load" file="$(find hdt)/config/joint_states_filter.yaml"/>
     </node>
 
@@ -33,8 +33,8 @@
     </include>
 
     <!-- SURROGATE PROVIDERS OF /joint_states -->
-    <include file="$(find hdt)/launch/husky_simulator.launch"/>
-    <include file="$(find hdt)/launch/tilt_mount_simulator.launch"/>
+    <include file="$(find hdt)/launch/sim/husky_simulator.launch"/>
+    <include file="$(find hdt)/launch/sim/tilt_mount_simulator.launch"/>
 
     <group if="$(arg kinect_sensor)">
         <node name="kinect_simulator" pkg="hdt" type="kinect_simulator" args="--mode=static 0"/>

@@ -1,5 +1,5 @@
 <launch>
-    <node pkg="hdt" name="joint_trajectory_action" type="joint_trajectory_action_HDT" output="screen">
+    <node pkg="hdt" name="joint_trajectory_action" type="joint_trajectory_action_HDT">
 	    <remap from="joint_path_command" to="command"/>
         <rosparam command="load" file="$(find hdt)/config/joint_trajectory_action.yaml"/>
     </node>
