@@ -53,7 +53,7 @@ namespace RepositionBaseExecutionStatus
 				return "ComputingRepositionBase";
 			default:
 				return "Invalid";
-		}
+		}   
 	}
 }
 
@@ -76,7 +76,7 @@ bool RepositionBaseExecutor::initialize()
 	if (!as_) {
 		ROS_ERROR("Failed to instantiate Reposition Base Command Action Server");
 		return false;
-	}
+	}   
 
 	as_->registerGoalCallback(boost::bind(&RepositionBaseExecutor::goal_callback,this));
 	as_->registerPreemptCallback(boost::bind(&RepositionBaseExecutor::preempt_callback,this));
@@ -84,6 +84,7 @@ bool RepositionBaseExecutor::initialize()
 	ROS_INFO("Starting action server '%s'...", action_name_.c_str());
 	as_->start();
 	ROS_INFO("Action server started");
+
 
 	// hdt robot initialization for inverse kinematics check
 	std::string group_name_;
@@ -97,7 +98,7 @@ bool RepositionBaseExecutor::initialize()
 	if (!nh_.hasParam("robot_description")) {
 		ROS_ERROR("Missing parameter \"robot_description\"");
 		return false;
-	}
+	}   
 
 	nh_.getParam("robot_description", urdf_);
 
@@ -105,13 +106,13 @@ bool RepositionBaseExecutor::initialize()
 	if (!urdf_model_) {
 		ROS_ERROR("Failed to parse URDF");
 		return false;
-	}
+	}   
 
 	boost::shared_ptr<const urdf::Joint> first_joint = urdf_model_->getJoint("arm_1_shoulder_twist");
 	if (!first_joint) {
 		ROS_ERROR("Failed to find joint 'arm_1_shoulder_twist'");
 		return false;
-	}
+	}   
 
 	group_name_ = "hdt_arm";
 
@@ -126,11 +127,13 @@ bool RepositionBaseExecutor::initialize()
 	if (!hdt_robot_model_ || !hdt_robot_model_->init(urdf_)) {
 		ROS_ERROR("Failed to initialize HDT Robot Model");
 		return false;
-	}
+	}   
+
 
 // TODO: remove the followings when actionlib works with /map
 	subMap_ = nh_.subscribe("/local_costmap/costmap/costmap",1,subMapCallback);   // TODO: frame_id: /abs_nwu (but identical to /abs_ned)
 	subRobPose_ = nh_.subscribe("/rrnav/absPose",1,subRobPoseCallback);           // TODO: frame_id: /abs_ned
+
 }
 
 
@@ -172,6 +175,7 @@ int RepositionBaseExecutor::run()
 			case RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE:
 				{
 					if (!bComputedRobPose_) {
+						
 						// given object pose (x-axis is aligned to canister hose)
 						double objx = current_goal_->gas_can_in_map.pose.position.x;	
 						double objy = current_goal_->gas_can_in_map.pose.position.y;	
@@ -194,9 +198,9 @@ int RepositionBaseExecutor::run()
 						bool ret = computeRobPose(objx,objy,objY, robx0,roby0,robY0, robxf,robyf,robYf, hdt_robot_model_); 
 						if (ret)
 						{
-							bComputedRobPose_ = true;
+							bComputedRobPose_ = true;	
 
-// //						hdt_msgs::RepositionBaseCommandFeedback feedback;
+// //						hdt::RepositionBaseCommandFeedback feedback;
 // // 						feedback.status = execution_status_to_feedback_status(status_?);
 // // 						as_->publishFeedback(feedback);
 // 							status_ = RepositionBaseExecutionStatus::COMPLETING_GOAL;
@@ -212,15 +216,14 @@ int RepositionBaseExecutor::run()
 							candidate_base_pose.pose.position.z = robzf;
 
 							tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
-
 							candidate_base_pose.pose.orientation.x = robqf[0]; 
 							candidate_base_pose.pose.orientation.y = robqf[1]; 
 							candidate_base_pose.pose.orientation.z = robqf[2]; 
 							candidate_base_pose.pose.orientation.w = robqf[3];
 							candidate_base_poses.push_back(candidate_base_pose);
 
-							hdt_msgs::RepositionBaseCommandResult result;
-							result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
+							hdt::RepositionBaseCommandResult result;
+							result.result = hdt::RepositionBaseCommandResult::SUCCESS;
 							result.candidate_base_poses = candidate_base_poses;
 							as_->setSucceeded(result);
 							status_ = RepositionBaseExecutionStatus::IDLE;
@@ -229,9 +232,9 @@ int RepositionBaseExecutor::run()
 				}   break;
 			case RepositionBaseExecutionStatus::COMPLETING_GOAL:
 				{
-// 					hdt_msgs::RepositionBaseCommandResult result;
-// 					result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
-// 					result.candidate_base_poses =
+// 					hdt::RepositionBaseCommandResult result;
+// 					result.result = hdt::RepositionBaseCommandResult::SUCCESS;
+// 					result.candidate_base_poses = 
 // 					as_->setSucceeded(result);
 // 					status_ = RepositionBaseExecutionStatus::IDLE;
 				}   break;
@@ -243,7 +246,7 @@ int RepositionBaseExecutor::run()
 	nh_.deleteParam("hdt_base_planning_node/objx");
 	nh_.deleteParam("hdt_base_planning_node/objy");
 	nh_.deleteParam("hdt_base_planning_node/objY");
-
+	
 	return SUCCESS;
 }
 
@@ -257,7 +260,7 @@ void RepositionBaseExecutor::goal_callback()
 	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
 
-	bComputedRobPose_ = false;
+	bComputedRobPose_ = false;	
 }
 
 void RepositionBaseExecutor::preempt_callback()
@@ -291,7 +294,7 @@ double RepositionBaseExecutor::wrapAngle(double ang)
 	return ang;
 }
 
-bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model)
+bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model) 
 {
 	// COMPARISON OPTIONS
 	// A) flag for pGrasp operation
@@ -343,9 +346,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 		for (int j=0; j<nAng; j++)
 			for (int k=0; k<nYaw; k++)
 			{
-				pTot[i][j][k] = 0.0;
-				pGrasp[i][j][k] = 1.0;
-				pObs[i][j][k] = 1.0;
+				pTot[i][j][k] = 0.0;	
+				pGrasp[i][j][k] = 1.0;	
+				pObs[i][j][k] = 1.0;	
 				pWork[i][j][k] = 1.0;
 				bTotMax[i][j][k] = false;	// used when 1) check candidate validity before IK (process 1~4)
 											//			 2) select the one with maximum pTot (process 5~6)
@@ -362,7 +365,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			}
 
 
-	// 1) probability of successful grasping
+	// 1) probability of successful grasping 
 	if (bCheckGrasp)
 	{
 		// heuristic probability of successful grasping
@@ -537,13 +540,14 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 					}
 	}
 
+
 	// 4) total probability
 	for (int i=0; i<nDist; i++)
 		for (int j=0; j<nAng; j++)
 			for (int k=0; k<nYaw; k++)
 				if (bTotMax[i][j][k]==true)
-					pTot[i][j][k] = pGrasp[i][j][k] * pObs[i][j][k] * pWork[i][j][k];
-				else
+					pTot[i][j][k] = pGrasp[i][j][k] * pObs[i][j][k] * pWork[i][j][k];	
+				else 
 					pTot[i][j][k] = 0.0;
 
 
@@ -573,7 +577,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	ROS_INFO("\tcntTotMax: %d",cntTotMax);
 
-
+	
 	if (cntTotMax==0)
 	{
 		ROS_ERROR("No candidate pose was found!");

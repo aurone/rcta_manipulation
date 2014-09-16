@@ -57,6 +57,7 @@ private:
 
 	hdt::HDTRobotModel* hdt_robot_model_;
 
+	double sign(double val);
 	double wrapAngle(double ang);
 	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model);
 
@@ -69,8 +70,12 @@ private:
 
 	bool bComputedRobPose_;
 
+	// TODO: remove the followings when actionlib works with /map
+	ros::Subscriber subMap_;
+	ros::Subscriber subRobPose_;
 
-	hdt_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
+
+	hdt::RepositionBaseCommandGoal::ConstPtr current_goal_;
 
 	RepositionBaseExecutionStatus::Status status_;
 	RepositionBaseExecutionStatus::Status last_status_;

@@ -1,39 +1,319 @@
-#include <ros/ros.h>
-#include <signal.h>
-#include <visualization_msgs/Marker.h>
-#include <tf/transform_datatypes.h>
-#include <stdlib.h>
-#include <sstream>
-
-#include <urdf_model/model.h>
-#include <urdf_parser/urdf_parser.h>
-#include <hdt/planning/arm_planning_node/HDTRobotModel.h>
-
-#include <hdt/RepositionBaseCommandAction.h>
-#include <actionlib/server/simple_action_server.h>
+#include "RepositionBaseExecutor.h"
+#include <hdt/common/utils/RunUponDestruction.h>
+#include <hdt/common/stringifier/stringifier.h>
 
 
-typedef actionlib::SimpleActionServer<hdt::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+namespace RepositionBaseExecutionStatus
+{
+	std::string to_string(Status status)
+	{
+		switch (status) {
+			case IDLE:
+				return "Idle";
+			case FAULT:
+				return "Fault";
+			case COMPUTING_REPOSITION_BASE:
+				return "ComputingRepositionBase";
+			default:
+				return "Invalid";
+		}   
+	}
+}
+
+RepositionBaseExecutor::RepositionBaseExecutor() :
+nh_(),
+action_name_("reposition_base_command"),
+as_(),
+bComputedRobPose_(false),
+current_goal_(),
+status_(RepositionBaseExecutionStatus::INVALID),
+last_status_(RepositionBaseExecutionStatus::INVALID)
+{
+}
+
+bool RepositionBaseExecutor::initialize()
+{
+// 	// object pose parameters for simulation
+// 	// 	double objx = 1.0, objy = -0.5, objz = -0.05;	// for /base_link frame
+// 	double objx = 1.0, objy = -0.5, objz = 0.1;		// for /camera_link frame
+// 	double objR = M_PI/2, objP = 0.0, objY = 0.0;
+// 	if (nh_.hasParam("hdt_base_planning_node/objx"))
+// 		nh_.getParam("hdt_base_planning_node/objx",objx);
+// 	if (nh_.hasParam("hdt_base_planning_node/objy"))
+// 		nh_.getParam("hdt_base_planning_node/objy",objy);
+// 	if (nh_.hasParam("hdt_base_planning_node/objY"))
+// 	{
+// 		nh_.getParam("hdt_base_planning_node/objY",objY);
+// 		objY *= M_PI/180.0;			// when "objY" is in [deg]
+// 	}
+// 	// 	ROS_INFO("Object Pose: %f %f %f",objx,objy,objY*180/M_PI);
 
 
-// # goal
-// uint32 id
-// int32 retry_count
-// geometry_msgs/PoseStamped gas_can_in_map
-// geometry_msgs/PoseStamped base_link_in_map
-// nav_msgs/OccupancyGrid map 
-// ---
-// # result
-// uint8 SUCCESS=0
-// uint8 PLANNING_FAILURE_OBJECT_UNREACHABLE=1
-// uint8 result
-// geometry_msgs/PoseStamped[] candidate_base_poses
-// ---
-// # feedback
-// float64 planning_time_s
+	// action server initialization
+	std::string action_name_ = "reposition_base_command";
+	as_.reset(new RepositionBaseCommandActionServer(action_name_, false));
+	if (!as_) {
+		ROS_ERROR("Failed to instantiate Reposition Base Command Action Server");
+		return false;
+	}   
+
+	as_->registerGoalCallback(boost::bind(&RepositionBaseExecutor::goal_callback,this));
+	as_->registerPreemptCallback(boost::bind(&RepositionBaseExecutor::preempt_callback,this));
+
+	ROS_INFO("Starting action server '%s'...", action_name_.c_str());
+	as_->start();
+	ROS_INFO("Action server started");
 
 
-double wrapAngle(double ang)
+// 	// visualization marker for gastank
+// 	ros::Publisher vis_pub = nh.advertise<visualization_msgs::Marker>( "hdt_base_planning_node/visualization_marker", 1 );
+// 
+// 	visualization_msgs::Marker marker;
+// 	// 	marker.header.frame_id = "/base_link";
+// 	marker.header.frame_id = "/camera_link";
+// 	marker.header.stamp = ros::Time::now();
+// 	marker.ns = "hdt_base_planning_node";
+// 	marker.id = 0;
+// 	marker.type = visualization_msgs::Marker::MESH_RESOURCE;
+// 	marker.action = visualization_msgs::Marker::ADD;
+// 	marker.pose.position.x = objx;
+// 	marker.pose.position.y = objy;
+// 	marker.pose.position.z = objz;
+// 
+// 	tf::Quaternion q = tf::createQuaternionFromRPY(objR,objP,objY);
+// 	marker.pose.orientation.x = q[0];
+// 	marker.pose.orientation.y = q[1];
+// 	marker.pose.orientation.z = q[2];
+// 	marker.pose.orientation.w = q[3];
+// 
+// 	// marker.scale.x = 10;	// gastank_c.dae
+// 	// marker.scale.y = 10;
+// 	// marker.scale.z = 10;
+// 	marker.scale.x = 0.1;	// gastank_c_sparse.dae
+// 	marker.scale.y = 0.1;
+// 	marker.scale.z = 0.1;
+// 	marker.color.a = 1.0;
+// 	marker.color.r = 0.0;
+// 	marker.color.g = 1.0;
+// 	marker.color.b = 0.0;
+// 	marker.lifetime = ros::Duration();
+// 
+// 	//only if using a MESH_RESOURCE marker type:
+// 	// 	marker.mesh_resource = "package://hdt_base_planning/meshes/gastank_c_sparse.dae";
+// 	marker.mesh_resource = "package://hdt/resource/meshes/gastank/gastank_c.dae";
+// 
+// 
+// 	// to give some time to publish markers
+// 	int cntPub = 0;
+// 	ros::Rate r(10);
+// 	// 	while(ros::ok())
+// 	while(cntPub < 5)
+// 	{
+// 		vis_pub.publish( marker );
+// 
+// 		ros::spinOnce();
+// 		r.sleep();
+// 		cntPub++;
+// 	}
+
+
+	// hdt robot initialization for inverse kinematics check
+	std::string group_name_;
+	std::string kinematics_frame_;
+	std::string planning_frame_;
+	std::string planning_link_;
+	std::string chain_tip_link_;
+	std::string urdf_;
+	boost::shared_ptr<urdf::ModelInterface> urdf_model_;
+
+	if (!nh_.hasParam("robot_description")) {
+		ROS_ERROR("Missing parameter \"robot_description\"");
+		return false;
+	}   
+
+	nh_.getParam("robot_description", urdf_);
+
+	urdf_model_ = urdf::parseURDF(urdf_);
+	if (!urdf_model_) {
+		ROS_ERROR("Failed to parse URDF");
+		return false;
+	}   
+
+	boost::shared_ptr<const urdf::Joint> first_joint = urdf_model_->getJoint("arm_1_shoulder_twist");
+	if (!first_joint) {
+		ROS_ERROR("Failed to find joint 'arm_1_shoulder_twist'");
+		return false;
+	}   
+
+	group_name_ = "hdt_arm";
+
+	kinematics_frame_ = first_joint->parent_link_name;
+	planning_frame_ = first_joint->parent_link_name;
+
+	planning_link_ = "arm_7_gripper_lift_link";
+	chain_tip_link_ = "arm_7_gripper_lift_link";
+
+// 	hdt::HDTRobotModel* hdt_robot_model = new hdt::HDTRobotModel;
+	hdt_robot_model_ = new hdt::HDTRobotModel;
+	if (!hdt_robot_model_ || !hdt_robot_model_->init(urdf_)) {
+		ROS_ERROR("Failed to initialize HDT Robot Model");
+		return false;
+	}   
+
+
+// 	// COMPUTE ROBOT POSE HERE
+// 	double robx0=0, roby0=0, robz0=-0.65, robY0=0, robP0=0, robR0=0;						// initial robot pose	// z-offset for /camera_link frame
+// 	double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
+// 	computeRobPose(objx,objy,objY, robx0,roby0,robY0, robxf,robyf,robYf, hdt_robot_model); 
+
+
+// 	// VISUALIZE THE ROBOT 
+// 	std::stringstream str;
+// 	str << "rosrun hdt hdt_base_planning_shell.sh " <<  robxf << " " << robyf << " " << robzf << " " << robYf << " " << robPf << " " << robRf;
+// 	if (system(str.str().c_str())!=-1)
+// 	{
+// 		ROS_INFO("Robot Pose Established!\n");
+// 	}
+
+}
+
+
+int RepositionBaseExecutor::run()
+{
+	if (!initialize()) {
+		return FAILED_TO_INITIALIZE;
+	}
+
+	status_ = RepositionBaseExecutionStatus::IDLE;
+
+	ros::Rate loop_rate(1);
+	while (ros::ok()) {
+		RunUponDestruction rod([&](){ loop_rate.sleep(); });
+
+		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
+
+		ros::spinOnce();
+
+		if (status_ != last_status_) {
+			ROS_INFO("Reposition Base Executor Transitioning: %s -> %s", to_string(last_status_).c_str(), to_string(status_).c_str());
+			last_status_ = status_;
+		}
+
+		assert((bool)as_);
+
+		switch (status_) {
+			case RepositionBaseExecutionStatus::IDLE:
+				{
+					if (as_->isActive()) {
+						status_ = RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE;
+					}
+				}   break;
+			case RepositionBaseExecutionStatus::FAULT:
+				{
+					if (as_->isActive()) {
+						status_ = RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE;
+					}
+				}   break;
+			case RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE:
+				{
+					if (!bComputedRobPose_) {
+						
+						// COMPUTE ROBOT POSE HERE
+						double objx=0, objy=0, objz=0, objY=0, objP=0, objR=0;
+						double robx0=0, roby0=0, robz0=-0.65, robY0=0, robP0=0, robR0=0;						// initial robot pose	// z-offset for /camera_link frame
+						double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
+
+						objx = current_goal_->gas_can_in_map.pose.position.x;	
+						objy = current_goal_->gas_can_in_map.pose.position.y;	
+						objz = current_goal_->gas_can_in_map.pose.position.z;
+						
+						robx0 = current_goal_->base_link_in_map.pose.position.x;	
+						roby0 = current_goal_->base_link_in_map.pose.position.y;	
+						robz0 = current_goal_->base_link_in_map.pose.position.z;
+						robY0 = 2.0*acos(current_goal_->base_link_in_map.pose.orientation.w);		// assuming that rotation axis is parallel to z-axis
+						robP0 = 0.0;
+						robR0 = 0.0;
+						
+						bool ret = computeRobPose(objx,objy,objY, robx0,roby0,robY0, robxf,robyf,robYf, hdt_robot_model_); 
+						if (ret)
+						{
+							bComputedRobPose_ = true;	
+
+// //						hdt::RepositionBaseCommandFeedback feedback;
+// // 						feedback.status = execution_status_to_feedback_status(status_?);
+// // 						as_->publishFeedback(feedback);
+// 							status_ = RepositionBaseExecutionStatus::COMPLETING_GOAL;
+
+							std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
+							candidate_base_poses.resize(1);
+							candidate_base_poses[0].pose.position.x = robxf;
+							candidate_base_poses[0].pose.position.y = robyf;
+							candidate_base_poses[0].pose.position.z = robzf;
+							tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+							candidate_base_poses[0].pose.orientation.x = robqf[0]; 
+							candidate_base_poses[0].pose.orientation.y = robqf[1]; 
+							candidate_base_poses[0].pose.orientation.z = robqf[2]; 
+							candidate_base_poses[0].pose.orientation.w = robqf[3]; 
+
+							hdt::RepositionBaseCommandResult result;
+							result.result = hdt::RepositionBaseCommandResult::SUCCESS;
+							result.candidate_base_poses = candidate_base_poses;
+							as_->setSucceeded(result);
+							status_ = RepositionBaseExecutionStatus::IDLE;
+						}
+					}
+				}   break;
+			case RepositionBaseExecutionStatus::COMPLETING_GOAL:
+				{
+// 					hdt::RepositionBaseCommandResult result;
+// 					result.result = hdt::RepositionBaseCommandResult::SUCCESS;
+// 					result.candidate_base_poses = 
+// 					as_->setSucceeded(result);
+// 					status_ = RepositionBaseExecutionStatus::IDLE;
+				}   break;
+			default:
+				break;
+		}
+	}
+
+	nh_.deleteParam("hdt_base_planning_node/objx");
+	nh_.deleteParam("hdt_base_planning_node/objy");
+	nh_.deleteParam("hdt_base_planning_node/objY");
+	
+	return SUCCESS;
+}
+
+void RepositionBaseExecutor::goal_callback()
+{
+	ROS_INFO("Received a new goal");
+	current_goal_ = as_->acceptNewGoal();
+	ROS_INFO("    Goal ID: %u", current_goal_->id);
+	ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
+	ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
+	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
+// 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
+
+	bComputedRobPose_ = false;	
+}
+
+void RepositionBaseExecutor::preempt_callback()
+{
+}
+
+uint8_t RepositionBaseExecutor::execution_status_to_feedback_status(RepositionBaseExecutionStatus::Status status)
+{
+	switch (status) {
+		case RepositionBaseExecutionStatus::IDLE:
+			return -1;
+		case RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE:
+			return (float) 0.0;	// TODO: feedback of planning time in [s]
+		default:
+			return -1;
+	}
+}
+
+
+double RepositionBaseExecutor::wrapAngle(double ang)
 {
 	while(ang >= M_PI)
 		ang -= 2*M_PI;
@@ -42,7 +322,7 @@ double wrapAngle(double ang)
 	return ang;
 }
 
-void computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model) 
+bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model) 
 {
 	// COMPARISON OPTIONS
 	// a) flag for pGrasp operation
@@ -382,205 +662,20 @@ void computeRobPose(double objx, double objy, double objY,  double robx0, double
 	ROS_INFO("iMax: %d,    jMax: %d    kMax: %d",iMax,jMax,kMax);
 
 	// computing final desired robot pose with maximum pTot
-	robxf = objx + cos(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);		// kMax comes here!
+	robxf = objx + cos(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);
 	robyf = objy + sin(objY + angMin + angStep*jMax)*(distMin + distStep*iMax);
-	robYf = objY + angMin + angStep*jMax - M_PI; 
+	robYf = objY + (angMin + angStep*jMax) - M_PI + (yawMin + yawStep*kMax);
 	ROS_INFO("Object Pose: %f %f %f",objx,objy,objY*180/M_PI);
 	ROS_INFO("Robot Pose: %f %f %f", robxf,robyf,robYf*180/M_PI);
 
 
-	// 6) conversion for /camera_link frame
-	double robxfswp=robxf, robyfswp=robyf;
-	robYf = -robYf;
-	robxf = -cos(robYf)*robxfswp + sin(robYf)*robyfswp;
-	robyf = -sin(robYf)*robxfswp - cos(robYf)*robyfswp;
-	ROS_INFO("Robot Pose (cvt): %f %f %f", robxf,robyf,robYf*180/M_PI);
+// 	// 6) conversion for /camera_link frame
+// 	double robxfswp=robxf, robyfswp=robyf;
+// 	robYf = -robYf;
+// 	robxf = -cos(robYf)*robxfswp + sin(robYf)*robyfswp;
+// 	robyf = -sin(robYf)*robxfswp - cos(robYf)*robyfswp;
+// 	ROS_INFO("Robot Pose (cvt): %f %f %f", robxf,robyf,robYf*180/M_PI);
 
+	return true;
 }
 
-void goal_callback()
-{
-}
-
-void preempt_callback()
-{
-}
-
-
-int main(int argc, char** argv)
-{
-	ros::init(argc, argv, "hdt_base_planning_node");
-	ros::NodeHandle nh;
-
-
-	// object pose parameters for simulation
-// 	double objx = 1.0, objy = -0.5, objz = -0.05;	// for /base_link frame
-	double objx = 1.0, objy = -0.5, objz = 0.1;		// for /camera_link frame
-	double objR = M_PI/2, objP = 0.0, objY = 0.0;
-	if (nh.hasParam("hdt_base_planning_node/objx"))
-		nh.getParam("hdt_base_planning_node/objx",objx);
-	if (nh.hasParam("hdt_base_planning_node/objy"))
-		nh.getParam("hdt_base_planning_node/objy",objy);
-	if (nh.hasParam("hdt_base_planning_node/objY"))
-	{
-		nh.getParam("hdt_base_planning_node/objY",objY);
-		objY *= M_PI/180.0;			// when "objY" is in [deg]
-	}
-// 	ROS_INFO("Object Pose: %f %f %f",objx,objy,objY*180/M_PI);
-
-
-	// action server initialization
-	std::string action_name_ = "reposition base command";
-	std::unique_ptr<RepositionBaseCommandActionServer> as_;
-	as_.reset(new RepositionBaseCommandActionServer(action_name_, false));
-	if (!as_) {
-		ROS_ERROR("Failed to instantiate Reposition Base Command Action Server");
-		return false;
-	}   
-
-	as_->registerGoalCallback(boost::bind(&goal_callback));
-	as_->registerPreemptCallback(boost::bind(&preempt_callback));
-
-	ROS_INFO("Starting action server '%s'...", action_name_.c_str());
-	as_->start();
-	ROS_INFO("Action server started");
-
-
-
-	
-	// visualization marker for gastank
-	ros::Publisher vis_pub = nh.advertise<visualization_msgs::Marker>( "hdt_base_planning_node/visualization_marker", 1 );
-
-	visualization_msgs::Marker marker;
-// 	marker.header.frame_id = "/base_link";
-	marker.header.frame_id = "/camera_link";
-	marker.header.stamp = ros::Time::now();
-	marker.ns = "hdt_base_planning_node";
-	marker.id = 0;
-	marker.type = visualization_msgs::Marker::MESH_RESOURCE;
-	marker.action = visualization_msgs::Marker::ADD;
-	marker.pose.position.x = objx;
-	marker.pose.position.y = objy;
-	marker.pose.position.z = objz;
-
-	tf::Quaternion q = tf::createQuaternionFromRPY(objR,objP,objY);
-	marker.pose.orientation.x = q[0];
-	marker.pose.orientation.y = q[1];
-	marker.pose.orientation.z = q[2];
-	marker.pose.orientation.w = q[3];
-
-	// marker.scale.x = 10;	// gastank_c.dae
-	// marker.scale.y = 10;
-	// marker.scale.z = 10;
-	marker.scale.x = 0.1;	// gastank_c_sparse.dae
-	marker.scale.y = 0.1;
-	marker.scale.z = 0.1;
-	marker.color.a = 1.0;
-	marker.color.r = 0.0;
-	marker.color.g = 1.0;
-	marker.color.b = 0.0;
-	marker.lifetime = ros::Duration();
-
-	//only if using a MESH_RESOURCE marker type:
-// 	marker.mesh_resource = "package://hdt_base_planning/meshes/gastank_c_sparse.dae";
-	marker.mesh_resource = "package://hdt/resource/meshes/gastank/gastank_c.dae";
-
-
-	// to give some time to publish markers
-	int cntPub = 0;
-	ros::Rate r(10);
-// 	while(ros::ok())
-	while(cntPub < 5)
-	{
-		vis_pub.publish( marker );
-
-		ros::spinOnce();
-		r.sleep();
-		cntPub++;
-	}
-
-
-	// hdt robot initialization for inverse kinematics check
-	std::string group_name_;
-	std::string kinematics_frame_;
-	std::string planning_frame_;
-	std::string planning_link_;
-	std::string chain_tip_link_;
-	std::string urdf_;
-    boost::shared_ptr<urdf::ModelInterface> urdf_model_;
-
-	if (!nh.hasParam("robot_description")) {
-		ROS_ERROR("Missing parameter \"robot_description\"");
-		return false;
-	}   
-
-	nh.getParam("robot_description", urdf_);
-
-	urdf_model_ = urdf::parseURDF(urdf_);
-	if (!urdf_model_) {
-		ROS_ERROR("Failed to parse URDF");
-		return false;
-	}   
-
-	boost::shared_ptr<const urdf::Joint> first_joint = urdf_model_->getJoint("arm_1_shoulder_twist");
-	if (!first_joint) {
-		ROS_ERROR("Failed to find joint 'arm_1_shoulder_twist'");
-		return false;
-	}   
-
-	group_name_ = "hdt_arm";
-
-	kinematics_frame_ = first_joint->parent_link_name;
-	planning_frame_ = first_joint->parent_link_name;
-
-	planning_link_ = "arm_7_gripper_lift_link";
-	chain_tip_link_ = "arm_7_gripper_lift_link";
-
-	hdt::HDTRobotModel* hdt_robot_model = new hdt::HDTRobotModel;
-	if (!hdt_robot_model || !hdt_robot_model->init(urdf_)) {
-		ROS_ERROR("Failed to initialize HDT Robot Model");
-		return false;
-	}   
-
-// 	std::vector<double> pose = { 1.5,0,0, 0,0,0 };	// { x,y,z, r,p,y }
-// 	std::vector<double> start = { 0,0,0,0,0,0,0 };
-// 	std::vector<double> solution = { 0,0,0,0,0,0,0 };
-// 	int option = 0;
-// 	bool ret = hdt_robot_model->computeIK(pose,start,solution,option);
-	
-
-
-	// COMPUTE ROBOT POSE HERE
-  	double robx0=0, roby0=0, robz0=-0.65, robY0=0, robP0=0, robR0=0;						// initial robot pose	// z-offset for /camera_link frame
-  	double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
-	computeRobPose(objx,objy,objY, robx0,roby0,robY0, robxf,robyf,robYf, hdt_robot_model); 
-
-
-	// VISUALIZE THE ROBOT 
-	std::stringstream str;
-	str << "rosrun hdt hdt_base_planning_shell.sh " <<  robxf << " " << robyf << " " << robzf << " " << robYf << " " << robPf << " " << robRf;
-	if (system(str.str().c_str())!=-1)
-	{
-		ROS_INFO("Robot Pose Established!\n");
-	}
-
-
-// 	int cntPub = 0;
-// 	ros::Rate r(10);
-// // 	while(ros::ok())
-// 	while(cntPub < 5)
-// 	{
-// 		vis_pub.publish( marker );
-// 
-// 		ros::spinOnce();
-// 		r.sleep();
-// 		cntPub++;
-// 	}
-
-
-	nh.deleteParam("hdt_base_planning_node/objx");
-	nh.deleteParam("hdt_base_planning_node/objy");
-	nh.deleteParam("hdt_base_planning_node/objY");
-
-	return 0;
-}
