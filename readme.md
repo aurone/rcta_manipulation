@@ -87,6 +87,10 @@ Run RViz to control the robot:
 Control the robot via the Manipulator Command Panel:
 > Add the Manipulator Command Panel via Panels > Add New Panel. Select hdt/ManipulatorCommandPanel.  
 > In the Manipulator Command Panel, fill out the name of the URDF parameter on the parameter server (likely /robot_description)
+> Add an Interactive Markers Display via Displays [Add] > rviz/InteractiveMarkers
+> Select hdt_control/update as the Update Topic for the Interactive Markers Display
+> Add a MarkerArray Display via Displays [Add] > rviz/MarkerArray
+> If not already selected, select /visualization_marker_array as the Marker Topic
 
 #### Live
 

@@ -1,0 +1,6 @@
+<launch>
+    <node name="localization_simulator" pkg="hdt" type="localization_simulator" output="screen">
+        <rosparam command="load" file="$(find hdt)/config/localization_simulator.yaml"/>
+        <param name="costmap_bagfile" value="$(find hdt)/data/only-global-costmap.bag"/>
+    </node>
+</launch>

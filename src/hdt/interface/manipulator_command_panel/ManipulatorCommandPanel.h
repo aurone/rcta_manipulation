@@ -286,6 +286,7 @@ private:
     void update_spinboxes();
     void update_gui();
 
+    // TODO: Modest improvement over a similar method in GraspObjectExecutor.cpp
     template <typename ActionType>
     bool reconnect_client(
             std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& client,

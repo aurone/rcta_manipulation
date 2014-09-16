@@ -373,6 +373,12 @@ const std::vector<double>& ManipulatorInterfaceSimROS::max_velocity_limits() con
 void ManipulatorInterfaceSimROS::goal_callback()
 {
     auto current_goal = as_->acceptNewGoal();
+    
+    if (current_goal->joint_state.position.size() != 7) {
+        as_->setAborted();
+        return;
+    }
+
     true_joint_positions_ = current_goal->joint_state.position;
     noisy_joint_positions_ = current_goal->joint_state.position;
     joint_velocities_ = std::vector<double>(7, 0.0);

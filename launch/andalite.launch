@@ -41,7 +41,7 @@
     </group>
 
     <!-- Global Frame Functionality -->
-    <node name="localization_simulator" pkg="hdt" type="localization_simulator"/>
+    <include file="$(find hdt)/launch/localization_simulator.launch"/>
     <!-- <node name="reposition_base_simulator" pkg="hdt" type="reposition_base_simulator"/> -->
     <!-- <node name="reposition_base_executor" pkg="hdt" type="hdt_base_planning_node"/> -->
 

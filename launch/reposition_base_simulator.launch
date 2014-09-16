@@ -1,0 +1,5 @@
+<launch>
+    <node name="reposition_base_simulator" pkg="hdt" type="reposition_base_simulator" output="screen">
+        <param name="max_output_candidates" value="4"/> <!-- allows sampling at a higher density and returning a subset of the 'best' ones -->
+    </node>
+</launch>

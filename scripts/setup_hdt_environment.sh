@@ -43,10 +43,15 @@ sudo sh -c "HDT_DIR=$HDT_DIR \
 echo "Updating rosdep..."
 rosdep update
 
-echo "Installing missing rosdep dependencies"
+echo "Installing missing rosdep dependencies for source packages"
+echo " -> hdt"
 rosdep install --ignore-src hdt
+echo " -> sbpl_manipulation"
 rosdep install --ignore-src sbpl_manipulation
+echo " -> pviz"
 rosdep install --ignore-src pviz
+echo " -> leatherman"
 rosdep install --ignore-src leatherman
+echo " -> pr2_vfh_database"
 rosdep install --ignore-src pr2_vfh_database
 
