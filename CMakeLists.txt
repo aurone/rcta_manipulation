@@ -70,6 +70,10 @@ pkg_check_modules(glew REQUIRED glew)
 include_directories(${glew_INCLUDE_DIRS})
 link_directories(${glew_LIBRARY_DIRS})
 
+# SBPL
+find_package(sbpl REQUIRED)
+include_directories(${SBPL_INCLUDE_DIRS})
+
 find_package(GLUT REQUIRED)
 include_directories(${GLUT_INCLUDE_DIR})
 

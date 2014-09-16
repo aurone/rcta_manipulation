@@ -208,6 +208,9 @@ private:
     }
 
     void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+
+    std::vector<geometry_msgs::PoseStamped>
+    collision_check_object_poses(const std::vector<geometry_msgs::PoseStamped>& sample_poses);
 };
 
 #endif

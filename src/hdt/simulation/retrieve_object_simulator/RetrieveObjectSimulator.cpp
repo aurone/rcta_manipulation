@@ -1,5 +1,6 @@
 #include "RetrieveObjectSimulator.h"
 
+#include <sbpl/utils/utils.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/utils/utils.h>
@@ -196,6 +197,9 @@ int RetrieveObjectSimulator::run()
         case RetrieveObjectExecutionStatus::INITIALIZING:
         {
             sample_object_poses_ = create_sample_object_poses();
+
+            sample_object_poses_ = collision_check_object_poses(sample_object_poses_);
+
             ROS_INFO("Sampled %zd object poses", sample_object_poses_.size());
             if (sample_object_poses_.empty()) {
                 status_ = RetrieveObjectExecutionStatus::COMPLETE;
@@ -548,8 +552,8 @@ std::vector<geometry_msgs::PoseStamped> RetrieveObjectSimulator::create_sample_o
                 double object_yaw = (yaw * 2.0 * M_PI) / num_disc_yaw_;
 
                 Eigen::Affine3d room_to_footprint =
-                    Eigen::Translation3d(object_x, object_y, 0.0) *
-                    Eigen::AngleAxisd(object_yaw, Eigen::Vector3d(0.0, 0.0, 1.0));
+                        Eigen::Translation3d(object_x, object_y, 0.0) *
+                        Eigen::AngleAxisd(object_yaw, Eigen::Vector3d(0.0, 0.0, 1.0));
 
                 Eigen::Affine3d room_to_object = room_to_footprint * object_to_footprint_.inverse();
 
@@ -571,4 +575,84 @@ std::vector<geometry_msgs::PoseStamped> RetrieveObjectSimulator::create_sample_o
 void RetrieveObjectSimulator::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
     last_occupancy_grid_ = msg;
+}
+
+template <typename T>
+static T** new_grid(std::size_t width, std::size_t height)
+{
+    T** grid = new T*[width];
+    for (std::size_t x = 0; x < width; ++x) {
+        grid[x] = new T[height];
+    }
+    return grid;
+};
+
+template <typename T>
+void free_grid(T** grid, std::size_t width, std::size_t height)
+{
+    for (std::size_t x = 0; x < width; ++x) {
+        delete [] grid[x];
+        grid[x] = nullptr;
+    }
+    delete [] grid;
+    grid = nullptr;
+};
+
+std::vector<geometry_msgs::PoseStamped>
+RetrieveObjectSimulator::collision_check_object_poses(const std::vector<geometry_msgs::PoseStamped>& sample_poses)
+{
+    const std::uint32_t width = last_occupancy_grid_->info.width; // size in x
+    const std::uint32_t height = last_occupancy_grid_->info.height; // size in y
+
+    unsigned char** grid = new_grid<unsigned char>(width, height);
+    float** distances_to_obstacle_cells = new_grid<float>(width, height);
+    float** distances_to_nonfree_cells = new_grid<float>(width, height);
+
+
+    for (std::size_t x = 0; x < width; ++x) {
+        for (std::size_t y = 0; y < height; ++y) {
+            grid[x][y] = last_occupancy_grid_->data[y * width + x];
+        }
+    }
+
+    // count number of obstacles
+    int num_obstacles = 0;
+    for (std::size_t x = 0; x < width; ++x) {
+        for (std::size_t y = 0; y < height; ++y) {
+            if (grid[x][y] > 0 && grid[x][y] < (std::uint8_t)-1) {
+                ++num_obstacles;
+            }
+        }
+    }
+
+    ROS_INFO("%d / %d (%0.3f %%) obstacles", num_obstacles, (int)(width * height), (double)num_obstacles / (width * height));
+
+    std::map<std::int8_t, int> vhistogram;
+    // create histogram of values
+    for (std::size_t x = 0; x < width; ++x) {
+        for (std::size_t y = 0; y < height; ++y) {
+            std::int8_t value = grid[x][y];
+            if (vhistogram.find(value) != vhistogram.end()) {
+                ++vhistogram[value];
+                grid[x][y] = 0; // clear unknown cells
+            }
+            else {
+                vhistogram[value] = 1;
+            }
+        }
+    }
+
+    ROS_INFO("Value Histogram:");
+    for (const auto& entry : vhistogram) {
+        ROS_INFO("    value = %d: %d", (int)entry.first, entry.second);
+    }
+
+    computeDistancestoNonfreeAreas(grid, width, height, 1, distances_to_obstacle_cells, distances_to_nonfree_cells);
+
+    free_grid(grid, width, height);
+    free_grid(distances_to_obstacle_cells, width, height);
+    free_grid(distances_to_nonfree_cells, width, height);
+
+    std::vector<geometry_msgs::PoseStamped> valid_samples = sample_poses;
+    return valid_samples;
 }

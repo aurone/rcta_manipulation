@@ -253,8 +253,8 @@ void RepositionBaseExecutor::goal_callback()
 	current_goal_ = as_->acceptNewGoal();
 	ROS_INFO("    Goal ID: %u", current_goal_->id);
 	ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
-	ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
-	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
+	ROS_INFO("    Gas Can Pose [world:\"%s\"]: %s", current_goal_->gas_can_in_map.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_map.pose).c_str());
+	ROS_INFO("    Base Link Pose [world:\"%s\"]: %s", current_goal_->base_link_in_map.header.frame_id.c_str(), to_string(current_goal_->base_link_in_map.pose).c_str());
 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
 
 	bComputedRobPose_ = false;
