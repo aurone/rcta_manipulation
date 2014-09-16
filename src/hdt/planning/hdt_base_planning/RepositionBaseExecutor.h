@@ -75,7 +75,7 @@ private:
 	ros::Subscriber subRobPose_;
 
 
-	hdt::RepositionBaseCommandGoal::ConstPtr current_goal_;
+	hdt_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
 
 	RepositionBaseExecutionStatus::Status status_;
 	RepositionBaseExecutionStatus::Status last_status_;
