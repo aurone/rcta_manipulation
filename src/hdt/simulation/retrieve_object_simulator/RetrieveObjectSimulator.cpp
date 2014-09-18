@@ -577,82 +577,33 @@ void RetrieveObjectSimulator::occupancy_grid_cb(const nav_msgs::OccupancyGrid::C
     last_occupancy_grid_ = msg;
 }
 
-template <typename T>
-static T** new_grid(std::size_t width, std::size_t height)
-{
-    T** grid = new T*[width];
-    for (std::size_t x = 0; x < width; ++x) {
-        grid[x] = new T[height];
-    }
-    return grid;
-};
-
-template <typename T>
-void free_grid(T** grid, std::size_t width, std::size_t height)
-{
-    for (std::size_t x = 0; x < width; ++x) {
-        delete [] grid[x];
-        grid[x] = nullptr;
-    }
-    delete [] grid;
-    grid = nullptr;
-};
-
 std::vector<geometry_msgs::PoseStamped>
 RetrieveObjectSimulator::collision_check_object_poses(const std::vector<geometry_msgs::PoseStamped>& sample_poses)
 {
-    const std::uint32_t width = last_occupancy_grid_->info.width; // size in x
-    const std::uint32_t height = last_occupancy_grid_->info.height; // size in y
+    CollisionModel2 collision_model;
+    collision_model.set_occupancy_grid(last_occupancy_grid_);
 
-    unsigned char** grid = new_grid<unsigned char>(width, height);
-    float** distances_to_obstacle_cells = new_grid<float>(width, height);
-    float** distances_to_nonfree_cells = new_grid<float>(width, height);
+    std::vector<geometry_msgs::PoseStamped> valid_samples;
+    const double object_radius_m = 6.52 * 2.54 * 0.01; // 6.52 inches
+    ROS_INFO("Estimated Object Radius: %0.3f", object_radius_m);
+    for (const geometry_msgs::PoseStamped& sample : sample_poses) {
+        Circle sample_circle;
 
+        Eigen::Affine3d room_to_object;
+        tf::poseMsgToEigen(sample.pose, room_to_object);
+        Eigen::Affine3d world_to_object = world_to_room_ * room_to_object;
+        geometry_msgs::Pose object_pose_in_world;
+        tf::poseEigenToMsg(world_to_object, object_pose_in_world);
 
-    for (std::size_t x = 0; x < width; ++x) {
-        for (std::size_t y = 0; y < height; ++y) {
-            grid[x][y] = last_occupancy_grid_->data[y * width + x];
+        sample_circle.x = object_pose_in_world.position.x;
+        sample_circle.y = object_pose_in_world.position.y;
+        sample_circle.radius = object_radius_m;
+        if (collision_model.check_obstacle(sample_circle)) {
+            valid_samples.push_back(sample);
         }
     }
 
-    // count number of obstacles
-    int num_obstacles = 0;
-    for (std::size_t x = 0; x < width; ++x) {
-        for (std::size_t y = 0; y < height; ++y) {
-            if (grid[x][y] > 0 && grid[x][y] < (std::uint8_t)-1) {
-                ++num_obstacles;
-            }
-        }
-    }
+    ROS_INFO("%zd of %zd samples are valid", valid_samples.size(), sample_poses.size());
 
-    ROS_INFO("%d / %d (%0.3f %%) obstacles", num_obstacles, (int)(width * height), (double)num_obstacles / (width * height));
-
-    std::map<std::int8_t, int> vhistogram;
-    // create histogram of values
-    for (std::size_t x = 0; x < width; ++x) {
-        for (std::size_t y = 0; y < height; ++y) {
-            std::int8_t value = grid[x][y];
-            if (vhistogram.find(value) != vhistogram.end()) {
-                ++vhistogram[value];
-                grid[x][y] = 0; // clear unknown cells
-            }
-            else {
-                vhistogram[value] = 1;
-            }
-        }
-    }
-
-    ROS_INFO("Value Histogram:");
-    for (const auto& entry : vhistogram) {
-        ROS_INFO("    value = %d: %d", (int)entry.first, entry.second);
-    }
-
-    computeDistancestoNonfreeAreas(grid, width, height, 1, distances_to_obstacle_cells, distances_to_nonfree_cells);
-
-    free_grid(grid, width, height);
-    free_grid(distances_to_obstacle_cells, width, height);
-    free_grid(distances_to_nonfree_cells, width, height);
-
-    std::vector<geometry_msgs::PoseStamped> valid_samples = sample_poses;
     return valid_samples;
 }

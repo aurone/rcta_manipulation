@@ -14,6 +14,7 @@
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
 #include <hdt/common/hdt_description/RobotModel.h>
+#include "CollisionModel2.h"
 
 namespace RetrieveObjectExecutionStatus
 {

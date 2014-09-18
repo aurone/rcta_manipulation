@@ -1,3 +1,3 @@
-add_executable(retrieve_object_simulator RetrieveObjectSimulator.cpp retrieve_object_simulator.cpp)
+add_executable(retrieve_object_simulator CollisionModel2.cpp RetrieveObjectSimulator.cpp retrieve_object_simulator.cpp)
 target_link_libraries(retrieve_object_simulator ${catkin_LIBRARIES} msg_utils hdt_robot_model ${SBPL_LIBRARIES})
 
