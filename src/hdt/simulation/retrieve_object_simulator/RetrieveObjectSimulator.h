@@ -95,6 +95,10 @@ private:
     int num_disc_yaw_;
     /// @}
 
+    double gas_can_scale_;
+
+    ros::Publisher goal_object_pose_marker_pub_;
+
     ros::Subscriber occupancy_grid_sub_;
     nav_msgs::OccupancyGrid::ConstPtr last_occupancy_grid_;
 
@@ -212,6 +216,8 @@ private:
 
     std::vector<geometry_msgs::PoseStamped>
     collision_check_object_poses(const std::vector<geometry_msgs::PoseStamped>& sample_poses);
+
+    void publish_gas_canister_marker(const geometry_msgs::PoseStamped& pose);
 };
 
 #endif

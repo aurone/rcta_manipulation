@@ -2,6 +2,7 @@
 
 #include <sbpl/utils/utils.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/utils/utils.h>
 #include <hdt/common/hdt_description/RobotModel.h>
@@ -17,6 +18,8 @@ RetrieveObjectSimulator::RetrieveObjectSimulator() :
     num_disc_x_(0),
     num_disc_y_(0),
     num_disc_yaw_(0),
+    gas_can_scale_(0.12905),
+    goal_object_pose_marker_pub_(),
     occupancy_grid_sub_(),
     reposition_base_command_client_(),
     sent_reposition_base_command_(false),
@@ -172,6 +175,8 @@ bool RetrieveObjectSimulator::initialize()
     ROS_INFO(" -> Received occupancy grid. Shutting down subscriber...");
     occupancy_grid_sub_.shutdown();
 
+    goal_object_pose_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("/visualization_marker", 5);
+
     return true;
 }
 
@@ -220,11 +225,18 @@ int RetrieveObjectSimulator::run()
                 current_sample_object_pose_ = sample_object_poses_.back();
                 sample_object_poses_.pop_back(); // consume next object poses
 
-                static int reposition_base_goal_id = 0;
-
                 Eigen::Affine3d room_to_object;
                 tf::poseMsgToEigen(current_sample_object_pose_.pose, room_to_object);
                 Eigen::Affine3d world_to_object = world_to_room_ * room_to_object;
+
+                geometry_msgs::PoseStamped object_pose_world_frame;
+                object_pose_world_frame.header.seq = 0;
+                object_pose_world_frame.header.stamp = ros::Time::now();
+                object_pose_world_frame.header.frame_id = world_frame_;
+                tf::poseEigenToMsg(world_to_object, object_pose_world_frame.pose);
+                publish_gas_canister_marker(object_pose_world_frame);
+
+                static int reposition_base_goal_id = 0;
 
                 hdt_msgs::RepositionBaseCommandGoal goal;
                 goal.id = reposition_base_goal_id++;
@@ -606,4 +618,24 @@ RetrieveObjectSimulator::collision_check_object_poses(const std::vector<geometry
     ROS_INFO("%zd of %zd samples are valid", valid_samples.size(), sample_poses.size());
 
     return valid_samples;
+}
+
+void RetrieveObjectSimulator::publish_gas_canister_marker(const geometry_msgs::PoseStamped& pose)
+{
+    visualization_msgs::Marker object_marker;
+    object_marker.header.seq = 0;
+    object_marker.header.stamp = ros::Time::now();
+    object_marker.header.frame_id = pose.header.frame_id;
+    object_marker.ns = "goal_object_pose";
+    object_marker.id = 0;
+    object_marker.type = visualization_msgs::Marker::MESH_RESOURCE;
+    object_marker.action = visualization_msgs::Marker::ADD;
+    object_marker.pose = pose.pose;
+    object_marker.scale = geometry_msgs::CreateVector3(gas_can_scale_, gas_can_scale_, gas_can_scale_);
+    object_marker.color = std_msgs::CreateColorRGBA(0.2f, 1.0f, 0.2f, 0.9f);
+    object_marker.lifetime = ros::Duration(0);
+    object_marker.frame_locked = false;
+    object_marker.mesh_resource = "package://hdt/resource/meshes/gastank/clean_small_gastank.obj";
+    object_marker.mesh_use_embedded_materials = false;
+    goal_object_pose_marker_pub_.publish(object_marker);
 }
