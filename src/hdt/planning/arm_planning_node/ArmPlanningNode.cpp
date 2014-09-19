@@ -1,6 +1,7 @@
 #include "ArmPlanningNode.h"
 #include <cstdio>
 #include <leatherman/utils.h>
+#include <octomap_msgs/conversions.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
@@ -261,6 +262,12 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     ROS_INFO("Received Move Arm Command Goal");
     ROS_INFO("    Octomap ID: %s", request->octomap.id.c_str());
 
+    // update the world
+    std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(request->octomap));
+    if (!dynamic_cast<octomap::OcTree*>(octomap.get())) {
+        ROS_WARN("Octomap from message does not support OcTree requirements");
+    }
+
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
 
@@ -303,6 +310,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     ////////////////////////////////////////////////////////////////////////////////
 
     if (success) {
+
         ROS_INFO("Original joint path (%zd points):", result_traj.points.size());
         for (int i = 0; i < (int)result_traj.points.size(); ++i) {
             const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
