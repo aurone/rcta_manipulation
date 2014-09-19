@@ -17,6 +17,25 @@
 #include <actionlib/server/simple_action_server.h>
 
 
+namespace RepositionBaseCandidate
+{
+
+struct candidate
+{
+	int i;
+	int j;
+	int k;
+	double pTot;
+
+	bool operator < (const candidate& cand2) const
+	{
+		return pTot > cand2.pTot;
+	}
+};
+
+}
+
+
 namespace RepositionBaseExecutionStatus
 {
 
@@ -59,7 +78,7 @@ private:
 
 	double sign(double val);
 	double wrapAngle(double ang);
-	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  double& robxf, double& robyf, double& robYf, hdt::HDTRobotModel* hdt_robot_model);
+	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
 
 	ros::NodeHandle nh_;
@@ -70,9 +89,13 @@ private:
 
 	bool bComputedRobPose_;
 
+/*
 	// TODO: remove the followings when actionlib works with /map
 	ros::Subscriber subMap_;
 	ros::Subscriber subRobPose_;
+*/
+// 	nav_msgs::OccupancyGrid::ConstPtr map_;
+	nav_msgs::OccupancyGrid map_;
 
 
 	hdt_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
