@@ -258,6 +258,9 @@ bool ArmPlanningNode::init_sbpl()
 
 void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 {
+    ROS_INFO("Received Move Arm Command Goal");
+    ROS_INFO("    Octomap ID: %s", request->octomap.id.c_str());
+
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
 

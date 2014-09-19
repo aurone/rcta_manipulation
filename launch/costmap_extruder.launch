@@ -1,0 +1,6 @@
+<launch>
+    <node name="costmap_extruder" pkg="hdt" type="costmap_extruder" output="screen">
+        <remap from="occupancy_grid" to="fixed_costmap_sim"/>
+    </node>
+</launch>
+

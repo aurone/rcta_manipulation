@@ -490,6 +490,8 @@ int GraspObjectExecutor::run()
                 last_move_arm_pregrasp_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
                 tf::poseEigenToMsg(next_best_grasp.grasp_candidate_transform, last_move_arm_pregrasp_goal_.goal_pose);
 
+                last_move_arm_pregrasp_goal_.octomap = current_goal_->octomap;
+
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
                 move_arm_command_client_->sendGoal(last_move_arm_pregrasp_goal_, result_cb);
 
@@ -789,10 +791,6 @@ int GraspObjectExecutor::run()
         }   break;
         case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
         {
-            ////////////////////////////////////////////////////////////////////////////////
-            // Main loop of PLANNING_ARM_MOTION_TO_PREGRASP
-            ////////////////////////////////////////////////////////////////////////////////
-
             if (!sent_move_arm_goal_) {
                 hdt_msgs::GraspObjectCommandFeedback feedback;
                 feedback.status = execution_status_to_feedback_status(status_);
@@ -842,6 +840,8 @@ int GraspObjectExecutor::run()
 //                const Eigen::Affine3d HARDCODED_STOW_POSE =
 //                        Eigen::Translation3d(stow_x, stow_y, stow_z) * Eigen::Quaterniond(stow_qw, stow_qx, stow_qy, stow_qz);
                 tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
+
+                last_move_arm_stow_goal_.octomap = current_goal_->octomap;
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
                 move_arm_command_client_->sendGoal(last_move_arm_stow_goal_, result_cb);
