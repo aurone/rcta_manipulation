@@ -5,6 +5,8 @@ uint8 JointGoal = 1
 geometry_msgs/Pose goal_pose
 sensor_msgs/JointState goal_joint_state
 uint8 type
+
+octomap_msgs/Octomap octomap
 ---
 # result
 bool success
