@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
 #include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt_msgs/RepositionBaseCommandAction.h>
@@ -101,6 +102,9 @@ private:
 
     ros::Subscriber occupancy_grid_sub_;
     nav_msgs::OccupancyGrid::ConstPtr last_occupancy_grid_;
+
+    ros::Subscriber octomap_sub_;
+    octomap_msgs::Octomap::ConstPtr last_octomap_;
 
     /// @{ Action Clients and State
     typedef actionlib::SimpleActionClient<hdt_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
@@ -213,6 +217,7 @@ private:
     }
 
     void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+    void octomap_cb(const octomap_msgs::Octomap::ConstPtr& msg);
 
     std::vector<geometry_msgs::PoseStamped>
     collision_check_object_poses(const std::vector<geometry_msgs::PoseStamped>& sample_poses);

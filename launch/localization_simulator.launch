@@ -3,4 +3,6 @@
         <rosparam command="load" file="$(find hdt)/config/localization_simulator.yaml"/>
         <param name="costmap_bagfile" value="$(find hdt)/data/only-global-costmap.bag"/>
     </node>
+
+    <include file="$(find hdt)/launch/costmap_extruder.launch"/>
 </launch>

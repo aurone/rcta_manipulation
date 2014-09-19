@@ -166,7 +166,7 @@ bool RetrieveObjectSimulator::initialize()
     initial_robot_joint_values_ = robot_initial_joint_values;
 
     ROS_WARN("Waiting for occupancy grid message...");
-    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_occupancy_grid", 5, &RetrieveObjectSimulator::occupancy_grid_cb, this);
+    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_occupancy_grid", 1, &RetrieveObjectSimulator::occupancy_grid_cb, this);
     while (!last_occupancy_grid_) {
         ros::Duration(1.0).sleep();
         ros::spinOnce();
@@ -174,6 +174,15 @@ bool RetrieveObjectSimulator::initialize()
 
     ROS_INFO(" -> Received occupancy grid. Shutting down subscriber...");
     occupancy_grid_sub_.shutdown();
+
+    octomap_sub_ = nh_.subscribe<octomap_msgs::Octomap>("fixed_octomap", 1, &RetrieveObjectSimulator::octomap_cb, this);
+    while (!last_octomap_) {
+        ros::Duration(1.0).sleep();
+        ros::spinOnce();
+    }
+
+    ROS_INFO(" -> Received octomap. Shutting down subscriber...");
+    octomap_sub_.shutdown();
 
     goal_object_pose_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("/visualization_marker", 5);
 
@@ -410,7 +419,7 @@ int RetrieveObjectSimulator::run()
                 robot_to_object = world_to_robot.inverse() * world_to_object;
                 tf::poseEigenToMsg(robot_to_object, goal.gas_can_in_base_link.pose);
 
-                goal.octomap; // TODO: as usual
+                goal.octomap = *last_octomap_;
 
                 if (!wait_for_action_server(
                         grasp_object_command_client_,
@@ -587,6 +596,11 @@ std::vector<geometry_msgs::PoseStamped> RetrieveObjectSimulator::create_sample_o
 void RetrieveObjectSimulator::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
     last_occupancy_grid_ = msg;
+}
+
+void RetrieveObjectSimulator::octomap_cb(const octomap_msgs::Octomap::ConstPtr& msg)
+{
+    last_octomap_ = msg;
 }
 
 std::vector<geometry_msgs::PoseStamped>
