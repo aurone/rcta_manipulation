@@ -56,7 +56,7 @@ namespace RepositionBaseExecutionStatus
 				return "ComputingRepositionBase";
 			default:
 				return "Invalid";
-		}   
+		}
 	}
 }
 
@@ -79,7 +79,7 @@ bool RepositionBaseExecutor::initialize()
 	if (!as_) {
 		ROS_ERROR("Failed to instantiate Reposition Base Command Action Server");
 		return false;
-	}   
+	}
 
 	as_->registerGoalCallback(boost::bind(&RepositionBaseExecutor::goal_callback,this));
 	as_->registerPreemptCallback(boost::bind(&RepositionBaseExecutor::preempt_callback,this));
@@ -101,7 +101,7 @@ bool RepositionBaseExecutor::initialize()
 	if (!nh_.hasParam("robot_description")) {
 		ROS_ERROR("Missing parameter \"robot_description\"");
 		return false;
-	}   
+	}
 
 	nh_.getParam("robot_description", urdf_);
 
@@ -109,13 +109,13 @@ bool RepositionBaseExecutor::initialize()
 	if (!urdf_model_) {
 		ROS_ERROR("Failed to parse URDF");
 		return false;
-	}   
+	}
 
 	boost::shared_ptr<const urdf::Joint> first_joint = urdf_model_->getJoint("arm_1_shoulder_twist");
 	if (!first_joint) {
 		ROS_ERROR("Failed to find joint 'arm_1_shoulder_twist'");
 		return false;
-	}   
+	}
 
 	group_name_ = "hdt_arm";
 
@@ -130,7 +130,7 @@ bool RepositionBaseExecutor::initialize()
 	if (!hdt_robot_model_ || !hdt_robot_model_->init(urdf_)) {
 		ROS_ERROR("Failed to initialize HDT Robot Model");
 		return false;
-	}   
+	}
 
 /*
 // TODO: remove the followings when actionlib works with /map
@@ -178,49 +178,49 @@ int RepositionBaseExecutor::run()
 			case RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE:
 				{
 					if (!bComputedRobPose_) {
-						
+
 						// given object pose (x-axis is aligned to canister hose)
-						double objx = current_goal_->gas_can_in_map.pose.position.x;	
-						double objy = current_goal_->gas_can_in_map.pose.position.y;	
+						double objx = current_goal_->gas_can_in_map.pose.position.x;
+						double objy = current_goal_->gas_can_in_map.pose.position.y;
 						double objz = current_goal_->gas_can_in_map.pose.position.z;
 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
 						double objP0 = 0.0;
 						double objR0 = 0.0;
-						
+
 						// initial robot pose
-						double robx0 = current_goal_->base_link_in_map.pose.position.x;	
-						double roby0 = current_goal_->base_link_in_map.pose.position.y;	
+						double robx0 = current_goal_->base_link_in_map.pose.position.x;
+						double roby0 = current_goal_->base_link_in_map.pose.position.y;
 						double robz0 = current_goal_->base_link_in_map.pose.position.z;
 						double robY0 = 2.0*acos(current_goal_->base_link_in_map.pose.orientation.w)*sign(current_goal_->base_link_in_map.pose.orientation.z);	// assuming that rotation axis is parallel to z-axis
 						double robP0 = 0.0;
 						double robR0 = 0.0;
-						
+
 						// desired robot pose
 // 						double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
-						
-						std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
-						bool ret = computeRobPose(objx,objy,objY, robx0,roby0,robY0, candidate_base_poses); 
-						
-						bComputedRobPose_ = true;	
 
-// //					hdt::RepositionBaseCommandFeedback feedback;
+						std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
+						bool ret = computeRobPose(objx,objy,objY, robx0,roby0,robY0, candidate_base_poses);
+
+						bComputedRobPose_ = true;
+
+// //					hdt_msgs::RepositionBaseCommandFeedback feedback;
 // // 					feedback.status = execution_status_to_feedback_status(status_?);
 // // 					as_->publishFeedback(feedback);
 // 						status_ = RepositionBaseExecutionStatus::COMPLETING_GOAL;
 
 						if (ret)
 						{
-							hdt::RepositionBaseCommandResult result;
-							result.result = hdt::RepositionBaseCommandResult::SUCCESS;
+							hdt_msgs::RepositionBaseCommandResult result;
+							result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
 							result.candidate_base_poses = candidate_base_poses;
 							as_->setSucceeded(result);
 							status_ = RepositionBaseExecutionStatus::IDLE;
 						}
 						else
 						{
-							hdt::RepositionBaseCommandResult result;
-							result.result = hdt::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
-							result.candidate_base_poses = candidate_base_poses;		// this pose is same with the initial base pose 
+							hdt_msgs::RepositionBaseCommandResult result;
+							result.result = hdt_msgs::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
+							result.candidate_base_poses = candidate_base_poses;		// this pose is same with the initial base pose
 							as_->setSucceeded(result);
 							status_ = RepositionBaseExecutionStatus::IDLE;
 						}
@@ -228,9 +228,9 @@ int RepositionBaseExecutor::run()
 				}   break;
 			case RepositionBaseExecutionStatus::COMPLETING_GOAL:
 				{
-// 					hdt::RepositionBaseCommandResult result;
-// 					result.result = hdt::RepositionBaseCommandResult::SUCCESS;
-// 					result.candidate_base_poses = 
+// 					hdt_msgs::RepositionBaseCommandResult result;
+// 					result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
+// 					result.candidate_base_poses =
 // 					as_->setSucceeded(result);
 // 					status_ = RepositionBaseExecutionStatus::IDLE;
 				}   break;
@@ -252,7 +252,7 @@ void RepositionBaseExecutor::goal_callback()
 	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
 
-	bComputedRobPose_ = false;	
+	bComputedRobPose_ = false;
 }
 
 void RepositionBaseExecutor::preempt_callback()
@@ -290,12 +290,12 @@ double RepositionBaseExecutor::wrapAngle(double ang)
 }
 
 
-bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses) 
+bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses)
 {
 
 	// policy for robot pose selection
 	// 0) set search space
-	// 1) candidate pose validity for grasing 
+	// 1) candidate pose validity for grasing
 	// 2) distance to obstacles
 	// 3) kinematics of hdt arm
 	// 4) multiplication of 1~3)
@@ -331,7 +331,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	// 1) grasp achievable zone 	// TODO: tune these parameters
 	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
-	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1)) 
+	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1))
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
 	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
@@ -345,7 +345,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
 	int mapObsThr = 1;			// threshold for classifying clear and occupied regions
 
-	// 5) candidate selection criterion 
+	// 5) candidate selection criterion
 	double scaleDiffYglob = 0.05;	// multiply a quadratic function to pTot (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
 	double pTotThr = 0.8;		// pTot threshold for bSortMetric==3
 
@@ -361,16 +361,16 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// 0) set search space (r,th,Y)
 	// (r,th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
 	// (Y): orientation about z-axis
-	
+
 	double pTot[nDist][nAng][nYaw], pGrasp[nDist][nAng][nYaw], pObs[nDist][nAng][nYaw], pWork[nDist][nAng][nYaw];
 	bool bTotMax[nDist][nAng][nYaw];
 	for (int i=0; i<nDist; i++)
 		for (int j=0; j<nAng; j++)
 			for (int k=0; k<nYaw; k++)
 			{
-				pTot[i][j][k] = 0.0;	
-				pGrasp[i][j][k] = 1.0;	
-				pObs[i][j][k] = 1.0;	
+				pTot[i][j][k] = 0.0;
+				pGrasp[i][j][k] = 1.0;
+				pObs[i][j][k] = 1.0;
 				pWork[i][j][k] = 1.0;
 				bTotMax[i][j][k] = false;	// used when 1) check candidate validity before IK (process 1~4)
 											//			 2) select the one with maximum pTot (process 5~6)
@@ -390,7 +390,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			}
 
 
-	// 1) probability of successful grasping 
+	// 1) probability of successful grasping
 
 	if (bCheckGrasp)
 	{
@@ -399,7 +399,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			// exception: exclude poses at close distance, include ones in right-hand side at far distance
 		// b) orientation: the object handle should be directed to the right of the robot
 			// c) exception: allow more deviation at close distance, reject most of deviations at far distance
-	
+
 		for (int i=0; i<nDist; i++)
 		{
 			// c) set acceptable object orientation range
@@ -451,9 +451,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	// 2) probability not to collide with obstacles
 	// depends on distance to obstacles considering the position offset wrt orientation
-	
+
 	if (bCheckObs == true)
-	{ 
+	{
 		// TODO: not working with actionlib yet...
 // 		double resolution = current_goal_->map.info.resolution;
 // 		int width = current_goal_->map.info.width;
@@ -475,7 +475,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			int height = map_.info.height;
             geometry_msgs::Pose origin = map_.info.origin;
 			// OccupancyGrid index usage
-			//	mapx = origin.position.x + resolution*ii;	// x-position in world_frame 
+			//	mapx = origin.position.x + resolution*ii;	// x-position in world_frame
 			//	mapy = origin.position.y + resolution*jj;	// y-position in world_frame
 			//	mapObs = map_.data[width*jj+ii];			// probability of occupancy in this (x,y) position 	// -1: unknown, 0: clear, 1-100: higher probability
 
@@ -545,7 +545,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 						ret = hdt_robot_model_->computeIK(pose,start,solution,option);
 						if (!ret)
-							pWork[i][j][k] = 0.0; 
+							pWork[i][j][k] = 0.0;
 					}
 	}
 
@@ -556,8 +556,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 		for (int j=0; j<nAng; j++)
 			for (int k=0; k<nYaw; k++)
 				if (bTotMax[i][j][k]==true)
-					pTot[i][j][k] = pGrasp[i][j][k] * pObs[i][j][k] * pWork[i][j][k];	
-				else 
+					pTot[i][j][k] = pGrasp[i][j][k] * pObs[i][j][k] * pWork[i][j][k];
+				else
 					pTot[i][j][k] = 0.0;
 
 
@@ -565,7 +565,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// HEURISTICALLY, minimum difference in angular coordinate wrt object, then farthest from the origin of object
 	if (bSortMetric==1 || bSortMetric==2)
 	{
-		double pTotMax = 1E-10;		// to opt out the poses with pTot[i][j][k]==0	
+		double pTotMax = 1E-10;		// to opt out the poses with pTot[i][j][k]==0
 
 		for (int i=0; i<nDist; i++)
 			for (int j=0; j<nAng; j++)
@@ -590,7 +590,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 		ROS_INFO("    cntTotMax: %d",cntTotMax);
 
-		
+
 		if (cntTotMax==0)
 		{
 			// TODO: check why the previous candidate_base_poses remain in RViz panel
@@ -598,7 +598,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			robxf = robx0;
 			robyf = roby0;
 			robYf = robY0;
-			
+
 			geometry_msgs::PoseStamped candidate_base_pose;
 			candidate_base_pose.header.frame_id = "/abs_nwu";
 			candidate_base_pose.header.seq = 0;
@@ -609,9 +609,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			candidate_base_pose.pose.position.z = robzf;
 
 			tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
-			candidate_base_pose.pose.orientation.x = robqf[0]; 
-			candidate_base_pose.pose.orientation.y = robqf[1]; 
-			candidate_base_pose.pose.orientation.z = robqf[2]; 
+			candidate_base_pose.pose.orientation.x = robqf[0];
+			candidate_base_pose.pose.orientation.y = robqf[1];
+			candidate_base_pose.pose.orientation.z = robqf[2];
 			candidate_base_pose.pose.orientation.w = robqf[3];
 			candidate_base_poses.push_back(candidate_base_pose);
 
@@ -663,8 +663,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							}
 						}
 			ROS_INFO("    cntTotMax: %d",cntTotMax);
-				
-			// TODO: comment these part for more candidates	
+
+			// TODO: comment these part for more candidates
 			if (bSortMetric==2)
 			{
 				if (cntTotMax > 1)	// if more than one candidate poses are still selected
@@ -710,7 +710,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 					ROS_INFO("    cntTotMax: %d",cntTotMax);
 					if (cntTotMax > 1)
 						ROS_WARN("    Multiple candidate poses exist!");
-				
+
 				}
 			}	// if (bSortMetric==2)
 		}
@@ -747,9 +747,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						candidate_base_pose.pose.position.z = robzf;
 
 						tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
-						candidate_base_pose.pose.orientation.x = robqf[0]; 
-						candidate_base_pose.pose.orientation.y = robqf[1]; 
-						candidate_base_pose.pose.orientation.z = robqf[2]; 
+						candidate_base_pose.pose.orientation.x = robqf[0];
+						candidate_base_pose.pose.orientation.y = robqf[1];
+						candidate_base_pose.pose.orientation.z = robqf[2];
 						candidate_base_pose.pose.orientation.w = robqf[3];
 						candidate_base_poses.push_back(candidate_base_pose);
 					}
@@ -773,7 +773,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						cntTotMax++;
 					}
 		ROS_INFO("    cntTotMax: %d",cntTotMax);
-		
+
 		if (cntTotMax==0)
 		{
 			// TODO: check why the previous candidate_base_poses remain in RViz panel
@@ -781,7 +781,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			robxf = robx0;
 			robyf = roby0;
 			robYf = robY0;
-			
+
 			geometry_msgs::PoseStamped candidate_base_pose;
 			candidate_base_pose.header.frame_id = "/abs_nwu";
 			candidate_base_pose.header.seq = 0;
@@ -792,9 +792,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			candidate_base_pose.pose.position.z = robzf;
 
 			tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
-			candidate_base_pose.pose.orientation.x = robqf[0]; 
-			candidate_base_pose.pose.orientation.y = robqf[1]; 
-			candidate_base_pose.pose.orientation.z = robqf[2]; 
+			candidate_base_pose.pose.orientation.x = robqf[0];
+			candidate_base_pose.pose.orientation.y = robqf[1];
+			candidate_base_pose.pose.orientation.z = robqf[2];
 			candidate_base_pose.pose.orientation.w = robqf[3];
 			candidate_base_poses.push_back(candidate_base_pose);
 
@@ -820,7 +820,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						cands.push_back(cand);
 					}
 		std::sort(cands.begin(), cands.end());
-		
+
 
 		// 6-2) generate final desired robot poses with maximum pTot
 		ROS_INFO("Reposition Base Command Result:");
@@ -855,9 +855,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				candidate_base_pose.pose.position.z = robzf;
 
 				tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
-				candidate_base_pose.pose.orientation.x = robqf[0]; 
-				candidate_base_pose.pose.orientation.y = robqf[1]; 
-				candidate_base_pose.pose.orientation.z = robqf[2]; 
+				candidate_base_pose.pose.orientation.x = robqf[0];
+				candidate_base_pose.pose.orientation.y = robqf[1];
+				candidate_base_pose.pose.orientation.z = robqf[2];
 				candidate_base_pose.pose.orientation.w = robqf[3];
 				candidate_base_poses.push_back(candidate_base_pose);
 			}
