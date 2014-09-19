@@ -13,7 +13,7 @@
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/planning/arm_planning_node/HDTRobotModel.h>
 
-#include <hdt_msgs/RepositionBaseCommandAction.h>
+#include <hdt/RepositionBaseCommandAction.h>
 #include <actionlib/server/simple_action_server.h>
 
 
@@ -60,15 +60,15 @@ std::string to_string(Status status);
 class RepositionBaseExecutor
 {
 public:
-
+	
 	RepositionBaseExecutor();
 	bool initialize();
 	int run();
-
+	
 	enum MainResult
 	{
 		SUCCESS = 0,
-		FAILED_TO_INITIALIZE
+		FAILED_TO_INITIALIZE		
 	};
 
 
@@ -80,11 +80,11 @@ private:
 	double wrapAngle(double ang);
 	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
-
+	
 	ros::NodeHandle nh_;
-
+	
 	std::string action_name_;
-	typedef actionlib::SimpleActionServer<hdt_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+	typedef actionlib::SimpleActionServer<hdt::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
 	std::unique_ptr<RepositionBaseCommandActionServer> as_;
 
 	bool bComputedRobPose_;
@@ -98,7 +98,7 @@ private:
 	nav_msgs::OccupancyGrid map_;
 
 
-	hdt_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
+	hdt::RepositionBaseCommandGoal::ConstPtr current_goal_;
 
 	RepositionBaseExecutionStatus::Status status_;
 	RepositionBaseExecutionStatus::Status last_status_;
