@@ -399,6 +399,20 @@ const Point ZeroPoint()
     return CreatePoint(0.0, 0.0, 0.0);
 }
 
+Point32 CreatePoint32(float x, float y, float z)
+{
+    Point32 p;
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    return p;
+}
+
+const Point32 ZeroPoint32()
+{
+    return CreatePoint32(0.0f, 0.0f, 0.0f);
+}
+
 Quaternion CreateQuaternion(double w, double x, double y, double z)
 {
     Quaternion q;

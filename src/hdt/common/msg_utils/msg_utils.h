@@ -8,6 +8,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Point32.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Vector3.h>
@@ -230,6 +231,9 @@ const Vector3 ZeroVector3();
 
 Point CreatePoint(double x, double y, double z);
 const Point ZeroPoint();
+
+Point32 CreatePoint32(float x, float y, float z);
+const Point32 ZeroPoint32();
 
 Quaternion CreateQuaternion(double w, double x, double y, double z);
 const Quaternion IdentityQuaternion();
