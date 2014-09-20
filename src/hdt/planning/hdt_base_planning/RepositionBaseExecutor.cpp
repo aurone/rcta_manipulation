@@ -1,5 +1,5 @@
 #include "RepositionBaseExecutor.h"
-// #include <hdt/common/utils/RunUponDestruction.h>
+#include <hdt/common/utils/RunUponDestruction.h>
 #include <hdt/common/stringifier/stringifier.h>
 
 #include <algorithm>
@@ -150,7 +150,7 @@ int RepositionBaseExecutor::run()
 
 	ros::Rate loop_rate(1);
 	while (ros::ok()) {
-// 		RunUponDestruction rod([&](){ loop_rate.sleep(); });
+		RunUponDestruction rod([&](){ loop_rate.sleep(); });
 // 		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
 
 		ros::spinOnce();
