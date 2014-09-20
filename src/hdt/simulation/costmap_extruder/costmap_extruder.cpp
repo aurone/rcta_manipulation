@@ -87,21 +87,16 @@ octomap_msgs::Octomap::ConstPtr convert_to_octomap(const moveit_msgs::CollisionM
     octomap::OcTree octree(res);
     octree.insertScan(octomap_cloud, octomap::point3d(0.0, 0.0, 0.0));
 
-    std::vector<std::int8_t> octomap_msg_data;
-    if (!octomap_msgs::binaryMapToMsgData(octree, octomap_msg_data)) {
-        return octomap_msgs::Octomap::ConstPtr();
-    }
-
     octomap_msgs::Octomap::Ptr octomap(new octomap_msgs::Octomap);
     if (!octomap) {
         return octomap;
     }
 
+    if (!octomap_msgs::binaryMapToMsg(octree, *octomap)) {
+        return octomap;
+    }
+
     octomap->header = cmap.header;
-    octomap->binary = true;
-    octomap->id = "extruded_collision_map";
-    octomap->resolution = res;
-    octomap->data = octomap_msg_data;
     return octomap;
 }
 
