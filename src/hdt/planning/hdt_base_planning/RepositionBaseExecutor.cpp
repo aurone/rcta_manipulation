@@ -5,44 +5,6 @@
 #include <algorithm>
 
 
-/*
-// TODO: remove the followings when actionlib works with /map
-///////////////////////////////////////////////////////////
-#include <nav_msgs/OccupancyGrid.h>
-#include <geometry_msgs/PoseStamped.h>
-
-nav_msgs::OccupancyGrid::ConstPtr map_;
-geometry_msgs::PoseStamped::ConstPtr rob0_;
-int bMapReceived_ = 0;			// 0: ready to receive, 1: received, -1: blocked (in processing)
-int bRobPoseReceived_ = 0;
-
-void subMapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
-{
-	if (bMapReceived_!=-1)
-	{
-		map_ = msg;
-		bMapReceived_ = 1;
-// 		printf("map received!\n");
-// 		std::cerr << msg->header << std::endl;
-// 		std::cerr << msg->info << std::endl;
-	}
-}
-
-void subRobPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
-{
-	if (bRobPoseReceived_!=-1)
-	{
-		rob0_ = msg;
-		bRobPoseReceived_ = 1;
-// 		printf("robot pose received!\n");
-// 		std::cerr << msg->header << std::endl;
-	}
-}
-///////////////////////////////////////////////////////////
-*/
-
-
-
 namespace RepositionBaseExecutionStatus
 {
 	std::string to_string(Status status)
@@ -64,8 +26,8 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
 nh_(),
 action_name_("reposition_base_command"),
 as_(),
-// bComputedRobPose_(false),
-bComputedRobPose_(true),
+bComputedRobPose_(false),
+// bComputedRobPose_(true),
 current_goal_(),
 status_(RepositionBaseExecutionStatus::INVALID),
 last_status_(RepositionBaseExecutionStatus::INVALID)
@@ -97,7 +59,7 @@ bool RepositionBaseExecutor::initialize()
 	std::string planning_link_;
 	std::string chain_tip_link_;
 	std::string urdf_;
-	boost::shared_ptr<urdf::ModelInterface> urdf_model_;
+// 	boost::shared_ptr<urdf::ModelInterface> urdf_model_;
 
 	if (!nh_.hasParam("robot_description")) {
 		ROS_ERROR("Missing parameter \"robot_description\"");
@@ -106,7 +68,8 @@ bool RepositionBaseExecutor::initialize()
 
 	nh_.getParam("robot_description", urdf_);
 
-	urdf_model_ = urdf::parseURDF(urdf_);
+// 	urdf_model_ = urdf::parseURDF(urdf_);
+	boost::shared_ptr<urdf::ModelInterface> urdf_model_ = urdf::parseURDF(urdf_);
 	if (!urdf_model_) {
 		ROS_ERROR("Failed to parse URDF");
 		return false;
@@ -133,11 +96,6 @@ bool RepositionBaseExecutor::initialize()
 		return false;
 	}
 
-/*
-// TODO: remove the followings when actionlib works with /map
-	subMap_ = nh_.subscribe("/local_costmap/costmap/costmap",1,subMapCallback);   // TODO: frame_id: /abs_nwu (but identical to /abs_ned)
-	subRobPose_ = nh_.subscribe("/rrnav/absPose",1,subRobPoseCallback);           // TODO: frame_id: /abs_ned
-*/
 }
 
 
@@ -149,8 +107,7 @@ int RepositionBaseExecutor::run()
 
 	status_ = RepositionBaseExecutionStatus::IDLE;
 
-// 	ros::Rate loop_rate(1);
-	ros::Rate loop_rate(3);
+	ros::Rate loop_rate(1);
 	while (ros::ok()) {
 		RunUponDestruction rod([&](){ loop_rate.sleep(); });
 // 		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
@@ -185,10 +142,10 @@ int RepositionBaseExecutor::run()
 						double objx = current_goal_->gas_can_in_map.pose.position.x;
 						double objy = current_goal_->gas_can_in_map.pose.position.y;
 						double objz = current_goal_->gas_can_in_map.pose.position.z;
-// 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
 						double objP0 = 0.0;
 						double objR0 = 0.0;
 						
+// 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
 						Eigen::Matrix3f Robj, Robjoff, RobjY;
 						double a = current_goal_->gas_can_in_map.pose.orientation.w;
 						double b = current_goal_->gas_can_in_map.pose.orientation.x;
@@ -201,19 +158,7 @@ int RepositionBaseExecutor::run()
 								   0.0, cos(M_PI/2.0), -sin(M_PI/2.0),
 								   0.0, sin(M_PI/2.0), cos(M_PI/2.0);
 						RobjY = Robj * Robjoff.transpose();
-// 						double objY = atan2(RobjY[1][0],RobjY[0][0]);
-// 						std::cerr << "RobjY:\n" << std::endl;
-// 						std::cerr << "\t" << RobjY[0][0] << RobjY[0][1] << RobjY[0][2] << std::endl;
-// 						std::cerr << "\t" << RobjY[1][0] << RobjY[1][1] << RobjY[1][2] << std::endl;
-// 						std::cerr << "\t" << RobjY[2][0] << RobjY[2][1] << RobjY[2][2] << std::endl;
-// 						std::cerr << "objY:\n" << objY << std::endl;
 						double objY = atan2(RobjY(1,0),RobjY(0,0));
-// 						std::cerr << "RobjY:\n" << std::endl;
-						std::cerr << "RobjY:\n" << RobjY << std::endl;
-// 						std::cerr << "\t" << RobjY[0][0] << RobjY[0][1] << RobjY[0][2] << std::endl;
-// 						std::cerr << "\t" << RobjY[1][0] << RobjY[1][1] << RobjY[1][2] << std::endl;
-// 						std::cerr << "\t" << RobjY[2][0] << RobjY[2][1] << RobjY[2][2] << std::endl;
-						std::cerr << "objY:\n" << objY*180/M_PI << std::endl;
 
 						// initial robot pose
 						double robx0 = current_goal_->base_link_in_map.pose.position.x;
@@ -273,20 +218,22 @@ int RepositionBaseExecutor::run()
 void RepositionBaseExecutor::goal_callback()
 {
 
-if (bComputedRobPose_)
-{
+// if (bComputedRobPose_)
+// {
 
 	ROS_INFO("Received a new goal");
 	current_goal_ = as_->acceptNewGoal();
-	ROS_INFO("    Goal ID: %u", current_goal_->id);
-	ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
-	ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
-	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
-	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
+// 	ROS_INFO("    Goal ID: %u", current_goal_->id);
+// 	ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
+// 	ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
+// 	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
+// 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
+// 	ROS_INFO("Received a new goal [ID: %u]",current_goal_->id);
+// 	current_goal_ = as_->acceptNewGoal();
 
 	bComputedRobPose_ = false;
 
-}
+// }
 
 }
 
@@ -807,7 +754,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						pTot[i][j][k] *= std::max( std::pow(1 - (scaleDiffYglob * fabs(diffYglob)/M_PI), 2.0), pTotThr);	// quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
 						cntTotMax++;
 					}
-		ROS_INFO("    cntTotMax: %d",cntTotMax);
+		ROS_INFO("Reposition Base Command Result:");
+// 		ROS_INFO("    cntTotMax: %d",cntTotMax);
+// 		ROS_INFO("    Number of valid candidates: %d",cntTotMax);
 
 		if (cntTotMax==0)
 		{
@@ -833,7 +782,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			candidate_base_pose.pose.orientation.w = robqf[3];
 			candidate_base_poses.push_back(candidate_base_pose);
 
-			ROS_ERROR("    No candidate pose was found!");
+			ROS_ERROR("    No valid candidate poses for grasping!");
 			return false;
 		}
 
@@ -858,11 +807,11 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 
 		// 6-2) generate final desired robot poses with maximum pTot
-		ROS_INFO("Reposition Base Command Result:");
+// 		ROS_INFO("Reposition Base Command Result:");
 		ROS_INFO("    Object Pose (initial): %f %f %f",objx,objy,wrapAngle(objY)*180/M_PI);
 		ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0,roby0,wrapAngle(robY0)*180/M_PI);
 
-		double cntTotThr = 0;	// number of candidate poses with pTot higher than threshold
+		int cntTotThr = 0;	// number of candidate poses with pTot higher than threshold
 		for (std::vector<RepositionBaseCandidate::candidate>::iterator m=cands.begin(); m!=cands.end(); ++m)
 			if (m->pTot >= pTotThr)
 			{
@@ -900,7 +849,13 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				cntTotThr++;
 			}
 		if (cntTotThr==0)
-			ROS_ERROR("    No candidates with probability higher than threshold!");
+			ROS_ERROR("    No probable candidate poses higher than a threshold!");
+		else
+		{
+			ROS_INFO("    Number of valid candidates: %d",cntTotMax);
+			ROS_INFO("    Number of probable candidates: %d",cntTotThr);
+		}
+
 	}
 
 	return true;
