@@ -64,7 +64,8 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
 nh_(),
 action_name_("reposition_base_command"),
 as_(),
-bComputedRobPose_(false),
+// bComputedRobPose_(false),
+bComputedRobPose_(true),
 current_goal_(),
 status_(RepositionBaseExecutionStatus::INVALID),
 last_status_(RepositionBaseExecutionStatus::INVALID)
@@ -148,7 +149,8 @@ int RepositionBaseExecutor::run()
 
 	status_ = RepositionBaseExecutionStatus::IDLE;
 
-	ros::Rate loop_rate(1);
+// 	ros::Rate loop_rate(1);
+	ros::Rate loop_rate(3);
 	while (ros::ok()) {
 		RunUponDestruction rod([&](){ loop_rate.sleep(); });
 // 		ROS_INFO("Spinning (%s)...", to_string(status_).c_str());
@@ -183,9 +185,35 @@ int RepositionBaseExecutor::run()
 						double objx = current_goal_->gas_can_in_map.pose.position.x;
 						double objy = current_goal_->gas_can_in_map.pose.position.y;
 						double objz = current_goal_->gas_can_in_map.pose.position.z;
-						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
+// 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
 						double objP0 = 0.0;
 						double objR0 = 0.0;
+						
+						Eigen::Matrix3f Robj, Robjoff, RobjY;
+						double a = current_goal_->gas_can_in_map.pose.orientation.w;
+						double b = current_goal_->gas_can_in_map.pose.orientation.x;
+						double c = current_goal_->gas_can_in_map.pose.orientation.y;
+						double d = current_goal_->gas_can_in_map.pose.orientation.z;
+						Robj << a*a+b*b-c*c-d*d, 2*b*c-2*a*d, 2*b*d+2*a*c,
+								2*b*c+2*a*d, a*a-b*b+c*c-d*d, 2*c*d-2*a*b,
+								2*b*d-2*a*c, 2*c*d+2*a*b, a*a-b*b-c*c+d*d;
+						Robjoff << 1.0, 0.0, 0.0,
+								   0.0, cos(M_PI/2.0), -sin(M_PI/2.0),
+								   0.0, sin(M_PI/2.0), cos(M_PI/2.0);
+						RobjY = Robj * Robjoff.transpose();
+// 						double objY = atan2(RobjY[1][0],RobjY[0][0]);
+// 						std::cerr << "RobjY:\n" << std::endl;
+// 						std::cerr << "\t" << RobjY[0][0] << RobjY[0][1] << RobjY[0][2] << std::endl;
+// 						std::cerr << "\t" << RobjY[1][0] << RobjY[1][1] << RobjY[1][2] << std::endl;
+// 						std::cerr << "\t" << RobjY[2][0] << RobjY[2][1] << RobjY[2][2] << std::endl;
+// 						std::cerr << "objY:\n" << objY << std::endl;
+						double objY = atan2(RobjY(1,0),RobjY(0,0));
+// 						std::cerr << "RobjY:\n" << std::endl;
+						std::cerr << "RobjY:\n" << RobjY << std::endl;
+// 						std::cerr << "\t" << RobjY[0][0] << RobjY[0][1] << RobjY[0][2] << std::endl;
+// 						std::cerr << "\t" << RobjY[1][0] << RobjY[1][1] << RobjY[1][2] << std::endl;
+// 						std::cerr << "\t" << RobjY[2][0] << RobjY[2][1] << RobjY[2][2] << std::endl;
+						std::cerr << "objY:\n" << objY*180/M_PI << std::endl;
 
 						// initial robot pose
 						double robx0 = current_goal_->base_link_in_map.pose.position.x;
@@ -200,8 +228,6 @@ int RepositionBaseExecutor::run()
 
 						std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
 						bool ret = computeRobPose(objx,objy,objY, robx0,roby0,robY0, candidate_base_poses);
-
-						bComputedRobPose_ = true;
 
 // //					hdt_msgs::RepositionBaseCommandFeedback feedback;
 // // 					feedback.status = execution_status_to_feedback_status(status_?);
@@ -224,6 +250,8 @@ int RepositionBaseExecutor::run()
 							as_->setSucceeded(result);
 							status_ = RepositionBaseExecutionStatus::IDLE;
 						}
+
+						bComputedRobPose_ = true;
 					}
 				}   break;
 			case RepositionBaseExecutionStatus::COMPLETING_GOAL:
@@ -244,6 +272,10 @@ int RepositionBaseExecutor::run()
 
 void RepositionBaseExecutor::goal_callback()
 {
+
+if (bComputedRobPose_)
+{
+
 	ROS_INFO("Received a new goal");
 	current_goal_ = as_->acceptNewGoal();
 	ROS_INFO("    Goal ID: %u", current_goal_->id);
@@ -253,6 +285,9 @@ void RepositionBaseExecutor::goal_callback()
 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
 
 	bComputedRobPose_ = false;
+
+}
+
 }
 
 void RepositionBaseExecutor::preempt_callback()
@@ -318,7 +353,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	bool bCheckWork = false;
 
 	// 5) flag for candidate sorting
-	int bSortMetric = 3;		// 1: angle, 2: angle, position, 3: pTot threshold
+	int bSortMetric = 3;		// 1: angle, 2: angle, position, 3: pTot threshold (default)
 
 
 	// 0) search space
@@ -827,6 +862,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 		ROS_INFO("    Object Pose (initial): %f %f %f",objx,objy,wrapAngle(objY)*180/M_PI);
 		ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0,roby0,wrapAngle(robY0)*180/M_PI);
 
+		double cntTotThr = 0;	// number of candidate poses with pTot higher than threshold
 		for (std::vector<RepositionBaseCandidate::candidate>::iterator m=cands.begin(); m!=cands.end(); ++m)
 			if (m->pTot >= pTotThr)
 			{
@@ -860,7 +896,11 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				candidate_base_pose.pose.orientation.z = robqf[2];
 				candidate_base_pose.pose.orientation.w = robqf[3];
 				candidate_base_poses.push_back(candidate_base_pose);
+
+				cntTotThr++;
 			}
+		if (cntTotThr==0)
+			ROS_ERROR("    No candidates with probability higher than threshold!");
 	}
 
 	return true;
