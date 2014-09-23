@@ -26,8 +26,8 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
 nh_(),
 action_name_("reposition_base_command"),
 as_(),
-bComputedRobPose_(false),
-// bComputedRobPose_(true),
+// bComputedRobPose_(false),
+bComputedRobPose_(true),
 current_goal_(),
 status_(RepositionBaseExecutionStatus::INVALID),
 last_status_(RepositionBaseExecutionStatus::INVALID)
@@ -218,22 +218,20 @@ int RepositionBaseExecutor::run()
 void RepositionBaseExecutor::goal_callback()
 {
 
-// if (bComputedRobPose_)
-// {
+if (bComputedRobPose_)
+{
 
-	ROS_INFO("Received a new goal");
 	current_goal_ = as_->acceptNewGoal();
+// 	ROS_INFO("Received a new goal");
+	ROS_INFO("Received a new goal [#%u]",current_goal_->id);
 // 	ROS_INFO("    Goal ID: %u", current_goal_->id);
 // 	ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
 // 	ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
 // 	ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
 // 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
-// 	ROS_INFO("Received a new goal [ID: %u]",current_goal_->id);
-// 	current_goal_ = as_->acceptNewGoal();
 
 	bComputedRobPose_ = false;
-
-// }
+}
 
 }
 
@@ -254,7 +252,7 @@ uint8_t RepositionBaseExecutor::execution_status_to_feedback_status(RepositionBa
 }
 
 
-////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////1qa
 
 
 double RepositionBaseExecutor::sign(double val)
@@ -315,9 +313,13 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
 	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1))
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
+	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
 	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
-	double scalepGrasp = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+// 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+// 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
+	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+	double scalepGraspDist = 0.05;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
 
 	// 2) arm position offset for computing pObs
 // 	double armOffsety = -0.0;
@@ -332,7 +334,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double pTotThr = 0.8;		// pTot threshold for bSortMetric==3
 
 	// 6) /base_link offset from /top_shelf for final robot pose return
-	double baseOffsetx = -0.3;
+// 	double baseOffsetx = -0.3;
+	double baseOffsetx = -0.5;
 
 
 
@@ -389,19 +392,22 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 120.0/180.0*M_PI;
-				bestAngYaw   = 60.0/180.0*M_PI;
+// 				bestAngYaw   = 60.0/180.0*M_PI;
+				bestAngYaw   = 80.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 90.0/180.0*M_PI;
-				bestAngYaw   = 45.0/180.0*M_PI;
+// 				bestAngYaw   = 45.0/180.0*M_PI;
+				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 30.0/180.0*M_PI;
-				bestAngYaw   = 15.0/180.0*M_PI;
+// 				bestAngYaw   = 15.0/180.0*M_PI;
+				bestAngYaw   = 20.0/180.0*M_PI;
 			}
 
 			for (int j=0; j<nAng; j++)
@@ -416,13 +422,17 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						// b) object handle orientation to the right of the robot
 						double diffY = wrapAngle( objY-robY[i][j][k] );
 						double diffYMax = std::max( fabs(secAngYaw[0]-bestAngYaw), fabs(secAngYaw[1]-bestAngYaw) );
+						double diffDistMax = std::max( fabs(distMin-bestDist), fabs(distMin+distStep*(nDist-1)-bestDist) );
 						if ( diffY >= secAngYaw[0] && diffY <= secAngYaw[1] )
 						{
 							bTotMax[i][j][k] = true;	// using bTotMax instead of pGrasp to explicitly represent candidate validity (before expensive IK test)
 
 							// higher probability around diffY==bestAngYaw
 // 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+// 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+							
+							// higher probability around diffY==bestAngYaw and diffDist==bestDist
+							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 						}
 					}
 				}
@@ -827,7 +837,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				// /base_link pose
 				robxf += cos(robYf)*baseOffsetx;
 				robyf += sin(robYf)*baseOffsetx;
-				ROS_INFO("    Robot Pose (desired):  %f %f %f", robxf,robyf,wrapAngle(robYf)*180/M_PI);
+// 				ROS_INFO("    Robot Pose (desired):  %f %f %f", robxf,robyf,wrapAngle(robYf)*180/M_PI);
+				ROS_INFO("    Robot Pose (desired):  %f %f %f  (i:%d j:%d k:%d)    pTot: %f", robxf,robyf,wrapAngle(robYf)*180/M_PI, i,j,k, m->pTot);
 
 
 				geometry_msgs::PoseStamped candidate_base_pose;
