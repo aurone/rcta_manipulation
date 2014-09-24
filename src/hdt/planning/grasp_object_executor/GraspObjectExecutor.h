@@ -124,7 +124,8 @@ private:
 
     std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
 
-    const double gas_can_scale_;
+    std::string gas_can_mesh_path_;
+    double gas_can_scale_;
 
     Eigen::Affine3d wrist_to_tool_;
     double pregrasp_to_grasp_offset_m_;

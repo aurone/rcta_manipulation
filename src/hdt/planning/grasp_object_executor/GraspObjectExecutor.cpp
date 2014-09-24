@@ -95,7 +95,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     status_(GraspObjectExecutionStatus::INVALID),
     last_status_(GraspObjectExecutionStatus::INVALID),
     grasp_spline_(),
-    gas_can_scale_(0.12905),
+    gas_can_scale_(),
     wrist_to_tool_(),
     pregrasp_to_grasp_offset_m_(0.0),
     listener_()
@@ -113,6 +113,13 @@ bool GraspObjectExecutor::initialize()
     robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
     if (!robot_model_) {
         ROS_ERROR("Failed to load Robot Model from the URDF");
+        return false;
+    }
+
+    if (!msg_utils::download_param(ph_, "gas_canister_mesh", gas_can_mesh_path_) ||
+        !msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_))
+    {
+        ROS_ERROR("Failed to download gas canister parameters");
         return false;
     }
 

@@ -1,3 +1,4 @@
+gas_canister_mesh: "resource/meshes/gastank/clean_small_gastank.obj"
 gas_canister_mesh_scale: 0.12905
 
 degree: 3

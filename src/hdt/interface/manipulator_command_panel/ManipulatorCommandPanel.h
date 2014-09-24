@@ -9,7 +9,6 @@
 #include <thread>
 #include <vector>
 #include <QtGui>
-#include <rospack/rospack.h>
 #include <actionlib/client/simple_action_client.h>
 #include <hdt_description/RobotModel.h>
 #include <interactive_markers/interactive_marker_server.h>

@@ -96,6 +96,7 @@ private:
     int num_disc_yaw_;
     /// @}
 
+    std::string gas_can_mesh_path_;
     double gas_can_scale_;
 
     ros::Publisher goal_object_pose_marker_pub_;

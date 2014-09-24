@@ -1,8 +1,17 @@
 # describe convenience frame from the object frame to the footprint of the object
+# Object Frame to Object Footprint Frame for gas canister v1
+#object_footprint_x_m: 0.0
+#object_footprint_y_m: -0.10
+#object_footprint_z_m: 0.0
+#object_footprint_roll_deg: -90.0
+#object_footprint_pitch_deg: 0.0
+#object_footprint_yaw_deg: 0.0
+
+# Object Frame to Object Footprint Frame for gas canister v2
 object_footprint_x_m: 0.0
-object_footprint_y_m: -0.10 #0.172
-object_footprint_z_m: 0.0
-object_footprint_roll_deg: -90.0
+object_footprint_y_m: 0.0
+object_footprint_z_m: -0.15
+object_footprint_roll_deg: 0.0
 object_footprint_pitch_deg: 0.0
 object_footprint_yaw_deg: 0.0
 

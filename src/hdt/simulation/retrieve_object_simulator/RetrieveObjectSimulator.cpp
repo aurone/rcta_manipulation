@@ -18,7 +18,7 @@ RetrieveObjectSimulator::RetrieveObjectSimulator() :
     num_disc_x_(0),
     num_disc_y_(0),
     num_disc_yaw_(0),
-    gas_can_scale_(0.12905),
+    gas_can_scale_(0),
     goal_object_pose_marker_pub_(),
     occupancy_grid_sub_(),
     reposition_base_command_client_(),
@@ -55,6 +55,13 @@ bool RetrieveObjectSimulator::initialize()
     robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
     if (!robot_model_) {
         ROS_ERROR("Failed to load Robot Model from the URDF");
+        return false;
+    }
+
+    if (!msg_utils::download_param(ph_, "gas_canister_mesh", gas_can_mesh_path_) ||
+        !msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_))
+    {
+        ROS_ERROR("Failed to download gas canister parameters");
         return false;
     }
 
@@ -649,7 +656,7 @@ void RetrieveObjectSimulator::publish_gas_canister_marker(const geometry_msgs::P
     object_marker.color = std_msgs::CreateColorRGBA(0.2f, 1.0f, 0.2f, 0.9f);
     object_marker.lifetime = ros::Duration(0);
     object_marker.frame_locked = false;
-    object_marker.mesh_resource = "package://hdt/resource/meshes/gastank/clean_small_gastank.obj";
+    object_marker.mesh_resource = "package://hdt/" + gas_can_mesh_path_;
     object_marker.mesh_use_embedded_materials = false;
     goal_object_pose_marker_pub_.publish(object_marker);
 }

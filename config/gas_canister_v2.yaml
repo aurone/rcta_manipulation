@@ -1,3 +1,4 @@
+gas_canister_mesh: "resource/meshes/gastank/rcta_gastank.ply"
 gas_canister_mesh_scale: 1.0
 
 degree: 3

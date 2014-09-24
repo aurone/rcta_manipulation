@@ -1309,12 +1309,6 @@ bool ManipulatorCommandPanel::reinit_manipulator_interactive_marker()
 bool ManipulatorCommandPanel::reinit_object_interactive_marker()
 {
     ROS_INFO("Inserting marker 'gas_canister_fixture'");
-    rospack::Rospack rpack;
-    std::vector<std::string> search_path;
-    rpack.getSearchPathFromEnv(search_path);
-    rpack.crawl(search_path, false);
-    std::string hdt_package_path = "";
-    rpack.find("hdt", hdt_package_path);
 
     // initializer an interactive marker for the gas canister object
     visualization_msgs::InteractiveMarker gas_canister_interactive_marker;
@@ -1344,6 +1338,8 @@ bool ManipulatorCommandPanel::reinit_object_interactive_marker()
     gas_can_mesh_control.interaction_mode = visualization_msgs::InteractiveMarkerControl::NONE;
     gas_can_mesh_control.always_visible = true;
 
+    // TODO: somehow grab the gas canister mesh and scale from the parameter server (does this mean those parameters have to be global?)
+
     visualization_msgs::Marker mesh_marker;
     mesh_marker.header.seq = 0;
     mesh_marker.header.stamp = ros::Time(0);
@@ -1353,7 +1349,7 @@ bool ManipulatorCommandPanel::reinit_object_interactive_marker()
     mesh_marker.type = visualization_msgs::Marker::MESH_RESOURCE;
     mesh_marker.action = visualization_msgs::Marker::ADD;
     mesh_marker.pose = geometry_msgs::IdentityPose();
-    const double gas_can_mesh_scale = 0.12905;
+    const double gas_can_mesh_scale = 1.0; //0.12905;
     mesh_marker.scale = geometry_msgs::CreateVector3(gas_can_mesh_scale, gas_can_mesh_scale, gas_can_mesh_scale);
     mesh_marker.color = std_msgs::WhiteColorRGBA(0.5f);
     mesh_marker.lifetime = ros::Duration(0);
@@ -1361,7 +1357,7 @@ bool ManipulatorCommandPanel::reinit_object_interactive_marker()
     mesh_marker.points.clear();
     mesh_marker.colors.clear();
     mesh_marker.text = "";
-    mesh_marker.mesh_resource = "file://" + hdt_package_path + "/resource/meshes/gastank/clean_small_gastank.obj";
+    mesh_marker.mesh_resource = "package://hdt/resource/meshes/gastank/rcta_gastank.ply";
     mesh_marker.mesh_use_embedded_materials = false;
     gas_can_mesh_control.markers.push_back(mesh_marker);
     gas_canister_interactive_marker.controls.push_back(gas_can_mesh_control);
