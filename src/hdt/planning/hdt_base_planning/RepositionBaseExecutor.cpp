@@ -302,8 +302,10 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 
 	// 0) search space
-	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
-	double distMin = 0.5, distStep = 0.1;
+// 	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
+// 	double distMin = 0.5, distStep = 0.1;
+	int nDist = 6;		// r in [0.6:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
+	double distMin = 0.6, distStep = 0.1;
 	int nAng = 12;		// th in [0:30:330]
 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
 	int nYaw = 9;		// Y in [-20:5:20]
@@ -313,7 +315,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
 	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1))
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
-	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
+	double bestDist = 0.80;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
 	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
@@ -334,8 +336,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double pTotThr = 0.8;		// pTot threshold for bSortMetric==3
 
 	// 6) /base_link offset from /top_shelf for final robot pose return
-// 	double baseOffsetx = -0.3;
-	double baseOffsetx = -0.5;
+	double baseOffsetx = -0.3;
+// 	double baseOffsetx = -0.5;
 
 
 
@@ -607,7 +609,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			candidate_base_pose.pose.orientation.w = robqf[3];
 			candidate_base_poses.push_back(candidate_base_pose);
 
-			ROS_ERROR("    No candidate pose was found!");
+			ROS_WARN("    No candidate pose was found!");
 			return false;
 		}
 		else if (cntTotMax > 1)	// if more than one candidate poses are selected
@@ -792,7 +794,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			candidate_base_pose.pose.orientation.w = robqf[3];
 			candidate_base_poses.push_back(candidate_base_pose);
 
-			ROS_ERROR("    No valid candidate poses for grasping!");
+			ROS_WARN("    No valid candidate poses for grasping!");
 			return false;
 		}
 
@@ -828,8 +830,50 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				int i = m->i;
 				int j = m->j;
 				int k = m->k;
+/*
+				tf::TransformListener listener;
+				tf::StampedTransform tool_frame_in_camera;
+				KDL::Frame tool_in_camera_kdl;
+				int counter = 0;
+				std::string objectname;
 
+				ROS_INFO("Enter the object name");
+				getline(cin,objectname);
+				ROS_INFO("The object you created is (%s)",objectname.c_str());
 
+				//grasp recording
+				geometry_msgs::PoseArray posearr;
+				posearr.header.frame_id="/r_gripper_tool_frame";
+				for (int i = 0; i < 3; ++i)
+				{
+					ROS_INFO("place the gripper in the grasping position. Press[G] when finished");
+					std::cin>>key;
+					cin.get();
+					while(!((key=='G')||(key=='g'))){
+						ROS_INFO("place the gripper in the grasping position. Press[G] when finished");
+						std::cin>>key;
+						cin.get();
+					}
+					//reading grasp position
+					ROS_INFO("reading grasp position");
+					geometry_msgs::Pose pose;
+					tf::StampedTransform l_wrist_in_r_wrist_frame;
+					listener.waitForTransform("/r_gripper_tool_frame",
+							"/l_wrist_roll_link",
+							ros::Time(0), ros::Duration(5.0));
+					listener.lookupTransform("/r_gripper_tool_frame",
+							"/l_wrist_roll_link",ros::Time(0),
+							l_wrist_in_r_wrist_frame);
+					pose.position.x = l_wrist_in_r_wrist_frame.getOrigin().x();
+					pose.position.y = l_wrist_in_r_wrist_frame.getOrigin().y();
+					pose.position.z = l_wrist_in_r_wrist_frame.getOrigin().z();
+					pose.orientation.x = l_wrist_in_r_wrist_frame.getRotation().x();
+					pose.orientation.y = l_wrist_in_r_wrist_frame.getRotation().y();
+					pose.orientation.z = l_wrist_in_r_wrist_frame.getRotation().z();
+					pose.orientation.w = l_wrist_in_r_wrist_frame.getRotation().w();
+					posearr.poses.push_back(pose);
+				}
+*/
 				// /top_shelf pose
 				robxf = robx[i][j][k];
 				robyf = roby[i][j][k];
@@ -858,9 +902,13 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				candidate_base_poses.push_back(candidate_base_pose);
 
 				cntTotThr++;
+
+
+				// for fast test only
+				break;
 			}
 		if (cntTotThr==0)
-			ROS_ERROR("    No probable candidate poses higher than a threshold!");
+			ROS_WARN("    No probable candidate poses higher than a threshold!");
 		else
 		{
 			ROS_INFO("    Number of valid candidates: %d",cntTotMax);
