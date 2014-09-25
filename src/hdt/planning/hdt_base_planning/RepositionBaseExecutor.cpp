@@ -145,20 +145,21 @@ int RepositionBaseExecutor::run()
 						double objP0 = 0.0;
 						double objR0 = 0.0;
 						
-// 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
-						Eigen::Matrix3f Robj, Robjoff, RobjY;
-						double a = current_goal_->gas_can_in_map.pose.orientation.w;
-						double b = current_goal_->gas_can_in_map.pose.orientation.x;
-						double c = current_goal_->gas_can_in_map.pose.orientation.y;
-						double d = current_goal_->gas_can_in_map.pose.orientation.z;
-						Robj << a*a+b*b-c*c-d*d, 2*b*c-2*a*d, 2*b*d+2*a*c,
-								2*b*c+2*a*d, a*a-b*b+c*c-d*d, 2*c*d-2*a*b,
-								2*b*d-2*a*c, 2*c*d+2*a*b, a*a-b*b-c*c+d*d;
-						Robjoff << 1.0, 0.0, 0.0,
-								   0.0, cos(M_PI/2.0), -sin(M_PI/2.0),
-								   0.0, sin(M_PI/2.0), cos(M_PI/2.0);
-						RobjY = Robj * Robjoff.transpose();
-						double objY = atan2(RobjY(1,0),RobjY(0,0));
+// 						Eigen::Matrix3f Robj, Robjoff, RobjY;
+// 						double a = current_goal_->gas_can_in_map.pose.orientation.w;
+// 						double b = current_goal_->gas_can_in_map.pose.orientation.x;
+// 						double c = current_goal_->gas_can_in_map.pose.orientation.y;
+// 						double d = current_goal_->gas_can_in_map.pose.orientation.z;
+// 						Robj << a*a+b*b-c*c-d*d, 2*b*c-2*a*d, 2*b*d+2*a*c,
+// 								2*b*c+2*a*d, a*a-b*b+c*c-d*d, 2*c*d-2*a*b,
+// 								2*b*d-2*a*c, 2*c*d+2*a*b, a*a-b*b-c*c+d*d;
+// 						Robjoff << 1.0, 0.0, 0.0,
+// 								   0.0, cos(M_PI/2.0), -sin(M_PI/2.0),
+// 								   0.0, sin(M_PI/2.0), cos(M_PI/2.0);
+// 						RobjY = Robj * Robjoff.transpose();
+// 						double objY = atan2(RobjY(1,0),RobjY(0,0));
+						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
+						objY = wrapAngle(objY-M_PI/2.0);	// for new mesh file of gas canister
 
 						// initial robot pose
 						double robx0 = current_goal_->base_link_in_map.pose.position.x;
@@ -308,10 +309,10 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double distMin = 0.6, distStep = 0.1;
 	int nAng = 12;		// th in [0:30:330]
 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
-// 	int nYaw = 9;		// Y in [-20:5:20]
-// 	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
-	int nYaw = 5;		// Y in [-20:5:20]
-	double yawMin = -10.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
+	int nYaw = 9;		// Y in [-20:5:20]
+	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
+// 	int nYaw = 5;		// Y in [-20:5:20]
+// 	double yawMin = -10.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
 
 	// 1) grasp achievable zone 	// TODO: tune these parameters
 	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
@@ -319,8 +320,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 	double bestDist = 0.80;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-// 	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
-	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+// 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
 	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
@@ -329,9 +330,16 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// 2) arm position offset for computing pObs
 // 	double armOffsety = -0.0;
 // 	double armOffsety = -0.5;
-	double armOffsety = -1.1;	// center of arm (when straightend)
-	double armLength = 1.5;		// workspace radius about the center of arm
+// 	double armOffsety = -1.1;	// center of arm (when straightend)
+// 	double armLength = 1.5;		// workspace radius about the center of arm
+// 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
+	double armOffsetx = 0.3;	// center of arm (for normal grasping motion)
+	double armOffsety = -0.6;	// center of arm (for normal grasping motion)
+	double armLength = 1.0;		// workspace radius about the center of arm
 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
+	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
+	double bodyLength = 1.0;	// support polygon radius about the center of body
+	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
 	int mapObsThr = 1;			// threshold for classifying clear and occupied regions
 
 	// 5) candidate selection criterion
@@ -340,8 +348,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	// 6) /base_link offset from /top_shelf for final robot pose return
 // 	double baseOffsetx = -0.0;
-	double baseOffsetx = -0.3;
+// 	double baseOffsetx = -0.3;
 // 	double baseOffsetx = -0.5;
+	double baseOffsetx = -0.49+0.148975;	// /base_link to /base_link_front_bumper_part to /top_shelf
 
 
 
@@ -399,7 +408,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				secAngYaw[0] = 0.0/180.0*M_PI;
 				secAngYaw[1] = 120.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
-				bestAngYaw   = 80.0/180.0*M_PI;
+				bestAngYaw   = 65.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
@@ -411,9 +420,10 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			else // if (i >= secDist[1])
 			{
 				secAngYaw[0] = 0.0/180.0*M_PI;
-				secAngYaw[1] = 30.0/180.0*M_PI;
+// 				secAngYaw[1] = 30.0/180.0*M_PI;
+				secAngYaw[1] = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
-				bestAngYaw   = 20.0/180.0*M_PI;
+				bestAngYaw   = 50.0/180.0*M_PI;
 			}
 
 			for (int j=0; j<nAng; j++)
@@ -485,8 +495,10 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 					for (int k=0; k<nYaw; k++)
 						if (bTotMax[i][j][k]==true)
 						{
-							armx = robx[i][j][k] - sin(robY[i][j][k])*armOffsety;
-							army = roby[i][j][k] + cos(robY[i][j][k])*armOffsety;
+// 							armx = robx[i][j][k] - sin(robY[i][j][k])*armOffsety;
+// 							army = roby[i][j][k] + cos(robY[i][j][k])*armOffsety;
+							armx = robx[i][j][k] + cos(robY[i][j][k])*armOffsetx - sin(robY[i][j][k])*armOffsety;
+							army = roby[i][j][k] + sin(robY[i][j][k])*armOffsetx + cos(robY[i][j][k])*armOffsety;
 
 							armi = (int)((armx-origin.position.x)/resolution);
 							armj = (int)((army-origin.position.y)/resolution);
@@ -515,6 +527,46 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 								ROS_ERROR("    Patch for obstacle check is out of the map");
 							}
 						}
+
+			patchSize2 = (int)(bodyLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
+			double bodyx, bodyy, bodyY;		// body center position biased from /top_shelf by bodyOffsetx
+			int bodyi, bodyj;				// index for patch center
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k]==true)
+						{
+							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx;
+							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx;
+
+							bodyi = (int)((bodyx-origin.position.x)/resolution);
+							bodyj = (int)((bodyy-origin.position.y)/resolution);
+
+							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+							{
+								bool bCollided = false;
+								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
+										{
+											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+											if (distObs < bodyLengthCore)
+											{
+												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+												bCollided = true;
+											}
+											else if (distObs < bodyLength)
+												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+										}
+							}
+							else
+							{
+// 								bTotMax[i][j][k] = false;
+// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+							}
+						}
+
 
 // 			bMapReceived_ = 0;
 // 			bRobPoseReceived_ = 0;
@@ -909,7 +961,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 
 				// for fast test only
-// 				break;
+				break;
 			}
 		if (cntTotThr==0)
 		{
