@@ -304,12 +304,14 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	// 0) search space
 // 	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
 // 	double distMin = 0.5, distStep = 0.1;
-	int nDist = 6;		// r in [0.6:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
+	int nDist = 4;		// r in [0.6:0.1:0.9] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
 	double distMin = 0.6, distStep = 0.1;
 	int nAng = 12;		// th in [0:30:330]
 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
-	int nYaw = 9;		// Y in [-20:5:20]
-	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
+// 	int nYaw = 9;		// Y in [-20:5:20]
+// 	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
+	int nYaw = 5;		// Y in [-20:5:20]
+	double yawMin = -10.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
 
 	// 1) grasp achievable zone 	// TODO: tune these parameters
 	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
@@ -317,7 +319,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 	double bestDist = 0.80;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+// 	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
 	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
@@ -336,6 +339,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double pTotThr = 0.8;		// pTot threshold for bSortMetric==3
 
 	// 6) /base_link offset from /top_shelf for final robot pose return
+// 	double baseOffsetx = -0.0;
 	double baseOffsetx = -0.3;
 // 	double baseOffsetx = -0.5;
 
@@ -905,10 +909,33 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 
 				// for fast test only
-				break;
+// 				break;
 			}
 		if (cntTotThr==0)
+		{
+			robxf = robx0;
+			robyf = roby0;
+			robYf = robY0;
+
+			geometry_msgs::PoseStamped candidate_base_pose;
+			candidate_base_pose.header.frame_id = "/abs_nwu";
+			candidate_base_pose.header.seq = 0;
+			candidate_base_pose.header.stamp = ros::Time::now();
+
+			candidate_base_pose.pose.position.x = robxf;
+			candidate_base_pose.pose.position.y = robyf;
+			candidate_base_pose.pose.position.z = robzf;
+
+			tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+			candidate_base_pose.pose.orientation.x = robqf[0];
+			candidate_base_pose.pose.orientation.y = robqf[1];
+			candidate_base_pose.pose.orientation.z = robqf[2];
+			candidate_base_pose.pose.orientation.w = robqf[3];
+			candidate_base_poses.push_back(candidate_base_pose);
+
 			ROS_WARN("    No probable candidate poses higher than a threshold!");
+			return false;
+		}
 		else
 		{
 			ROS_INFO("    Number of valid candidates: %d",cntTotMax);

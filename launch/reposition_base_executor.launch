@@ -1,3 +1,3 @@
 <launch>
-    <node name="reposition_base_command" pkg="hdt" type="hdt_base_planning_node" />
+    <node name="reposition_base_command" pkg="hdt" type="hdt_base_planning_node" output="screen"/>
 </launch>
