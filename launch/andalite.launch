@@ -1,6 +1,7 @@
 <launch>
     <arg name="sim" default="false"/>
     <arg name="kinect_sensor" default="false"/> <!-- false = asus, true = kinect -->
+    <arg name="standalone" default="false"/>
 
     <!-- UPLOAD URDF -->
     <include file="$(find hdt)/launch/urdf/upload_andalite.launch">
@@ -9,10 +10,12 @@
     </include>
 
     <!-- LAUNCH OPENNI IN LIVE MODE -->
-    <group unless="$(arg sim)">
-        <include file="$(find hdt)/launch/perception/openni.launch">
-            <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
-        </include>
+    <group if="$(arg standalone)">
+        <group unless="$(arg sim)">
+            <include file="$(find hdt)/launch/perception/openni.launch">
+                <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
+            </include>
+        </group>
     </group>
 
     <!-- LAUNCH ARM DRIVER UNDER SIM, LAUNCH SEPARATELY AS ROOT IN LIVE MODE -->
@@ -41,7 +44,9 @@
     </group>
 
     <!-- Global Frame Functionality -->
-    <include file="$(find hdt)/launch/localization_simulator.launch"/>
+    <group if="$(arg standalone)">
+        <include file="$(find hdt)/launch/localization_simulator.launch"/>
+    </group>
     <!-- <node name="reposition_base_simulator" pkg="hdt" type="reposition_base_simulator"/> -->
     <!-- <node name="reposition_base_executor" pkg="hdt" type="hdt_base_planning_node"/> -->
 
