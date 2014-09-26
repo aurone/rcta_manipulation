@@ -194,11 +194,17 @@ private:
 
     bool valid_global_frame(const std::string& frame) const;
 
-    // @ brief Return the global transform of the robot. If operating in local
-    // frame mode, this will be identity; otherwise this will be the transform
-    // from the global frame to the robot
+    /// @{
+    ///
+    ///    Marker frame transform accessors. The marker frame is the frame that
+    ///    the interactive markers are expressed in: either the local frame of
+    ///    the robot or a specific global frame (an ancestor of the robot local frame)
+    ///
+    /// @ brief Return the transform of the robot in the marker frame
     const Eigen::Affine3d robot_transform() const;
+    /// @brief Return the transform of the object in the marker frame
     const Eigen::Affine3d object_transform() const;
+    ///@}
 
     bool reinit(const std::string& robot_description, std::string& why);
     bool reinit_robot_models(const std::string& robot_description, std::string& why);

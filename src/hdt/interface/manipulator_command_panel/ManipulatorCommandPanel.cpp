@@ -530,6 +530,10 @@ void ManipulatorCommandPanel::send_grasp_object_command()
     grasp_object_goal.gas_can_in_base_link.header.frame_id = rm_->getModelFrame();
     tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
 
+    ROS_INFO("Robot -> Marker: %s", to_string(robot_transform().inverse()).c_str());
+    ROS_INFO("Marker -> Object: %s", to_string(object_transform()).c_str());
+    ROS_INFO("Robot -> Object: %s", to_string(robot_to_object).c_str());
+
     grasp_object_goal.gas_can_in_map.header.frame_id = interactive_marker_frame();
     tf::poseEigenToMsg(object_transform(), grasp_object_goal.gas_can_in_map.pose);
 
