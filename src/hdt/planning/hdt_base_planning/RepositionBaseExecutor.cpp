@@ -505,6 +505,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 							if (armi>=patchSize2 && armi<width-patchSize2 && armj>=patchSize2 && armj<height-patchSize2)
 							{
+								double pObsijk = 1.0;
 								bool bCollided = false;
 								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
 									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
@@ -518,8 +519,11 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 												bCollided = true;
 											}
 											else if (distObs < armLength)
-												pObs[i][j][k] = std::min( pObs[i][j][k], std::pow( (distObs-armLengthCore)/(armLength-armLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+// 												pObs[i][j][k] = std::min( pObs[i][j][k], std::pow( (distObs-armLengthCore)/(armLength-armLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+												pObsijk = std::min( pObsijk, std::pow( (distObs-armLengthCore)/(armLength-armLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
 										}
+								if (!bCollided)
+									pObs[i][j][k] *= pObsijk;
 							}
 							else
 							{
@@ -544,6 +548,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
 							{
+								double pObsijk = 1.0;
 								bool bCollided = false;
 								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
 									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
@@ -557,8 +562,11 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 												bCollided = true;
 											}
 											else if (distObs < bodyLength)
-												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+// 												pObs[i][j][k] = std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+												pObsijk = std::min( pObsijk, std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
 										}
+								if (!bCollided)
+									pObs[i][j][k] *= pObsijk;
 							}
 							else
 							{
@@ -959,9 +967,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 				cntTotThr++;
 
-
 				// for fast test only
-				break;
+// 				break;
 			}
 		if (cntTotThr==0)
 		{
