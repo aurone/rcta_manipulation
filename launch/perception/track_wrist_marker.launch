@@ -1,9 +1,9 @@
 <launch>
     <include file="$(find hdt)/launch/perception/track_marker_in_gripper.launch">
         <arg name="marker_size" value="4.518"/>
-        <arg name="cam_info_topic" value="/asus/depth/camera_info"/>
-        <arg name="cam_image_topic" value="/asus/depth/points_xyzrgb"/>
-        <arg name="output_frame" value="/asus_rgb_frame"/>
+        <arg name="cam_info_topic" value="/camera/depth/camera_info"/>
+        <arg name="cam_image_topic" value="/camera/depth/points_xyzrgb"/>
+        <arg name="output_frame" value="/camera_rgb_frame"/>
     </include>
 </launch>
 

@@ -462,7 +462,7 @@ void ManipulatorCommandPanel::send_viservo_command()
         return;
     }
 
-    const std::string camera_link_name = "asus_rgb_frame";
+    const std::string camera_link_name = "camera_rgb_frame";
     const std::string wrist_link_name = "arm_7_gripper_lift_link";
 
     if (/*!rs_->hasLinkState(camera_link_name) ||*/ !rs_->hasLinkState(wrist_link_name)) {

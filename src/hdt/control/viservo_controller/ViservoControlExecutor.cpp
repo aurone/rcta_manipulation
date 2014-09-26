@@ -55,7 +55,7 @@ ViservoControlExecutor::ViservoControlExecutor() :
     minimum_joint_velocities_rps_(),
     max_joint_velocities_rps_(7, sbpl::utils::ToRadians(20.0)),
     listener_(),
-    camera_frame_("asus_rgb_frame"),
+    camera_frame_("camera_rgb_frame"),
     wrist_frame_("arm_7_gripper_lift_link"),
     mount_frame_("arm_mount_panel_dummy"),
     attached_marker_(),

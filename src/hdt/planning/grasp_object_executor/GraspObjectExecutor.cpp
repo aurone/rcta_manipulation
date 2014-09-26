@@ -300,8 +300,10 @@ int GraspObjectExecutor::run()
                     Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
                     ROS_INFO("    Sample Spline Deriv [canister frame]: %s", to_string(sample_spline_deriv).c_str());
 
+                    Eigen::Affine3d mark_to_menglong(Eigen::Affine3d::Identity());
+                    // mark_to_menglong = Eigen::AngleAxisd(-M_PI/2.0, Eigen::Vector3d::UnitZ());
                     Eigen::Vector3d sample_spline_point_robot_frame =
-                            base_link_to_gas_canister * Eigen::Scaling(gas_can_scale_) * sample_spline_point;
+                            base_link_to_gas_canister * mark_to_menglong * Eigen::Scaling(gas_can_scale_) * sample_spline_point;
                     ROS_INFO("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
 
                     Eigen::Vector3d sample_spline_deriv_robot_frame =
@@ -401,6 +403,7 @@ int GraspObjectExecutor::run()
                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     std::stringstream ss;
                     ss << "Failed to lookup transform " << robot_frame << " -> " << kinematics_frame << "; Unable to determine grasp reachability";
+                    ROS_WARN("%s", ss.str().c_str());
                     as_->setAborted(result, ss.str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
@@ -617,7 +620,7 @@ int GraspObjectExecutor::run()
                 }
 
                 const std::string kinematics_frame = "arm_mount_panel_dummy";
-                const std::string camera_frame = "asus_rgb_frame";
+                const std::string camera_frame = "camera_rgb_frame";
 
                 tf::StampedTransform tf_transform;
                 try {
@@ -902,8 +905,8 @@ void GraspObjectExecutor::goal_callback()
     current_goal_ = as_->acceptNewGoal();
     ROS_INFO("    Goal ID: %u", current_goal_->id);
     ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
-    ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
-    ROS_INFO("    Gas Can Pose [base_link]: %s", to_string(current_goal_->gas_can_in_base_link.pose).c_str());
+    ROS_INFO("    Gas Can Pose [world frame: %s]: %s", current_goal_->gas_can_in_map.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_map.pose).c_str());
+    ROS_INFO("    Gas Can Pose [robot frame: %s]: %s", current_goal_->gas_can_in_base_link.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_base_link.pose).c_str());
     ROS_INFO("    Octomap ID: %s", current_goal_->octomap.id.c_str());
 
     generated_grasps_ = false;

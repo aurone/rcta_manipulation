@@ -59,7 +59,7 @@
                      ${-0.5 * shelf_width_m}"/>
     </xacro:tilt_mount>
 
-    <xacro:asus_xtion_pro_live name="asus" parent="tilt_mount_sensor_basket">
+    <xacro:asus_xtion_pro_live name="camera" parent="tilt_mount_sensor_basket">
         <origin xyz="${0.5 * basket_part_c_length_m}
                     ${-0.5 * basket_part_ab_width_m - basket_part_c_width_m - 0.5 * basket_sensor_gap}
                     0"
