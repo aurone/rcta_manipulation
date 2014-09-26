@@ -199,6 +199,10 @@ private:
     }
 
     uint8_t execution_status_to_feedback_status(GraspObjectExecutionStatus::Status status);
+
+    /// @brief Sample uniformly along the grasp spline to produce pregrasp poses for the wrist
+    std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
+    void visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps) const;
 };
 
 #endif
