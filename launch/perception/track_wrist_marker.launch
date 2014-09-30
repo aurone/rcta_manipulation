@@ -3,7 +3,7 @@
         <arg name="marker_size" value="4.518"/>
         <arg name="cam_info_topic" value="/camera/depth/camera_info"/>
         <arg name="cam_image_topic" value="/camera/depth/points_xyzrgb"/>
-        <arg name="output_frame" value="/camera_rgb_frame"/>
+        <arg name="output_frame" value="/camera_rgb_optical_frame"/>
     </include>
 </launch>
 
