@@ -627,7 +627,18 @@ void ViservoControlExecutor::joint_states_cb(const sensor_msgs::JointState::Cons
 void ViservoControlExecutor::ar_markers_cb(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
 {
     ROS_DEBUG("Received an AR marker message at %s", boost::posix_time::to_simple_string(msg->header.stamp.toBoost()).c_str());
-    last_ar_markers_msg_ = msg;
+    // scan the message to filter out ones that do not contain the markers we are tracking
+    bool found = false;
+    for (const auto& marker : msg->markers) {
+        if (marker.id == attached_marker_.marker_id) {
+            found = true;
+            break;
+        }
+    }
+
+    if (found) {
+        last_ar_markers_msg_ = msg;
+    }
 }
 
 bool ViservoControlExecutor::lost_marker()
