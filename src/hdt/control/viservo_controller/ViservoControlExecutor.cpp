@@ -416,7 +416,8 @@ int ViservoControlExecutor::run()
 
         double angular_velocity_rps = angle_error;
         if (fabs(angular_velocity_rps) > fabs(max_rotational_velocity_rps_)) {
-            angular_velocity_rps = clamp(angular_velocity_rps, -max_rotational_velocity_rps_, max_rotational_velocity_rps_);
+            angular_velocity_rps =
+                    clamp(angular_velocity_rps, -max_rotational_velocity_rps_, max_rotational_velocity_rps_);
         }
 
         double real_angular_velocity_rps = ee_rot_vel_camera_frame.norm();
@@ -486,10 +487,16 @@ int ViservoControlExecutor::run()
             msg_utils::vector_sum(traj_cmd.points[0].positions, diff, traj_cmd.points[0].positions);
         }
 
+        // clamp the target joint position to be within joint limits
+        for (size_t i = 0; i < robot_model_->joint_names().size(); ++i)
+            traj_cmd.points[0].positions[i] =
+                    clamp(traj_cmd.points[0].positions[i], robot_model_->min_limits()[i], robot_model_->max_limits()[i]);
+
         std::vector<double> delta_joints;
         std::vector<double> joint_velocities;
         msg_utils::vector_diff(chosen_solution, curr_joint_state_->position, delta_joints);
-        msg_utils::vector_mul(delta_joints, std::vector<double>(robot_model_->joint_names().size(), 1.0 / dt), joint_velocities);
+        msg_utils::vector_mul(
+                delta_joints, std::vector<double>(robot_model_->joint_names().size(), 1.0 / dt), joint_velocities);
         for (double& vel : joint_velocities) { // convert velocities to speeds
             vel = fabs(vel);
         }
