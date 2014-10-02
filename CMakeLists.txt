@@ -92,6 +92,7 @@ add_message_files(
     FILES
         ControllerDiagnosticStatus.msg 
         JointDiagnosticStatus.msg 
+        JointState.msg
         EmergencyStop.msg 
         ClearEmergencyStop.msg
         AcknowledgeReset.msg

@@ -1651,6 +1651,8 @@ void ManipulatorCommandPanel::update_gui()
         pending_teleport_andalite_command_ ||
         pending_teleport_hdt_command_;
 
+    pending_motion_command = false;
+
     global_frame_line_edit_->setEnabled(use_global_frame());
 
     copy_current_base_pose_button_->setEnabled(global_frame_active() && initialized());

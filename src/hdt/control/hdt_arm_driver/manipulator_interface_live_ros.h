@@ -33,6 +33,7 @@ private:
     ros::NodeHandle ph_;
     ros::Publisher follow_joint_traj_feedback_pub_;
     ros::Publisher joint_states_pub_;
+    ros::Publisher hdt_joint_states_pub_;
     ros::Publisher diagnostic_status_pub_;
     ros::Subscriber joint_traj_sub_;
     ros::Subscriber estop_sub_;
