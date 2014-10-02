@@ -206,12 +206,25 @@ bool ArmPlanningNode::init_collision_model()
     }
     distance_field_->reset();
 
+    ROS_INFO("Initializing Occupancy Grid");
     grid_.reset(new sbpl_arm_planner::OccupancyGrid(distance_field_.get()));
     if (!grid_) {
         ROS_ERROR("Failed to instantiate Occupancy Grid");
         return false;
     }
     grid_->setReferenceFrame(planning_frame_);
+    ROS_INFO("OccupancyGrid:");
+    int num_cells_x, num_cells_y, num_cells_z;
+    grid_->getGridSize(num_cells_x, num_cells_y, num_cells_z);
+    ROS_INFO("  Dimensions (cells): %d x %d x %d", num_cells_x, num_cells_y, num_cells_z);
+    double grid_size_x, grid_size_y, grid_size_z;
+    grid_->getWorldSize(grid_size_x, grid_size_y, grid_size_z);
+    ROS_INFO("  Dimensions (world): %0.3f x %0.3f x %0.3f", grid_size_x, grid_size_y, grid_size_z);
+    double grid_origin_x, grid_origin_y, grid_origin_z;
+    grid_->getOrigin(grid_origin_x, grid_origin_y, grid_origin_z);
+    ROS_INFO("  Origin (world): < %0.3f, %0.3f, %0.3f >", grid_origin_x, grid_origin_y, grid_origin_z);
+    ROS_INFO("  Resolution: %0.3f", grid_->getResolution());
+    ROS_INFO("  Reference Frame: %s", grid_->getReferenceFrame().c_str());
 
     collision_checker_.reset(new sbpl_arm_planner::SBPLCollisionSpace(grid_.get()));
     if (!collision_checker_) {
