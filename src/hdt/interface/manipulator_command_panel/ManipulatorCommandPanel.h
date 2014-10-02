@@ -291,39 +291,45 @@ private:
     void update_spinboxes();
     void update_gui();
 
-    // TODO: Modest improvement over a similar method in GraspObjectExecutor.cpp
     template <typename ActionType>
     bool reconnect_client(
-            std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& client,
-            const std::string& action_name)
+        std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& client,
+        const std::string& action_name,
+        ros::Rate poll_frequency = ros::Rate(10.0),
+        const ros::Duration& timeout = ros::Duration(1.0))
     {
         if (!client) {
-            ROS_INFO("Instantiating action client '%s'", action_name.c_str());
             client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
         }
 
-        // should have a non-null client by this point
+        ROS_DEBUG("Waiting for action server '%s'", action_name.c_str());
+
         if (!client) {
-            ROS_ERROR("Failed to instantiate action client");
+            ROS_WARN("Action client is null");
             return false;
         }
 
-        if (!client->isServerConnected()) {
-            // attempt to reconnect by reinstantiation
-            ROS_INFO("Attempting to reconnect action client");
-            client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
-            if (!client) {
-                ROS_INFO("Failed to reinstantiate action client");
-                return false;
+        ros::Time start = ros::Time::now();
+        while (ros::ok() && (timeout == ros::Duration(0) || ros::Time::now() < start + timeout)) {
+            ros::spinOnce();
+            if (!client->isServerConnected()) {
+                client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
+                if (!client) {
+                    ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
+                    return false;
+                }
             }
+
+            if (client->isServerConnected()) {
+                return true;
+            }
+
+            poll_frequency.sleep();
+
+            ROS_DEBUG("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
         }
 
-        if (!client->isServerConnected()) {
-            ROS_WARN("Failed to reconnect action client '%s'", action_name.c_str());
-            return false;
-        }
-
-        return true;
+        return false;
     }
 };
 
