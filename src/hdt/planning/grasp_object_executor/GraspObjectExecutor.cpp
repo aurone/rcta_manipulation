@@ -722,20 +722,13 @@ int GraspObjectExecutor::run()
 
                 const StowPosition& next_stow_position = stow_positions_[next_stow_position_to_attempt_++];
 
-                last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
-                Eigen::Affine3d stow_eef_pose;
-                robot_model_->compute_fk(next_stow_position.joint_positions, stow_eef_pose);
-//                double stow_x = 0.0;
-//                double stow_y = -0.382;
-//                double stow_z = 0.514;
-//                double stow_qx = 0.084;
-//                double stow_qy = 0.147;
-//                double stow_qz = -0.594;
-//                double stow_qw = 0.787;
-//
-//                const Eigen::Affine3d HARDCODED_STOW_POSE =
-//                        Eigen::Translation3d(stow_x, stow_y, stow_z) * Eigen::Quaterniond(stow_qw, stow_qx, stow_qy, stow_qz);
-                tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
+                last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::JointGoal;
+                last_move_arm_stow_goal_.goal_joint_state = next_stow_position.joint_positions;
+
+//                last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
+//                Eigen::Affine3d stow_eef_pose;
+//                robot_model_->compute_fk(next_stow_position.joint_positions, stow_eef_pose);
+//                tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
 
                 last_move_arm_stow_goal_.octomap = current_goal_->octomap;
 
