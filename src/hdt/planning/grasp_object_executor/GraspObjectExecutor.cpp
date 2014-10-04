@@ -723,7 +723,7 @@ int GraspObjectExecutor::run()
                 const StowPosition& next_stow_position = stow_positions_[next_stow_position_to_attempt_++];
 
                 last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::JointGoal;
-                last_move_arm_stow_goal_.goal_joint_state = next_stow_position.joint_positions;
+                last_move_arm_stow_goal_.goal_joint_state.position = next_stow_position.joint_positions;
 
 //                last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
 //                Eigen::Affine3d stow_eef_pose;
