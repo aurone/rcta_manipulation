@@ -801,7 +801,84 @@ bool ArmPlanningNode::plan_to_joint_goal(
     const hdt::MoveArmCommandGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    trajectory_msgs::JointTrajectory interp_traj;
+
+    sensor_msgs::JointState start_joint_state = start.joint_state;
+    if (!msg_utils::reorder_joints(start_joint_state, manipulator_joint_names_)) {
+        ROS_WARN("Start robot state contains joints other than manipulator joints");
+        return false;
+    }
+
+    sensor_msgs::JointState goal_joint_state = goal.goal_joint_state;
+    if (!msg_utils::reorder_joints(goal_joint_state, manipulator_joint_names_)) {
+        ROS_WARN("Goal state contains joints other than manipulator joints");
+        return false;
+    }
+
+    // fill goal state
+    moveit_msgs::GetMotionPlan::Request req;
+    req.motion_plan_request.goal_constraints.resize(1);
+
+    std::vector<double> goal_vector = goal_joint_state.position;
+    std::vector<double> goal_tolerances (7, 0.05); 
+
+    req.motion_plan_request.goal_constraints.resize(1);
+    req.motion_plan_request.goal_constraints.front().joint_constraints.resize(goal_vector.size());
+    for(int i = 0; i < goal_vector.size(); i++){
+      req.motion_plan_request.goal_constraints.front().joint_constraints[i].position = goal_joint_state.position[i];
+      req.motion_plan_request.goal_constraints.front().joint_constraints[i].joint_name = goal_joint_state.name[i];
+      req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_above = 3.0 * M_PI / 180.0;
+      req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_below = -3.0 * M_PI / 180.0;
+      ROS_INFO("%s: %.3f tol(%.3f, %.3f)", goal_joint_state.name[i].c_str(), goal_joint_state.position[i], req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_below, req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_above);
+    }
+    
+    ROS_WARN("Created a 7DoF goal!");
+    
+    req.motion_plan_request.allowed_planning_time = 10.0; //2.0;
+    req.motion_plan_request.start_state = scene->robot_state;
+
+    // set planning scene
+    //cc->setPlanningScene(*scene);
+
+    // plan
+    ROS_INFO("Calling solve...");
+    moveit_msgs::GetMotionPlan::Response res;
+    bool plan_result = planner_->solve(scene, req, res);
+    if (!plan_result) {
+        ROS_ERROR("Failed to plan.");
+    }
+    else {
+        ROS_INFO("Planning succeeded");
+    }
+
+    // print statistics
+    std::map<std::string, double> planning_stats = planner_->getPlannerStats();
+
+    ROS_INFO("Planning statistics");
+    for (const auto& statistic : statistic_names_) {
+        auto it = planning_stats.find(statistic);
+        if (it != planning_stats.end()) {
+            ROS_INFO("    %s: %0.3f", statistic.c_str(), it->second);
+        }
+        else {
+            ROS_WARN("Did not find planning statistic \"%s\"", statistic.c_str());
+        }
+    }
+
+    // visualizations
+    marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
+    marker_array_pub_.publish(collision_checker_->getVisualization("distance_field"));
+    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
+    marker_array_pub_.publish(planner_->getVisualization("goal"));
+
+    // visualize, filter, and publish plan
+    if (plan_result) {
+        marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
+        traj = res.motion_plan_response.trajectory.joint_trajectory;
+    }
+
+    return plan_result;
+
+    /*trajectory_msgs::JointTrajectory interp_traj;
     interp_traj.header.frame_id = "";
     interp_traj.joint_names = manipulator_joint_names_;
     interp_traj.points.resize(2);
@@ -834,7 +911,7 @@ bool ArmPlanningNode::plan_to_joint_goal(
     }
 
     traj = std::move(interp_traj);
-    return true;
+    return true;*/
 }
 
 std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(const geometry_msgs::Pose& pose)
