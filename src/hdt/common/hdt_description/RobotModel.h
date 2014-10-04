@@ -75,9 +75,11 @@ public:
 
     static RobotModelPtr LoadFromURDF(const std::string& urdf_string);
 
+    std::size_t num_joints() const { return joint_names_.size(); }
     const std::vector<std::string>& joint_names() const { return joint_names_; }
     const std::vector<double>& min_limits() const { return min_limits_; }
     const std::vector<double>& max_limits() const { return max_limits_; }
+    const std::vector<double>& max_velocity_limits() const { return max_velocity_limits_; }
     const std::vector<bool>& continuous() const { return continuous_; }
 
     bool within_joint_limits(const std::vector<double>& joint_vals) const;
@@ -128,6 +130,7 @@ private:
     std::vector<std::string> joint_names_;
     std::vector<double> min_limits_;
     std::vector<double> max_limits_;
+    std::vector<double> max_velocity_limits_;
     std::vector<bool> continuous_;
     std::size_t free_angle_index_;
 
@@ -143,6 +146,7 @@ private:
         const std::vector<std::string>& joints,
         std::vector<double>& min_limits,
         std::vector<double>& max_limits,
+        std::vector<double>& max_velocity_limits,
         std::vector<bool>& continuous,
         std::string& why) const;
 };

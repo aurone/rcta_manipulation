@@ -193,7 +193,7 @@ bool RobotModel::load(const std::string& urdf_string)
 
     std::vector<bool> continuous;
     std::string why;
-    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, continuous, why)) {
+    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, max_velocity_limits_, continuous, why)) {
         ROS_ERROR("Failed to extract joint info (%s)", why.c_str());
         return false;
     }
@@ -462,10 +462,11 @@ bool RobotModel::extract_joint_info(
     const std::vector<std::string>& joints,
     std::vector<double>& min_limits_out,
     std::vector<double>& max_limits_out,
+    std::vector<double>& max_velocity_limits_out,
     std::vector<bool>& continuous_out,
     std::string& why) const
 {
-    std::vector<double> min_limits, max_limits;
+    std::vector<double> min_limits, max_limits, max_velocity_limits;
     std::vector<bool> continuous;
 
     min_limits.reserve(joints.size());
@@ -490,12 +491,14 @@ bool RobotModel::extract_joint_info(
 
         min_limits.push_back(joint_model->limits->lower);
         max_limits.push_back(joint_model->limits->upper);
+        max_velocity_limits.push_back(joint_model->limits->velocity);
         continuous.push_back(joint_model->type == urdf::Joint::CONTINUOUS ? true : false);
     }
 
     if (success) {
         min_limits_out = std::move(min_limits);
         max_limits_out = std::move(max_limits);
+        max_velocity_limits_out = std::move(max_velocity_limits);
         continuous_out = std::move(continuous);
     }
     return success;
