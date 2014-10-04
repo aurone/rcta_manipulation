@@ -280,6 +280,9 @@ bool TrajectoryFollower::get_point_at_time(
                 return false;
             }
 
+            for (size_t i = 0; i < robot_model_->num_joints(); ++i)
+                interm_velocities[i] = std::max(interm_velocities[i], 0.06);
+
             trajectory_msgs::JointTrajectoryPoint interm_point;
             interm_point.positions = std::move(interm_position);
             interm_point.velocities = std::move(interm_velocities);
