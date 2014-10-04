@@ -1,0 +1,3 @@
+add_executable(trajectory_follower trajectory_follower.cpp TrajectoryFollower.cpp)
+target_link_libraries(trajectory_follower ${catkin_LIBRARIES} hdt_robot_model)
+
