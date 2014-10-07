@@ -1,6 +1,6 @@
 wrist_to_tool_transform:
     position:
-        x: 0.06
+        x: 0.13 # 16cm origin
         y: 0.0
         z: 0.0
     orientation:
