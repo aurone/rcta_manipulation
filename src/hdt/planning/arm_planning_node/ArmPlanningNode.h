@@ -24,6 +24,7 @@
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/common/stringifier/stringifier.h>
+#include <hdt/common/hdt_description/RobotModel.h>
 #include "JointInterpolationPathGenerator.h"
 
 namespace hdt
@@ -68,6 +69,7 @@ private:
     std::vector<std::string> planning_joints_;
 
     std::unique_ptr<sbpl_arm_planner::RobotModel> robot_model_;
+    hdt::RobotModelPtr hdt_robot_model_;
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field_;
     std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid_;
     std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
@@ -131,7 +133,7 @@ private:
             const hdt::MoveArmCommandGoal& goal,
             trajectory_msgs::JointTrajectory& traj);
 
-    void clamp_to_joint_limits(std::vector<double>& joint_vector);
+    void clamp_to_joint_limits(std::vector<double>& joint_vector, const std::vector<double>& min_limits, const std::vector<double>& max_limits);
 };
 
 } // namespace hdt

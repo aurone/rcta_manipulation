@@ -152,6 +152,12 @@ bool ArmPlanningNode::init_robot()
 
     manipulator_joint_names_ = planning_joints_;
 
+    hdt_robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_);
+    if (!hdt_robot_model_) {
+        ROS_ERROR("Sad");
+        return false;
+    }
+
     min_limits_.clear();
     max_limits_.clear();
     continuous_.clear();
@@ -275,11 +281,11 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     ROS_INFO("Received Move Arm Command Goal");
     ROS_INFO("    Octomap ID: %s", request->octomap.id.c_str());
 
-    // update the world
-    std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(request->octomap));
-    if (!dynamic_cast<octomap::OcTree*>(octomap.get())) {
-        ROS_WARN("Octomap from message does not support OcTree requirements");
-    }
+//    // update the world
+//    std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(request->octomap));
+//    if (!dynamic_cast<octomap::OcTree*>(octomap.get())) {
+//        ROS_WARN("Octomap from message does not support OcTree requirements");
+//    }
 
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
@@ -462,7 +468,13 @@ bool ArmPlanningNode::get_initial_configuration(ros::NodeHandle& nh, moveit_msgs
     }
 
     state.joint_state = last_joint_state_;
+    msg_utils::reorder_joints(state.joint_state, hdt_robot_model_->joint_names());
+    if (!sbpl::utils::NormalizeAnglesIntoRange(state.joint_state.position, hdt_robot_model_->min_limits(), hdt_robot_model_->max_limits())) {
+        ROS_WARN("Hopefully this doesn't happen");
+    }
 
+    clamp_to_joint_limits(state.joint_state.position, hdt_robot_model_->min_safety_limits(), hdt_robot_model_->max_safety_limits());
+    
     geometry_msgs::Pose pose;
     state.multi_dof_joint_state.header.frame_id = "map";
     state.multi_dof_joint_state.joint_names.resize(1);
@@ -804,13 +816,13 @@ bool ArmPlanningNode::plan_to_joint_goal(
 
     sensor_msgs::JointState start_joint_state = start.joint_state;
     if (!msg_utils::reorder_joints(start_joint_state, manipulator_joint_names_)) {
-        ROS_WARN("Start robot state contains joints other than manipulator joints");
+        ROS_ERROR("Start robot state contains joints other than manipulator joints");
         return false;
     }
 
     sensor_msgs::JointState goal_joint_state = goal.goal_joint_state;
     if (!msg_utils::reorder_joints(goal_joint_state, manipulator_joint_names_)) {
-        ROS_WARN("Goal state contains joints other than manipulator joints");
+        ROS_ERROR("Goal state contains joints other than manipulator joints");
         return false;
     }
 
@@ -898,8 +910,8 @@ bool ArmPlanningNode::plan_to_joint_goal(
     interp_traj.points[0].positions = start_joint_state.position;
     interp_traj.points[1].positions = goal_joint_state.position;
 
-    clamp_to_joint_limits(interp_traj.points[0].positions);
-    clamp_to_joint_limits(interp_traj.points[1].positions);
+    clamp_to_joint_limits(interp_traj.points[0].positions, min_limits_, max_limits_);
+    clamp_to_joint_limits(interp_traj.points[1].positions, min_limits_, max_limits_);
 
     add_interpolation_to_plan(interp_traj);
 
@@ -923,11 +935,11 @@ std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(const geometry_msgs::P
     return { pose.position.x, pose.position.y, pose.position.z, goal_roll, goal_pitch, goal_yaw };
 }
 
-void ArmPlanningNode::clamp_to_joint_limits(std::vector<double>& joint_vector)
+void ArmPlanningNode::clamp_to_joint_limits(std::vector<double>& joint_vector, const std::vector<double>& min_limits, const std::vector<double>& max_limits)
 {
     auto clamp = [](double d, double min, double max) { if (d < min) return min; else if (d > max) return max; else return d; };
     for (std::size_t i = 0; i < joint_vector.size(); ++i) {
-        joint_vector[i] = clamp(joint_vector[i], min_limits_[i], max_limits_[i]);
+        joint_vector[i] = clamp(joint_vector[i], min_limits[i], max_limits[i]);
     }
 }
 
