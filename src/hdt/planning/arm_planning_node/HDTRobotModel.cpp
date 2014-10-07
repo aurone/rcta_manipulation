@@ -12,10 +12,7 @@ namespace hdt
 
 HDTRobotModel::HDTRobotModel() :
     RobotModel(),
-    robot_model_(),
-    min_limits_(),
-    max_limits_(),
-    free_angle_idx_(4)
+    robot_model_()
 {
     setPlanningJoints({ "arm_1_shoulder_twist",
                         "arm_2_shoulder_lift",
@@ -33,12 +30,13 @@ HDTRobotModel::~HDTRobotModel()
 
 bool HDTRobotModel::init(const std::string& robot_description)
 {
-    return (bool)(robot_model_ = hdt::RobotModel::LoadFromURDF(robot_description));
+    return (bool)(robot_model_ = hdt::RobotModel::LoadFromURDF(robot_description, true));
 }
 
 bool HDTRobotModel::checkJointLimits(const std::vector<double>& angles)
 {
-    return robot_model_->within_joint_limits(angles);
+    return robot_model_->within_safety_joint_limits(angles);
+//    return robot_model_->within_joint_limits(angles);
 }
 
 bool HDTRobotModel::computePlanningLinkFK(const std::vector<double>& angles, std::vector<double>& pose)

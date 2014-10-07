@@ -154,9 +154,9 @@ bool IKSolutionGenerator::operator()(std::vector<double>& solution)
     return false;
 }
 
-RobotModelPtr RobotModel::LoadFromURDF(const std::string& urdf_string)
+RobotModelPtr RobotModel::LoadFromURDF(const std::string& urdf_string, bool enable_safety_limits)
 {
-    RobotModelPtr robot_model_ptr(new RobotModel);
+    RobotModelPtr robot_model_ptr(new RobotModel(enable_safety_limits));
     if (robot_model_ptr) {
         if (robot_model_ptr->load(urdf_string)) {
             return robot_model_ptr;
@@ -168,7 +168,7 @@ RobotModelPtr RobotModel::LoadFromURDF(const std::string& urdf_string)
     return robot_model_ptr;
 }
 
-RobotModel::RobotModel() :
+RobotModel::RobotModel(bool enable_safety_limits) :
     joint_names_({ "arm_1_shoulder_twist",
                    "arm_2_shoulder_lift",
                    "arm_3_elbow_twist",
@@ -178,7 +178,8 @@ RobotModel::RobotModel() :
                    "arm_7_gripper_lift" }),
     min_limits_(),
     max_limits_(),
-    free_angle_index_()
+    free_angle_index_(),
+    safety_limits_enabled_(enable_safety_limits)
 {
     free_angle_index_ = GetFreeParameters()[0];
 }
@@ -193,7 +194,7 @@ bool RobotModel::load(const std::string& urdf_string)
 
     std::vector<bool> continuous;
     std::string why;
-    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, max_velocity_limits_, continuous, why)) {
+    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, min_safety_limits_, max_safety_limits_, max_velocity_limits_, continuous, why)) {
         ROS_ERROR("Failed to extract joint info (%s)", why.c_str());
         return false;
     }
@@ -221,9 +222,26 @@ bool RobotModel::load(const std::string& urdf_string)
 
 bool RobotModel::within_joint_limits(const std::vector<double>& joint_vals) const
 {
-    if (!sbpl::utils::AreJointsWithinLimits(joint_vals, min_limits_, max_limits_)) {
+    const std::vector<double>& lower_limits = safety_limits_enabled_ ? min_safety_limits_ : min_limits_;
+    const std::vector<double>& upper_limits = safety_limits_enabled_ ? max_safety_limits_ : max_limits_;
+    if (!sbpl::utils::AreJointsWithinLimits(joint_vals, lower_limits, upper_limits)) {
         std::vector<double> angles_copy = joint_vals;
-        if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, min_limits_, max_limits_)) {
+        if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, lower_limits, upper_limits)) {
+            ROS_WARN("Joint angles are not within limits when unnormalized");
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool RobotModel::within_safety_joint_limits(const std::vector<double>& joint_vals) const
+{
+    if (!sbpl::utils::AreJointsWithinLimits(joint_vals, min_safety_limits_, max_safety_limits_)) {
+        std::vector<double> angles_copy = joint_vals;
+        if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, min_safety_limits_, max_safety_limits_)) {
             ROS_WARN("Joint angles are not within limits when unnormalized");
             return true;
         }
@@ -300,8 +318,8 @@ bool RobotModel::search_nearest_ik(
 {
     double free_angle_seed = seed[free_angle_index_];
 
-    double free_angle_min = min_limits_[free_angle_index_];
-    double free_angle_max = max_limits_[free_angle_index_];
+    double free_angle_min = safety_limits_enabled_ ? min_safety_limits_[free_angle_index_] : min_limits_[free_angle_index_];
+    double free_angle_max = safety_limits_enabled_ ? max_safety_limits_[free_angle_index_] : max_limits_[free_angle_index_];
 
     std::vector<double> cseed = seed;
 
@@ -462,11 +480,13 @@ bool RobotModel::extract_joint_info(
     const std::vector<std::string>& joints,
     std::vector<double>& min_limits_out,
     std::vector<double>& max_limits_out,
+    std::vector<double>& min_safety_limits_out,
+    std::vector<double>& max_safety_limits_out,
     std::vector<double>& max_velocity_limits_out,
     std::vector<bool>& continuous_out,
     std::string& why) const
 {
-    std::vector<double> min_limits, max_limits, max_velocity_limits;
+    std::vector<double> min_limits, max_limits, max_velocity_limits, min_safety_limits, max_safety_limits;
     std::vector<bool> continuous;
 
     min_limits.reserve(joints.size());
@@ -489,6 +509,17 @@ bool RobotModel::extract_joint_info(
             break;
         }
 
+        bool have_safety = (bool)joint_model->safety;
+        if (joint_model->safety) {
+            min_safety_limits.push_back(joint_model->safety->soft_lower_limit);
+            max_safety_limits.push_back(joint_model->safety->soft_upper_limit);
+        }
+        else {
+            ROS_WARN("Absent safety limits for joint '%s'. Overriding to software limits", joint.c_str());
+            min_safety_limits.push_back(joint_model->limits->lower);
+            max_safety_limits.push_back(joint_model->limits->upper);
+        }
+
         min_limits.push_back(joint_model->limits->lower);
         max_limits.push_back(joint_model->limits->upper);
         max_velocity_limits.push_back(joint_model->limits->velocity);
@@ -498,6 +529,8 @@ bool RobotModel::extract_joint_info(
     if (success) {
         min_limits_out = std::move(min_limits);
         max_limits_out = std::move(max_limits);
+        min_safety_limits_out = std::move(min_safety_limits);
+        max_safety_limits_out = std::move(max_safety_limits);
         max_velocity_limits_out = std::move(max_velocity_limits);
         continuous_out = std::move(continuous);
     }

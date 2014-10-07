@@ -73,16 +73,19 @@ class RobotModel : public std::enable_shared_from_this<RobotModel>
 {
 public:
 
-    static RobotModelPtr LoadFromURDF(const std::string& urdf_string);
+    static RobotModelPtr LoadFromURDF(const std::string& urdf_string, bool enable_safety_limits = false);
 
     std::size_t num_joints() const { return joint_names_.size(); }
     const std::vector<std::string>& joint_names() const { return joint_names_; }
     const std::vector<double>& min_limits() const { return min_limits_; }
     const std::vector<double>& max_limits() const { return max_limits_; }
+    const std::vector<double>& min_safety_limits() const { return min_safety_limits_; }
+    const std::vector<double>& max_safety_limits() const { return max_safety_limits_; }
     const std::vector<double>& max_velocity_limits() const { return max_velocity_limits_; }
     const std::vector<bool>& continuous() const { return continuous_; }
 
     bool within_joint_limits(const std::vector<double>& joint_vals) const;
+    bool within_safety_joint_limits(const std::vector<double>& joint_vals) const;
 
     bool compute_fk(const std::vector<double>& joint_values, Eigen::Affine3d& eef_transform_out) const;
 
@@ -124,17 +127,21 @@ public:
 
 private:
 
-    RobotModel();
+    RobotModel(bool enable_safety_limits);
     bool load(const std::string& urdf_string);
 
     std::vector<std::string> joint_names_;
     std::vector<double> min_limits_;
     std::vector<double> max_limits_;
+    std::vector<double> min_safety_limits_;
+    std::vector<double> max_safety_limits_;
     std::vector<double> max_velocity_limits_;
     std::vector<bool> continuous_;
     std::size_t free_angle_index_;
 
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
+
+    bool safety_limits_enabled_;
 
     static void convert(const double* trans, const double* rot, Eigen::Affine3d& transform_out);
     static void convert(const Eigen::Affine3d& transform, double* trans_out, double* rot_out);
@@ -146,6 +153,8 @@ private:
         const std::vector<std::string>& joints,
         std::vector<double>& min_limits,
         std::vector<double>& max_limits,
+        std::vector<double>& min_safety_limits,
+        std::vector<double>& max_safety_limits,
         std::vector<double>& max_velocity_limits,
         std::vector<bool>& continuous,
         std::string& why) const;

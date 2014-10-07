@@ -53,10 +53,6 @@ private:
 
     hdt::RobotModelPtr robot_model_;
 
-    std::vector<double> min_limits_;
-    std::vector<double> max_limits_;
-    int free_angle_idx_;
-
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
 
     // Privatizing these methods since the OpenRAVE IK is generated only for the 7th dof
