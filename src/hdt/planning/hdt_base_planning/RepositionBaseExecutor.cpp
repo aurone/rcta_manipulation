@@ -216,10 +216,10 @@ int RepositionBaseExecutor::run()
 						double objR = 0.0;
 
 						// initial robot pose
-						double robx0 = current_goal_->base_link_in_map.pose.position.x;
-						double roby0 = current_goal_->base_link_in_map.pose.position.y;
-						double robz0 = current_goal_->base_link_in_map.pose.position.z;
-						double robY0 = 2.0*acos(current_goal_->base_link_in_map.pose.orientation.w)*sign(current_goal_->base_link_in_map.pose.orientation.z);	// assuming that rotation axis is parallel to z-axis
+						double robx0 = robot_pose_world_frame_.pose.position.x;
+						double roby0 = robot_pose_world_frame_.pose.position.y;
+						double robz0 = robot_pose_world_frame_.pose.position.z;
+						double robY0 = 2.0*acos(robot_pose_world_frame_.pose.orientation.w)*sign(robot_pose_world_frame_.pose.orientation.z);	// assuming that rotation axis is parallel to z-axis
 						double robP0 = 0.0;
 						double robR0 = 0.0;
 						// transform from /base_link to /top_shelf (in 2D)
@@ -236,10 +236,10 @@ int RepositionBaseExecutor::run()
 					
 						
 						// check for inverse kinematics and arm planning (if object is in reachable range and within angle of view)
-						double secDist[2] = {0.5, 1.5};		// TODO: a more general than (distMin + (nDist-1)*distStep) determined in computeRobPose()
+						double secDist[2] = {0.3, 1.5};		// TODO: a more general than (distMin + (nDist-1)*distStep) determined in computeRobPose()
 						double distRob2Obj = std::sqrt( std::pow(objx-robx0,2) + std::pow(objy-roby0,2) );	
 						if (distRob2Obj >= secDist[0] && distRob2Obj <= secDist[1]) {
-							double secSide[2] = {-15.0/180.0*M_PI, 45.0/180.0*M_PI};	// TODO: a more general than secSide[2] determined in computeRobPose()
+							double secSide[2] = {-20.0/180.0*M_PI, 45.0/180.0*M_PI};	// TODO: a more general than secSide[2] determined in computeRobPose()
 							double rob2obj = atan2(objy-roby0, objx-robx0);	// angular coordinate of a vector from robot position to object position
 							double diffAng = wrapAngle( rob2obj-robY0 );
 							if ( diffAng >= secSide[0] && diffAng <= secSide[1] ) {		// left-hand side and angle of view
@@ -249,7 +249,7 @@ int RepositionBaseExecutor::run()
 									hdt_msgs::RepositionBaseCommandResult result;
 									result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
 
-									candidate_base_poses.push_back(current_goal_->base_link_in_map);
+									candidate_base_poses.push_back(robot_pose_world_frame_);
 									result.candidate_base_poses = candidate_base_poses;
 									as_->setSucceeded(result);
 									status_ = RepositionBaseExecutionStatus::IDLE;
@@ -314,6 +314,18 @@ void RepositionBaseExecutor::goal_callback()
 	ROS_INFO("    Occupancy Grid Seq: %d", current_goal_->map.header.seq);
 	ROS_INFO("    Occupancy Grid Stamp: %d", current_goal_->map.header.stamp.sec);
 	ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
+
+  robot_pose_world_frame_.header.stamp = ros::Time(0);
+  robot_pose_world_frame_.header.frame_id = "base_footprint";
+  robot_pose_world_frame_.pose = geometry_msgs::IdentityPose();
+  try {
+    listener_.transformPose("abs_nwu", robot_pose_world_frame_, robot_pose_world_frame_);
+    ROS_INFO("Robot Pose [abs_nwu]: %s", to_string(robot_pose_world_frame_.pose).c_str());
+  }
+  catch (const tf::TransformException& ex) {
+    ROS_ERROR("Failed to transform from 'base_footprint' to 'abs_nwu'");
+    as_->setAborted();
+  }
 
 	bComputedRobPose_ = false;
 	
@@ -421,23 +433,23 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
 	double armOffsetx = 0.3;	// center of arm (for normal grasping motion)
 	double armOffsety = -0.6;	// center of arm (for normal grasping motion)
-	double armLength = 1.0;		// workspace radius about the center of arm
-	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
+	double armLength = 0.6;		// workspace radius about the center of arm
+	double armLengthCore = 0.4;	// core workspace radius about the center of arm (pObs = 0.0)
 	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
-	double bodyLength = 1.0;	// support polygon radius about the center of body
+	double bodyLength = 0.8;	// support polygon radius about the center of body
 	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
 	int mapObsThr = 1;			// threshold for classifying clear and occupied regions
 
 	// 5) candidate selection criterion
 	double scaleDiffYglob = 0.05;	// multiply a quadratic function to pTot (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
-	double pTotThr = 0.8;		// pTot threshold for bSortMetric==3
+	double pTotThr = 0.5;		// pTot threshold for bSortMetric==3
 
 	// 6) /base_link offset from /top_shelf for final robot pose return
 // 	double baseOffsetx = -0.0;
 // 	double baseOffsetx = -0.3;
 // 	double baseOffsetx = -0.5;
-// 	double baseOffsetx = -0.49+0.148975;	// /base_link to /base_link_front_bumper_part to /top_shelf
-	double baseOffsetx = -0.49;				// /base_link to /base_link_front_bumper_part (in new Hokuyo setting) 	// same as in computeRobPose()
+ 	double baseOffsetx = -0.49+0.148975;	// /base_link to /base_link_front_bumper_part to /top_shelf
+//	double baseOffsetx = -0.49;				// /base_link to /base_link_front_bumper_part (in new Hokuyo setting) 	// same as in computeRobPose()
 
 
 
@@ -1050,7 +1062,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 int RepositionBaseExecutor::checkIKPLAN()
 {
-	checkIKPLAN(current_goal_->base_link_in_map);
+	checkIKPLAN(robot_pose_world_frame_);
 }
 
 int RepositionBaseExecutor::checkIKPLAN(const geometry_msgs::PoseStamped& candidate_base_pose)
@@ -1066,7 +1078,7 @@ int RepositionBaseExecutor::checkIKPLAN(const geometry_msgs::PoseStamped& candid
                 Eigen::Affine3d gas_can_in_map;
                 tf::poseMsgToEigen(current_goal_->gas_can_in_map.pose, gas_can_in_map);
 
-//                 tf::poseMsgToEigen(current_goal_->base_link_in_map.pose, base_link_in_map);
+//                 tf::poseMsgToEigen(robot_pose_world_frame_.pose, base_link_in_map);
                 tf::poseMsgToEigen(candidate_base_pose.pose, base_link_in_map);
 				Eigen::Affine3d base_link_to_gas_canister = base_link_in_map.inverse() * gas_can_in_map;
                 

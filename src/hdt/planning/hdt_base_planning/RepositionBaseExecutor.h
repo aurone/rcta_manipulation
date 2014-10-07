@@ -109,6 +109,8 @@ private:
     tf::TransformListener listener_;
     ros::Publisher marker_arr_pub_;
 
+    geometry_msgs::PoseStamped robot_pose_world_frame_;
+
 	int checkIKPLAN();
 	int checkIKPLAN(const geometry_msgs::PoseStamped& candidate_base_pose);
     std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
