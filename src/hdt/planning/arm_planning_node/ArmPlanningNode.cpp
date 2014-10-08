@@ -328,44 +328,46 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // Post-process the plan and send to the joint trajectory follower
     ////////////////////////////////////////////////////////////////////////////////
 
-    if (success) {
-
-        ROS_INFO("Original joint path (%zd points):", result_traj.points.size());
-        for (int i = 0; i < (int)result_traj.points.size(); ++i) {
-            const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
-            ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
-        }
-
-        apply_shortcutting(result_traj);
-
-        ROS_INFO("Shortcut trajectory (%zd points):", result_traj.points.size());
-        for (int i = 0; i < (int)result_traj.points.size(); ++i) {
-            const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
-            ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
-        }
-
-        bool interp_res = add_interpolation_to_plan(result_traj);
-        if (!interp_res) {
-            ROS_ERROR("Failed to interpolate joint trajectory");
-            hdt::MoveArmCommandResult result;
-            result.success = false;
-            move_command_server_->setAborted(result);
-            return;
-        }
-
-        publish_trajectory(result_traj);
-
-        hdt::MoveArmCommandResult result;
-        result.success = true;
-        result.trajectory = result_traj;
-        move_command_server_->setSucceeded(result);
-    }
-    else {
+    if (!success) {
         hdt::MoveArmCommandResult result;
         result.success = false;
         result.trajectory;
         move_command_server_->setAborted(result);
+        return;
     }
+
+
+    ROS_INFO("Original joint path (%zd points):", result_traj.points.size());
+    for (int i = 0; i < (int)result_traj.points.size(); ++i) {
+        const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
+        ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
+    }
+
+    apply_shortcutting(result_traj);
+
+    ROS_INFO("Shortcut trajectory (%zd points):", result_traj.points.size());
+    for (int i = 0; i < (int)result_traj.points.size(); ++i) {
+        const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
+        ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
+    }
+
+    bool interp_res = add_interpolation_to_plan(result_traj);
+    if (!interp_res) {
+        ROS_ERROR("Failed to interpolate joint trajectory");
+        hdt::MoveArmCommandResult result;
+        result.success = false;
+        move_command_server_->setAborted(result);
+        return;
+    }
+
+    if (request->execute_path) {
+        publish_trajectory(result_traj);
+    }
+
+    hdt::MoveArmCommandResult result;
+    result.success = true;
+    result.trajectory = result_traj;
+    move_command_server_->setSucceeded(result);
 }
 
 void ArmPlanningNode::fill_constraint(const std::vector<double>& pose,
@@ -659,13 +661,14 @@ bool ArmPlanningNode::add_interpolation_to_plan(trajectory_msgs::JointTrajectory
 
 void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory& joint_trajectory)
 {
-    const std::vector<std::string> joint_names = { "arm_1_shoulder_twist",
-                                                   "arm_2_shoulder_lift",
-                                                   "arm_3_elbow_twist",
-                                                   "arm_4_elbow_lift",
-                                                   "arm_5_wrist_twist",
-                                                   "arm_6_wrist_lift",
-                                                   "arm_7_gripper_lift",
+    const std::vector<std::string> joint_names = {
+            "arm_1_shoulder_twist",
+            "arm_2_shoulder_lift",
+            "arm_3_elbow_twist",
+            "arm_4_elbow_lift",
+            "arm_5_wrist_twist",
+            "arm_6_wrist_lift",
+            "arm_7_gripper_lift",
     };
 
     trajectory_msgs::JointTrajectory traj;

@@ -389,6 +389,8 @@ void ManipulatorCommandPanel::send_move_arm_command()
     tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
     ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
 
+    move_arm_goal.execute_path = true;
+
     auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
     move_arm_command_client_->sendGoal(move_arm_goal, result_callback);
 

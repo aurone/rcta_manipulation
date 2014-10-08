@@ -7,6 +7,8 @@ sensor_msgs/JointState goal_joint_state
 uint8 type
 
 octomap_msgs/Octomap octomap
+
+bool execute_path
 ---
 # result
 bool success

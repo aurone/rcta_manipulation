@@ -388,6 +388,8 @@ int GraspObjectExecutor::run()
 
                 last_move_arm_pregrasp_goal_.octomap = current_goal_->octomap;
 
+                last_move_arm_pregrasp_goal_.execute_path = true;
+
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
                 move_arm_command_client_->sendGoal(last_move_arm_pregrasp_goal_, result_cb);
 
@@ -732,6 +734,8 @@ int GraspObjectExecutor::run()
 //                tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
 
                 last_move_arm_stow_goal_.octomap = current_goal_->octomap;
+
+                last_move_arm_stow_goal_.execute_path = true;
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
                 move_arm_command_client_->sendGoal(last_move_arm_stow_goal_, result_cb);
