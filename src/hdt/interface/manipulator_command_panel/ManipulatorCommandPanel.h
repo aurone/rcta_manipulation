@@ -158,9 +158,11 @@ private:
     interactive_markers::InteractiveMarkerServer server_;
 
     ros::Subscriber joint_states_sub_;
+    ros::Subscriber octomap_sub_;
     ros::Publisher robot_markers_pub_;
 
     sensor_msgs::JointState last_joint_state_;
+    octomap_msgs::Octomap::ConstPtr last_octomap_msg_;
 
     std::string tip_link_;
     std::string base_link_;
@@ -234,6 +236,7 @@ private:
     void update_joint_position(int joint_index, double joint_position);
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
+    void octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg);
 
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);

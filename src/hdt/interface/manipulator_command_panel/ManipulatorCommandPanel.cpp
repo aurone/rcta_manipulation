@@ -82,6 +82,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
 {
     setup_gui();
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
+    octomap_sub_ = nh_.subscribe("fixed_octomap", 1, &ManipulatorCommandPanel::octomap_callback, this);
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 }
 
@@ -537,7 +538,7 @@ void ManipulatorCommandPanel::send_grasp_object_command()
     grasp_object_goal.gas_can_in_map.header.frame_id = interactive_marker_frame();
     tf::poseEigenToMsg(object_transform(), grasp_object_goal.gas_can_in_map.pose);
 
-    // TODO: octomap
+    grasp_object_goal.octomap = *last_octomap_msg_;
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::grasp_object_command_result_cb, this, _1, _2);
     grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
@@ -1129,6 +1130,11 @@ void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointStat
             last_joint_state_.position[i] = 0.0;
         }
     }
+}
+
+void ManipulatorCommandPanel::octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg)
+{
+    last_octomap_msg_ = msg;
 }
 
 bool ManipulatorCommandPanel::reinit(const std::string& robot_description, std::string& why)
