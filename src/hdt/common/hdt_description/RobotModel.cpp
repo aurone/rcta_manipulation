@@ -191,9 +191,8 @@ bool RobotModel::load(const std::string& urdf_string)
         return false;
     }
 
-    std::vector<bool> continuous;
     std::string why;
-    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, max_velocity_limits_, continuous, why)) {
+    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, max_velocity_limits_, continuous_, why)) {
         ROS_ERROR("Failed to extract joint info (%s)", why.c_str());
         return false;
     }
