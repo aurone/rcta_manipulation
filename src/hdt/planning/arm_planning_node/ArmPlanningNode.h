@@ -24,6 +24,8 @@
 #include <urdf_parser/urdf_parser.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/common/stringifier/stringifier.h>
+#include <hdt/common/hdt_description/RobotModel.h>
+#include <tf/transform_listener.h>
 #include "JointInterpolationPathGenerator.h"
 
 namespace hdt
@@ -42,6 +44,7 @@ public:
 
 private:
 
+
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
@@ -58,16 +61,16 @@ private:
     bool use_action_server_;
 
     std::string action_set_filename_;
-    std::string group_name_;
     std::string kinematics_frame_;
     std::string planning_frame_;
-    std::string planning_link_;
-    std::string chain_tip_link_;
     std::string object_filename_;
-    std::string urdf_;
-    std::vector<std::string> planning_joints_;
+    std::string urdf_string_;
 
-    std::unique_ptr<sbpl_arm_planner::RobotModel> robot_model_;
+    std::string robot_name_;
+    std::string robot_root_;
+    hdt::RobotModelPtr robot_model_;
+
+    std::unique_ptr<sbpl_arm_planner::RobotModel> planner_robot_model_;
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field_;
     std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid_;
     std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
@@ -75,8 +78,11 @@ private:
     std::unique_ptr<sbpl_arm_planner::SBPLArmPlannerInterface> planner_;
 
     sensor_msgs::JointState last_joint_state_;
+    std::vector<ros::Time> received_joint_state_;
+    tf::TransformListener listener_;
 
-    std::vector<std::string> manipulator_joint_names_;
+    ros::Duration joint_staleness_threshold_;
+
     std::vector<double> min_limits_;
     std::vector<double> max_limits_;
     std::vector<bool> continuous_;
@@ -89,27 +95,33 @@ private:
     bool init_collision_model();
     bool init_sbpl();
 
+    bool reinit(const hdt::MoveArmCommandGoal& goal);
+    bool reinit_robot(const hdt::MoveArmCommandGoal& goal);
+    bool reinit_collision_model(const hdt::MoveArmCommandGoal& goal);
+    bool reinit_sbpl(const hdt::MoveArmCommandGoal& goal);
+
     void move_arm(const hdt::MoveArmCommandGoal::ConstPtr& goal);
 
-    void fill_constraint(const std::vector<double>& pose,
-                         const std::string& frame_id,
-                         moveit_msgs::Constraints& goals);
+    void fill_constraint(
+            const std::vector<double>& pose,
+            const std::string& frame_id,
+            moveit_msgs::Constraints& goals);
 
     moveit_msgs::CollisionObject
-    get_collision_cube(const geometry_msgs::Pose& pose,
-                       const std::vector<double>& dims,
-                       const std::string& frame_id,
-                       const std::string& id);
+    get_collision_cube(
+            const geometry_msgs::Pose& pose,
+            const std::vector<double>& dims,
+            const std::string& frame_id,
+            const std::string& id);
 
     std::vector<moveit_msgs::CollisionObject>
-    get_collision_cubes(const std::vector<std::vector<double>>& objects,
-                        const std::vector<std::string>& object_ids,
-                        const std::string& frame_id);
+    get_collision_cubes(
+            const std::vector<std::vector<double>>& objects,
+            const std::vector<std::string>& object_ids,
+            const std::string& frame_id);
 
     std::vector<moveit_msgs::CollisionObject>
     get_collision_objects(const std::string& filename, const std::string& frame_id);
-
-    bool get_initial_configuration(ros::NodeHandle& nh, moveit_msgs::RobotState& state);
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
@@ -132,6 +144,8 @@ private:
             trajectory_msgs::JointTrajectory& traj);
 
     void clamp_to_joint_limits(std::vector<double>& joint_vector);
+
+    bool valid_octomap(const octomap_msgs::Octomap& msg);
 };
 
 } // namespace hdt
