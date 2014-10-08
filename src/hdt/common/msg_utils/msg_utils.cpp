@@ -75,6 +75,17 @@ bool reorder_joints(trajectory_msgs::JointTrajectory& joint_trajectory, const st
     return true;
 }
 
+int get_joint_index(const sensor_msgs::JointState& joint_state, const std::string& name)
+{
+    for (size_t i = 0; i < joint_state.name.size(); ++i) {
+        const std::string& joint_name = joint_state.name[i];
+        if (joint_name == name) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 visualization_msgs::Marker create_arrow_marker(const geometry_msgs::Vector3 &scale)
 {
     visualization_msgs::Marker arrow_marker;

@@ -40,6 +40,8 @@ bool reorder_joints(sensor_msgs::JointState& joint_state, const std::vector<std:
 
 bool reorder_joints(trajectory_msgs::JointTrajectory& joint_trajectory, const std::vector<std::string>& joint_order);
 
+int get_joint_index(const sensor_msgs::JointState& joint_state, const std::string& name);
+
 visualization_msgs::Marker create_arrow_marker(const geometry_msgs::Vector3 &scale);
 visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vector3& scale);
 
