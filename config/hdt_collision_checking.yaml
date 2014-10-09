@@ -4,8 +4,8 @@ collision_groups:
     root_name: base_footprint
     tip_name: arm_mount_panel_dummy
     collision_links:
-      - name: base_link
-        root: base_link
+#      - name: base_link
+#        root: base_link
       - name: back_left_wheel
         root: back_left_wheel
       - name: back_right_wheel
@@ -14,14 +14,14 @@ collision_groups:
         root: front_left_wheel
       - name: front_right_wheel
         root: front_right_wheel
-      - name: base_link_front_bumper_part
-        root: base_link_front_bumper_part
-      - name: base_link_rear_bumper_part
-        root: base_link_rear_bumper_part
-      - name: base_link_top_plate_part
-        root: base_link_top_plate_part
-      - name: base_link_user_rail_part
-        root: base_link_user_rail_part 
+#      - name: base_link_front_bumper_part
+#        root: base_link_front_bumper_part
+#      - name: base_link_rear_bumper_part
+#        root: base_link_rear_bumper_part
+#      - name: base_link_top_plate_part
+#        root: base_link_top_plate_part
+#      - name: base_link_user_rail_part
+#        root: base_link_user_rail_part 
       - name: top_shelf
         root: top_shelf
       - name: left_shelf_support
