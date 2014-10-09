@@ -507,4 +507,13 @@ const ColorRGBA WhiteColorRGBA(float a)
     return CreateColorRGBA(1.0f, 1.0f, 1.0f, a);
 }
 
+Header CreateHeader(uint32_t seq, const ros::Time& stamp, const std::string& frame_id)
+{
+    Header header;
+    header.seq = seq;
+    header.stamp = stamp;
+    header.frame_id = frame_id;
+    return header;
+}
+
 }

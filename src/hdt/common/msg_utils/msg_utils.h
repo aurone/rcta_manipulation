@@ -259,6 +259,8 @@ const ColorRGBA CyanColorRGBA(float a = 1.0f);
 const ColorRGBA MagentaColorRGBA(float a = 1.0f);
 const ColorRGBA WhiteColorRGBA(float a = 1.0f);
 
+Header CreateHeader(uint32_t seq, const ros::Time& stamp, const std::string& frame_id);
+
 } // namespace std_msgs
 
 
