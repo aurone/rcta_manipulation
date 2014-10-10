@@ -1,6 +1,7 @@
 #include "ArmPlanningNode.h"
 #include <cassert>
 #include <cstdio>
+#include <chrono>
 #include <queue>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_kdl.h>
@@ -143,10 +144,11 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
 
     // initialize the distance field
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field;
+    ROS_INFO_PRETTY("  Octomap:");
     if (!octomap) {
         // still need to instantiate a distance field to check for collisions against other collision groups
-        ROS_WARN_PRETTY("  Octomap from message does not support OcTree type requirements");
-        ROS_WARN_PRETTY("  Planning with empty collision map in the robot frame");
+        ROS_WARN_PRETTY("    Octomap from message does not support OcTree type requirements");
+        ROS_WARN_PRETTY("    Planning with empty collision map in the robot frame");
 
         const double size_x = 3.0, size_y = 3.0, size_z = 3.0;
         const double origin_x = -0.75, origin_y = -1.25, origin_z = -1.0;
@@ -160,16 +162,16 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         distance_field->reset();
     }
     else {
-        ROS_INFO_PRETTY("  Octree: %p", octomap);
+        ROS_INFO_PRETTY("    Octree: %p", octomap);
         size_t num_nodes = octomap->calcNumNodes();
-        ROS_INFO_PRETTY("  Num Nodes: %zd", num_nodes);
-        ROS_INFO_PRETTY("  Memory Usage: %zd bytes", octomap->memoryUsage());
-        ROS_INFO_PRETTY("  Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
+        ROS_INFO_PRETTY("    Num Nodes: %zd", num_nodes);
+        ROS_INFO_PRETTY("    Memory Usage: %zd bytes", octomap->memoryUsage());
+        ROS_INFO_PRETTY("    Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
 
         unsigned num_thresholded, num_other;
         octomap->calcNumThresholdedNodes(num_thresholded, num_other);
-        ROS_INFO_PRETTY("  Num Thresholded Nodes: %u", num_thresholded);
-        ROS_INFO_PRETTY("  Num Other Nodes: %u", num_other);
+        ROS_INFO_PRETTY("    Num Thresholded Nodes: %u", num_thresholded);
+        ROS_INFO_PRETTY("    Num Other Nodes: %u", num_other);
 
         const octomap::point3d octomap_min = octomap->getBBXMin();
         const octomap::point3d octomap_max = octomap->getBBXMax();
@@ -177,12 +179,12 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         double clamping_thresh_min = octomap->getClampingThresMin();
         double clamping_thresh_max = octomap->getClampingThresMax();
 
-        ROS_INFO_PRETTY("  Bounding Box Set: %s", octomap->bbxSet() ? "TRUE" : "FALSE");
-        ROS_INFO_PRETTY("  Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
-        ROS_INFO_PRETTY("  Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
-        ROS_INFO_PRETTY("  Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
-        ROS_INFO_PRETTY("  Clamping Threshold Min: %0.3f", clamping_thresh_min);
-        ROS_INFO_PRETTY("  Clamping Threshold Max: %0.3f", clamping_thresh_max);
+        ROS_INFO_PRETTY("    Bounding Box Set: %s", octomap->bbxSet() ? "TRUE" : "FALSE");
+        ROS_INFO_PRETTY("    Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
+        ROS_INFO_PRETTY("    Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
+        ROS_INFO_PRETTY("    Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
+        ROS_INFO_PRETTY("    Clamping Threshold Min: %0.3f", clamping_thresh_min);
+        ROS_INFO_PRETTY("    Clamping Threshold Max: %0.3f", clamping_thresh_max);
 
         double metric_min_x, metric_min_y, metric_min_z;
         double metric_max_x, metric_max_y, metric_max_z;
@@ -190,28 +192,55 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         octomap->getMetricMin(metric_min_x, metric_min_y, metric_min_z);
         octomap->getMetricMax(metric_max_x, metric_max_y, metric_max_z);
 
-        ROS_INFO_PRETTY("  Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
-        ROS_INFO_PRETTY("  Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
+        ROS_INFO_PRETTY("    Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
+        ROS_INFO_PRETTY("    Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
 
         octomap->getMetricSize(metric_size_x, metric_size_y, metric_size_z);
-        ROS_INFO_PRETTY("  Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
+        ROS_INFO_PRETTY("    Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
 
-        ROS_INFO_PRETTY("  Node Size (max depth): %0.6f", octomap->getNodeSize(octomap->getTreeDepth()));
-        ROS_INFO_PRETTY("  Occupancy Threshold: %0.3f", octomap->getOccupancyThres());
-        ROS_INFO_PRETTY("  Probability Hit: %0.3f", octomap->getProbHit());
-        ROS_INFO_PRETTY("  Probability Miss: %0.3f", octomap->getProbMiss());
-        ROS_INFO_PRETTY("  Resolution: %0.3f", octomap->getResolution());
-        ROS_INFO_PRETTY("  Depth: %u", octomap->getTreeDepth());
-        ROS_INFO_PRETTY("  Tree Type: %s", octomap->getTreeType().c_str());
+        ROS_INFO_PRETTY("    Node Size (max depth): %0.6f", octomap->getNodeSize(octomap->getTreeDepth()));
+        ROS_INFO_PRETTY("    Occupancy Threshold: %0.3f", octomap->getOccupancyThres());
+        ROS_INFO_PRETTY("    Probability Hit: %0.3f", octomap->getProbHit());
+        ROS_INFO_PRETTY("    Probability Miss: %0.3f", octomap->getProbMiss());
+        ROS_INFO_PRETTY("    Resolution: %0.3f", octomap->getResolution());
+        ROS_INFO_PRETTY("    Depth: %u", octomap->getTreeDepth());
+        ROS_INFO_PRETTY("    Tree Type: %s", octomap->getTreeType().c_str());
 
         octomap::point3d metric_min(metric_min_x, metric_min_y, metric_min_z);
         octomap::point3d metric_max(metric_max_x, metric_max_y, metric_max_z);
 
+        ROS_INFO_PRETTY("  Distance Field: ");
+
+        auto start = std::chrono::high_resolution_clock::now();
         distance_field.reset(new distance_field::PropagationDistanceField(*octomap, metric_min, metric_max, max_dist_m));
         if (!distance_field) {
             ROS_ERROR_PRETTY("Failed to instantiate Propagation Distance Field");
             return false;
         }
+        auto finish = std::chrono::high_resolution_clock::now();
+        ROS_INFO("    Instantiating Distance Field took %0.6f seconds", std::chrono::duration<double>(finish - start).count());
+        ROS_INFO("    Distance Field Pointer: %p", distance_field.get());
+        ROS_INFO("    Origin: (%0.3f, %0.3f, %0.3f)", distance_field->getOriginX(), distance_field->getOriginY(), distance_field->getOriginZ());
+        ROS_INFO("    Size (m): (%0.3f, %0.3f, %0.3f)", distance_field->getSizeX(), distance_field->getSizeY(), distance_field->getSizeZ());
+        ROS_INFO("    Resolution: %0.3f", distance_field->getResolution());
+        ROS_INFO("    Size (cells): (%d, %d, %d)", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
+
+        int num_invalid = 0;
+        int dist_field_size_x = distance_field->getXNumCells();
+        int dist_field_size_y = distance_field->getYNumCells();
+        int dist_field_size_z = distance_field->getZNumCells();
+
+        for (int x = 0; x < distance_field->getXNumCells(); ++x) {
+            for (int y = 0; y < distance_field->getYNumCells(); ++y) {
+                for (int z = 0; z < distance_field->getZNumCells(); ++z) {
+                    if (distance_field->getDistance(x, y, z) >= distance_field->getUninitializedDistance()) {
+                        ++num_invalid;
+                    }
+                }
+            }
+        }
+
+        ROS_INFO_PRETTY("    %d of %d cells invalid in distance field", num_invalid, dist_field_size_x * dist_field_size_y * dist_field_size_z);
     }
 
     distance_field_ = std::move(distance_field);
@@ -1017,13 +1046,6 @@ bool ArmPlanningNode::plan_to_joint_goal(
     const hdt::MoveArmCommandGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-
-    sensor_msgs::JointState start_joint_state = start.joint_state;
-    if (!msg_utils::reorder_joints(start_joint_state, robot_model_->joint_names())) {
-        ROS_WARN_PRETTY("Start robot state contains joints other than manipulator joints");
-        return false;
-    }
-
     sensor_msgs::JointState goal_joint_state = goal.goal_joint_state;
     if (!msg_utils::reorder_joints(goal_joint_state, robot_model_->joint_names())) {
         ROS_WARN_PRETTY("Goal state contains joints other than manipulator joints");
