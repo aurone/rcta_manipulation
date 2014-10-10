@@ -53,10 +53,10 @@ private:
     ros::Subscriber joint_states_sub_;
 
     typedef actionlib::SimpleActionServer<hdt::MoveArmCommandAction> MoveArmActionServer;
-    std::unique_ptr<MoveArmActionServer> move_command_server_;
+    std::unique_ptr<MoveArmActionServer> move_arm_command_server_;
 
     typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> JTAC;
-    JTAC action_client_;
+    JTAC follow_trajectory_client_;
 
     bool use_action_server_;
 
@@ -67,7 +67,7 @@ private:
     std::string urdf_string_;
 
     std::string robot_name_;
-    std::string robot_root_;
+    std::string robot_local_frame_;
     hdt::RobotModelPtr robot_model_;
 
     std::unique_ptr<sbpl_arm_planner::RobotModel> planner_robot_model_;
@@ -83,22 +83,24 @@ private:
 
     ros::Duration joint_staleness_threshold_;
 
-    std::vector<double> min_limits_;
-    std::vector<double> max_limits_;
-    std::vector<bool> continuous_;
-
     boost::shared_ptr<urdf::ModelInterface> urdf_model_;
 
     std::vector<std::string> statistic_names_;
+
+    moveit_msgs::PlanningScenePtr planning_scene_;
 
     bool init_robot();
     bool init_collision_model();
     bool init_sbpl();
 
-    bool reinit(const hdt::MoveArmCommandGoal& goal);
-    bool reinit_robot(const hdt::MoveArmCommandGoal& goal);
-    bool reinit_collision_model(const hdt::MoveArmCommandGoal& goal);
-    bool reinit_sbpl(const hdt::MoveArmCommandGoal& goal);
+    bool reinit(
+            const Eigen::Affine3d& T_kinematics_planning,
+            const std::string& planning_frame,
+            octomap::OcTree* octomap);
+
+    bool reinit_robot(const Eigen::Affine3d& T_kinematics_planning);
+    bool reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octree);
+    bool reinit_sbpl();
 
     void move_arm(const hdt::MoveArmCommandGoal::ConstPtr& goal);
 
@@ -133,8 +135,7 @@ private:
 
     bool plan_to_eef_goal(
             const moveit_msgs::PlanningScenePtr& scene,
-            const moveit_msgs::RobotState& start,
-            const hdt::MoveArmCommandGoal& goal,
+            const geometry_msgs::PoseStamped& goal_pose,
             trajectory_msgs::JointTrajectory& traj);
 
     bool plan_to_joint_goal(

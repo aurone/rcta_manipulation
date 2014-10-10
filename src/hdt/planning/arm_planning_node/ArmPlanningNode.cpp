@@ -1,5 +1,10 @@
 #include "ArmPlanningNode.h"
+#include <cassert>
 #include <cstdio>
+#include <queue>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <eigen_conversions/eigen_kdl.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <leatherman/utils.h>
 #include <octomap_msgs/conversions.h>
 #include <sbpl_geometry_utils/utils.h>
@@ -8,6 +13,7 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/hdt_description/RobotModel.h>
+#include <hdt/common/stringifier/stringifier.h>
 #include "HDTRobotModel.h"
 
 namespace hdt
@@ -19,13 +25,16 @@ ArmPlanningNode::ArmPlanningNode() :
     marker_array_pub_(),
     joint_trajectory_pub_(),
     joint_states_sub_(),
-    move_command_server_(),
-    action_client_("arm_controller/joint_trajectory_action"),
+    move_arm_command_server_(),
+    follow_trajectory_client_("arm_controller/joint_trajectory_action"),
+    use_action_server_(false),
     action_set_filename_(),
     kinematics_frame_(),
     planning_frame_(),
     object_filename_(),
     urdf_string_(),
+    robot_name_(),
+    robot_local_frame_(),
     robot_model_(),
     planner_robot_model_(),
     distance_field_(),
@@ -34,8 +43,9 @@ ArmPlanningNode::ArmPlanningNode() :
     sbpl_action_set_(),
     planner_(),
     last_joint_state_(),
+    received_joint_state_(),
+    listener_(),
     joint_staleness_threshold_(10.0),
-    use_action_server_(false),
     urdf_model_(),
     statistic_names_({
         "initial solution planning time",
@@ -45,7 +55,8 @@ ArmPlanningNode::ArmPlanningNode() :
         "final epsilon",
         "solution epsilon",
         "expansions",
-        "solution cost" })
+        "solution cost" }),
+    planning_scene_()
 {
 }
 
@@ -79,16 +90,16 @@ bool ArmPlanningNode::init()
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ArmPlanningNode::joint_states_callback, this);
 
     auto move_command_callback = boost::bind(&ArmPlanningNode::move_arm, this, _1);
-    move_command_server_.reset(new MoveArmActionServer("move_arm_command", move_command_callback, false));
-    if (!move_command_server_) {
+    move_arm_command_server_.reset(new MoveArmActionServer("move_arm_command", move_command_callback, false));
+    if (!move_arm_command_server_) {
         ROS_ERROR("Failed to instantiate Move Arm Action Server");
         return false;
     }
 
-    move_command_server_->start();
+    move_arm_command_server_->start();
 
     ROS_INFO("Waiting for action client \"arm_controller/joint_trajectory_action\"");
-    action_client_.waitForServer();
+    follow_trajectory_client_.waitForServer();
 
     return true;
 }
@@ -101,33 +112,37 @@ int ArmPlanningNode::run()
     return 0;
 }
 
-bool ArmPlanningNode::reinit(const hdt::MoveArmCommandGoal& goal)
+bool ArmPlanningNode::reinit(
+    const Eigen::Affine3d& T_kinematics_planning,
+    const std::string& planning_frame,
+    octomap::OcTree* octree)
 {
-    return reinit_robot(goal) && reinit_collision_model(goal) && reinit_sbpl(goal);
+    ROS_INFO("Reinitializing Planner");
+    return reinit_robot(T_kinematics_planning) && reinit_collision_model(planning_frame, octree) && reinit_sbpl();
 }
 
-bool ArmPlanningNode::reinit_robot(const hdt::MoveArmCommandGoal& goal)
+bool ArmPlanningNode::reinit_robot(const Eigen::Affine3d& T_kinematics_planning)
 {
-    planner_robot_model_->setKinematicsToPlanningTransform(KDL::Frame(), std::string());
+    ROS_INFO("Reinitializing Robot");
+    KDL::Frame F_kinematics_planning;
+    tf::transformEigenToKDL(T_kinematics_planning, F_kinematics_planning);
+    planner_robot_model_->setKinematicsToPlanningTransform(F_kinematics_planning, kinematics_frame_); // todo: is this what string its asking for?
     return true;
 }
 
-bool ArmPlanningNode::reinit_collision_model(const hdt::MoveArmCommandGoal& goal)
+bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octomap)
 {
     ROS_INFO("Reinitializing collision model");
-    // update the world
-    std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(goal.octomap));
-    octomap::OcTree* octree(dynamic_cast<octomap::OcTree*>(octomap.get()));
-    bool valid_octomap = (bool)octree;
 
-    planning_frame_ = valid_octomap ? goal.octomap.header.frame_id : robot_frame_;
+    // if we didn't receive an octomap, we better be planning in the robot's base frame
+    assert(((bool)octomap) ? (true) : (planning_frame == robot_local_frame_));
 
     const double max_dist_m = 0.2;
     const double cell_res_m = 0.02;
 
     // initialize the distance field
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field;
-    if (!valid_octomap) {
+    if (!octomap) {
         // still need to instantiate a distance field to check for collisions against other collision groups
         ROS_WARN("  Octomap from message does not support OcTree type requirements");
         ROS_WARN("  Planning with empty collision map in the robot frame");
@@ -144,24 +159,24 @@ bool ArmPlanningNode::reinit_collision_model(const hdt::MoveArmCommandGoal& goal
         distance_field->reset();
     }
     else {
-        ROS_INFO("  Octree: %p", octree);
-        size_t num_nodes = octree->calcNumNodes();
+        ROS_INFO("  Octree: %p", octomap);
+        size_t num_nodes = octomap->calcNumNodes();
         ROS_INFO("  Num Nodes: %zd", num_nodes);
-        ROS_INFO("  Memory Usage: %zd bytes", octree->memoryUsage());
-        ROS_INFO("  Num Leaf Nodes: %zd", octree->getNumLeafNodes());
+        ROS_INFO("  Memory Usage: %zd bytes", octomap->memoryUsage());
+        ROS_INFO("  Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
 
         unsigned num_thresholded, num_other;
-        octree->calcNumThresholdedNodes(num_thresholded, num_other);
+        octomap->calcNumThresholdedNodes(num_thresholded, num_other);
         ROS_INFO("  Num Thresholded Nodes: %u", num_thresholded);
         ROS_INFO("  Num Other Nodes: %u", num_other);
 
-        const octomap::point3d octomap_min = octree->getBBXMin();
-        const octomap::point3d octomap_max = octree->getBBXMax();
-        const octomap::point3d octomap_center = octree->getBBXCenter();
-        double clamping_thresh_min = octree->getClampingThresMin();
-        double clamping_thresh_max = octree->getClampingThresMax();
+        const octomap::point3d octomap_min = octomap->getBBXMin();
+        const octomap::point3d octomap_max = octomap->getBBXMax();
+        const octomap::point3d octomap_center = octomap->getBBXCenter();
+        double clamping_thresh_min = octomap->getClampingThresMin();
+        double clamping_thresh_max = octomap->getClampingThresMax();
 
-        ROS_INFO("  Bounding Box Set: %s", octree->bbxSet() ? "TRUE" : "FALSE");
+        ROS_INFO("  Bounding Box Set: %s", octomap->bbxSet() ? "TRUE" : "FALSE");
         ROS_INFO("  Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
         ROS_INFO("  Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
         ROS_INFO("  Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
@@ -171,24 +186,24 @@ bool ArmPlanningNode::reinit_collision_model(const hdt::MoveArmCommandGoal& goal
         double metric_min_x, metric_min_y, metric_min_z;
         double metric_max_x, metric_max_y, metric_max_z;
         double metric_size_x, metric_size_y, metric_size_z;
-        octree->getMetricMin(metric_min_x, metric_min_y, metric_min_z);
-        octree->getMetricMax(metric_max_x, metric_max_y, metric_max_z);
+        octomap->getMetricMin(metric_min_x, metric_min_y, metric_min_z);
+        octomap->getMetricMax(metric_max_x, metric_max_y, metric_max_z);
 
         ROS_INFO("  Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
         ROS_INFO("  Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
 
-        octree->getMetricSize(metric_size_x, metric_size_y, metric_size_z);
+        octomap->getMetricSize(metric_size_x, metric_size_y, metric_size_z);
         ROS_INFO("  Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
 
-        ROS_INFO("  Node Size (max depth): %0.6f", octree->getNodeSize(octree->getTreeDepth()));
-        ROS_INFO("  Occupancy Threshold: %0.3f", octree->getOccupancyThres());
-        ROS_INFO("  Probability Hit: %0.3f", octree->getProbHit());
-        ROS_INFO("  Probability Miss: %0.3f", octree->getProbMiss());
-        ROS_INFO("  Resolution: %0.3f", octree->getResolution());
-        ROS_INFO("  Depth: %u", octree->getTreeDepth());
-        ROS_INFO("  Tree Type: %s", octree->getTreeType().c_str());
+        ROS_INFO("  Node Size (max depth): %0.6f", octomap->getNodeSize(octomap->getTreeDepth()));
+        ROS_INFO("  Occupancy Threshold: %0.3f", octomap->getOccupancyThres());
+        ROS_INFO("  Probability Hit: %0.3f", octomap->getProbHit());
+        ROS_INFO("  Probability Miss: %0.3f", octomap->getProbMiss());
+        ROS_INFO("  Resolution: %0.3f", octomap->getResolution());
+        ROS_INFO("  Depth: %u", octomap->getTreeDepth());
+        ROS_INFO("  Tree Type: %s", octomap->getTreeType().c_str());
 
-        distance_field.reset(new distance_field::PropagationDistanceField(*octree, octomap_min, octomap_max, max_dist_m));
+        distance_field.reset(new distance_field::PropagationDistanceField(*octomap, octomap_min, octomap_max, max_dist_m));
         if (!distance_field) {
             ROS_ERROR("Failed to instantiate Propagation Distance Field");
             return false;
@@ -204,8 +219,7 @@ bool ArmPlanningNode::reinit_collision_model(const hdt::MoveArmCommandGoal& goal
         return false;
     }
 
-    std::string collision_model_frame = valid_octomap ? goal.octomap.header.frame_id : robot_root_;
-    grid_->setReferenceFrame(collision_model_frame);
+    grid_->setReferenceFrame(planning_frame);
 
     ROS_INFO("  OccupancyGrid:");
     int num_cells_x, num_cells_y, num_cells_z;
@@ -227,7 +241,7 @@ bool ArmPlanningNode::reinit_collision_model(const hdt::MoveArmCommandGoal& goal
     }
 
     const std::string group_name = "manipulator"; // This has something to do with the collision checking config file?
-    if (!collision_checker_->init(group_name) ||
+    if (!collision_checker_->init(urdf_string_, group_name) ||
         !collision_checker_->setPlanningJoints(robot_model_->joint_names()))
     {
         ROS_ERROR("  Failed to initialize SBPL Collision Checker");
@@ -238,8 +252,9 @@ bool ArmPlanningNode::reinit_collision_model(const hdt::MoveArmCommandGoal& goal
     return true;
 }
 
-bool ArmPlanningNode::reinit_sbpl(const hdt::MoveArmCommandGoal& goal)
+bool ArmPlanningNode::reinit_sbpl()
 {
+    ROS_INFO("Reinitializing SBPL");
     planner_.reset(new sbpl_arm_planner::SBPLArmPlannerInterface(
             planner_robot_model_.get(), collision_checker_.get(), sbpl_action_set_.get(), distance_field_.get()));
 
@@ -258,6 +273,8 @@ bool ArmPlanningNode::reinit_sbpl(const hdt::MoveArmCommandGoal& goal)
 
 bool ArmPlanningNode::init_robot()
 {
+    ROS_INFO("Initializing Robot Models");
+
     if (!nh_.hasParam("robot_description")) {
         ROS_ERROR("Missing parameter \"robot_description\"");
         return false;
@@ -265,24 +282,55 @@ bool ArmPlanningNode::init_robot()
 
     nh_.getParam("robot_description", urdf_string_);
 
-    auto urdf_model = urdf::parseURDF(urdf_string_);
+    boost::shared_ptr<urdf::ModelInterface> urdf_model = urdf::parseURDF(urdf_string_);
     if (!urdf_model) {
         ROS_ERROR("Failed to parse URDF");
         return false;
     }
 
-    robot_name_ = urdf_model->getName();
-    robot_root_ = urdf_model->getRoot()->name;
+    std::vector<std::string> all_joints;
+    all_joints.reserve(urdf_model->joints_.size());
 
-    size_t num_robot_joints = urdf_model->joints_.size();
+    std::queue<boost::shared_ptr<const urdf::Link>> links;
+    links.push(urdf_model->getRoot());
+    // traverse the tree in breadth-first fashion to gather all the joints for this model
+    while (!links.empty()) {
+        // grab the next link
+        boost::shared_ptr<const urdf::Link> link = links.front();
+        links.pop();
+
+        // gather the child joints of this link
+        for (const boost::shared_ptr<urdf::Joint>& child_joint : link->child_joints) {
+            if (child_joint->type != urdf::Joint::FIXED) {
+                all_joints.push_back(child_joint->name);
+            }
+        }
+
+        // add all children to the queue
+        for (const boost::shared_ptr<urdf::Link>& child_link : link->child_links) {
+            links.push(child_link);
+        }
+    }
+
+    ROS_INFO("  All Joints (%zd):", all_joints.size());
+    for (const std::string& joint : all_joints) {
+        ROS_INFO("    %s", joint.c_str());
+    }
+
+    robot_name_ = urdf_model->getName();
+    robot_local_frame_ = urdf_model->getRoot()->name;
+    ROS_INFO("  Robot Name: %s", robot_name_.c_str());
+    ROS_INFO("  Robot Local Frame: %s", robot_local_frame_.c_str());
+
+    size_t num_nonfixed_joints = all_joints.size();
     last_joint_state_.header.frame_id = "";
     last_joint_state_.header.seq = 0;
     last_joint_state_.header.stamp = ros::Time(0);
-    last_joint_state_.name = urdf_model->joints_;
-    last_joint_state_.position = std::vector<double>(num_robot_joints, 0.0);
-    last_joint_state_.velocity = std::vector<double>(num_robot_joints, 0.0);
-    last_joint_state_.effort = std::vector<double>(num_robot_joints, 0.0);
-    received_joint_state_ = std::vector<ros::Time>(num_robot_joints, ros::Time(0));
+    last_joint_state_.name = std::move(all_joints);
+    last_joint_state_.position = std::vector<double>(num_nonfixed_joints, 0.0);
+    last_joint_state_.velocity = std::vector<double>(num_nonfixed_joints, 0.0);
+    last_joint_state_.effort = std::vector<double>(num_nonfixed_joints, 0.0);
+    received_joint_state_ = std::vector<ros::Time>(num_nonfixed_joints, ros::Time(0));
 
     // Initialize Robot Model
     robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string_);
@@ -334,61 +382,104 @@ bool ArmPlanningNode::init_sbpl()
         return false;
     }
 
+    planning_scene_.reset(new moveit_msgs::PlanningScene);
+    if (!planning_scene_) {
+        ROS_ERROR("Failed to instantiate Planning Scene");
+        return false;
+    }
+
     return true;
 }
 
 void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 {
     ros::Time now = ros::Time::now();
-    ROS_INFO("Received Move Arm Command Goal");
+    ROS_INFO("Received Move Arm Command Goal at %s", boost::posix_time::to_simple_string(now.toBoost()).c_str());
+
+    // create the octomap here
+    std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(request->octomap));
+    octomap::OcTree* octree(dynamic_cast<octomap::OcTree*>(octomap.get()));
+    bool valid_octomap = (bool)octree;
+
+    std::string planning_frame;
+    if (valid_octomap) {
+        planning_frame = request->octomap.header.frame_id;
+        ROS_INFO("Valid Octomap. Planning in frame '%s'", planning_frame.c_str());
+    }
+    else {
+        planning_frame = robot_local_frame_;
+        ROS_INFO("Invalid Octomap. Planning in frame '%s'", planning_frame.c_str());
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     // Check for up-to-date state
     ////////////////////////////////////////////////////////////////////////////////
 
     // check for recent joint information
-    if (std::any_of(received_joint_state_.begin(), received_joint_state_.end(),
-        [&](const ros::Time& time) { return time < now - joint_staleness_threshold_; }))
-    {
-        hdt::MoveArmCommandResult result;
-        result.success = false;
-        std::stringstream ss;
-        ss << "Joint information is more than " << joint_staleness_threshold_.toSec() << " seconds old";
-        move_command_server_->setAborted(result, ss.str());
-        return;
+    for (size_t i = 0; i < received_joint_state_.size(); ++i) {
+        const ros::Time& time = received_joint_state_[i];
+        if (time < now - joint_staleness_threshold_) {
+            hdt::MoveArmCommandResult result;
+            result.success = false;
+            std::stringstream ss;
+            ss << "Joint information for joint '" << last_joint_state_.name[i]
+               << "' is more than " << joint_staleness_threshold_.toSec() << " seconds old";
+            ROS_WARN("%s", ss.str().c_str());
+            move_arm_command_server_->setAborted(result, ss.str());
+            return;
+        }
     }
 
+    ROS_INFO("  Joint States are up-to-date (within %0.3f seconds)", joint_staleness_threshold_.toSec());
+
+    // check for recent transform from the robot to the planning frame
     geometry_msgs::Pose robot_pose_planning_frame = geometry_msgs::IdentityPose();
-    if (request->octomap.id.empty()) {
+    if (planning_frame == robot_local_frame_) {
         ROS_WARN("Unidentfied octomap received. Planning in robot's local frame without obstacles");
     }
     else {
-        const std::string& robot_local_frame = robot_root_;
-        tf::StampedTransform map_to_robot;
+        tf::StampedTransform T_map_robot_tf;
         try {
-            listener_.lookupTransform(request->octomap.header.frame_id, robot_local_frame, ros::Time(0), map_to_robot);
-            Eigen::Affine3d map_to_robot_eigen;
-            msg_utils::convert(map_to_robot, map_to_robot_eigen);
-            tf::poseEigenToMsg(map_to_robot_eigen, robot_pose_planning_frame);
+            listener_.lookupTransform(planning_frame, robot_local_frame_, ros::Time(0), T_map_robot_tf);
+            Eigen::Affine3d T_map_to_robot;
+            msg_utils::convert(T_map_robot_tf, T_map_to_robot);
+            tf::poseEigenToMsg(T_map_to_robot, robot_pose_planning_frame);
         }
         catch (const tf::TransformException& ex) {
             hdt::MoveArmCommandResult result;
             result.success = false;
-            move_command_server_->setAborted(result, ex.what());
+            move_arm_command_server_->setAborted(result, ex.what());
             return;
         }
     }
+
+    ROS_INFO("  Robot Pose [%s]: %s", planning_frame.c_str(), to_string(robot_pose_planning_frame).c_str());
+
+    // look up the transform from the kinematics frame (the frame that goals are specified in) to the planning frame
+    tf::StampedTransform kinematics_to_planning_tf;
+    Eigen::Affine3d T_kinematics_planning;
+    try {
+        listener_.lookupTransform(kinematics_frame_, planning_frame, ros::Time(0), kinematics_to_planning_tf);
+        msg_utils::convert(kinematics_to_planning_tf, T_kinematics_planning);
+    }
+    catch (const tf::TransformException& ex) {
+        hdt::MoveArmCommandResult result;
+        result.success = false;
+        move_arm_command_server_->setAborted(result, ex.what());
+        return;
+    }
+
+    ROS_INFO("  Kinematics -> Planning: %s", to_string(T_kinematics_planning).c_str());
 
     ////////////////////////////////////////////////////////////////////////////////
     // Set up the planning scene
     ////////////////////////////////////////////////////////////////////////////////
 
-    moveit_msgs::PlanningScenePtr scene(new moveit_msgs::PlanningScene);
-    scene->name = "manipulation_planning_scene";
+    planning_scene_->name = "manipulation_planning_scene";
 
     moveit_msgs::RobotState robot_state;
     robot_state.joint_state = last_joint_state_;
-    robot_state.multi_dof_joint_state.joint_names = { "world_pose" };
+    robot_state.multi_dof_joint_state.joint_names = { "robot_pose" };
     robot_state.multi_dof_joint_state.joint_transforms.resize(1);
     robot_state.multi_dof_joint_state.joint_transforms[0].translation.x = robot_pose_planning_frame.position.x;
     robot_state.multi_dof_joint_state.joint_transforms[0].translation.y = robot_pose_planning_frame.position.y;
@@ -397,29 +488,32 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     robot_state.multi_dof_joint_state.joint_transforms[0].rotation.x = robot_pose_planning_frame.orientation.x;
     robot_state.multi_dof_joint_state.joint_transforms[0].rotation.y = robot_pose_planning_frame.orientation.y;
     robot_state.multi_dof_joint_state.joint_transforms[0].rotation.z = robot_pose_planning_frame.orientation.z;
-    scene->robot_state = robot_state;
+    planning_scene_->robot_state = robot_state;
 
-    scene->robot_model_name = robot_name_;
-    scene->robot_model_root = robot_root_;
+    planning_scene_->robot_model_name = robot_name_;
+    planning_scene_->robot_model_root = robot_local_frame_;
 
-    scene->fixed_frame_transforms.clear(); // todo: are these necessary?
-    scene->allowed_collision_matrix; // todo: covered by sbpl_collision_model?
-    scene->link_padding.clear(); // todo: covered by sbpl_collision_model?
-    scene->link_scale.clear(); // todo: covered by sbpl_collision_model?
-    scene->object_colors.clear(); // todo: also probably not used
+    planning_scene_->fixed_frame_transforms.clear();  // todo: are these necessary?
+    planning_scene_->allowed_collision_matrix;        // todo: covered by sbpl_collision_model?
+    planning_scene_->link_padding.clear();            // todo: covered by sbpl_collision_model?
+    planning_scene_->link_scale.clear();              // todo: covered by sbpl_collision_model?
+    planning_scene_->object_colors.clear();           // todo: also probably not used
 
-    scene->world; // todo: covered by sbpl_collision_model/occupancy grid?
+    // Fill out header information for the collision map so that sbpl::manipulation doesn't get pissed off
+    planning_scene_->world.collision_objects.clear();
+    // planning_scene_->world.octomap = request->octomap; // todo: covered by sbpl_collision_model/occupancy grid?
+    planning_scene_->world.collision_map.header = std_msgs::CreateHeader(0, ros::Time(0), planning_frame);
 
-    scene->is_diff = false;
+    planning_scene_->is_diff = false;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Reinitialize for updated collision model
     ////////////////////////////////////////////////////////////////////////////////
 
-    if (!reinit(*request)) {
+    if (!reinit(T_kinematics_planning, planning_frame, octree)) {
         hdt::MoveArmCommandResult result;
         result.success = false;
-        move_command_server_->setAborted(result, "Failed to initialize Arm Planner");
+        move_arm_command_server_->setAborted(result, "Failed to initialize Arm Planner");
         return;
     }
 
@@ -427,18 +521,30 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // Plan to the received goal state
     ////////////////////////////////////////////////////////////////////////////////
 
+    collision_checker_->setPlanningScene(*planning_scene_);
+
+    // transform the wrist goal from the kinematics frame to the planning frame
+    Eigen::Affine3d T_kinematics_wrist_goal;
+    tf::poseMsgToEigen(request->goal_pose, T_kinematics_wrist_goal);
+
+    Eigen::Affine3d T_planning_kinematics(T_kinematics_planning.inverse());
+    Eigen::Affine3d T_planning_wrist_goal(T_planning_kinematics * T_kinematics_wrist_goal);
+
+    geometry_msgs::PoseStamped wrist_goal_planning_frame;
+    wrist_goal_planning_frame.header.seq = 0;
+    wrist_goal_planning_frame.header.stamp = ros::Time(0);
+    wrist_goal_planning_frame.header.frame_id = planning_frame;
+    tf::poseEigenToMsg(T_planning_wrist_goal, wrist_goal_planning_frame.pose);
+
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
-
-    collision_checker_->setPlanningScene(*scene);
-
     if (request->type == hdt::MoveArmCommandGoal::JointGoal) {
         ROS_INFO("Received a joint goal");
-        success = plan_to_joint_goal(scene, scene->robot_state, *request, result_traj);
+        success = plan_to_joint_goal(planning_scene_, planning_scene_->robot_state, *request, result_traj);
     }
     else if (request->type == hdt::MoveArmCommandGoal::EndEffectorGoal) {
         ROS_INFO("Received an end effector goal");
-        success = plan_to_eef_goal(scene, scene->robot_state, *request, result_traj);
+        success = plan_to_eef_goal(planning_scene_, wrist_goal_planning_frame, result_traj);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -466,7 +572,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
             ROS_ERROR("Failed to interpolate joint trajectory");
             hdt::MoveArmCommandResult result;
             result.success = false;
-            move_command_server_->setAborted(result);
+            move_arm_command_server_->setAborted(result);
             return;
         }
 
@@ -475,13 +581,13 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
         hdt::MoveArmCommandResult result;
         result.success = true;
         result.trajectory = result_traj;
-        move_command_server_->setSucceeded(result);
+        move_arm_command_server_->setSucceeded(result);
     }
     else {
         hdt::MoveArmCommandResult result;
         result.success = false;
         result.trajectory;
-        move_command_server_->setAborted(result);
+        move_arm_command_server_->setAborted(result);
     }
 }
 
@@ -549,9 +655,10 @@ moveit_msgs::CollisionObject ArmPlanningNode::get_collision_cube(
 }
 
 std::vector<moveit_msgs::CollisionObject>
-ArmPlanningNode::get_collision_cubes(const std::vector<std::vector<double>>& objects,
-                                     const std::vector<std::string>& object_ids,
-                                     const std::string& frame_id)
+ArmPlanningNode::get_collision_cubes(
+    const std::vector<std::vector<double>>& objects,
+    const std::vector<std::string>& object_ids,
+    const std::string& frame_id)
 {
     std::vector<moveit_msgs::CollisionObject> objs;
     std::vector<double> dims(3,0);
@@ -577,37 +684,6 @@ ArmPlanningNode::get_collision_cubes(const std::vector<std::vector<double>>& obj
         objs.push_back(get_collision_cube(pose, dims, frame_id, object_ids.at(i)));
     }
     return objs;
-}
-
-bool ArmPlanningNode::get_initial_configuration(ros::NodeHandle& nh, moveit_msgs::RobotState& state)
-{
-    if (!last_joint_state_.header.stamp.isValid()) {
-        ROS_ERROR("Haven't received a valid joint state yet");
-        return false;
-    }
-
-    state.joint_state = last_joint_state_;
-
-    geometry_msgs::Pose pose;
-    state.multi_dof_joint_state.header.frame_id = "map";
-    state.multi_dof_joint_state.joint_names.resize(1);
-    state.multi_dof_joint_state.joint_transforms.resize(1);
-    state.multi_dof_joint_state.joint_names[0] = "world_pose";
-
-    // identity transform from map to root
-    pose.position.x = 0.0;
-    pose.position.y = 0.0;
-    pose.position.z = 0.0;
-    leatherman::rpyToQuatMsg(0.0, 0.0, 0.0, pose.orientation);
-    state.multi_dof_joint_state.joint_transforms[0].translation.x = pose.position.x;
-    state.multi_dof_joint_state.joint_transforms[0].translation.y = pose.position.y;
-    state.multi_dof_joint_state.joint_transforms[0].translation.z = pose.position.z;
-    state.multi_dof_joint_state.joint_transforms[0].rotation.w = pose.orientation.w;
-    state.multi_dof_joint_state.joint_transforms[0].rotation.x = pose.orientation.x;
-    state.multi_dof_joint_state.joint_transforms[0].rotation.y = pose.orientation.y;
-    state.multi_dof_joint_state.joint_transforms[0].rotation.z = pose.orientation.z;
-
-    return true;
 }
 
 std::vector<moveit_msgs::CollisionObject>
@@ -786,13 +862,14 @@ bool ArmPlanningNode::add_interpolation_to_plan(trajectory_msgs::JointTrajectory
 
 void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory& joint_trajectory)
 {
-    const std::vector<std::string> joint_names = { "arm_1_shoulder_twist",
-                                                   "arm_2_shoulder_lift",
-                                                   "arm_3_elbow_twist",
-                                                   "arm_4_elbow_lift",
-                                                   "arm_5_wrist_twist",
-                                                   "arm_6_wrist_lift",
-                                                   "arm_7_gripper_lift",
+    const std::vector<std::string> joint_names = {
+            "arm_1_shoulder_twist",
+            "arm_2_shoulder_lift",
+            "arm_3_elbow_twist",
+            "arm_4_elbow_lift",
+            "arm_5_wrist_twist",
+            "arm_6_wrist_lift",
+            "arm_7_gripper_lift",
     };
 
     trajectory_msgs::JointTrajectory traj;
@@ -842,12 +919,12 @@ void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory&
         else {
             control_msgs::FollowJointTrajectoryGoal goal;
             goal.trajectory = std::move(traj);
-            action_client_.sendGoal(goal);
-            action_client_.waitForResult();
-            if (action_client_.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            follow_trajectory_client_.sendGoal(goal);
+            follow_trajectory_client_.waitForResult();
+            if (follow_trajectory_client_.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
                 ROS_INFO("Yay! The dishes are now clean");
             }
-            ROS_INFO("Current State: %s", action_client_.getState().toString().c_str());
+            ROS_INFO("Current State: %s", follow_trajectory_client_.getState().toString().c_str());
         }
     }
 }
@@ -878,15 +955,14 @@ void ArmPlanningNode::apply_shortcutting(trajectory_msgs::JointTrajectory& joint
 
 bool ArmPlanningNode::plan_to_eef_goal(
     const moveit_msgs::PlanningScenePtr& scene,
-    const moveit_msgs::RobotState& start,
-    const hdt::MoveArmCommandGoal& goal,
+    const geometry_msgs::PoseStamped& goal_pose,
     trajectory_msgs::JointTrajectory& traj)
 {
     // fill goal state
     moveit_msgs::GetMotionPlan::Request req;
     req.motion_plan_request.goal_constraints.resize(1);
-    std::vector<double> goal_vector = convert_to_sbpl_goal(goal.goal_pose);
-    fill_constraint(goal_vector, planning_frame_, req.motion_plan_request.goal_constraints[0]);
+    std::vector<double> goal_vector = convert_to_sbpl_goal(goal_pose.pose);
+    fill_constraint(goal_vector, goal_pose.header.frame_id, req.motion_plan_request.goal_constraints[0]);
     ROS_WARN("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
     req.motion_plan_request.allowed_planning_time = 10.0; //2.0;
     req.motion_plan_request.start_state = scene->robot_state;
@@ -1010,41 +1086,6 @@ bool ArmPlanningNode::plan_to_joint_goal(
     }
 
     return plan_result;
-
-    /*trajectory_msgs::JointTrajectory interp_traj;
-    interp_traj.header.frame_id = "";
-    interp_traj.joint_names = robot_model_->joint_names();
-    interp_traj.points.resize(2);
-
-    sensor_msgs::JointState start_joint_state = start.joint_state;
-    if (!msg_utils::reorder_joints(start_joint_state, robot_model_->joint_names())) {
-        ROS_WARN("Start robot state contains joints other than manipulator joints");
-        return false;
-    }
-
-    sensor_msgs::JointState goal_joint_state = goal.goal_joint_state;
-    if (!msg_utils::reorder_joints(goal_joint_state, robot_model_->joint_names())) {
-        ROS_WARN("Goal state contains joints other than manipulator joints");
-        return false;
-    }
-
-    interp_traj.points[0].positions = start_joint_state.position;
-    interp_traj.points[1].positions = goal_joint_state.position;
-
-    clamp_to_joint_limits(interp_traj.points[0].positions);
-    clamp_to_joint_limits(interp_traj.points[1].positions);
-
-    add_interpolation_to_plan(interp_traj);
-
-    for (const trajectory_msgs::JointTrajectoryPoint& point : interp_traj.points) {
-        double dist = 0.0;
-        if (!collision_checker_->isStateValid(point.positions, false, false, dist)) {
-            return false;
-        }
-    }
-
-    traj = std::move(interp_traj);
-    return true;*/
 }
 
 std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(const geometry_msgs::Pose& pose)
