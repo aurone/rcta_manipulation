@@ -58,6 +58,8 @@ public Q_SLOTS:
     void send_teleport_andalite_command();
     void send_teleport_hdt_command();
 
+    void check_send_octomap(int);
+    void subscribe_to_octomap();
     void copy_current_state();
     void cycle_ik_solutions();
     void send_move_arm_command();
@@ -124,6 +126,8 @@ private:
     QPushButton* send_teleport_andalite_command_button_;
 
     // Arm Command Widgets
+    QCheckBox* octomap_checkbox_;
+    QLineEdit* octomap_topic_line_edit_;
     QPushButton* copy_current_state_button_;
     QPushButton* cycle_ik_solutions_button_;
     QPushButton* send_move_arm_command_button_;
