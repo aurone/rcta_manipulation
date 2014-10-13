@@ -3,6 +3,7 @@
 #include <boost/shared_ptr.hpp>
 #include <sbpl_geometry_utils/utils.h>
 #include <eigen_conversions/eigen_kdl.h>
+#include <leatherman/print.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <urdf/model.h>
@@ -106,14 +107,14 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
 
     // kinematics -> end effector = kinematics -> planning * planning -> end effector
     eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
-    ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
+    ROS_DEBUG("eef in manipulator frame: %s", to_string(eef_transform).c_str());
 
     bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
     if (res) {
-        ROS_INFO("IK Succeeded");
+        ROS_DEBUG("IK Succeeded");
     }
     else {
-        ROS_WARN("IK Failed");
+        ROS_WARN_PRETTY("IK Failed");
     }
     return res;
 }
