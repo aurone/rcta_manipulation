@@ -150,7 +150,7 @@ int main(int argc, char** argv)
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }
 
-    if (!cc->init(group_name)) {
+    if (!cc->init(urdf, group_name)) {
         ROS_ERROR("Failed to initialize collision checking for HDT arm group %s", group_name.c_str());
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }

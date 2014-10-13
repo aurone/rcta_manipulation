@@ -40,6 +40,8 @@ bool reorder_joints(sensor_msgs::JointState& joint_state, const std::vector<std:
 
 bool reorder_joints(trajectory_msgs::JointTrajectory& joint_trajectory, const std::vector<std::string>& joint_order);
 
+int get_joint_index(const sensor_msgs::JointState& joint_state, const std::string& name);
+
 visualization_msgs::Marker create_arrow_marker(const geometry_msgs::Vector3 &scale);
 visualization_msgs::MarkerArray create_triad_marker_arr(const geometry_msgs::Vector3& scale);
 
@@ -256,6 +258,8 @@ const ColorRGBA YellowColorRGBA(float a = 1.0f);
 const ColorRGBA CyanColorRGBA(float a = 1.0f);
 const ColorRGBA MagentaColorRGBA(float a = 1.0f);
 const ColorRGBA WhiteColorRGBA(float a = 1.0f);
+
+Header CreateHeader(uint32_t seq, const ros::Time& stamp, const std::string& frame_id);
 
 } // namespace std_msgs
 

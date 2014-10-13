@@ -58,6 +58,8 @@ public Q_SLOTS:
     void send_teleport_andalite_command();
     void send_teleport_hdt_command();
 
+    void check_send_octomap(int);
+    void subscribe_to_octomap();
     void copy_current_state();
     void cycle_ik_solutions();
     void send_move_arm_command();
@@ -124,6 +126,8 @@ private:
     QPushButton* send_teleport_andalite_command_button_;
 
     // Arm Command Widgets
+    QCheckBox* octomap_checkbox_;
+    QLineEdit* octomap_topic_line_edit_;
     QPushButton* copy_current_state_button_;
     QPushButton* cycle_ik_solutions_button_;
     QPushButton* send_move_arm_command_button_;
@@ -158,9 +162,11 @@ private:
     interactive_markers::InteractiveMarkerServer server_;
 
     ros::Subscriber joint_states_sub_;
+    ros::Subscriber octomap_sub_;
     ros::Publisher robot_markers_pub_;
 
     sensor_msgs::JointState last_joint_state_;
+    octomap_msgs::Octomap::ConstPtr last_octomap_msg_;
 
     std::string tip_link_;
     std::string base_link_;
@@ -234,6 +240,7 @@ private:
     void update_joint_position(int joint_index, double joint_position);
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
+    void octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg);
 
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);

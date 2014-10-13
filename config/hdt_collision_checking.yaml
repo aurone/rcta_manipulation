@@ -1,11 +1,8 @@
 collision_groups:
-
-# disabling collision checking with the rest of the robot until i figure out
-# how to make this clean and platform-agnostic - Andrew
   - name: platform
     type: voxels
-    root_name: arm_mount_panel_dummy      #base_link
-    tip_name: arm_7_gripper_lift_link #top_shelf       #arm_7_gripper_lift_link
+    root_name: base_footprint
+    tip_name: arm_mount_panel_dummy
     collision_links:
 #      - name: base_link
 #        root: base_link
@@ -32,9 +29,9 @@ collision_groups:
       - name: right_shelf_support
         root: right_shelf_support
 
-  - name: hdt_arm
+  - name: manipulator
     type: spheres
-    root_name: arm_mount_panel_dummy #base_link
+    root_name: arm_mount_panel_dummy
     tip_name: arm_7_gripper_lift_link
     collision_links:
     - name: arm_1_shoulder_twist_link
@@ -58,9 +55,9 @@ collision_groups:
     - name: arm_7_gripper_lift_link
       root: arm_7_gripper_lift_link
       spheres: l7_0
-#    - name: gripper_base
-#      root: gripper_base
-#      spheres: gb_0 gb_1 gb_2 gb_3 gb_4 gb_5 gb_6 gb_7 gb_8 gb_9 gb_10 gb_11 gb_12 gb_13 
+    - name: gripper_base
+      root: gripper_base
+      spheres: gb_0 gb_1 gb_2 gb_3 gb_4 gb_5 gb_6 gb_7 gb_8 gb_9 gb_10 gb_11 gb_12 gb_13 
 
 
 collision_spheres:

@@ -75,6 +75,17 @@ bool reorder_joints(trajectory_msgs::JointTrajectory& joint_trajectory, const st
     return true;
 }
 
+int get_joint_index(const sensor_msgs::JointState& joint_state, const std::string& name)
+{
+    for (size_t i = 0; i < joint_state.name.size(); ++i) {
+        const std::string& joint_name = joint_state.name[i];
+        if (joint_name == name) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 visualization_msgs::Marker create_arrow_marker(const geometry_msgs::Vector3 &scale)
 {
     visualization_msgs::Marker arrow_marker;
@@ -494,6 +505,15 @@ const ColorRGBA MagentaColorRGBA(float a)
 const ColorRGBA WhiteColorRGBA(float a)
 {
     return CreateColorRGBA(1.0f, 1.0f, 1.0f, a);
+}
+
+Header CreateHeader(uint32_t seq, const ros::Time& stamp, const std::string& frame_id)
+{
+    Header header;
+    header.seq = seq;
+    header.stamp = stamp;
+    header.frame_id = frame_id;
+    return header;
 }
 
 }

@@ -18,6 +18,7 @@
 #include <geometric_shapes/shape_operations.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/msg_utils/msg_utils.h>
+#include <hdt/common/utils/utils.h>
 
 namespace hdt
 {
@@ -48,6 +49,8 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     teleport_base_command_yaw_box_(nullptr),
     send_teleport_andalite_command_button_(nullptr),
     send_teleport_hdt_command_button_(nullptr),
+    octomap_checkbox_(nullptr),
+    octomap_topic_line_edit_(nullptr),
     copy_current_state_button_(nullptr),
     cycle_ik_solutions_button_(nullptr),
     send_move_arm_command_button_(nullptr),
@@ -301,6 +304,25 @@ void ManipulatorCommandPanel::send_teleport_hdt_command()
     pending_teleport_hdt_command_ = true;
 }
 
+void ManipulatorCommandPanel::check_send_octomap(int)
+{
+	ROS_INFO("Send Octomap: %s", ::boolstr(octomap_checkbox_->isChecked()));
+}
+
+void ManipulatorCommandPanel::subscribe_to_octomap()
+{
+	const std::string octomap_topic = octomap_topic_line_edit_->text().toStdString();
+	last_octomap_msg_.reset();
+	if (octomap_topic.empty()) {
+		ROS_INFO("Shutting down octomap subscriber");
+		octomap_sub_.shutdown();
+	}
+	else {
+		ROS_INFO("Subscribing to octomap topic '%s'", octomap_topic.c_str());
+		octomap_sub_ = nh_.subscribe<octomap_msgs::Octomap>(octomap_topic, 1, &ManipulatorCommandPanel::octomap_callback, this);
+	}
+}
+
 void ManipulatorCommandPanel::copy_current_state()
 {
     std::vector<double> curr_joint_angles = get_current_joint_angles();
@@ -390,6 +412,9 @@ void ManipulatorCommandPanel::send_move_arm_command()
     ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
 
     move_arm_goal.execute_path = true;
+    if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
+        move_arm_goal.octomap = *last_octomap_msg_;
+    }
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
     move_arm_command_client_->sendGoal(move_arm_goal, result_callback);
@@ -413,6 +438,10 @@ void ManipulatorCommandPanel::send_joint_goal()
     move_arm_goal.goal_joint_state.position.reserve(7);
     for (const std::string& joint_name : robot_model_->joint_names()) {
         move_arm_goal.goal_joint_state.position.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
+    }
+
+    if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
+        move_arm_goal.octomap = *last_octomap_msg_;
     }
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
@@ -539,7 +568,7 @@ void ManipulatorCommandPanel::send_grasp_object_command()
     grasp_object_goal.gas_can_in_map.header.frame_id = interactive_marker_frame();
     tf::poseEigenToMsg(object_transform(), grasp_object_goal.gas_can_in_map.pose);
 
-    // TODO: octomap
+    grasp_object_goal.octomap = *last_octomap_msg_;
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::grasp_object_command_result_cb, this, _1, _2);
     grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
@@ -643,6 +672,14 @@ void ManipulatorCommandPanel::setup_gui()
     // arm commands
     QGroupBox* arm_commands_group = new QGroupBox(tr("Arm Commands"));
         QVBoxLayout* arm_commands_layout = new QVBoxLayout;
+            QHBoxLayout* octomap_settings_layout = new QHBoxLayout;
+            	octomap_checkbox_ = new QCheckBox(tr("Send Octomap"));
+            	octomap_checkbox_->setChecked(false);
+            	QLabel* octomap_topic_label = new QLabel(tr("Octomap Topic:"));
+            	octomap_topic_line_edit_ = new QLineEdit;
+			octomap_settings_layout->addWidget(octomap_checkbox_);
+			octomap_settings_layout->addWidget(octomap_topic_label);
+			octomap_settings_layout->addWidget(octomap_topic_line_edit_);
             copy_current_state_button_ = new QPushButton(tr("Copy Arm State"));
             cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
             QGridLayout* joint_state_spinbox_layout = new QGridLayout;
@@ -678,6 +715,7 @@ void ManipulatorCommandPanel::setup_gui()
             send_joint_goal_button_ = new QPushButton(tr("Move Arm to Joint State"));
             send_teleport_hdt_command_button_ = new QPushButton(tr("Teleport HDT"));
             send_viservo_command_button_ = new QPushButton(tr("Visual Servo"));
+		arm_commands_layout->addLayout(octomap_settings_layout);
         arm_commands_layout->addWidget(copy_current_state_button_);
         arm_commands_layout->addWidget(cycle_ik_solutions_button_);
         arm_commands_layout->addLayout(joint_state_spinbox_layout);
@@ -723,6 +761,8 @@ void ManipulatorCommandPanel::setup_gui()
     connect(send_teleport_andalite_command_button_, SIGNAL(clicked()), this, SLOT(send_teleport_andalite_command()));
 
     // arm commands
+    connect(octomap_checkbox_, SIGNAL(stateChanged(int)), this, SLOT(check_send_octomap(int)));
+    connect(octomap_topic_line_edit_, SIGNAL(editingFinished()), this, SLOT(subscribe_to_octomap()));
     connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
     connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
     connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
@@ -1131,6 +1171,11 @@ void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointStat
             last_joint_state_.position[i] = 0.0;
         }
     }
+}
+
+void ManipulatorCommandPanel::octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg)
+{
+    last_octomap_msg_ = msg;
 }
 
 bool ManipulatorCommandPanel::reinit(const std::string& robot_description, std::string& why)

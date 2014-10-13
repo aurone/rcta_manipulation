@@ -149,7 +149,7 @@ private:
     bool check_ik_solution(double solution[], const Eigen::Affine3d& eef_transform) const;
 
     bool extract_joint_info(
-        const boost::shared_ptr<urdf::ModelInterface>& urdf,
+        const urdf::ModelInterface& urdf,
         const std::vector<std::string>& joints,
         std::vector<double>& min_limits,
         std::vector<double>& max_limits,

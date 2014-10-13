@@ -186,20 +186,29 @@ RobotModel::RobotModel(bool enable_safety_limits) :
 
 bool RobotModel::load(const std::string& urdf_string)
 {
-    boost::shared_ptr<urdf::ModelInterface> urdf = urdf::parseURDF(urdf_string);
-    if (!urdf) {
+    boost::shared_ptr<urdf::ModelInterface> urdf_model = urdf::parseURDF(urdf_string);
+    if (!urdf_model) {
         ROS_ERROR("Failed to parse URDF");
         return false;
     }
 
-    std::vector<bool> continuous;
     std::string why;
-    if (!extract_joint_info(urdf, joint_names_, min_limits_, max_limits_, min_safety_limits_, max_safety_limits_, max_velocity_limits_, continuous, why)) {
+    if (!extract_joint_info(
+            *urdf_model,
+            joint_names_,
+            min_limits_,
+            max_limits_, 
+            min_safety_limits_, 
+            max_safety_limits_, 
+            max_velocity_limits_, 
+            continuous_, 
+            why))
+    {
         ROS_ERROR("Failed to extract joint info (%s)", why.c_str());
         return false;
     }
 
-    boost::shared_ptr<const urdf::Joint> first_joint = urdf->getJoint("arm_1_shoulder_twist");
+    boost::shared_ptr<const urdf::Joint> first_joint = urdf_model->getJoint("arm_1_shoulder_twist");
     if (!first_joint) {
         return false;
     }
@@ -476,7 +485,7 @@ bool RobotModel::check_ik_solution(double solution[], const Eigen::Affine3d& eef
 }
 
 bool RobotModel::extract_joint_info(
-    const boost::shared_ptr<urdf::ModelInterface>& urdf_model,
+    const urdf::ModelInterface& urdf_model,
     const std::vector<std::string>& joints,
     std::vector<double>& min_limits_out,
     std::vector<double>& max_limits_out,
@@ -495,7 +504,7 @@ bool RobotModel::extract_joint_info(
 
     bool success = true;
     for (const std::string& joint : joints) {
-        boost::shared_ptr<const urdf::Joint> joint_model = urdf_model->getJoint(joint);
+        boost::shared_ptr<const urdf::Joint> joint_model = urdf_model.getJoint(joint);
 
         if (!joint_model) {
             why = "No joint '" + joint + "'";

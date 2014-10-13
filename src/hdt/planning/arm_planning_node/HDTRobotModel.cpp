@@ -2,6 +2,7 @@
 #include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <sbpl_geometry_utils/utils.h>
+#include <eigen_conversions/eigen_kdl.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <urdf/model.h>
@@ -48,8 +49,10 @@ bool HDTRobotModel::computePlanningLinkFK(const std::vector<double>& angles, std
         return false;
     }
 
-    // mount_frame -> eef = mount_frame -> manipulator_frame * manipulator -> eef
-    res_transform = robot_model_->mount_to_manipulator_transform() * res_transform;
+    Eigen::Affine3d T_planning_kinematics;
+    tf::transformKDLToEigen(this->T_planning_to_kinematics_, T_planning_kinematics);
+    // kinematics -> eef = planning -> kinematics * mount_frame -> manipulator_frame * manipulator -> eef
+    res_transform = T_planning_kinematics * robot_model_->mount_to_manipulator_transform() * res_transform;
 
     Eigen::Vector3d eef_pos(res_transform.translation());
     Eigen::Quaterniond eef_orient(res_transform.rotation());
@@ -98,8 +101,11 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
                         Eigen::Quaterniond(pose[6], pose[3], pose[4], pose[5]);
     }
 
-    // manipulator -> end effector = manipulator -> mount_frame * mount_frame -> end effector
-    eef_transform = robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
+    Eigen::Affine3d T_kinematics_planning;
+    tf::transformKDLToEigen(this->T_kinematics_to_planning_, T_kinematics_planning);
+
+    // kinematics -> end effector = kinematics -> planning * planning -> end effector
+    eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
     ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
 
     bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
