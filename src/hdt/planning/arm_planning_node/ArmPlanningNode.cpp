@@ -15,6 +15,7 @@
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/hdt_description/RobotModel.h>
 #include <hdt/common/stringifier/stringifier.h>
+#include <hdt/common/utils/utils.h>
 #include "HDTRobotModel.h"
 
 namespace hdt
@@ -85,6 +86,9 @@ bool ArmPlanningNode::init()
     else {
         ROS_INFO_PRETTY("Publishing joint trajectories to command");
     }
+
+    ph_.param("apply_shortcutting", apply_shortcutting_, true);
+    ROS_INFO_PRETTY("Apply Shortcutting: %s", boolstr(apply_shortcutting_));
 
     marker_array_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 500);
     joint_trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
@@ -162,14 +166,14 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
     else {
         ROS_INFO_PRETTY("  Octree: %p", octomap);
         size_t num_nodes = octomap->calcNumNodes();
-        ROS_INFO_PRETTY("  Num Nodes: %zd", num_nodes);
-        ROS_INFO_PRETTY("  Memory Usage: %zd bytes", octomap->memoryUsage());
-        ROS_INFO_PRETTY("  Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
+        ROS_INFO_PRETTY("    Num Nodes: %zd", num_nodes);
+        ROS_INFO_PRETTY("    Memory Usage: %zd bytes", octomap->memoryUsage());
+        ROS_INFO_PRETTY("    Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
 
         unsigned num_thresholded, num_other;
         octomap->calcNumThresholdedNodes(num_thresholded, num_other);
-        ROS_INFO_PRETTY("  Num Thresholded Nodes: %u", num_thresholded);
-        ROS_INFO_PRETTY("  Num Other Nodes: %u", num_other);
+        ROS_INFO_PRETTY("    Num Thresholded Nodes: %u", num_thresholded);
+        ROS_INFO_PRETTY("    Num Other Nodes: %u", num_other);
 
         const octomap::point3d octomap_min = octomap->getBBXMin();
         const octomap::point3d octomap_max = octomap->getBBXMax();
@@ -177,12 +181,12 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         double clamping_thresh_min = octomap->getClampingThresMin();
         double clamping_thresh_max = octomap->getClampingThresMax();
 
-        ROS_INFO_PRETTY("  Bounding Box Set: %s", octomap->bbxSet() ? "TRUE" : "FALSE");
-        ROS_INFO_PRETTY("  Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
-        ROS_INFO_PRETTY("  Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
-        ROS_INFO_PRETTY("  Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
-        ROS_INFO_PRETTY("  Clamping Threshold Min: %0.3f", clamping_thresh_min);
-        ROS_INFO_PRETTY("  Clamping Threshold Max: %0.3f", clamping_thresh_max);
+        ROS_INFO_PRETTY("    Bounding Box Set: %s", octomap->bbxSet() ? "TRUE" : "FALSE");
+        ROS_INFO_PRETTY("    Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
+        ROS_INFO_PRETTY("    Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
+        ROS_INFO_PRETTY("    Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
+        ROS_INFO_PRETTY("    Clamping Threshold Min: %0.3f", clamping_thresh_min);
+        ROS_INFO_PRETTY("    Clamping Threshold Max: %0.3f", clamping_thresh_max);
 
         double metric_min_x, metric_min_y, metric_min_z;
         double metric_max_x, metric_max_y, metric_max_z;
@@ -190,19 +194,67 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         octomap->getMetricMin(metric_min_x, metric_min_y, metric_min_z);
         octomap->getMetricMax(metric_max_x, metric_max_y, metric_max_z);
 
-        ROS_INFO_PRETTY("  Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
-        ROS_INFO_PRETTY("  Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
+        ROS_INFO_PRETTY("    Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
+        ROS_INFO_PRETTY("    Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
 
         octomap->getMetricSize(metric_size_x, metric_size_y, metric_size_z);
-        ROS_INFO_PRETTY("  Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
+        ROS_INFO_PRETTY("    Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
 
-        ROS_INFO_PRETTY("  Node Size (max depth): %0.6f", octomap->getNodeSize(octomap->getTreeDepth()));
-        ROS_INFO_PRETTY("  Occupancy Threshold: %0.3f", octomap->getOccupancyThres());
-        ROS_INFO_PRETTY("  Probability Hit: %0.3f", octomap->getProbHit());
-        ROS_INFO_PRETTY("  Probability Miss: %0.3f", octomap->getProbMiss());
-        ROS_INFO_PRETTY("  Resolution: %0.3f", octomap->getResolution());
-        ROS_INFO_PRETTY("  Depth: %u", octomap->getTreeDepth());
-        ROS_INFO_PRETTY("  Tree Type: %s", octomap->getTreeType().c_str());
+        ROS_INFO_PRETTY("    Node Size (max depth): %0.6f", octomap->getNodeSize(octomap->getTreeDepth()));
+        ROS_INFO_PRETTY("    Occupancy Threshold: %0.3f", octomap->getOccupancyThres());
+        ROS_INFO_PRETTY("    Probability Hit: %0.3f", octomap->getProbHit());
+        ROS_INFO_PRETTY("    Probability Miss: %0.3f", octomap->getProbMiss());
+        ROS_INFO_PRETTY("    Resolution: %0.3f", octomap->getResolution());
+        ROS_INFO_PRETTY("    Depth: %u", octomap->getTreeDepth());
+        ROS_INFO_PRETTY("    Tree Type: %s", octomap->getTreeType().c_str());
+
+        // gather octree statistics
+        int num_occupied_octree_cells = 0;
+        std::map<double, int> occupancy_hist;
+        std::map<float, int> value_hist;
+        std::map<bool, int> occupied_hist;
+        for (auto tit = octomap->begin(); tit != octomap->end(); ++tit) {
+            const octomap::OcTreeNode& node = *tit;
+
+            double occupancy = node.getOccupancy();
+            if (occupancy_hist.find(occupancy) == occupancy_hist.end()) {
+                occupancy_hist[occupancy] = 0;
+            }
+            else {
+                ++occupancy_hist[occupancy];
+            }
+
+            float value = node.getValue();
+            if (value_hist.find(value) == value_hist.end()) {
+                value_hist[value] = 0;
+            }
+            else {
+                ++value_hist[value];
+            }
+
+            bool occupied = octomap->isNodeOccupied(node);
+            if (occupied_hist.find(occupied) == occupied_hist.end()) {
+                occupied_hist[occupied] = 0;
+            }
+            else {
+                ++occupied_hist[occupied];
+            }
+        }
+
+        ROS_INFO("    Occupancy Histogram:");
+        for (const auto& entry : occupancy_hist) {
+            ROS_INFO("      %0.3f: %d", entry.first, entry.second);
+        }
+
+        ROS_INFO("    Value Histogram:");
+        for (const auto& entry : value_hist) {
+            ROS_INFO("      %0.3f: %d", entry.first, entry.second);
+        }
+
+        ROS_INFO("    Occupied Histogram:");
+        for (const auto& entry : occupied_hist) {
+            ROS_INFO("      %s: %d", boolstr(entry.first), entry.second);
+        }
 
         octomap::point3d metric_min(metric_min_x, metric_min_y, metric_min_z);
         octomap::point3d metric_max(metric_max_x, metric_max_y, metric_max_z);
@@ -212,6 +264,34 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
             ROS_ERROR_PRETTY("Failed to instantiate Propagation Distance Field");
             return false;
         }
+
+        distance_field->reset();
+        this->addOcTreeToField(distance_field.get(), octomap);
+
+        ROS_INFO("  Distance Field:");
+        ROS_INFO("    Pointer: %p", distance_field.get());
+        ROS_INFO("    Size (m): (%0.3f, %0.3f, %0.3f)", distance_field->getSizeX(), distance_field->getSizeY(), distance_field->getSizeZ());
+        ROS_INFO("    Size (cells): (%d", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
+        ROS_INFO("    Origin (m): (%0.3f, %0.3f, %0.3f)", distance_field->getOriginX(), distance_field->getOriginY(), distance_field->getOriginZ());
+        ROS_INFO("    Resolution (m): %0.3f", distance_field->getResolution());
+        ROS_INFO("    Uninitialized Distance: %0.3f", distance_field->getUninitializedDistance());
+
+        int num_invalid_cells = 0;
+        for (int x = 0; x < distance_field->getXNumCells(); ++x) {
+            for (int y = 0; y < distance_field->getYNumCells(); ++y) {
+                for (int z = 0; z < distance_field->getZNumCells(); ++z) {
+                    if (!distance_field->getDistance(x, y, z) <= 0.0) {
+                        ++num_invalid_cells;
+                    }
+                }
+            }
+        }
+
+        int num_cells = distance_field->getXNumCells() * distance_field->getYNumCells() * distance_field->getZNumCells();
+
+        ROS_INFO("    Num Cells: %d", num_cells);
+        ROS_INFO("      Num Invalid Cells: %d", num_invalid_cells);
+        ROS_INFO("      Num Valid Cells: %d", num_cells - num_invalid_cells);
     }
 
     distance_field_ = std::move(distance_field);
@@ -228,13 +308,13 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
     ROS_INFO_PRETTY("  OccupancyGrid:");
     int num_cells_x, num_cells_y, num_cells_z;
     grid_->getGridSize(num_cells_x, num_cells_y, num_cells_z);
-    ROS_INFO_PRETTY("    Dimensions (cells): %d x %d x %d", num_cells_x, num_cells_y, num_cells_z);
+    ROS_INFO_PRETTY("    Dimensions (cells): (%d, %d, %d)", num_cells_x, num_cells_y, num_cells_z);
     double grid_size_x, grid_size_y, grid_size_z;
     grid_->getWorldSize(grid_size_x, grid_size_y, grid_size_z);
-    ROS_INFO_PRETTY("    Dimensions (world): %0.3f x %0.3f x %0.3f", grid_size_x, grid_size_y, grid_size_z);
+    ROS_INFO_PRETTY("    Dimensions (m): (%0.3f, %0.3f, %0.3f)", grid_size_x, grid_size_y, grid_size_z);
     double grid_origin_x, grid_origin_y, grid_origin_z;
     grid_->getOrigin(grid_origin_x, grid_origin_y, grid_origin_z);
-    ROS_INFO_PRETTY("    Origin (world): < %0.3f, %0.3f, %0.3f >", grid_origin_x, grid_origin_y, grid_origin_z);
+    ROS_INFO_PRETTY("    Origin (m): (%0.3f, %0.3f, %0.3f)", grid_origin_x, grid_origin_y, grid_origin_z);
     ROS_INFO_PRETTY("    Resolution: %0.3f", grid_->getResolution());
     ROS_INFO_PRETTY("    Reference Frame: %s", grid_->getReferenceFrame().c_str());
 
@@ -251,6 +331,14 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         ROS_ERROR_PRETTY("  Failed to initialize SBPL Collision Checker");
         return false;
     }
+
+    auto distance_field_markers = collision_checker_->getVisualization("distance_field");
+    ROS_INFO_PRETTY("Publishing %zd distance field visualization markers", distance_field_markers.markers.size());
+    ROS_INFO_PRETTY("Visualizing marker types:");
+    for (const auto& marker : distance_field_markers.markers) {
+        ROS_INFO_PRETTY("  %s, Num Points: %zd", visualization_msgs_marker_type_to_cstr(marker.type), marker.points.size());
+    }
+    marker_array_pub_.publish(distance_field_markers);
 
     ROS_INFO_PRETTY("Successfully reinitialized collision model");
     return true;
@@ -563,7 +651,9 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
             ROS_INFO_PRETTY("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
         }
 
-        apply_shortcutting(result_traj);
+        if (apply_shortcutting_) {
+            apply_shortcutting(result_traj);
+        }
 
         ROS_INFO_PRETTY("Shortcut trajectory (%zd points):", result_traj.points.size());
         for (int i = 0; i < (int)result_traj.points.size(); ++i) {
@@ -998,7 +1088,9 @@ bool ArmPlanningNode::plan_to_eef_goal(
 
     // visualizations
     marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
-    marker_array_pub_.publish(collision_checker_->getVisualization("distance_field"));
+    auto distance_field_markers = collision_checker_->getVisualization("distance_field");
+    ROS_INFO("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
+    marker_array_pub_.publish(distance_field_markers);
     marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
     marker_array_pub_.publish(planner_->getVisualization("goal"));
 
@@ -1072,8 +1164,9 @@ bool ArmPlanningNode::plan_to_joint_goal(
 
     // visualizations
     marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
-    marker_array_pub_.publish(collision_checker_->getVisualization("distance_field"));
-    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
+    auto distance_field_markers = collision_checker_->getVisualization("distance_field");
+    ROS_INFO("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
+    marker_array_pub_.publish(distance_field_markers);    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
     marker_array_pub_.publish(planner_->getVisualization("goal"));
 
     // visualize, filter, and publish plan
@@ -1108,6 +1201,51 @@ void ArmPlanningNode::clamp_to_joint_limits(
 bool ArmPlanningNode::valid_octomap(const octomap_msgs::Octomap& msg)
 {
     return true;
+}
+
+void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, const octomap::OcTree* octree)
+{
+    //lower extent
+    double min_x, min_y, min_z;
+    df->gridToWorld(0,0,0, min_x, min_y, min_z);
+
+    octomap::point3d bbx_min(min_x, min_y, min_z);
+
+    int num_x = df->getXNumCells();
+    int num_y = df->getYNumCells();
+    int num_z = df->getZNumCells();
+
+    //upper extent
+    double max_x, max_y, max_z;
+    df->gridToWorld(num_x, num_y, num_z, max_x, max_y, max_z);
+
+    octomap::point3d bbx_max(max_x, max_y, max_z);
+
+    EigenSTL::vector_Vector3d points;
+
+    for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(bbx_min,bbx_max), end=octree->end_leafs_bbx(); it!= end; ++it)
+    {
+        if (octree->isNodeOccupied(*it))
+        {
+            if(it.getSize() <= df->getResolution()) {
+                Eigen::Vector3d point(it.getX(), it.getY(), it.getZ());
+                points.push_back(point);
+            }
+            else {
+                double ceil_val = ceil(it.getSize()/df->getResolution())*df->getResolution();
+                for(double x = it.getX()-ceil_val; x < it.getX()+ceil_val; x += df->getResolution()) {
+                for(double y = it.getY()-ceil_val; y < it.getY()+ceil_val; y += df->getResolution()) {
+                for(double z = it.getZ()-ceil_val; z < it.getZ()+ceil_val; z += df->getResolution()) {
+                    points.push_back(Eigen::Vector3d(x,y,z));
+                }
+                }
+                }
+            }
+        }
+    }
+
+    ROS_INFO_PRETTY("Adding %zd points to the distance field", points.size());
+    df->addPointsToField(points);
 }
 
 } //namespace hdt

@@ -89,6 +89,8 @@ private:
 
     moveit_msgs::PlanningScenePtr planning_scene_;
 
+    bool apply_shortcutting_;
+
     bool init_robot();
     bool init_collision_model();
     bool init_sbpl();
@@ -150,6 +152,8 @@ private:
             const std::vector<double>& max_limits);
 
     bool valid_octomap(const octomap_msgs::Octomap& msg);
+
+    void addOcTreeToField(distance_field::DistanceField* df, const octomap::OcTree* octree);
 };
 
 } // namespace hdt

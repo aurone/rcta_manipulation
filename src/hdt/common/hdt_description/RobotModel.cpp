@@ -2,10 +2,11 @@
 
 #include <cassert>
 #include <utility>
-#include <hdt_kinematics/kinematics.h>
+#include <leatherman/print.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <urdf_parser/urdf_parser.h>
+#include <hdt/common/hdt_kinematics/kinematics.h>
 
 #define RM_DEBUG 0
 #if RM_DEBUG
@@ -188,7 +189,7 @@ bool RobotModel::load(const std::string& urdf_string)
 {
     boost::shared_ptr<urdf::ModelInterface> urdf_model = urdf::parseURDF(urdf_string);
     if (!urdf_model) {
-        ROS_ERROR("Failed to parse URDF");
+        ROS_ERROR_PRETTY("Failed to parse URDF");
         return false;
     }
 
@@ -204,7 +205,7 @@ bool RobotModel::load(const std::string& urdf_string)
             continuous_, 
             why))
     {
-        ROS_ERROR("Failed to extract joint info (%s)", why.c_str());
+        ROS_ERROR_PRETTY("Failed to extract joint info (%s)", why.c_str());
         return false;
     }
 
@@ -223,8 +224,8 @@ bool RobotModel::load(const std::string& urdf_string)
 
     mount_frame_to_manipulator_frame_ = joint_origin_transform;
 
-    ROS_INFO("Joint origin translation: (%0.3f, %0.3f, %0.3f)", joint_origin_translation.x(), joint_origin_translation.y(), joint_origin_translation.z());
-    ROS_INFO("Joint origin rotation: (%0.3f, %0.3f, %0.3f, %0.3f)", joint_origin_rotation.w(), joint_origin_rotation.x(), joint_origin_rotation.y(), joint_origin_rotation.z());
+    ROS_INFO_PRETTY("Joint origin translation: (%0.3f, %0.3f, %0.3f)", joint_origin_translation.x(), joint_origin_translation.y(), joint_origin_translation.z());
+    ROS_INFO_PRETTY("Joint origin rotation: (%0.3f, %0.3f, %0.3f, %0.3f)", joint_origin_rotation.w(), joint_origin_rotation.x(), joint_origin_rotation.y(), joint_origin_rotation.z());
 
     return true;
 }
@@ -236,7 +237,7 @@ bool RobotModel::within_joint_limits(const std::vector<double>& joint_vals) cons
     if (!sbpl::utils::AreJointsWithinLimits(joint_vals, lower_limits, upper_limits)) {
         std::vector<double> angles_copy = joint_vals;
         if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, lower_limits, upper_limits)) {
-            ROS_WARN("Joint angles are not within limits when unnormalized");
+            ROS_WARN_PRETTY("Joint angles are not within limits when unnormalized");
             return true;
         }
         else {
@@ -251,7 +252,7 @@ bool RobotModel::within_safety_joint_limits(const std::vector<double>& joint_val
     if (!sbpl::utils::AreJointsWithinLimits(joint_vals, min_safety_limits_, max_safety_limits_)) {
         std::vector<double> angles_copy = joint_vals;
         if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, min_safety_limits_, max_safety_limits_)) {
-            ROS_WARN("Joint angles are not within limits when unnormalized");
+            ROS_WARN_PRETTY("Joint angles are not within limits when unnormalized");
             return true;
         }
         else {
@@ -264,7 +265,7 @@ bool RobotModel::within_safety_joint_limits(const std::vector<double>& joint_val
 bool RobotModel::compute_fk(const std::vector<double>& joint_values, Eigen::Affine3d& eef_transform_out) const
 {
     if (joint_values.size() < 7) {
-        ROS_WARN("Insufficient joint values given to forward kinematics");
+        ROS_WARN_PRETTY("Insufficient joint values given to forward kinematics");
         return false;
     }
 
@@ -524,7 +525,7 @@ bool RobotModel::extract_joint_info(
             max_safety_limits.push_back(joint_model->safety->soft_upper_limit);
         }
         else {
-            ROS_WARN("Absent safety limits for joint '%s'. Overriding to software limits", joint.c_str());
+            ROS_WARN_PRETTY("Absent safety limits for joint '%s'. Overriding to software limits", joint.c_str());
             min_safety_limits.push_back(joint_model->limits->lower);
             max_safety_limits.push_back(joint_model->limits->upper);
         }

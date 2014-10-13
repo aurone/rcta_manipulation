@@ -43,3 +43,5 @@ occupancy_grid:
 # true: use the action server on arm_controller/joint_trajectory
 # false: publish to the topic command
 use_action_server: true 
+
+apply_shortcutting: false
