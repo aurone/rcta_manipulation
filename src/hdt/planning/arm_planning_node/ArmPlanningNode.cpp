@@ -241,19 +241,19 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
             }
         }
 
-        ROS_INFO("    Occupancy Histogram:");
+        ROS_INFO_PRETTY("    Occupancy Histogram:");
         for (const auto& entry : occupancy_hist) {
-            ROS_INFO("      %0.3f: %d", entry.first, entry.second);
+            ROS_INFO_PRETTY("      %0.3f: %d", entry.first, entry.second);
         }
 
-        ROS_INFO("    Value Histogram:");
+        ROS_INFO_PRETTY("    Value Histogram:");
         for (const auto& entry : value_hist) {
-            ROS_INFO("      %0.3f: %d", entry.first, entry.second);
+            ROS_INFO_PRETTY("      %0.3f: %d", entry.first, entry.second);
         }
 
-        ROS_INFO("    Occupied Histogram:");
+        ROS_INFO_PRETTY("    Occupied Histogram:");
         for (const auto& entry : occupied_hist) {
-            ROS_INFO("      %s: %d", boolstr(entry.first), entry.second);
+            ROS_INFO_PRETTY("      %s: %d", boolstr(entry.first), entry.second);
         }
 
         octomap::point3d metric_min(metric_min_x, metric_min_y, metric_min_z);
@@ -268,13 +268,13 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         distance_field->reset();
         this->addOcTreeToField(distance_field.get(), octomap);
 
-        ROS_INFO("  Distance Field:");
-        ROS_INFO("    Pointer: %p", distance_field.get());
-        ROS_INFO("    Size (m): (%0.3f, %0.3f, %0.3f)", distance_field->getSizeX(), distance_field->getSizeY(), distance_field->getSizeZ());
-        ROS_INFO("    Size (cells): (%d", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
-        ROS_INFO("    Origin (m): (%0.3f, %0.3f, %0.3f)", distance_field->getOriginX(), distance_field->getOriginY(), distance_field->getOriginZ());
-        ROS_INFO("    Resolution (m): %0.3f", distance_field->getResolution());
-        ROS_INFO("    Uninitialized Distance: %0.3f", distance_field->getUninitializedDistance());
+        ROS_INFO_PRETTY("  Distance Field:");
+        ROS_INFO_PRETTY("    Pointer: %p", distance_field.get());
+        ROS_INFO_PRETTY("    Size (m): (%0.3f, %0.3f, %0.3f)", distance_field->getSizeX(), distance_field->getSizeY(), distance_field->getSizeZ());
+        ROS_INFO_PRETTY("    Size (cells): (%d", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
+        ROS_INFO_PRETTY("    Origin (m): (%0.3f, %0.3f, %0.3f)", distance_field->getOriginX(), distance_field->getOriginY(), distance_field->getOriginZ());
+        ROS_INFO_PRETTY("    Resolution (m): %0.3f", distance_field->getResolution());
+        ROS_INFO_PRETTY("    Uninitialized Distance: %0.3f", distance_field->getUninitializedDistance());
 
         int num_invalid_cells = 0;
         for (int x = 0; x < distance_field->getXNumCells(); ++x) {
@@ -289,9 +289,9 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
 
         int num_cells = distance_field->getXNumCells() * distance_field->getYNumCells() * distance_field->getZNumCells();
 
-        ROS_INFO("    Num Cells: %d", num_cells);
-        ROS_INFO("      Num Invalid Cells: %d", num_invalid_cells);
-        ROS_INFO("      Num Valid Cells: %d", num_cells - num_invalid_cells);
+        ROS_INFO_PRETTY("    Num Cells: %d", num_cells);
+        ROS_INFO_PRETTY("      Num Invalid Cells: %d", num_invalid_cells);
+        ROS_INFO_PRETTY("      Num Valid Cells: %d", num_cells - num_invalid_cells);
     }
 
     distance_field_ = std::move(distance_field);
@@ -1089,7 +1089,7 @@ bool ArmPlanningNode::plan_to_eef_goal(
     // visualizations
     marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
     auto distance_field_markers = collision_checker_->getVisualization("distance_field");
-    ROS_INFO("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
+    ROS_INFO_PRETTY("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
     marker_array_pub_.publish(distance_field_markers);
     marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
     marker_array_pub_.publish(planner_->getVisualization("goal"));
@@ -1165,7 +1165,7 @@ bool ArmPlanningNode::plan_to_joint_goal(
     // visualizations
     marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
     auto distance_field_markers = collision_checker_->getVisualization("distance_field");
-    ROS_INFO("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
+    ROS_INFO_PRETTY("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
     marker_array_pub_.publish(distance_field_markers);    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
     marker_array_pub_.publish(planner_->getVisualization("goal"));
 
