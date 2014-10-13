@@ -8,6 +8,7 @@
 #include <Eigen/Dense>
 #include <geometry_msgs/Pose.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <visualization_msgs/Marker.h>
 
 ////////////////////////////////
 /// Because, let's be honest ///
@@ -135,6 +136,39 @@ inline std::string to_string(const geometry_msgs::Pose& pose)
     ss << "y: " << pose.orientation.y << ", ";
     ss << "z: " << pose.orientation.z << "} }";
     return ss.str();
+}
+
+inline const char* visualization_msgs_marker_type_to_cstr(int32_t type)
+{
+    switch (type)
+    {
+    case visualization_msgs::Marker::ARROW:
+        return "Arrow";
+    case visualization_msgs::Marker::CUBE:
+        return "Cube";
+    case visualization_msgs::Marker::SPHERE:
+        return "Sphere";
+    case visualization_msgs::Marker::CYLINDER:
+        return "Cylinder";
+    case visualization_msgs::Marker::LINE_STRIP:
+        return "Line Strip";
+    case visualization_msgs::Marker::LINE_LIST:
+        return "Line List";
+    case visualization_msgs::Marker::CUBE_LIST:
+        return "Cube List";
+    case visualization_msgs::Marker::SPHERE_LIST:
+        return "Sphere List";
+    case visualization_msgs::Marker::POINTS:
+        return "Points";
+    case visualization_msgs::Marker::TEXT_VIEW_FACING:
+        return "Text View Facing";
+    case visualization_msgs::Marker::MESH_RESOURCE :
+        return "Mesh Resource";
+    case visualization_msgs::Marker::TRIANGLE_LIST :
+        return "Triangle List";
+    default:
+        return "Unknown";
+    }
 }
 
 #endif
