@@ -769,7 +769,7 @@ int GraspObjectExecutor::run()
                     ROS_INFO_PRETTY("    result.stalled = %s", gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
                 }
 
-                status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION; // Transfer back to planning regardless
+                status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP; // Transfer back to planning regardless
                 sent_gripper_command_ = false; // reset for future gripper goals
             }
         }   break;
