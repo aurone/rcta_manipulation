@@ -27,6 +27,7 @@ enum Status
     INVALID = -1,
     IDLE = 0,
     FAULT,
+    GENERATING_GRASPS,
     PLANNING_ARM_MOTION_TO_PREGRASP,
     EXECUTING_ARM_MOTION_TO_PREGRASP,
     OPENING_GRIPPER,
@@ -102,7 +103,6 @@ private:
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
     std::string move_arm_command_action_name_;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
-    bool generated_grasps_;
     bool sent_move_arm_goal_;
     bool pending_move_arm_command_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;

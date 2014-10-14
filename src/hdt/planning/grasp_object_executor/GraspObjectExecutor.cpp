@@ -18,6 +18,8 @@ std::string to_string(Status status)
         return "Idle";
     case FAULT:
         return "Fault";
+    case GENERATING_GRASPS:
+        return "GeneratingGrasps";
     case PLANNING_ARM_MOTION_TO_PREGRASP:
         return "PlanningArmMotionToPregrasp";
     case EXECUTING_ARM_MOTION_TO_PREGRASP:
@@ -77,7 +79,6 @@ GraspObjectExecutor::GraspObjectExecutor() :
 
     move_arm_command_action_name_("move_arm_command"),
     move_arm_command_client_(),
-    generated_grasps_(false),
     sent_move_arm_goal_(false),
     pending_move_arm_command_(false),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
@@ -287,110 +288,102 @@ int GraspObjectExecutor::run()
                     status_ = GraspObjectExecutionStatus::FAULT;
                 }
                 else {
-                    status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+                    status_ = GraspObjectExecutionStatus::GENERATING_GRASPS;
                 }
             }
         }   break;
         case GraspObjectExecutionStatus::FAULT:
         {
             if (as_->isActive()) {
-                status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+                status_ = GraspObjectExecutionStatus::GENERATING_GRASPS;
             }
+        }   break;
+        case GraspObjectExecutionStatus::GENERATING_GRASPS:
+        {
+            Eigen::Affine3d base_link_to_gas_canister;
+            tf::poseMsgToEigen(current_goal_->gas_can_in_base_link.pose, base_link_to_gas_canister);
+
+            // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
+            int max_num_candidates = 100;
+            std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
+            ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
+
+            visualize_grasp_candidates(grasp_candidates);
+
+            // mount -> wrist = mount -> robot * robot -> wrist
+
+            const std::string robot_frame = current_goal_->gas_can_in_base_link.header.frame_id;
+            const std::string kinematics_frame = "arm_mount_panel_dummy";
+            tf::StampedTransform tf_transform;
+            try {
+                listener_.lookupTransform(robot_frame, kinematics_frame, ros::Time(0), tf_transform);
+            }
+            catch (const tf::TransformException& ex) {
+                hdt_msgs::GraspObjectCommandResult result;
+                result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+                std::stringstream ss;
+                ss << "Failed to lookup transform " << robot_frame << " -> " << kinematics_frame << "; Unable to determine grasp reachability";
+                ROS_WARN("%s", ss.str().c_str());
+                as_->setAborted(result, ss.str());
+                status_ = GraspObjectExecutionStatus::FAULT;
+                break;
+            }
+
+            Eigen::Affine3d robot_to_kinematics;
+            msg_utils::convert(tf_transform, robot_to_kinematics);
+
+            // 2. filter unreachable grasp candidates
+            reachable_grasp_candidates_.clear();
+            reachable_grasp_candidates_.reserve(grasp_candidates.size());
+            for (const GraspCandidate& grasp_candidate : grasp_candidates) {
+                Eigen::Affine3d kinematics_to_grasp_candidate =
+                        robot_to_kinematics.inverse() * grasp_candidate.grasp_candidate_transform;
+
+                std::vector<double> fake_seed(robot_model_->joint_names().size(), 0.0);
+                std::vector<double> sol;
+                if (robot_model_->search_nearest_ik(
+                        kinematics_to_grasp_candidate, fake_seed, sol, sbpl::utils::ToRadians(1.0)))
+                {
+                    GraspCandidate reachable_grasp_candidate(kinematics_to_grasp_candidate, grasp_candidate.u);
+                    reachable_grasp_candidates_.push_back(reachable_grasp_candidate);
+                }
+            }
+
+            ROS_INFO("Produced %zd reachable grasp poses", reachable_grasp_candidates_.size());
+
+            if (reachable_grasp_candidates_.empty()) {
+                ROS_WARN("No reachable grasp candidates available");
+                hdt_msgs::GraspObjectCommandResult result;
+                result.result = hdt_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
+                as_->setAborted(result, "No reachable grasp candidates available");
+                status_ = GraspObjectExecutionStatus::FAULT;
+                break;
+            }
+
+            const double min_u = 0.0;
+            const double max_u = 1.0;
+
+            // 3. sort grasp candidates by desirability (note: more desirable grasps are at the end of the vector)
+            std::sort(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end(),
+                      [&](const GraspCandidate& a, const GraspCandidate& b) -> bool
+                      {
+                          double mid_u = 0.5 * (min_u + max_u);
+                          return fabs(a.u - mid_u) > fabs(b.u - mid_u);
+                      });
+
+            // limit the number of grasp attempts by the configured amount
+            std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
+            while (reachable_grasp_candidates_.size() > max_grasp_candidates_) {
+                reachable_grasp_candidates_.pop_back();
+            }
+            std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
+
+            ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
+
+            status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
         }   break;
         case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
         {
-            ////////////////////////////////////////////////////////////////////////////////
-            // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
-            ////////////////////////////////////////////////////////////////////////////////
-
-            if (!generated_grasps_) {
-                Eigen::Affine3d base_link_to_gas_canister;
-                tf::poseMsgToEigen(current_goal_->gas_can_in_base_link.pose, base_link_to_gas_canister);
-
-                // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
-                int max_num_candidates = 100;
-                std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
-                ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
-
-                visualize_grasp_candidates(grasp_candidates);
-
-                // mount -> wrist = mount -> robot * robot -> wrist
-
-                const std::string robot_frame = current_goal_->gas_can_in_base_link.header.frame_id;
-                const std::string kinematics_frame = "arm_mount_panel_dummy";
-                tf::StampedTransform tf_transform;
-                try {
-                    listener_.lookupTransform(robot_frame, kinematics_frame, ros::Time(0), tf_transform);
-                }
-                catch (const tf::TransformException& ex) {
-                    hdt_msgs::GraspObjectCommandResult result;
-                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-                    std::stringstream ss;
-                    ss << "Failed to lookup transform " << robot_frame << " -> " << kinematics_frame << "; Unable to determine grasp reachability";
-                    ROS_WARN("%s", ss.str().c_str());
-                    as_->setAborted(result, ss.str());
-                    status_ = GraspObjectExecutionStatus::FAULT;
-                    break;
-                }
-
-                Eigen::Affine3d robot_to_kinematics;
-                msg_utils::convert(tf_transform, robot_to_kinematics);
-
-                // 2. filter unreachable grasp candidates
-                reachable_grasp_candidates_.clear();
-                reachable_grasp_candidates_.reserve(grasp_candidates.size());
-                for (const GraspCandidate& grasp_candidate : grasp_candidates) {
-                    Eigen::Affine3d kinematics_to_grasp_candidate =
-                            robot_to_kinematics.inverse() * grasp_candidate.grasp_candidate_transform;
-
-                    std::vector<double> fake_seed(robot_model_->joint_names().size(), 0.0);
-                    std::vector<double> sol;
-                    if (robot_model_->search_nearest_ik(
-                            kinematics_to_grasp_candidate, fake_seed, sol, sbpl::utils::ToRadians(1.0)))
-                    {
-                        GraspCandidate reachable_grasp_candidate(kinematics_to_grasp_candidate, grasp_candidate.u);
-                        reachable_grasp_candidates_.push_back(reachable_grasp_candidate);
-                    }
-                }
-
-                ROS_INFO("Produced %zd reachable grasp poses", reachable_grasp_candidates_.size());
-
-                if (reachable_grasp_candidates_.empty()) {
-                    ROS_WARN("No reachable grasp candidates available");
-                    hdt_msgs::GraspObjectCommandResult result;
-                    result.result = hdt_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
-                    as_->setAborted(result, "No reachable grasp candidates available");
-                    status_ = GraspObjectExecutionStatus::FAULT;
-                    break;
-                }
-
-                const double min_u = 0.0;
-                const double max_u = 1.0;
-
-                // 3. sort grasp candidates by desirability (note: more desirable grasps are at the end of the vector)
-                std::sort(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end(),
-                          [&](const GraspCandidate& a, const GraspCandidate& b) -> bool
-                          {
-                              double mid_u = 0.5 * (min_u + max_u);
-                              return fabs(a.u - mid_u) > fabs(b.u - mid_u);
-                          });
-
-                // limit the number of grasp attempts by the configured amount
-                std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
-                while (reachable_grasp_candidates_.size() > max_grasp_candidates_) {
-                    reachable_grasp_candidates_.pop_back();
-                }
-                std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
-
-                ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
-
-                generated_grasps_ = true;
-            }
-
-            ////////////////////////////////////////////////////////////////////////////////
-            // Main loop of PLANNING_ARM_MOTION_TO_PREGRASP
-            ////////////////////////////////////////////////////////////////////////////////
-
             if (!sent_move_arm_goal_) {
                 hdt_msgs::GraspObjectCommandFeedback feedback;
                 feedback.status = execution_status_to_feedback_status(status_);
@@ -836,7 +829,6 @@ void GraspObjectExecutor::goal_callback()
     ROS_INFO("    Gas Can Pose [robot frame: %s]: %s", current_goal_->gas_can_in_base_link.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_base_link.pose).c_str());
     ROS_INFO("    Octomap ID: %s", current_goal_->octomap.id.c_str());
 
-    generated_grasps_ = false;
     sent_move_arm_goal_ = false;
     pending_move_arm_command_ = false;
 
