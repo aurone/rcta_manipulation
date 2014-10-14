@@ -8,6 +8,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
+#include <leatherman/print.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
@@ -186,10 +187,10 @@ private:
         const ros::Duration& poll_duration,
         const ros::Duration& timeout)
     {
-        ROS_INFO("Waiting for action server '%s'", action_name.c_str());
+        ROS_INFO_PRETTY("Waiting for action server '%s'", action_name.c_str());
 
         if (!action_client) {
-            ROS_WARN("Action client is null");
+            ROS_WARN_PRETTY("Action client is null");
             return false;
         }
 
@@ -199,7 +200,7 @@ private:
             if (!action_client->isServerConnected()) {
                 action_client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
                 if (!action_client) {
-                    ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
+                    ROS_WARN_PRETTY("Failed to reinstantiate action client '%s'", action_name.c_str());
                     return false;
                 }
             }
@@ -210,7 +211,7 @@ private:
 
             poll_duration.sleep();
 
-            ROS_INFO("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
+            ROS_INFO_PRETTY("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
         }
 
         return false;
