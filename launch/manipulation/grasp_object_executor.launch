@@ -1,9 +1,22 @@
 <launch>
-    <node name="grasp_object_executor" pkg="hdt" type="grasp_object_executor" output="screen">
-        <rosparam command="load" file="$(find hdt)/config/gas_canister_v2.yaml"/>
-        <rosparam command="load" file="$(find hdt)/config/grasp_object_executor.yaml"/>
-        <!-- TODO: find out the name of the global costmap topic when running in live -->
-        <remap from="costmap" to="fixed_costmap_sim"/>
-    </node>
+    <arg name="sim" default="false"/>
+
+    <group if="$(arg sim)">
+        <node name="grasp_object_executor" pkg="hdt" type="grasp_object_executor" output="screen">
+            <rosparam command="load" file="$(find hdt)/config/gas_canister_v2.yaml"/>
+            <rosparam command="load" file="$(find hdt)/config/grasp_object_executor.yaml"/>
+            <!-- TODO: find out the name of the global costmap topic when running in live -->
+            <remap from="costmap" to="fixed_costmap_sim"/>
+        </node>
+    </group>
+
+    <group unless="$(arg sim)">
+        <node name="grasp_object_executor" pkg="hdt" type="grasp_object_executor" output="screen">
+            <rosparam command="load" file="$(find hdt)/config/gas_canister_v2.yaml"/>
+            <rosparam command="load" file="$(find hdt)/config/grasp_object_executor.yaml"/>
+            <!-- TODO: find out the name of the global costmap topic when running in live -->
+            <remap from="costmap" to="/global_costmap/costmap/costmap"/>
+        </node>
+    </group>
 </launch>
 
