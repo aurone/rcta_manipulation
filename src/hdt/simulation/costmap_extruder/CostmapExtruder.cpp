@@ -101,7 +101,20 @@ moveit_msgs::OrientedBoundingBox CostmapExtruder::get_bbx(const moveit_msgs::Col
 {
     moveit_msgs::OrientedBoundingBox bbx;
 
-    double min_x, min_y, min_z, max_x, max_y, max_z;
+    if (collision_map.boxes.empty()) {
+        bbx.extents = geometry_msgs::CreatePoint32(0.0, 0.0, 0.0);
+        bbx.pose = geometry_msgs::IdentityPose();
+        return bbx;
+    }
+
+    const auto& first = collision_map.boxes.front();
+    double min_x = first.pose.position.x;
+    double min_y = first.pose.position.y;
+    double min_z = first.pose.position.z;
+    double max_x = first.pose.position.x;
+    double max_y = first.pose.position.y;
+    double max_z = first.pose.position.z;
+
     for (const auto& obbx : collision_map.boxes) {
         if (obbx.pose.position.x < min_x) {
             min_x = obbx.pose.position.x;
