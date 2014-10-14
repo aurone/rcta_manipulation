@@ -15,7 +15,7 @@ std::string GripperCommandActionExecutor::to_string(RunResult r)
     case SUCCESS:
         return "SUCCESS";
     case FAILED_TO_INITIALIZE:
-        return "FAILED_TO_INITIALIZE";    
+        return "FAILED_TO_INITIALIZE";
     default:
         return "INVAILD";
     }

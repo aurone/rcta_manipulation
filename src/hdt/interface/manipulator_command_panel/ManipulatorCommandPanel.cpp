@@ -19,6 +19,7 @@
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/utils/utils.h>
+#include <hdt/control/robotiq_controllers/gripper_model.h>
 
 namespace hdt
 {
@@ -38,6 +39,8 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     pending_teleport_andalite_command_(false),
     teleport_hdt_command_client_(),
     pending_teleport_hdt_command_(false),
+    gripper_command_client_(),
+    pending_gripper_command_(false),
     robot_description_line_edit_(nullptr),
     refresh_robot_desc_button_(nullptr),
     global_frame_line_edit_(nullptr),
@@ -315,9 +318,41 @@ void ManipulatorCommandPanel::send_teleport_hdt_command()
     pending_teleport_hdt_command_ = true;
 }
 
+void ManipulatorCommandPanel::send_open_gripper_command()
+{
+    if (!reconnect_client(gripper_command_client_, "gripper_controller/gripper_command_action")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected"));
+        return;
+    }
+
+    control_msgs::GripperCommandGoal gripper_command_goal;
+    gripper_command_goal.command.position = GripperModel().maximum_width();
+    gripper_command_goal.command.max_effort = GripperModel().maximum_force();
+
+    auto result_cb = boost::bind(&ManipulatorCommandPanel::gripper_command_result_cb, this, _1, _2);
+    gripper_command_client_->sendGoal(gripper_command_goal, result_cb);
+    pending_gripper_command_ = true;
+}
+
+void ManipulatorCommandPanel::send_close_gripper_command()
+{
+    if (!reconnect_client(gripper_command_client_, "gripper_controller/gripper_command_action")) {
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected"));
+        return;
+    }
+
+    control_msgs::GripperCommandGoal gripper_command_goal;
+    gripper_command_goal.command.position = GripperModel().minimum_width();
+    gripper_command_goal.command.max_effort = GripperModel().maximum_force();
+
+    auto result_cb = boost::bind(&ManipulatorCommandPanel::gripper_command_result_cb, this, _1, _2);
+    gripper_command_client_->sendGoal(gripper_command_goal, result_cb);
+    pending_gripper_command_ = true;
+}
+
 void ManipulatorCommandPanel::check_send_octomap(int)
 {
-	ROS_INFO("Send Octomap: %s", ::boolstr(octomap_checkbox_->isChecked()));
+    ROS_INFO("Send Octomap: %s", ::boolstr(octomap_checkbox_->isChecked()));
 }
 
 void ManipulatorCommandPanel::subscribe_to_octomap()
@@ -686,13 +721,13 @@ void ManipulatorCommandPanel::setup_gui()
     QGroupBox* arm_commands_group = new QGroupBox(tr("Arm Commands"));
         QVBoxLayout* arm_commands_layout = new QVBoxLayout;
             QHBoxLayout* octomap_settings_layout = new QHBoxLayout;
-            	octomap_checkbox_ = new QCheckBox(tr("Send Octomap"));
-            	octomap_checkbox_->setChecked(false);
-            	QLabel* octomap_topic_label = new QLabel(tr("Octomap Topic:"));
-            	octomap_topic_line_edit_ = new QLineEdit;
-			octomap_settings_layout->addWidget(octomap_checkbox_);
-			octomap_settings_layout->addWidget(octomap_topic_label);
-			octomap_settings_layout->addWidget(octomap_topic_line_edit_);
+                octomap_checkbox_ = new QCheckBox(tr("Send Octomap"));
+                octomap_checkbox_->setChecked(false);
+                QLabel* octomap_topic_label = new QLabel(tr("Octomap Topic:"));
+                octomap_topic_line_edit_ = new QLineEdit;
+            octomap_settings_layout->addWidget(octomap_checkbox_);
+            octomap_settings_layout->addWidget(octomap_topic_label);
+            octomap_settings_layout->addWidget(octomap_topic_line_edit_);
             copy_current_state_button_ = new QPushButton(tr("Copy Arm State"));
             cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
             QGridLayout* joint_state_spinbox_layout = new QGridLayout;
@@ -728,7 +763,7 @@ void ManipulatorCommandPanel::setup_gui()
             send_joint_goal_button_ = new QPushButton(tr("Move Arm to Joint State"));
             send_teleport_hdt_command_button_ = new QPushButton(tr("Teleport HDT"));
             send_viservo_command_button_ = new QPushButton(tr("Visual Servo"));
-		arm_commands_layout->addLayout(octomap_settings_layout);
+        arm_commands_layout->addLayout(octomap_settings_layout);
         arm_commands_layout->addWidget(copy_current_state_button_);
         arm_commands_layout->addWidget(cycle_ik_solutions_button_);
         arm_commands_layout->addLayout(joint_state_spinbox_layout);
@@ -737,6 +772,15 @@ void ManipulatorCommandPanel::setup_gui()
         arm_commands_layout->addWidget(send_teleport_hdt_command_button_);
         arm_commands_layout->addWidget(send_viservo_command_button_);
     arm_commands_group->setLayout(arm_commands_layout);
+
+    // gripper commands
+    QGroupBox* gripper_commands_group = new QGroupBox(tr("Gripper Commands"));
+        QVBoxLayout* gripper_commands_layout = new QVBoxLayout;
+            send_open_gripper_command_button_ = new QPushButton(tr("Open Gripper"));
+            send_close_gripper_command_button_ = new QPushButton(tr("Close Gripper"));
+        gripper_commands_layout->addWidget(send_open_gripper_command_button_);
+        gripper_commands_layout->addWidget(send_close_gripper_command_button_);
+    gripper_commands_group->setLayout(gripper_commands_layout);
 
     // object interaction commands
     QGroupBox* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
@@ -757,6 +801,7 @@ void ManipulatorCommandPanel::setup_gui()
     main_layout->addWidget(general_settings_group);
     main_layout->addWidget(base_commands_group);
     main_layout->addWidget(arm_commands_group);
+    main_layout->addWidget(gripper_commands_group);
     main_layout->addWidget(object_interaction_commands_group);
     setLayout(main_layout);
 
@@ -789,6 +834,10 @@ void ManipulatorCommandPanel::setup_gui()
     connect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
     connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
     connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
+
+    // gripper commands
+    connect(send_open_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_open_gripper_command()));
+    connect(send_close_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_close_gripper_command()));
 
     // object interaction commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
@@ -1566,6 +1615,24 @@ void ManipulatorCommandPanel::teleport_hdt_command_result_cb(
     pending_teleport_hdt_command_ = false;
 }
 
+void ManipulatorCommandPanel::gripper_command_active_cb()
+{
+
+}
+
+void ManipulatorCommandPanel::gripper_command_feedback_cb(
+    const control_msgs::GripperCommandFeedback::ConstPtr& feedback)
+{
+
+}
+
+void ManipulatorCommandPanel::gripper_command_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const control_msgs::GripperCommandResult::ConstPtr& result)
+{
+    pending_gripper_command_ = false;
+}
+
 bool ManipulatorCommandPanel::gatherRobotMarkers(
     const robot_state::RobotState& robot_state,
     const std::vector<std::string>& link_names,
@@ -1709,7 +1776,8 @@ void ManipulatorCommandPanel::update_gui()
         pending_grasp_object_command_      ||
         pending_reposition_base_command_   ||
         pending_teleport_andalite_command_ ||
-        pending_teleport_hdt_command_;
+        pending_teleport_hdt_command_      ||
+        pending_gripper_command_;
 
     pending_motion_command = false;
 

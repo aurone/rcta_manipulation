@@ -10,6 +10,7 @@
 #include <vector>
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
+#include <control_msgs/GripperCommandAction.h>
 #include <hdt_description/RobotModel.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
@@ -57,6 +58,8 @@ public Q_SLOTS:
     void update_base_pose_candidate(int index);
     void send_teleport_andalite_command();
     void send_teleport_hdt_command();
+    void send_open_gripper_command();
+    void send_close_gripper_command();
 
     void check_send_octomap(int);
     void subscribe_to_octomap();
@@ -106,6 +109,10 @@ private:
     std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
     bool pending_teleport_hdt_command_;
 
+    typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
+    std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
+    bool pending_gripper_command_;
+
     /// @}
 
     ///@{ GUI Interface
@@ -141,6 +148,10 @@ private:
     QDoubleSpinBox* j6_spinbox_;
     QDoubleSpinBox* j7_spinbox_;
     QPushButton* send_viservo_command_button_;
+
+    // Gripper Command Widgets
+    QPushButton* send_open_gripper_command_button_;
+    QPushButton* send_close_gripper_command_button_;
 
     // Object Interaction Command Widgets
     QPushButton* send_grasp_object_command_button_;
@@ -277,6 +288,12 @@ private:
     void teleport_hdt_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::TeleportHDTCommandResult::ConstPtr& result);
+
+    void gripper_command_active_cb();
+    void gripper_command_feedback_cb(const control_msgs::GripperCommandFeedback::ConstPtr& feedback);
+    void gripper_command_result_cb(
+            const actionlib::SimpleClientGoalState& state,
+            const control_msgs::GripperCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
             const robot_state::RobotState& robot_state,
