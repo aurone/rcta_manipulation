@@ -31,6 +31,8 @@ std::string to_string(Status status)
         return "ExecutingVisualServoMotionToGrasp";
     case GRASPING_OBJECT:
         return "GraspingObject";
+    case RETRACTING_GRIPPER:
+        return "RetractingGripper";
     case PLANNING_ARM_MOTION_TO_STOW_POSITION:
         return "PlanningArmMotionToStowPosition";
     case EXECUTING_ARM_MOTION_TO_STOW_POSITION:
@@ -422,7 +424,7 @@ int GraspObjectExecutor::run()
                         ros::Duration(5.0)))
                 {
                     std::stringstream ss; ss << "Failed to connect to '" << move_arm_command_action_name_ << "' action server";
-                    ROS_WARN_PRETTY("%s", ss.str().c_str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
                     hdt_msgs::GraspObjectCommandResult result;
                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, ss.str());
@@ -495,7 +497,7 @@ int GraspObjectExecutor::run()
                     result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << gripper_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
-                    ROS_WARN_PRETTY("%s", ss.str().c_str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
@@ -525,17 +527,12 @@ int GraspObjectExecutor::run()
                     status_ = GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
                 }
                 else {
-                    ROS_INFO_PRETTY("Gripper Command failed");
-                    ROS_INFO_PRETTY("    Simple Client Goal State: %s", gripper_command_goal_state_.toString().c_str());
-                    ROS_INFO_PRETTY("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
-                    ROS_INFO_PRETTY("    result.reached_goal = %s",
-                            gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
-                    ROS_INFO_PRETTY("    result.stalled = %s",
-                            gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
-
-                    ROS_WARN_PRETTY("Failed to open gripper");
+                    ROS_WARN_PRETTY("Open Gripper Command failed");
+                    ROS_WARN_PRETTY("    Simple Client Goal State: %s", gripper_command_goal_state_.toString().c_str());
+                    ROS_WARN_PRETTY("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
+                    ROS_WARN_PRETTY("    result.reached_goal = %s", gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
+                    ROS_WARN_PRETTY("    result.stalled = %s", gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
                     status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
-                    break;
                 }
 
                 sent_gripper_command_ = false; // reset for future gripper goals upon exiting
@@ -556,7 +553,7 @@ int GraspObjectExecutor::run()
                     result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << viservo_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
-                    ROS_WARN_PRETTY("%s", ss.str().c_str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
@@ -610,17 +607,9 @@ int GraspObjectExecutor::run()
                     ROS_INFO_PRETTY("Viservo Command failed");
                     ROS_INFO_PRETTY("    Simple Client Goal State: %s", viservo_command_goal_state_.toString().c_str());
                     ROS_INFO_PRETTY("    Error Text: %s", viservo_command_goal_state_.getText().c_str());
-                    ROS_INFO_PRETTY("    result.result = %s",
-                            viservo_command_result_ ?
-                                (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS") :
-                                "null");
-
-                    hdt_msgs::GraspObjectCommandResult result;
-                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
-                    const char* error_text = "Failed to complte visual servo motion to pregrasp";
-                    as_->setAborted(result, error_text);
-                    ROS_WARN_PRETTY("%s", error_text);
-                    status_ = GraspObjectExecutionStatus::FAULT;
+                    ROS_INFO_PRETTY("    result.result = %s", viservo_command_result_ ? (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS") : "null");
+                    ROS_WARN_PRETTY("Failed to complete visual servo motion to pregrasp");
+                    status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
                 }
 
                 sent_viservo_command_ = false; // reset for future viservo goals
@@ -641,7 +630,7 @@ int GraspObjectExecutor::run()
                     result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << viservo_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
-                    ROS_WARN_PRETTY("%s", ss.str().c_str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
@@ -673,18 +662,9 @@ int GraspObjectExecutor::run()
                     ROS_INFO_PRETTY("Viservo Command failed");
                     ROS_INFO_PRETTY("    Simple Client Goal State: %s", viservo_command_goal_state_.toString().c_str());
                     ROS_INFO_PRETTY("    Error Text: %s", viservo_command_goal_state_.getText().c_str());
-                    ROS_INFO_PRETTY("    result.result = %s",
-                            viservo_command_result_ ?
-                                (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS (lol)") :
-                                "null");
-
-                    hdt_msgs::GraspObjectCommandResult result;
-                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
-                    const char* error_text = "Failed to complete visual servo motion to grasp";
-                    as_->setAborted(result, error_text);
-                    ROS_WARN_PRETTY("%s", error_text);
+                    ROS_INFO_PRETTY("    result.result = %s", viservo_command_result_ ? (viservo_command_result_->result == hdt::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS (lol)") : "null");
+                    ROS_WARN_PRETTY("Failed to complete visual servo motion to grasp");
                     status_ = GraspObjectExecutionStatus::FAULT;
-                    break;
                 }
 
                 sent_viservo_command_ = false; // reset for future viservo goals
@@ -692,6 +672,7 @@ int GraspObjectExecutor::run()
         }   break;
         case GraspObjectExecutionStatus::GRASPING_OBJECT:
         {
+            // send the gripper command to close the gripper
             if (!sent_gripper_command_) {
                 ROS_WARN_PRETTY("Sending Gripper Goal to close gripper");
                 if (!wait_for_action_server(
@@ -704,7 +685,7 @@ int GraspObjectExecutor::run()
                     result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
                     std::stringstream ss; ss << "Failed to connect to '" << gripper_command_action_name_ << "' action server";
                     as_->setAborted(result, ss.str());
-                    ROS_WARN_PRETTY("%s", ss.str().c_str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
@@ -719,25 +700,76 @@ int GraspObjectExecutor::run()
                 pending_gripper_command_ = true;
                 sent_gripper_command_ = true;
             }
+
+            // check whether we've grabbed the object
             if (!pending_gripper_command_) {
                 ROS_INFO_PRETTY("Gripper Goal to close gripper is no longer pending");
 
-                if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
-                    (gripper_command_result_->reached_goal || gripper_command_result_->stalled))
-                {
+//                const bool grabbed_object = gripper_command_result_->reached_goal || gripper_command_result_->stalled;
+                const bool grabbed_object = !gripper_command_result_->reached_goal || gripper_command_result_->stalled;
+                if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED && grabbed_object) {
                     ROS_INFO_PRETTY("Gripper Command Succeeded");
                     status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
                 }
                 else {
-                    ROS_INFO_PRETTY("Gripper Command failed");
-                    ROS_INFO_PRETTY("    Simple Client Goal State: %s", gripper_command_goal_state_.toString().c_str());
-                    ROS_INFO_PRETTY("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
-                    ROS_INFO_PRETTY("    result.reached_goal = %s",
-                            gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
-                    ROS_INFO_PRETTY("    result.stalled = %s",
-                            gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
+                    ROS_WARN_PRETTY("Close Gripper Command failed");
+                    ROS_WARN_PRETTY("    Simple Client Goal State: %s", gripper_command_goal_state_.toString().c_str());
+                    ROS_WARN_PRETTY("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
+                    ROS_WARN_PRETTY("    result.reached_goal = %s", gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
+                    ROS_WARN_PRETTY("    result.stalled = %s", gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
+                    status_ = GraspObjectExecutionStatus::RETRACTING_GRIPPER;
                 }
 
+                sent_gripper_command_ = false; // reset for future gripper goals
+            }
+        }   break;
+        case GraspObjectExecutionStatus::RETRACTING_GRIPPER:
+        {
+            // send the first gripper command to close the gripper
+            if (!sent_gripper_command_) {
+                ROS_WARN_PRETTY("Sending Gripper Goal to retract gripper");
+                if (!wait_for_action_server(
+                        gripper_command_client_,
+                        gripper_command_action_name_,
+                        ros::Duration(0.1),
+                        ros::Duration(5.0)))
+                {
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+                    std::stringstream ss; ss << "Failed to connect to '" << gripper_command_action_name_ << "' action server";
+                    as_->setAborted(result, ss.str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
+                    status_ = GraspObjectExecutionStatus::FAULT;
+                    break;
+                }
+
+                control_msgs::GripperCommandGoal gripper_goal;
+                gripper_goal.command.max_effort = GripperModel().maximum_force();
+                gripper_goal.command.position = GripperModel().maximum_width();
+
+                auto result_cb = boost::bind(&GraspObjectExecutor::gripper_command_result_cb, this, _1, _2);
+                gripper_command_client_->sendGoal(gripper_goal, result_cb);
+
+                pending_gripper_command_ = true;
+                sent_gripper_command_ = true;
+            }
+
+            // check whether we've grabbed the object
+            if (!pending_gripper_command_) {
+                ROS_INFO_PRETTY("Gripper Goal to retract gripper is no longer pending");
+
+                if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED) {
+                    ROS_INFO_PRETTY("Gripper Command Succeeded");
+                }
+                else {
+                    ROS_INFO_PRETTY("Close Gripper Command failed");
+                    ROS_INFO_PRETTY("    Simple Client Goal State: %s", gripper_command_goal_state_.toString().c_str());
+                    ROS_INFO_PRETTY("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
+                    ROS_INFO_PRETTY("    result.reached_goal = %s", gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
+                    ROS_INFO_PRETTY("    result.stalled = %s", gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
+                }
+
+                status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION; // Transfer back to planning regardless
                 sent_gripper_command_ = false; // reset for future gripper goals
             }
         }   break;
@@ -756,7 +788,7 @@ int GraspObjectExecutor::run()
                         ros::Duration(5.0)))
                 {
                     std::stringstream ss; ss << "Failed to connect to '" << move_arm_command_action_name_ << "' action server";
-                    ROS_WARN_PRETTY("%s", ss.str().c_str());
+                    ROS_ERROR_PRETTY("%s", ss.str().c_str());
                     hdt_msgs::GraspObjectCommandResult result;
                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, ss.str());
@@ -781,11 +813,6 @@ int GraspObjectExecutor::run()
                 last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::JointGoal;
                 last_move_arm_stow_goal_.goal_joint_state.name = robot_model_->joint_names();
                 last_move_arm_stow_goal_.goal_joint_state.position = next_stow_position.joint_positions;
-
-//                last_move_arm_stow_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
-//                Eigen::Affine3d stow_eef_pose;
-//                robot_model_->compute_fk(next_stow_position.joint_positions, stow_eef_pose);
-//                tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
 
                 last_move_arm_stow_goal_.octomap = use_extrusion_octomap_ ?
                         *current_octomap_ : current_goal_->octomap;
