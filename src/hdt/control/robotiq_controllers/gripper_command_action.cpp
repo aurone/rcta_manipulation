@@ -229,7 +229,10 @@ GripperCommandActionExecutor::RunResult GripperCommandActionExecutor::run()
 
             feedback_.position = gripper_pos;
             feedback_.effort = gripper_force;
-            feedback_.stalled = !gripper_->fingers_in_motion();
+            auto object_status = gripper_->get_object_status();
+            feedback_.stalled = (object_status == ObjectStatus::FingersStoppedDueToContactWhileClosing) ||
+                                (object_status == ObjectStatus::FingersStoppedDueToContactWhileOpening);
+            //!gripper_->fingers_in_motion();
             feedback_.reached_goal = gripper_->completed_positioning();
 
             bool finished = false;
