@@ -643,46 +643,47 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // Post-process the plan and send to the joint trajectory follower
     ////////////////////////////////////////////////////////////////////////////////
 
-    if (success) {
-
-        ROS_INFO_PRETTY("Original joint path (%zd points):", result_traj.points.size());
-        for (int i = 0; i < (int)result_traj.points.size(); ++i) {
-            const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
-            ROS_INFO_PRETTY("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
-        }
-
-        if (apply_shortcutting_) {
-            apply_shortcutting(result_traj);
-        }
-
-        ROS_INFO_PRETTY("Shortcut trajectory (%zd points):", result_traj.points.size());
-        for (int i = 0; i < (int)result_traj.points.size(); ++i) {
-            const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
-            ROS_INFO_PRETTY("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
-        }
-
-        bool interp_res = add_interpolation_to_plan(result_traj);
-        if (!interp_res) {
-            ROS_ERROR_PRETTY("Failed to interpolate joint trajectory");
-            hdt::MoveArmCommandResult result;
-            result.success = false;
-            move_arm_command_server_->setAborted(result);
-            return;
-        }
-
-        publish_trajectory(result_traj);
-
-        hdt::MoveArmCommandResult result;
-        result.success = true;
-        result.trajectory = result_traj;
-        move_arm_command_server_->setSucceeded(result);
-    }
-    else {
+    if (!success) {
         hdt::MoveArmCommandResult result;
         result.success = false;
         result.trajectory;
-        move_arm_command_server_->setAborted(result);
+        move_arm_command_server_->setAborted(result, "Failed to plan path");
+        return;
     }
+
+    ROS_INFO_PRETTY("Original joint path (%zd points):", result_traj.points.size());
+    for (int i = 0; i < (int)result_traj.points.size(); ++i) {
+        const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
+        ROS_INFO_PRETTY("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
+    }
+
+    if (apply_shortcutting_) {
+        apply_shortcutting(result_traj);
+    }
+
+    ROS_INFO_PRETTY("Shortcut trajectory (%zd points):", result_traj.points.size());
+    for (int i = 0; i < (int)result_traj.points.size(); ++i) {
+        const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
+        ROS_INFO_PRETTY("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
+    }
+
+    bool interp_res = add_interpolation_to_plan(result_traj);
+    if (!interp_res) {
+        ROS_ERROR_PRETTY("Failed to interpolate joint trajectory");
+        hdt::MoveArmCommandResult result;
+        result.success = false;
+        move_arm_command_server_->setAborted(result, "Failed to interpolate joint trajectory");
+        return;
+    }
+
+    if (request->execute_path) {
+        publish_trajectory(result_traj);
+    }
+
+    hdt::MoveArmCommandResult result;
+    result.success = true;
+    result.trajectory = result_traj;
+    move_arm_command_server_->setSucceeded(result);
 }
 
 void ArmPlanningNode::fill_constraint(
