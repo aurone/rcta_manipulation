@@ -1,6 +1,7 @@
 #include "GraspObjectExecutor.h"
 
 #include <eigen_conversions/eigen_msg.h>
+#include <leatherman/print.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
 #include <hdt/common/stringifier/stringifier.h>
@@ -64,6 +65,13 @@ bool extract_xml_value(
 GraspObjectExecutor::GraspObjectExecutor() :
     nh_(),
     ph_("~"),
+    costmap_sub_(),
+    last_occupancy_grid_(),
+    current_occupancy_grid_(),
+    use_extrusion_octomap_(false),
+    current_octomap_(),
+    extruder_(100, false),
+    extrusion_octomap_pub_(),
     action_name_("grasp_object_command"),
     as_(),
 
@@ -104,6 +112,10 @@ GraspObjectExecutor::GraspObjectExecutor() :
 
 bool GraspObjectExecutor::initialize()
 {
+    ////////////////////////////////////////////////////////////////////////////////
+    // load robot models
+    ////////////////////////////////////////////////////////////////////////////////
+
     std::string urdf_string;
     if (!nh_.getParam("robot_description", urdf_string)) {
         ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
@@ -115,6 +127,10 @@ bool GraspObjectExecutor::initialize()
         ROS_ERROR("Failed to load Robot Model from the URDF");
         return false;
     }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // download grasping parameters
+    ////////////////////////////////////////////////////////////////////////////////
 
     if (!msg_utils::download_param(ph_, "gas_canister_mesh", gas_can_mesh_path_) ||
         !msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_))
@@ -188,6 +204,18 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
+    if (!msg_utils::download_param(ph_, "use_extrusion_octomap", use_extrusion_octomap_)) {
+        ROS_ERROR("Failed to retrieve 'use_extrusion_octomap' from the param server");
+        return false;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // set up comms
+    ////////////////////////////////////////////////////////////////////////////////
+
+    costmap_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("costmap", 1, &GraspObjectExecutor::occupancy_grid_cb, this);
+    extrusion_octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
+
     marker_arr_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
@@ -247,7 +275,20 @@ int GraspObjectExecutor::run()
         case GraspObjectExecutionStatus::IDLE:
         {
             if (as_->isActive()) {
-                status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+                if (use_extrusion_octomap_ &&
+                    (!current_occupancy_grid_ || !current_octomap_))
+                {
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+                    std::string msg = (bool)current_occupancy_grid_ ?
+                            "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
+                    ROS_WARN_PRETTY("%s", msg.c_str());
+                    as_->setAborted(result, msg.c_str());
+                    status_ = GraspObjectExecutionStatus::FAULT;
+                }
+                else {
+                    status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+                }
             }
         }   break;
         case GraspObjectExecutionStatus::FAULT:
@@ -386,7 +427,8 @@ int GraspObjectExecutor::run()
                 last_move_arm_pregrasp_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
                 tf::poseEigenToMsg(next_best_grasp.grasp_candidate_transform, last_move_arm_pregrasp_goal_.goal_pose);
 
-                last_move_arm_pregrasp_goal_.octomap = current_goal_->octomap;
+                last_move_arm_pregrasp_goal_.octomap = use_extrusion_octomap_ ?
+                        *current_octomap_ : current_goal_->octomap;
 
                 last_move_arm_pregrasp_goal_.execute_path = true;
 
@@ -733,7 +775,8 @@ int GraspObjectExecutor::run()
 //                robot_model_->compute_fk(next_stow_position.joint_positions, stow_eef_pose);
 //                tf::poseEigenToMsg(stow_eef_pose, last_move_arm_stow_goal_.goal_pose);
 
-                last_move_arm_stow_goal_.octomap = current_goal_->octomap;
+                last_move_arm_stow_goal_.octomap = use_extrusion_octomap_ ?
+                        *current_octomap_ : current_goal_->octomap;
 
                 last_move_arm_stow_goal_.execute_path = true;
 
@@ -804,6 +847,15 @@ void GraspObjectExecutor::goal_callback()
     pending_gripper_command_ = false;
 
     next_stow_position_to_attempt_ = 0;
+
+    current_occupancy_grid_ = last_occupancy_grid_;
+    if (use_extrusion_octomap_ && current_occupancy_grid_) {
+        const double HARDCODED_EXTRUSION = 2.0; // Extrude the occupancy grid from 0m to 2m
+        current_octomap_ = extruder_.extrude(*current_occupancy_grid_, HARDCODED_EXTRUSION);
+        if (current_octomap_) {
+            extrusion_octomap_pub_.publish(current_octomap_);
+        }
+    }
 }
 
 void GraspObjectExecutor::preempt_callback()
@@ -865,6 +917,11 @@ void GraspObjectExecutor::gripper_command_result_cb(
     gripper_command_goal_state_ = state;
     gripper_command_result_ = result;
     pending_gripper_command_ = false;
+}
+
+void GraspObjectExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+    last_occupancy_grid_ = msg;
 }
 
 uint8_t GraspObjectExecutor::execution_status_to_feedback_status(GraspObjectExecutionStatus::Status status)

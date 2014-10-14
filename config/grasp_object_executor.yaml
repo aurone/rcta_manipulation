@@ -1,6 +1,6 @@
 wrist_to_tool_transform:
     position:
-        x: 0.13 # 16cm origin
+        x: 0.13 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
         y: 0.0
         z: 0.0
     orientation:
@@ -16,3 +16,5 @@ stow_positions:
     - { name: "two", joint_vector_degs: [ -78.00, -42.00, 11.00, 29.00, 9.00, 10.00, -29.00 ] }
 
 max_grasp_candidates: 4 # the number of grasps to attempt to plan to
+
+use_extrusion_octomap: true

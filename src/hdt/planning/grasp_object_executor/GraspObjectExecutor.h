@@ -8,6 +8,8 @@
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
 #include <hdt_msgs/GraspObjectCommandAction.h>
@@ -15,6 +17,7 @@
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/common/geometry/nurb/NURB.h>
 #include <hdt/common/hdt_description/RobotModel.h>
+#include <hdt/simulation/costmap_extruder/CostmapExtruder.h>
 
 namespace GraspObjectExecutionStatus
 {
@@ -76,6 +79,19 @@ private:
 
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
+
+    ros::Subscriber costmap_sub_;
+
+    typedef nav_msgs::OccupancyGrid::ConstPtr OccupancyGridConstPtr;
+    typedef octomap_msgs::Octomap::ConstPtr OctomapConstPtr;
+
+    OccupancyGridConstPtr last_occupancy_grid_; ///< most recent OccupancyGrid message
+    OccupancyGridConstPtr current_occupancy_grid_; ///< most recent OccupancyGrid message when the goal was received
+
+    bool use_extrusion_octomap_; ///< Whether to override incoming octomaps with an extruded costmap variant
+    OctomapConstPtr current_octomap_; ///< extruded current occupancy grid
+    CostmapExtruder extruder_;
+    ros::Publisher extrusion_octomap_pub_;
 
     hdt::RobotModelConstPtr robot_model_;
 
@@ -160,6 +176,8 @@ private:
     void gripper_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const control_msgs::GripperCommandResult::ConstPtr& result);
+
+    void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 
     template <typename ActionType>
     bool wait_for_action_server(
