@@ -321,7 +321,7 @@ void ManipulatorCommandPanel::send_teleport_hdt_command()
 void ManipulatorCommandPanel::send_open_gripper_command()
 {
     if (!reconnect_client(gripper_command_client_, "gripper_controller/gripper_command_action")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected"));
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected)"));
         return;
     }
 
@@ -337,7 +337,7 @@ void ManipulatorCommandPanel::send_open_gripper_command()
 void ManipulatorCommandPanel::send_close_gripper_command()
 {
     if (!reconnect_client(gripper_command_client_, "gripper_controller/gripper_command_action")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected"));
+        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected)"));
         return;
     }
 
