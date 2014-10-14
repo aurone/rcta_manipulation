@@ -101,12 +101,16 @@ void ManipulatorCommandPanel::load(const rviz::Config& config)
     QString global_frame, robot_description;
     bool use_global_frame;
     float base_x, base_y, base_yaw;
+    float object_x, object_y, object_yaw;
     config.mapGetString("global_frame", &global_frame);
     config.mapGetString("robot_description", &robot_description);
     config.mapGetBool("use_global_frame", &use_global_frame);
     config.mapGetFloat("base_x", &base_x);
     config.mapGetFloat("base_y", &base_y);
     config.mapGetFloat("base_yaw", &base_yaw);
+    config.mapGetFloat("object_x", &object_x);
+    config.mapGetFloat("object_y", &object_y);
+    config.mapGetFloat("object_yaw", &object_yaw);
 
     ROS_INFO("Robot Description: %s", robot_description.toStdString().c_str());
     ROS_INFO("Use Global Frame: %s", use_global_frame ? "true" : "false");
@@ -141,6 +145,9 @@ void ManipulatorCommandPanel::load(const rviz::Config& config)
     }
 
     world_to_robot_ = Eigen::Translation3d(base_x, base_y, 0.0) * Eigen::AngleAxisd(base_yaw, Eigen::Vector3d(0, 0, 1));
+    world_to_object_ = Eigen::Translation3d(object_x, object_y, 0.0) *
+            Eigen::AngleAxisd(object_yaw, Eigen::Vector3d(0, 0, 1));
+
     update_manipulator_marker_pose();
     update_object_marker_pose();
 
@@ -162,6 +169,10 @@ void ManipulatorCommandPanel::save(rviz::Config config) const
     double yaw, pitch, roll;
     msg_utils::get_euler_ypr(robot_transform(), yaw, pitch, roll);
     config.mapSetValue("base_yaw", yaw);
+    config.mapSetValue("object_x", object_transform().translation()(0, 0));
+    config.mapSetValue("object_y", object_transform().translation()(1, 0));
+    msg_utils::get_euler_ypr(object_transform(), yaw, pitch, roll);
+    config.mapSetValue("object_yaw", yaw);
 }
 
 void ManipulatorCommandPanel::refresh_robot_description()
