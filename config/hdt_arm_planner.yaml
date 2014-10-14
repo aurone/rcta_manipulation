@@ -44,4 +44,5 @@ occupancy_grid:
 # false: publish to the topic command
 use_action_server: true 
 
-apply_shortcutting: false
+apply_shortcutting: true
+
