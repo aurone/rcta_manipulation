@@ -86,10 +86,14 @@ private:
     ros::Subscriber costmap_sub_;
 
     typedef nav_msgs::OccupancyGrid::ConstPtr OccupancyGridConstPtr;
+    typedef nav_msgs::OccupancyGrid::Ptr OccupancyGridPtr;
     typedef octomap_msgs::Octomap::ConstPtr OctomapConstPtr;
 
+    double object_filter_radius_m_;
+    ros::Publisher filtered_costmap_pub_;
+
     OccupancyGridConstPtr last_occupancy_grid_; ///< most recent OccupancyGrid message
-    OccupancyGridConstPtr current_occupancy_grid_; ///< most recent OccupancyGrid message when the goal was received
+    OccupancyGridPtr current_occupancy_grid_; ///< copy of most recent OccupancyGrid message when the goal was received
 
     bool use_extrusion_octomap_; ///< Whether to override incoming octomaps with an extruded costmap variant
     OctomapConstPtr current_octomap_; ///< extruded current occupancy grid
@@ -223,6 +227,12 @@ private:
     /// @brief Sample uniformly along the grasp spline to produce pregrasp poses for the wrist
     std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
     void visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps) const;
+
+    void clear_circle_from_grid(nav_msgs::OccupancyGrid& grid, double x, double y, double radius) const;
+    bool within_bounds(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
+    void grid_to_world(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y, double& world_x, double& world_y) const;
+    void world_to_grid(const nav_msgs::OccupancyGrid& grid, double world_x, double world_y, int& grid_x, int& grid_y) const;
+    std::int8_t& grid_at(nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
 };
 
 #endif

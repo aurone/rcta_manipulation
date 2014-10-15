@@ -1,5 +1,6 @@
 #include "GraspObjectExecutor.h"
 
+#include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
@@ -211,14 +212,22 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
+    if (!msg_utils::download_param(ph_, "object_filter_radius_m", object_filter_radius_m_)) {
+        ROS_ERROR("Failed to retrieve 'object_filter_radius_m' from the param server");
+        return false;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // set up comms
     ////////////////////////////////////////////////////////////////////////////////
 
+    // subscribers
     costmap_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("costmap", 1, &GraspObjectExecutor::occupancy_grid_cb, this);
-    extrusion_octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
 
+    // publishers
+    extrusion_octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
     marker_arr_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
+    filtered_costmap_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
@@ -869,11 +878,11 @@ void GraspObjectExecutor::goal_callback()
 {
     ROS_INFO_PRETTY("Received a new goal");
     current_goal_ = as_->acceptNewGoal();
-    ROS_INFO_PRETTY("    Goal ID: %u", current_goal_->id);
-    ROS_INFO_PRETTY("    Retry Count: %d", current_goal_->retry_count);
-    ROS_INFO_PRETTY("    Gas Can Pose [world frame: %s]: %s", current_goal_->gas_can_in_map.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_map.pose).c_str());
-    ROS_INFO_PRETTY("    Gas Can Pose [robot frame: %s]: %s", current_goal_->gas_can_in_base_link.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_base_link.pose).c_str());
-    ROS_INFO_PRETTY("    Octomap ID: %s", current_goal_->octomap.id.c_str());
+    ROS_INFO_PRETTY("  Goal ID: %u", current_goal_->id);
+    ROS_INFO_PRETTY("  Retry Count: %d", current_goal_->retry_count);
+    ROS_INFO_PRETTY("  Gas Can Pose [world frame: %s]: %s", current_goal_->gas_can_in_map.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_map.pose).c_str());
+    ROS_INFO_PRETTY("  Gas Can Pose [robot frame: %s]: %s", current_goal_->gas_can_in_base_link.header.frame_id.c_str(), to_string(current_goal_->gas_can_in_base_link.pose).c_str());
+    ROS_INFO_PRETTY("  Octomap ID: %s", current_goal_->octomap.id.c_str());
 
     sent_move_arm_goal_ = false;
     pending_move_arm_command_ = false;
@@ -886,7 +895,54 @@ void GraspObjectExecutor::goal_callback()
 
     next_stow_position_to_attempt_ = 0;
 
-    current_occupancy_grid_ = last_occupancy_grid_;
+    // make a hard copy of the grid
+    if (last_occupancy_grid_) {
+        current_occupancy_grid_.reset(new nav_msgs::OccupancyGrid);
+        *current_occupancy_grid_ = *last_occupancy_grid_;
+    }
+
+    // get the gas can pose in the frame of the occupancy grid
+    if (current_occupancy_grid_) {
+        const std::string& grid_frame = current_occupancy_grid_->header.frame_id;
+        const std::string& world_frame = current_goal_->gas_can_in_map.header.frame_id;
+
+        geometry_msgs::PoseStamped gas_can_in_grid_frame;
+        if (grid_frame != world_frame) {
+            ROS_INFO_PRETTY("Transforming gas can into frame '%s' to clear from the occupancy grid", grid_frame.c_str());
+            try {
+                geometry_msgs::PoseStamped gas_can_in_world_frame = current_goal_->gas_can_in_map;
+                gas_can_in_world_frame.header.stamp = ros::Time(0);
+
+                gas_can_in_grid_frame.header.frame_id = current_occupancy_grid_->header.frame_id;
+                gas_can_in_grid_frame.header.stamp = ros::Time(0);
+
+                listener_.transformPose(grid_frame, gas_can_in_world_frame, gas_can_in_grid_frame);
+            }
+            catch (const tf::TransformException& ex) {
+                ROS_ERROR_PRETTY("Failed to lookup transform gas can into the grid frame. Assuming Identity");
+                ROS_ERROR_PRETTY("%s", ex.what());
+                gas_can_in_grid_frame = current_goal_->gas_can_in_map;
+            }
+        }
+        else {
+            ROS_INFO_PRETTY("Gas can already exists in grid frame '%s'", grid_frame.c_str());
+            gas_can_in_grid_frame = current_goal_->gas_can_in_map;
+            gas_can_in_grid_frame.header.stamp = ros::Time(0);
+        }
+
+        ROS_INFO_PRETTY("Gas Can Pose [grid frame: %s]: %s", grid_frame.c_str(), to_string(gas_can_in_grid_frame.pose).c_str());
+
+        // todo: save all the cells that didn't need to be cleared, so that we can check for their existence later
+
+        clear_circle_from_grid(
+                *current_occupancy_grid_,
+                gas_can_in_grid_frame.pose.position.x,
+                gas_can_in_grid_frame.pose.position.y,
+                object_filter_radius_m_);
+    }
+
+    filtered_costmap_pub_.publish(current_occupancy_grid_);
+
     if (use_extrusion_octomap_ && current_occupancy_grid_) {
         const double HARDCODED_EXTRUSION = 2.0; // Extrude the occupancy grid from 0m to 2m
         current_octomap_ = extruder_.extrude(*current_occupancy_grid_, HARDCODED_EXTRUSION);
@@ -1154,4 +1210,83 @@ void GraspObjectExecutor::visualize_grasp_candidates(const std::vector<GraspCand
 
     ROS_INFO_PRETTY("Visualizing %zd triad markers", all_triad_markers.markers.size());
     marker_arr_pub_.publish(all_triad_markers);
+}
+
+void GraspObjectExecutor::clear_circle_from_grid(
+    nav_msgs::OccupancyGrid& grid,
+    double circle_x, double circle_y,
+    double circle_radius) const
+{
+    ROS_INFO_PRETTY("Clearing circle at (%0.3f, %0.3f) with radius %0.3f from costmap", circle_x, circle_y, circle_radius);
+    Eigen::Vector2d circle_center(circle_x, circle_y);
+
+    // get the min and max grid coordinates to scan
+    Eigen::Vector2i min_grid, max_grid;
+    world_to_grid(grid, circle_x - circle_radius, circle_y - circle_radius, min_grid(0), min_grid(1));
+    max_grid(0) = (int)std::ceil((circle_x + circle_radius - grid.info.origin.position.x) / grid.info.resolution);
+    max_grid(1) = (int)std::ceil((circle_y + circle_radius - grid.info.origin.position.y) / grid.info.resolution);
+
+    ROS_INFO_PRETTY("Clearing circle points within [%d, %d] x [%d, %d]", min_grid(0), min_grid(1), max_grid(0), max_grid(1));
+
+    int num_cleared = 0;
+    for (int grid_x = min_grid(0); grid_x < max_grid(0); ++grid_x) {
+        for (int grid_y = min_grid(1); grid_y <  max_grid(1); ++grid_y) {
+            Eigen::Vector2i gp(grid_x, grid_y);
+            if (!within_bounds(grid, gp(0), gp(1))) {
+                ROS_WARN_PRETTY("Grid point (%d, %d) is outside of costmap bounds", gp(0), gp(1));
+                continue;
+            }
+
+            Eigen::Vector2d wp;
+            grid_to_world(grid, grid_x, grid_y, wp(0), wp(1));
+
+            Eigen::Vector2d bl = wp - Eigen::Vector2d(-0.5 * grid.info.resolution, -0.5 * grid.info.resolution);
+            Eigen::Vector2d br = wp - Eigen::Vector2d(0.5 * grid.info.resolution, -0.5 * grid.info.resolution);
+            Eigen::Vector2d tr = wp - Eigen::Vector2d(0.5 * grid.info.resolution, 0.5 * grid.info.resolution);
+            Eigen::Vector2d tl = wp - Eigen::Vector2d(-0.5 * grid.info.resolution, 0.5 * grid.info.resolution);
+            if ((bl - circle_center).norm() <= circle_radius ||
+                (br - circle_center).norm() <= circle_radius ||
+                (tr - circle_center).norm() <= circle_radius ||
+                (tl - circle_center).norm() <= circle_radius)
+            {
+                grid_at(grid, gp(0), gp(1)) = 0;
+                ++num_cleared;
+                ROS_INFO_PRETTY("Clearing cell (%d, %d)", gp(0), gp(1));
+            }
+        }
+    }
+
+    ROS_INFO_PRETTY("Cleared %d cells", num_cleared);
+}
+
+bool GraspObjectExecutor::within_bounds(const nav_msgs::OccupancyGrid& grid, int x, int y) const
+{
+    return x >= 0 && x < grid.info.width && y >= 0 && y < grid.info.height;
+}
+
+void GraspObjectExecutor::grid_to_world(
+    const nav_msgs::OccupancyGrid& grid,
+    int grid_x,
+    int grid_y,
+    double& world_x,
+    double& world_y) const
+{
+    world_x = grid_x * grid.info.resolution + 0.5 * grid.info.resolution + grid.info.origin.position.x;
+    world_y = grid_y * grid.info.resolution + 0.5 * grid.info.resolution + grid.info.origin.position.y;
+}
+
+void GraspObjectExecutor::world_to_grid(
+    const nav_msgs::OccupancyGrid& grid,
+    double world_x,
+    double world_y,
+    int& grid_x,
+    int& grid_y) const
+{
+    grid_x = (int)((world_x - grid.info.origin.position.x) / grid.info.resolution);
+    grid_y = (int)((world_y - grid.info.origin.position.y) / grid.info.resolution);
+}
+
+std::int8_t& GraspObjectExecutor::grid_at(nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const
+{
+    return grid.data[grid_y * grid.info.width + grid_x];
 }
