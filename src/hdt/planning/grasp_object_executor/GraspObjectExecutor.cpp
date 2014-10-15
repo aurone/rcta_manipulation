@@ -714,8 +714,12 @@ int GraspObjectExecutor::run()
             if (!pending_gripper_command_) {
                 ROS_INFO_PRETTY("Gripper Goal to close gripper is no longer pending");
 
-//                const bool grabbed_object = gripper_command_result_->reached_goal || gripper_command_result_->stalled;
-                const bool grabbed_object = !gripper_command_result_->reached_goal || gripper_command_result_->stalled;
+                const bool grabbed_object = gripper_command_result_->reached_goal || gripper_command_result_->stalled;
+
+                // note: reverting to the old method since the gripper does not
+                // think that it has made contact with an object when a wraparound grasp is performed
+//                const bool grabbed_object = !gripper_command_result_->reached_goal || gripper_command_result_->stalled;
+
                 if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED && grabbed_object) {
                     ROS_INFO_PRETTY("Gripper Command Succeeded");
                     status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
