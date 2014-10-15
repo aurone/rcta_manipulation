@@ -967,11 +967,6 @@ void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory&
             "arm_7_gripper_lift",
     };
 
-    trajectory_msgs::JointTrajectory traj;
-    traj.header.frame_id = "";
-    traj.header.seq = 0;
-    traj.header.stamp = ros::Time::now();
-
     // map from planning joints to index in resulting message
     std::map<std::string, int> planning_joint_indices;
     for (int i = 0; i < (int)joint_trajectory.joint_names.size(); ++i) {
@@ -979,48 +974,57 @@ void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory&
         planning_joint_indices.insert({joint_name, i});
     }
 
-    // for each point in the resulting trajectory
-    if (!joint_trajectory.points.empty()) {
-        traj.joint_names = joint_names;
-        traj.points.resize(joint_trajectory.points.size());
-        int pidx = 0;
-        double t = 0.0;
-        for (const auto& point : joint_trajectory.points) {
-            trajectory_msgs::JointTrajectoryPoint& traj_point = traj.points[pidx];
-            traj_point.positions.resize(traj.joint_names.size());
-            traj_point.velocities.resize(traj.joint_names.size());
-            int jidx = 0;
-            for (const auto& joint_name : traj.joint_names) {
-                if (std::find(robot_model_->joint_names().begin(), robot_model_->joint_names().end(), joint_name) != robot_model_->joint_names().end()) {
-                    // if this joint is a planning joint grab it from the planner trajectory
-                    traj_point.positions[jidx] = point.positions[planning_joint_indices[joint_name]];
-                }
-                else {
-                    // just set to 0 for now; search should be seeded with the initial non-variable state
-                    traj_point.positions[jidx] = 0.0;
-                }
-                traj_point.time_from_start = ros::Duration(t);
-                traj_point.velocities[jidx] = sbpl::utils::ToRadians(20.0);
-                ++jidx;
-            }
+    if (joint_trajectory.points.empty()) {
+        ROS_INFO_PRETTY("Not publishing empty trajectory");
+        return;
+    }
 
-            t += 0.10;
-            ++pidx;
+    trajectory_msgs::JointTrajectory traj;
+    traj.header.frame_id = "";
+    traj.header.seq = 0;
+    traj.header.stamp = ros::Time::now();
+
+    traj.joint_names = joint_names;
+    traj.points.resize(joint_trajectory.points.size());
+    int pidx = 0;
+    double t = 0.0;
+    for (const auto& point : joint_trajectory.points) {
+        trajectory_msgs::JointTrajectoryPoint& traj_point = traj.points[pidx];
+        traj_point.positions.resize(traj.joint_names.size());
+        traj_point.velocities.resize(traj.joint_names.size());
+        int jidx = 0;
+        for (const auto& joint_name : traj.joint_names) {
+            if (std::find(robot_model_->joint_names().begin(), robot_model_->joint_names().end(), joint_name) != robot_model_->joint_names().end()) {
+                // if this joint is a planning joint grab it from the planner trajectory
+                traj_point.positions[jidx] = point.positions[planning_joint_indices[joint_name]];
+            }
+            else {
+                // just set to 0 for now; search should be seeded with the initial non-variable state
+                traj_point.positions[jidx] = 0.0;
+            }
+            traj_point.time_from_start = ros::Duration(t);
+            traj_point.velocities[jidx] = sbpl::utils::ToRadians(20.0);
+            ++jidx;
         }
 
-        if (!use_action_server_) {
-            joint_trajectory_pub_.publish(traj);
+        t += 0.10;
+        ++pidx;
+    }
+
+    if (!use_action_server_) {
+        ROS_INFO_PRETTY("Publishing trajectory to the arm controller");
+        joint_trajectory_pub_.publish(traj);
+    }
+    else {
+        ROS_INFO_PRETTY("Sending trajectory goal via actionlib");
+        control_msgs::FollowJointTrajectoryGoal goal;
+        goal.trajectory = std::move(traj);
+        follow_trajectory_client_.sendGoal(goal);
+        follow_trajectory_client_.waitForResult();
+        if (follow_trajectory_client_.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO_PRETTY("Yay! The dishes are now clean");
         }
-        else {
-            control_msgs::FollowJointTrajectoryGoal goal;
-            goal.trajectory = std::move(traj);
-            follow_trajectory_client_.sendGoal(goal);
-            follow_trajectory_client_.waitForResult();
-            if (follow_trajectory_client_.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-                ROS_INFO_PRETTY("Yay! The dishes are now clean");
-            }
-            ROS_INFO_PRETTY("Current State: %s", follow_trajectory_client_.getState().toString().c_str());
-        }
+        ROS_INFO_PRETTY("Current State: %s", follow_trajectory_client_.getState().toString().c_str());
     }
 }
 
