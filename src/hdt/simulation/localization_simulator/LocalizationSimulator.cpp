@@ -1,6 +1,5 @@
 #include "LocalizationSimulator.h"
 
-#include <nav_msgs/OccupancyGrid.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 
@@ -17,7 +16,9 @@ LocalizationSimulator::LocalizationSimulator() :
     listener_(),
     world_to_robot_(Eigen::Affine3d::Identity()),
     as_(),
-    costmap_pub_()
+    costmap_pub_(),
+    last_costmap_pub_time_(ros::Time(0)),
+    costmap_pub_rate_(1.0)
 {
 }
 
@@ -61,6 +62,13 @@ int LocalizationSimulator::run()
         broadcaster_.sendTransform(world_ned_to_nwu_stamped);
 
         // TODO: publish /laser transform?
+
+        // publish the costmap
+        if (last_costmap_msg_ && (now > last_costmap_pub_time_ + costmap_pub_rate_.expectedCycleTime())) {
+            last_costmap_msg_->header.stamp = now;
+            costmap_pub_.publish(last_costmap_msg_);
+            last_costmap_pub_time_ = now;
+        }
     }
 
     return SUCCESS;
@@ -130,17 +138,16 @@ void LocalizationSimulator::publish_costmap()
 
         // create a view of the rosbag that only contains the nav_msgs/OccupancyGrid
         rosbag::View grid_only_view(bag, rosbag::TopicQuery(std::vector<std::string>({occupancy_grid_topic})));
-        nav_msgs::OccupancyGrid::Ptr last_costmap_msg;
         int tmp = 0;
         for (const rosbag::MessageInstance m : grid_only_view) {
             ++tmp;
             nav_msgs::OccupancyGrid::Ptr s(m.instantiate<nav_msgs::OccupancyGrid>());
             if (s) {
-                last_costmap_msg = s;
+                last_costmap_msg_ = s;
             }
         }
 
-        if (!last_costmap_msg) {
+        if (!last_costmap_msg_) {
             ROS_WARN("Failed to find a valid costmap message. Weird... (searched %d messages)", tmp);
             return;
         }
@@ -148,7 +155,8 @@ void LocalizationSimulator::publish_costmap()
         // publish costmap message on latched topic "fixed_costmap_sim"
         ROS_INFO("Publishing costmap to latched topic 'fixed_costmap_sim'");
         costmap_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, true);
-        costmap_pub_.publish(last_costmap_msg);
+        costmap_pub_.publish(last_costmap_msg_);
+        last_costmap_pub_time_ = ros::Time::now();
     }
     catch (const rosbag::BagException& ex) {
         ROS_WARN("Failed to publish costmap from bagfile (%s)", ex.what());

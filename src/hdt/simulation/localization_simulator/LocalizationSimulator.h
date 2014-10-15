@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -53,7 +54,12 @@ private:
 
     bool publish_costmap_;
     std::string costmap_bagfile_;
+
+    nav_msgs::OccupancyGrid::Ptr last_costmap_msg_;
     ros::Publisher costmap_pub_;
+
+    ros::Time last_costmap_pub_time_;
+    ros::Rate costmap_pub_rate_;
 
     void goal_callback();
     void preempt_callback();
