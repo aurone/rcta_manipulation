@@ -883,7 +883,7 @@ bool ViservoControlExecutor::safe_joint_delta(const std::vector<double>& from, c
                 sbpl::utils::ToRadians(angle_threshold_degs);
 
         if (!safe_joint_command) {
-            ROS_ERROR("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
+            ROS_DEBUG("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
                 sbpl::utils::ToDegrees(to_angle),
                 sbpl::utils::ToDegrees(from_angle),
                 angle_threshold_degs);
