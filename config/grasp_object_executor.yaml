@@ -19,4 +19,4 @@ max_grasp_candidates: 4 # the number of grasps to attempt to plan to
 
 use_extrusion_octomap: true
 
-object_filter_radius_m: 0.25
+object_filter_radius_m: 0.3
