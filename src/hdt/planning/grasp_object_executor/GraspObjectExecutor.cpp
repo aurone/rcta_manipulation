@@ -810,6 +810,7 @@ int GraspObjectExecutor::run()
                     hdt_msgs::GraspObjectCommandResult result;
                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, ss.str());
+                    next_stow_position_to_attempt_ = 0;
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
@@ -820,6 +821,7 @@ int GraspObjectExecutor::run()
                     ROS_ERROR("%s", error.c_str());
                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
                     as_->setAborted(result, error);
+                    next_stow_position_to_attempt_ = 0;
                     status_ = GraspObjectExecutionStatus::FAULT;
                     break;
                 }
@@ -853,6 +855,7 @@ int GraspObjectExecutor::run()
                     move_arm_command_result_ && move_arm_command_result_->success)
                 {
                     ROS_INFO_PRETTY("Move Arm Command succeeded");
+                    next_stow_position_to_attempt_ = 0;
                     status_ = GraspObjectExecutionStatus::COMPLETING_GOAL;
                 }
                 else {
@@ -1360,6 +1363,8 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
     covariance(0, 0) = 0.1;
     covariance(1, 1) = 0.1;
     Gaussian2 gauss(mean, covariance);
+
+    ROS_INFO_PRETTY("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (")
 
 //    for (double x = -1.0; x <= 1.0; x += 0.1) {
 //        for (double y = -1.0; y <= 1.0; y += 0.1) {
