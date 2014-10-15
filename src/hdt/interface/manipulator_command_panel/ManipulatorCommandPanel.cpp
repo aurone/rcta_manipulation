@@ -458,6 +458,7 @@ void ManipulatorCommandPanel::send_move_arm_command()
     ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
 
     move_arm_goal.execute_path = true;
+
     if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
         move_arm_goal.octomap = *last_octomap_msg_;
     }
@@ -485,6 +486,8 @@ void ManipulatorCommandPanel::send_joint_goal()
     for (const std::string& joint_name : robot_model_->joint_names()) {
         move_arm_goal.goal_joint_state.position.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
     }
+
+    move_arm_goal.execute_path = true;
 
     if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
         move_arm_goal.octomap = *last_octomap_msg_;
