@@ -1,11 +1,14 @@
 #include "GraspObjectExecutor.h"
 
 #include <Eigen/Dense>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <hdt/common/utils/RunUponDestruction.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/msg_utils/msg_utils.h>
+#include <hdt/common/random/gaussian.h>
+#include <hdt/common/utils/utils.h>
 #include <hdt/control/robotiq_controllers/gripper_model.h>
 
 namespace GraspObjectExecutionStatus
@@ -72,6 +75,8 @@ GraspObjectExecutor::GraspObjectExecutor() :
     costmap_sub_(),
     last_occupancy_grid_(),
     current_occupancy_grid_(),
+    wait_for_after_grasp_grid_(false),
+    occupancy_grid_after_grasp_(),
     use_extrusion_octomap_(false),
     current_octomap_(),
     extruder_(100, false),
@@ -865,10 +870,49 @@ int GraspObjectExecutor::run()
         }   break;
         case GraspObjectExecutionStatus::COMPLETING_GOAL:
         {
-            hdt_msgs::GraspObjectCommandResult result;
-            result.result = hdt_msgs::GraspObjectCommandResult::SUCCESS;
-            as_->setSucceeded(result);
-            status_ = GraspObjectExecutionStatus::IDLE;
+            if (!wait_for_after_grasp_grid_) {
+                ros::Time now = ros::Time::now();
+                ROS_INFO_PRETTY("Waiting for a costmap more recent than %s", boost::posix_time::to_simple_string(now.toBoost()).c_str());
+                wait_for_grid_start_time_ = now;
+                wait_for_after_grasp_grid_ = true;
+            }
+
+            if (last_occupancy_grid_ && last_occupancy_grid_->header.stamp > wait_for_grid_start_time_) {
+                ROS_INFO_PRETTY("Received a fresh costmap");
+                // get here once we've received a newer costmap to evaluate for the object's position
+                wait_for_after_grasp_grid_ = false;
+                occupancy_grid_after_grasp_ = last_occupancy_grid_;
+
+                double success_pct = calc_prob_successful_grasp(
+                    *occupancy_grid_after_grasp_,
+                    gas_can_in_grid_frame_.pose.position.x,
+                    gas_can_in_grid_frame_.pose.position.y,
+                    object_filter_radius_m_);
+
+                occupancy_grid_after_grasp_.reset();
+
+                success_pct = clamp(success_pct, 0.0, 1.0);
+                if (success_pct == 1.0) {
+                    ROS_WARN_PRETTY("Mighty confident now, aren't we?");
+                }
+                else {
+                    ROS_WARN_PRETTY("Grasped object with %0.3f %% confidence", 100.0 * success_pct);
+                }
+
+                const double some_threshold = 0.7;
+                if (success_pct > some_threshold) {
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::SUCCESS;
+                    as_->setSucceeded(result);
+                    status_ = GraspObjectExecutionStatus::IDLE;
+                }
+                else {
+                    ROS_WARN_PRETTY("It appears that we have likely not grasped the object. Trying successive grasps");
+                    status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+                }
+
+            }
+
         }   break;
         default:
             break;
@@ -910,38 +954,43 @@ void GraspObjectExecutor::goal_callback()
         const std::string& grid_frame = current_occupancy_grid_->header.frame_id;
         const std::string& world_frame = current_goal_->gas_can_in_map.header.frame_id;
 
-        geometry_msgs::PoseStamped gas_can_in_grid_frame;
+        // clear gas_can_in_grid_frame_
+        gas_can_in_grid_frame_.header.frame_id = "";
+        gas_can_in_grid_frame_.header.stamp = ros::Time(0);
+        gas_can_in_grid_frame_.header.seq = 0;
+        gas_can_in_grid_frame_.pose = geometry_msgs::IdentityPose();
+
         if (grid_frame != world_frame) {
             ROS_INFO_PRETTY("Transforming gas can into frame '%s' to clear from the occupancy grid", grid_frame.c_str());
             try {
                 geometry_msgs::PoseStamped gas_can_in_world_frame = current_goal_->gas_can_in_map;
                 gas_can_in_world_frame.header.stamp = ros::Time(0);
 
-                gas_can_in_grid_frame.header.frame_id = current_occupancy_grid_->header.frame_id;
-                gas_can_in_grid_frame.header.stamp = ros::Time(0);
+                gas_can_in_grid_frame_.header.frame_id = current_occupancy_grid_->header.frame_id;
+                gas_can_in_grid_frame_.header.stamp = ros::Time(0);
 
-                listener_.transformPose(grid_frame, gas_can_in_world_frame, gas_can_in_grid_frame);
+                listener_.transformPose(grid_frame, gas_can_in_world_frame, gas_can_in_grid_frame_);
             }
             catch (const tf::TransformException& ex) {
                 ROS_ERROR_PRETTY("Failed to lookup transform gas can into the grid frame. Assuming Identity");
                 ROS_ERROR_PRETTY("%s", ex.what());
-                gas_can_in_grid_frame = current_goal_->gas_can_in_map;
+                gas_can_in_grid_frame_ = current_goal_->gas_can_in_map;
             }
         }
         else {
             ROS_INFO_PRETTY("Gas can already exists in grid frame '%s'", grid_frame.c_str());
-            gas_can_in_grid_frame = current_goal_->gas_can_in_map;
-            gas_can_in_grid_frame.header.stamp = ros::Time(0);
+            gas_can_in_grid_frame_ = current_goal_->gas_can_in_map;
+            gas_can_in_grid_frame_.header.stamp = ros::Time(0);
         }
 
-        ROS_INFO_PRETTY("Gas Can Pose [grid frame: %s]: %s", grid_frame.c_str(), to_string(gas_can_in_grid_frame.pose).c_str());
+        ROS_INFO_PRETTY("Gas Can Pose [grid frame: %s]: %s", grid_frame.c_str(), to_string(gas_can_in_grid_frame_.pose).c_str());
 
         // todo: save all the cells that didn't need to be cleared, so that we can check for their existence later
 
         clear_circle_from_grid(
                 *current_occupancy_grid_,
-                gas_can_in_grid_frame.pose.position.x,
-                gas_can_in_grid_frame.pose.position.y,
+                gas_can_in_grid_frame_.pose.position.x,
+                gas_can_in_grid_frame_.pose.position.y,
                 object_filter_radius_m_);
     }
 
@@ -1293,4 +1342,116 @@ void GraspObjectExecutor::world_to_grid(
 std::int8_t& GraspObjectExecutor::grid_at(nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const
 {
     return grid.data[grid_y * grid.info.width + grid_x];
+}
+
+const std::int8_t& GraspObjectExecutor::grid_at(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const
+{
+    return grid.data[grid_y * grid.info.width + grid_x];
+}
+
+double GraspObjectExecutor::calc_prob_successful_grasp(
+    const nav_msgs::OccupancyGrid& grid,
+    double circle_x,
+    double circle_y,
+    double circle_radius) const
+{
+    Eigen::Vector2d mean(circle_x, circle_y);
+    Eigen::Matrix2d covariance(Eigen::Matrix2d::Zero());
+    covariance(0, 0) = 0.1;
+    covariance(1, 1) = 0.1;
+    Gaussian2 gauss(mean, covariance);
+
+//    for (double x = -1.0; x <= 1.0; x += 0.1) {
+//        for (double y = -1.0; y <= 1.0; y += 0.1) {
+//            ROS_INFO_PRETTY("gauss(%0.3f, %0.3f) = %0.3f", x, y, gauss(Eigen::Vector2d(x, y)));
+//        }
+//    }
+
+    ROS_INFO_PRETTY("Evaluating circle at (%0.3f, %0.3f) with radius %0.3f from costmap", circle_x, circle_y, circle_radius);
+    Eigen::Vector2d circle_center(circle_x, circle_y);
+
+    // get the min and max grid coordinates to scan
+    Eigen::Vector2i min_grid, max_grid;
+    world_to_grid(grid, circle_x - circle_radius, circle_y - circle_radius, min_grid(0), min_grid(1));
+    max_grid(0) = (int)std::ceil((circle_x + circle_radius - grid.info.origin.position.x) / grid.info.resolution);
+    max_grid(1) = (int)std::ceil((circle_y + circle_radius - grid.info.origin.position.y) / grid.info.resolution);
+
+
+    int num_x_cells = max_grid(0) - min_grid(0);
+    int num_y_cells = max_grid(1) - min_grid(1);
+    ROS_INFO_PRETTY("Instantiating %d x %d probability mask", num_x_cells, num_y_cells);
+    Eigen::MatrixXd mask(num_x_cells, num_y_cells);
+    for (int i = 0; i < num_x_cells; ++i) {
+        for (int j = 0; j < num_y_cells; ++j) {
+            mask(i, j) = 0.0;
+        }
+    }
+
+    ROS_INFO_PRETTY("Initializing probability mask over [%d, %d] x [%d, %d]", min_grid(0), min_grid(1), max_grid(0), max_grid(1));
+    // initialize the mask to the gaussian values in each cell
+    double sum = 0.0;
+    for (int grid_x = min_grid(0); grid_x < max_grid(0); ++grid_x) {
+        for (int grid_y = min_grid(1); grid_y <  max_grid(1); ++grid_y) {
+
+            Eigen::Vector2i gp(grid_x, grid_y);
+            if (!within_bounds(grid, gp(0), gp(1))) {
+                ROS_WARN_PRETTY("Grid point (%d, %d) is outside of costmap bounds", gp(0), gp(1));
+                continue;
+            }
+
+            Eigen::Vector2d wp;
+            grid_to_world(grid, grid_x, grid_y, wp(0), wp(1));
+
+            // calculate the probability modulus for this cell
+            int xrow = grid_x - min_grid(0);
+            int ycol = grid_y - min_grid(1);
+            mask(xrow, ycol) = gauss(wp);
+            sum += mask(xrow, ycol);
+
+        }
+    }
+
+    ROS_INFO("Normalizing gaussian mask with normalizer %0.6f", sum);
+
+    // normalize the mask
+    for (int x = 0; x < num_x_cells; ++x) {
+        for (int y = 0; y < num_y_cells; ++y) {
+            mask(x, y) *= (1.0 / sum);
+            ROS_INFO_PRETTY("Probmask(%d, %d) = %0.3f", x, y, mask(x, y));
+        }
+    }
+
+    const std::int8_t obsthresh = 100;
+
+    double probability = 1.0;
+    for (int grid_x = min_grid(0); grid_x < max_grid(0); ++grid_x) {
+        for (int grid_y = min_grid(1); grid_y <  max_grid(1); ++grid_y) {
+            int xrow = grid_x - min_grid(0);
+            int ycol = grid_y - min_grid(1);
+            double probmask = mask(xrow, ycol);
+
+            if (grid_at(grid, grid_x, grid_y) >= obsthresh) {
+                probability *= (1.0 - probmask);
+            }
+            else {
+                probability *= probmask;
+            }
+        }
+    }
+
+    return probability;
+
+//            Eigen::Vector2d bl = wp - Eigen::Vector2d(-0.5 * grid.info.resolution, -0.5 * grid.info.resolution);
+//            Eigen::Vector2d br = wp - Eigen::Vector2d(0.5 * grid.info.resolution, -0.5 * grid.info.resolution);
+//            Eigen::Vector2d tr = wp - Eigen::Vector2d(0.5 * grid.info.resolution, 0.5 * grid.info.resolution);
+//            Eigen::Vector2d tl = wp - Eigen::Vector2d(-0.5 * grid.info.resolution, 0.5 * grid.info.resolution);
+//            if ((bl - circle_center).norm() <= circle_radius ||
+//                (br - circle_center).norm() <= circle_radius ||
+//                (tr - circle_center).norm() <= circle_radius ||
+//                (tl - circle_center).norm() <= circle_radius)
+//            {
+//                ROS_INFO_PRETTY("Clearing cell (%d, %d)", gp(0), gp(1));
+//            }
+//
+//    return 1.0;
 }

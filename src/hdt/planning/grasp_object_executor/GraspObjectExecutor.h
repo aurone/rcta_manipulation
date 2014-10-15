@@ -95,6 +95,11 @@ private:
     OccupancyGridConstPtr last_occupancy_grid_; ///< most recent OccupancyGrid message
     OccupancyGridPtr current_occupancy_grid_; ///< copy of most recent OccupancyGrid message when the goal was received
 
+    geometry_msgs::PoseStamped gas_can_in_grid_frame_;
+    bool wait_for_after_grasp_grid_;
+    ros::Time wait_for_grid_start_time_;
+    OccupancyGridConstPtr occupancy_grid_after_grasp_;
+
     bool use_extrusion_octomap_; ///< Whether to override incoming octomaps with an extruded costmap variant
     OctomapConstPtr current_octomap_; ///< extruded current occupancy grid
     CostmapExtruder extruder_;
@@ -233,6 +238,13 @@ private:
     void grid_to_world(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y, double& world_x, double& world_y) const;
     void world_to_grid(const nav_msgs::OccupancyGrid& grid, double world_x, double world_y, int& grid_x, int& grid_y) const;
     std::int8_t& grid_at(nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
+    const std::int8_t& grid_at(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
+
+    double calc_prob_successful_grasp(
+            const nav_msgs::OccupancyGrid& grid,
+            double circle_x,
+            double circle_y,
+            double radius) const;
 };
 
 #endif
