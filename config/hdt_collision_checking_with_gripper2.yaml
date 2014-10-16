@@ -1,0 +1,116 @@
+collision_groups:
+- collision_links:
+  - {name: back_left_wheel, root: back_left_wheel}
+  - {name: back_right_wheel, root: back_right_wheel}
+  - {name: front_left_wheel, root: front_left_wheel}
+  - {name: front_right_wheel, root: front_right_wheel}
+  - {name: top_shelf, root: top_shelf}
+  - {name: left_shelf_support, root: left_shelf_support}
+  - {name: right_shelf_support, root: right_shelf_support}
+  name: platform
+  root_name: arm_mount_panel_dummy
+  tip_name: arm_7_gripper_lift_link
+  type: voxels
+- collision_links:
+  - {name: arm_1_shoulder_twist_link, root: arm_1_shoulder_twist_link, spheres: l1_2
+      l1_3 l1_4}
+  - {name: arm_2_shoulder_lift_link, root: arm_2_shoulder_lift_link, spheres: l2_0}
+  - {name: arm_3_elbow_twist_link, root: arm_3_elbow_twist_link, spheres: l3_0 l3_1
+      l3_2 l3_3 l3_4 l3_5 l3_6 l3_7 l3_8 l3_9 l3_10 l3_11 l3_12 l3_13 l3_14 l3_15
+      l3_16 l3_17 l3_18 l3_19 l3_20 l3_21 l3_22 l3_23  l3_24 l3_25}
+  - {name: arm_4_elbow_lift_link, root: arm_4_elbow_lift_link, spheres: l4_0 l4_1
+      l4_2 sp_16}
+  - {name: arm_5_wrist_twist_link, root: arm_5_wrist_twist_link, spheres: l5_0 l5_1
+      l5_2 l5_3 l5_4 l5_5 l5_6 l5_7 l5_8 l5_9 l5_10 l5_11 l5_12 l5_13 l5_14 l5_15
+      l5_16 l5_17 l5_18 l5_19 l5_20 l5_21 l5_22 l5_23  l5_24 l5_25 l5_26 l5_27 sp_15}
+  - {name: arm_6_wrist_lift_link, root: arm_6_wrist_lift_link, spheres: l6_0 l6_1}
+  - {name: arm_7_gripper_lift_link, root: arm_7_gripper_lift_link, spheres: l7_0 sp_0
+      sp_1 sp_2 sp_3 sp_4 sp_5 sp_6 sp_8 sp_9 sp_10 sp_11 sp_12 sp_13 sp_14 sp_17}
+  name: manipulator
+  root_name: arm_mount_panel_dummy
+  tip_name: arm_7_gripper_lift_link
+  type: spheres
+collision_spheres:
+- {name: l1_0, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.03}
+- {name: l1_1, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.05}
+- {name: l1_2, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.07}
+- {name: l1_3, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.09}
+- {name: l1_4, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.11}
+- {name: l2_0, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.0}
+- {name: l3_0, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.03}
+- {name: l3_1, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.05}
+- {name: l3_2, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.07}
+- {name: l3_3, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.09}
+- {name: l3_4, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.11}
+- {name: l3_5, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.13}
+- {name: l3_6, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.15}
+- {name: l3_7, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.17}
+- {name: l3_8, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.19}
+- {name: l3_9, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.21}
+- {name: l3_10, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.23}
+- {name: l3_11, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.25}
+- {name: l3_12, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.27}
+- {name: l3_13, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.29}
+- {name: l3_14, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.31}
+- {name: l3_15, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.33}
+- {name: l3_16, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.35}
+- {name: l3_17, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.37}
+- {name: l3_18, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.39}
+- {name: l3_19, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.41}
+- {name: l3_20, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.43}
+- {name: l3_21, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.45}
+- {name: l3_22, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.47}
+- {name: l3_23, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.49}
+- {name: l3_24, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.51}
+- {name: l3_25, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.53}
+- {name: l4_0, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.03}
+- {name: l4_1, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.05}
+- {name: l4_2, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.07}
+- {name: l5_0, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.03}
+- {name: l5_1, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.05}
+- {name: l5_2, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.07}
+- {name: l5_3, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.09}
+- {name: l5_4, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.11}
+- {name: l5_5, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.13}
+- {name: l5_6, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.15}
+- {name: l5_7, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.17}
+- {name: l5_8, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.19}
+- {name: l5_9, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.21}
+- {name: l5_10, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.23}
+- {name: l5_11, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.25}
+- {name: l5_12, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.27}
+- {name: l5_13, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.29}
+- {name: l5_14, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.31}
+- {name: l5_15, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.33}
+- {name: l5_16, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.35}
+- {name: l5_17, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.37}
+- {name: l5_18, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.39}
+- {name: l5_19, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.41}
+- {name: l5_20, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.43}
+- {name: l5_21, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.45}
+- {name: l5_22, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.47}
+- {name: l5_23, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.49}
+- {name: l5_24, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.51}
+- {name: l5_25, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.53}
+- {name: l5_26, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.55}
+- {name: l5_27, priority: 5, radius: 0.0254, x: 0.0, y: 0.0, z: 0.57}
+- {name: l6_0, priority: 5, radius: 0.0127, x: 0.0, y: 0.0, z: -0.01}
+- {name: l6_1, priority: 5, radius: 0.0127, x: 0.0, y: 0.0, z: 0.01}
+- {name: l7_0, priority: 5, radius: 0.0127, x: 0.0, y: 0.0, z: 0.0}
+- {name: sp_0, priority: 5, radius: 0.028, x: 0.042, y: 0.0, z: 0.046}
+- {name: sp_1, priority: 5, radius: 0.028, x: 0.079, y: 0.0, z: 0.046}
+- {name: sp_2, priority: 5, radius: 0.028, x: 0.079, y: 0.0, z: -0.047}
+- {name: sp_3, priority: 5, radius: 0.028, x: 0.043, y: 0.0, z: -0.047}
+- {name: sp_4, priority: 5, radius: 0.028, x: 0.043, y: 0.0, z: 0.001}
+- {name: sp_5, priority: 5, radius: 0.028, x: 0.079, y: 0.0, z: 0.001}
+- {name: sp_6, priority: 5, radius: 0.028, x: 0.06, y: 0.0, z: 0.023}
+- {name: sp_8, priority: 5, radius: 0.028, x: 0.06, y: 0.0, z: -0.026}
+- {name: sp_9, priority: 5, radius: 0.028, x: 0.104, y: 0.0, z: -0.044}
+- {name: sp_10, priority: 5, radius: 0.028, x: 0.104, y: 0.0, z: 0.044}
+- {name: sp_11, priority: 5, radius: 0.028, x: 0.131, y: 0.0, z: 0.044}
+- {name: sp_12, priority: 5, radius: 0.028, x: 0.131, y: 0.0, z: -0.045}
+- {name: sp_13, priority: 5, radius: 0.028, x: 0.151, y: 0.0, z: -0.045}
+- {name: sp_14, priority: 5, radius: 0.028, x: 0.151, y: 0.0, z: 0.043}
+- {name: sp_15, priority: 5, radius: 0.018, x: 0.0, y: 0.0, z: 0.641}
+- {name: sp_16, priority: 5, radius: 0.025, x: 0.0, y: 0.59, z: 0.069}
+- {name: sp_17, priority: 5, radius: 0.020, x: 0.025, y: 0.000, z: 0.000}
