@@ -222,6 +222,10 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
+    if (!msg_utils::download_param(ph_, "gas_can_detection_threshold", gas_can_detection_threshold_)) {
+        return false;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // set up comms
     ////////////////////////////////////////////////////////////////////////////////
@@ -902,8 +906,7 @@ int GraspObjectExecutor::run()
                     ROS_WARN_PRETTY("Grasped object with %0.3f %% confidence", 100.0 * success_pct);
                 }
 
-                const double some_threshold = 0.7;
-                if (success_pct > some_threshold) {
+                if (success_pct > gas_can_detection_threshold_) {
                     hdt_msgs::GraspObjectCommandResult result;
                     result.result = hdt_msgs::GraspObjectCommandResult::SUCCESS;
                     as_->setSucceeded(result);
@@ -1360,17 +1363,11 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
 {
     Eigen::Vector2d mean(circle_x, circle_y);
     Eigen::Matrix2d covariance(Eigen::Matrix2d::Zero());
-    covariance(0, 0) = 0.1;
-    covariance(1, 1) = 0.1;
+    covariance(0, 0) = 0.2;
+    covariance(1, 1) = 0.2;
     Gaussian2 gauss(mean, covariance);
 
     ROS_INFO_PRETTY("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (")
-
-//    for (double x = -1.0; x <= 1.0; x += 0.1) {
-//        for (double y = -1.0; y <= 1.0; y += 0.1) {
-//            ROS_INFO_PRETTY("gauss(%0.3f, %0.3f) = %0.3f", x, y, gauss(Eigen::Vector2d(x, y)));
-//        }
-//    }
 
     ROS_INFO_PRETTY("Evaluating circle at (%0.3f, %0.3f) with radius %0.3f from costmap", circle_x, circle_y, circle_radius);
     Eigen::Vector2d circle_center(circle_x, circle_y);
@@ -1380,7 +1377,6 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
     world_to_grid(grid, circle_x - circle_radius, circle_y - circle_radius, min_grid(0), min_grid(1));
     max_grid(0) = (int)std::ceil((circle_x + circle_radius - grid.info.origin.position.x) / grid.info.resolution);
     max_grid(1) = (int)std::ceil((circle_y + circle_radius - grid.info.origin.position.y) / grid.info.resolution);
-
 
     int num_x_cells = max_grid(0) - min_grid(0);
     int num_y_cells = max_grid(1) - min_grid(1);
@@ -1416,14 +1412,16 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
         }
     }
 
+    sum = gauss(mean);
     ROS_INFO("Normalizing gaussian mask with normalizer %0.6f", sum);
 
     // normalize the mask
     for (int x = 0; x < num_x_cells; ++x) {
         for (int y = 0; y < num_y_cells; ++y) {
             mask(x, y) *= (1.0 / sum);
-            ROS_INFO_PRETTY("Probmask(%d, %d) = %0.3f", x, y, mask(x, y));
+            printf("%0.6f ", mask(x, y));
         }
+        printf("\n");
     }
 
     const std::int8_t obsthresh = 100;
@@ -1436,27 +1434,15 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
             double probmask = mask(xrow, ycol);
 
             if (grid_at(grid, grid_x, grid_y) >= obsthresh) {
+                ROS_INFO_PRETTY("Obstacle cell detected. probmask = %0.6f", probmask);
                 probability *= (1.0 - probmask);
             }
             else {
-                probability *= probmask;
+                ROS_INFO_PRETTY("Free cell detected");
             }
         }
     }
 
     return probability;
-
-//            Eigen::Vector2d bl = wp - Eigen::Vector2d(-0.5 * grid.info.resolution, -0.5 * grid.info.resolution);
-//            Eigen::Vector2d br = wp - Eigen::Vector2d(0.5 * grid.info.resolution, -0.5 * grid.info.resolution);
-//            Eigen::Vector2d tr = wp - Eigen::Vector2d(0.5 * grid.info.resolution, 0.5 * grid.info.resolution);
-//            Eigen::Vector2d tl = wp - Eigen::Vector2d(-0.5 * grid.info.resolution, 0.5 * grid.info.resolution);
-//            if ((bl - circle_center).norm() <= circle_radius ||
-//                (br - circle_center).norm() <= circle_radius ||
-//                (tr - circle_center).norm() <= circle_radius ||
-//                (tl - circle_center).norm() <= circle_radius)
-//            {
-//                ROS_INFO_PRETTY("Clearing cell (%d, %d)", gp(0), gp(1));
-//            }
-//
-//    return 1.0;
 }
+

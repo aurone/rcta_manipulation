@@ -138,7 +138,6 @@ double calc_prob_successful_grasp(
             }
             else {
                 ROS_INFO("Free cell detected. probmask = %0.6f", probmask);
-//                probability *= (1.0 - probmask);
                 ROS_INFO_PRETTY("  Probability = %0.3f", 100 * probability);
             }
         }

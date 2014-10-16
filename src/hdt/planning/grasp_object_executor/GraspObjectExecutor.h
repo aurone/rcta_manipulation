@@ -165,6 +165,8 @@ private:
 
     std::vector<StowPosition> stow_positions_;
 
+    double gas_can_detection_threshold_;
+
     int max_grasp_candidates_;
 
     void goal_callback();
