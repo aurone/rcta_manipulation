@@ -169,9 +169,32 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
     while(ik_gen(sol)){
       solutions.push_back(sol);
     }
-
-    ROS_INFO("Generated %zd IK solutions!", solutions.size());
+    if(solutions.size() > 0){
+      sortIKsolutions(solutions);
+      ROS_WARN_PRETTY("First IK score: %.3f", computeIKscore(solutions.front()));
+      ROS_WARN_PRETTY("Last IK score: %.3f", computeIKscore(solutions.back()));
+    }
+    if(solutions.size() > 10){
+      ROS_WARN_PRETTY("Generated %zd IK solutions!", solutions.size());
+    }
     return (solutions.size()>0)?true:false;
+}
+
+void HDTRobotModel::sortIKsolutions(std::vector<std::vector<double> > &solutions){
+    iksortstruct sorter(this, true); //sort ascending (biggest score is best and should be last)
+    std::sort(solutions.begin(), solutions.end(), sorter);
+}
+
+double HDTRobotModel::computeIKscore(const std::vector<double> &ik){
+  std::vector<double> min_limits_ = robot_model_->min_safety_limits();
+  std::vector<double> max_limits_ = robot_model_->max_safety_limits();
+  double res = 0;
+  for(size_t i = 0; i < min_limits_.size(); i++){
+    double dist_min = abs(ik[i] - min_limits_[i]);
+    double dist_max = abs(ik[i] - max_limits_[i]);
+    res+=std::min(dist_min, dist_max);
+  }
+  return res;
 }
 
 } // namespace hdt

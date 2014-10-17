@@ -52,6 +52,8 @@ public:
     bool computeIK(const std::vector<double> &pose, const std::vector<double> &start, std::vector<double> &solution, int option=0);
     bool computeIK(const std::vector<double> &pose, const std::vector<double> &start, std::vector< std::vector<double> > &solutions, int option=0);
 
+    double computeIKscore(const std::vector<double> &ik) ;
+
 private:
 
     ros::NodeHandle nh_;
@@ -65,6 +67,26 @@ private:
     RobotModel::init;
     RobotModel::setPlanningJoints;
     RobotModel::setPlanningLink;
+
+    //sorts the vector of ik solutions -- best ones should be at the end!
+    struct iksortstruct
+    {
+      // sortstruct needs to know its containing object
+      HDTRobotModel* rm_;
+      bool sort_asc;
+      iksortstruct(HDTRobotModel* rm, bool asc) : rm_(rm), sort_asc(asc) {};
+ 
+      bool operator() ( const std::vector<double> &ik1, const std::vector<double> &ik2 ) const
+      {
+        double s1 = rm_->computeIKscore(ik1);
+        double s2 = rm_->computeIKscore(ik2);
+        if ( sort_asc )
+	  return s1 < s2;
+        else return s1 > s2;
+      }
+    };
+
+    void sortIKsolutions(std::vector<std::vector<double> > &solutions);
 };
 
 }
