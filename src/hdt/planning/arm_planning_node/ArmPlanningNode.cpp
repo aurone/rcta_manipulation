@@ -1264,8 +1264,8 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
 
     double min_x, min_y, min_z;
     df->gridToWorld(0,0,0, min_x, min_y, min_z); 
-
-    octomap::point3d bbx_min(min_x, min_y, min_z);
+    tf::Vector3 bb_min_df_frame(min_x, min_y, min_z);
+    tf::Vector3 bb_min_oc_frame = octree_to_df * bb_min_df_frame;
 
     int num_x = df->getXNumCells();
     int num_y = df->getYNumCells();
@@ -1274,12 +1274,18 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
     //upper extent
     double max_x, max_y, max_z;
     df->gridToWorld(num_x, num_y, num_z, max_x, max_y, max_z);
+    tf::Vector3 bb_max_df_frame(max_x, max_y, max_z);
+    tf::Vector3 bb_max_oc_frame = octree_to_df * bb_max_df_frame;
 
-    octomap::point3d bbx_max(max_x, max_y, max_z);
+    octomap::point3d bbx_min(min(bb_min_oc_frame.getX(), bb_max_oc_frame.getX()),
+                             min(bb_min_oc_frame.getY(), bb_max_oc_frame.getY()),
+                             min(bb_min_oc_frame.getZ(), bb_max_oc_frame.getZ()));
+    octomap::point3d bbx_max(max(bb_min_oc_frame.getX(), bb_max_oc_frame.getX()),
+                             max(bb_min_oc_frame.getY(), bb_max_oc_frame.getY()),
+                             max(bb_min_oc_frame.getZ(), bb_max_oc_frame.getZ()));
 
     EigenSTL::vector_Vector3d points; //the points from octree transformed in df frame
-
-    int num_original_points = 0;
+    int num_pts_total = 0;
     for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(bbx_min,bbx_max), end=octree->end_leafs_bbx(); it!= end; ++it)
     {
         if (octree->isNodeOccupied(*it))
@@ -1287,7 +1293,7 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
             if(it.getSize() <= df->getResolution()) {
                 tf::Vector3 pt_octree_frame(it.getX(), it.getY(), it.getZ());
                 tf::Vector3 pt_df_frame = octree_to_df * pt_octree_frame;
-                num_original_points++;
+                num_pts_total++;
                 if(min_x <= pt_df_frame.getX() && pt_df_frame.getX() <= max_x &&
                    min_y <= pt_df_frame.getY() && pt_df_frame.getY() <= max_y &&
                    min_z <= pt_df_frame.getZ() && pt_df_frame.getZ() <= max_z){
@@ -1300,9 +1306,9 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
                 for(double x = it.getX()-ceil_val; x < it.getX()+ceil_val; x += df->getResolution()) {
                 for(double y = it.getY()-ceil_val; y < it.getY()+ceil_val; y += df->getResolution()) {
                 for(double z = it.getZ()-ceil_val; z < it.getZ()+ceil_val; z += df->getResolution()) {
-                    num_original_points++;
                     tf::Vector3 pt_octree_frame(x, y, z);
                     tf::Vector3 pt_df_frame = octree_to_df * pt_octree_frame;
+                    num_pts_total++;
                     if(min_x <= pt_df_frame.getX() && pt_df_frame.getX() <= max_x &&
                        min_y <= pt_df_frame.getY() && pt_df_frame.getY() <= max_y &&
                        min_z <= pt_df_frame.getZ() && pt_df_frame.getZ() <= max_z){
@@ -1316,7 +1322,7 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
         }
     }
 
-    ROS_INFO_PRETTY("Adding %zd/%d points to the distance field", points.size(), num_original_points);
+    ROS_INFO_PRETTY("Adding %zd/%d points to the distance field", points.size(), num_pts_total);
     df->addPointsToField(points);
 }
 
