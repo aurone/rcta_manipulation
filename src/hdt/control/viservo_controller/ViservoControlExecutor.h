@@ -99,6 +99,8 @@ private:
     double KI_, KP_, KD_;
     Eigen::Vector3d accum_ee_vel_error;
 
+    ros::Time goal_start_time_;
+
     void goal_callback();
     void preempt_callback();
     void joint_states_cb(const sensor_msgs::JointState::ConstPtr& msg);

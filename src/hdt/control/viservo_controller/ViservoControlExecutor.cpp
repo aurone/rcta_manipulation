@@ -295,11 +295,19 @@ int ViservoControlExecutor::run()
 
         // Incorporate new marker measurements and estimate the current wrist pose from them
         if (!update_wrist_pose_estimate()) {
-            ROS_WARN("Failed to update the pose of the wrist");
-            result.result = hdt::ViservoCommandResult::STUCK;
-            as_->setSucceeded(result);
-            stop_arm(cmd_seqno_++);
-            continue;
+        	ros::Time now = ros::Time::now();
+        	const ros::Duration initial_marker_estimate_timeout(5.0);
+        	if (now > goal_start_time_ + initial_marker_estimate_timeout) {
+        		ROS_ERROR("Have not seen the AR marker and it's been %0.3f seconds since we received the goal", initial_marker_estimate_timeout.toSec());
+        		result.result = hdt::ViservoCommandResult::LOST_MARKER;
+        		as_->setAborted(result);
+        		stop_arm(cmd_seqno_++);
+        		continue;
+        	}
+        	else {
+        		ROS_WARN("Failed to update the pose of the wrist");
+        		continue;
+        	}
         }
 
         publish_triad_marker("ee estimate", wrist_transform_estimate_, camera_frame_);
@@ -529,6 +537,7 @@ int ViservoControlExecutor::run()
 void ViservoControlExecutor::goal_callback()
 {
     current_goal_ = as_->acceptNewGoal();
+    goal_start_time_ = ros::Time::now();
     ROS_WARN("Received a goal to move the wrist to %s in the camera frame", to_string(current_goal_->goal_pose).c_str());
 
     prev_cmd_.positions.clear(); // indicate that we have no previous command for this goal
