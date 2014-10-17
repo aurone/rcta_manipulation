@@ -457,9 +457,13 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double armOffsety = -0.6;	// center of arm (for normal grasping motion)
 	double armLength = 0.6;		// workspace radius about the center of arm
 	double armLengthCore = 0.4;	// core workspace radius about the center of arm (pObs = 0.0)
-	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
-	double bodyLength = 0.8;	// support polygon radius about the center of body
-	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
+// 	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
+// 	double bodyLength = 0.8;	// support polygon radius about the center of body
+// 	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
+	double bodyOffsetx1 = -0.49+0.148975+0.27;	// center of front body (except arm)
+	double bodyOffsetx2 = -0.49+0.148975-0.27;	// center of rear body (except arm)
+	double bodyLength = 0.5;	// support polygon radius about the center of body
+	double bodyLengthCore = 0.335;	// core support polygon radius about the center of body (pObs = 0.0)
 	int mapObsThr = 1;			// threshold for classifying clear and occupied regions
 
 	// 5) candidate selection criterion
@@ -650,8 +654,46 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 					for (int k=0; k<nYaw; k++)
 						if (bTotMax[i][j][k]==true)
 						{
-							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx;
-							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx;
+							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx1;
+							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx1;
+
+							bodyi = (int)((bodyx-origin.position.x)/resolution);
+							bodyj = (int)((bodyy-origin.position.y)/resolution);
+
+							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+							{
+								bool bCollided = false;
+								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
+										{
+											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+											if (distObs < bodyLengthCore)
+											{
+												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+												bCollided = true;
+											}
+											else if (distObs < bodyLength)
+												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+										}
+							}
+							else
+							{
+// 								bTotMax[i][j][k] = false;
+// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+							}
+						}
+// 			patchSize2 = (int)(bodyLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
+// 			double bodyx, bodyy, bodyY;		// body center position biased from /top_shelf by bodyOffsetx
+// 			int bodyi, bodyj;				// index for patch center
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k]==true)
+						{
+							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx2;
+							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx2;
 
 							bodyi = (int)((bodyx-origin.position.x)/resolution);
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
