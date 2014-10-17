@@ -4,6 +4,7 @@ planning:
   use_bfs_heuristic: true
   group_name: right_arm
   reference_frame: base_link 
+  planning_frame: base_link 
   planning_joints:
     arm_1_shoulder_twist
     arm_2_shoulder_lift
