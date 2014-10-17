@@ -47,7 +47,7 @@ last_status_(RepositionBaseExecutionStatus::INVALID),
     move_arm_command_result_(),
     move_arm_command_action_name_("move_arm_command"),
     move_arm_command_client_(),
-//     occupancy_grid_sub_(), 	// TODO TODO
+    occupancy_grid_sub_(), 	// TODO TODO
     listener_()
 {
 }
@@ -168,19 +168,19 @@ bool RepositionBaseExecutor::initialize()
 
 
 	// TODO TODO
-//     ROS_WARN("Waiting for occupancy grid message...");
-//     occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
-// //     while (!map_) {
-// //         ros::Duration(1.0).sleep();
-// //         ros::spinOnce();
-// //     }
+    ROS_WARN("Waiting for occupancy grid message...");
+    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
+//     while (!map_) {
+//         ros::Duration(1.0).sleep();
+//         ros::spinOnce();
+//     }
 }
 
-// // TODO TODO
-// void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
-// {
-//     map_ = *msg;
-// }
+// TODO TODO
+void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+    map_ = *msg;
+}
 
 
 int RepositionBaseExecutor::run()
@@ -300,11 +300,25 @@ int RepositionBaseExecutor::run()
 						}
 						else
 						{
-							hdt_msgs::RepositionBaseCommandResult result;
-							result.result = hdt_msgs::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
-							result.candidate_base_poses = candidate_base_poses;		// this pose is same with the initial base pose
-							as_->setSucceeded(result);
-							status_ = RepositionBaseExecutionStatus::IDLE;
+							ROS_WARN("    Now search for candidates exhaustively!");
+							candidate_base_poses.clear();
+							bool ret2 = computeRobPoseExhaustive(objx,objy,objY, robx0,roby0,robY0, candidate_base_poses);
+							if (ret2)
+							{
+								hdt_msgs::RepositionBaseCommandResult result;
+								result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
+								result.candidate_base_poses = candidate_base_poses;
+								as_->setSucceeded(result);
+								status_ = RepositionBaseExecutionStatus::IDLE;
+							}
+							else
+							{
+								hdt_msgs::RepositionBaseCommandResult result;
+								result.result = hdt_msgs::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
+								result.candidate_base_poses = candidate_base_poses;		// this pose is same with the initial base pose
+								as_->setSucceeded(result);
+								status_ = RepositionBaseExecutionStatus::IDLE;
+							}
 						}
 						bComputedRobPose_ = true;
 					}
@@ -440,7 +454,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-	double secSide[2] = {0.0, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {-10.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
@@ -454,9 +468,9 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 	double armLength = 1.5;		// workspace radius about the center of arm
 // 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
 	double armOffsetx = 0.3;	// center of arm (for normal grasping motion)
-	double armOffsety = -0.6;	// center of arm (for normal grasping motion)
-	double armLength = 0.6;		// workspace radius about the center of arm
-	double armLengthCore = 0.4;	// core workspace radius about the center of arm (pObs = 0.0)
+	double armOffsety = -0.5;	// center of arm (for normal grasping motion)
+	double armLength = 0.5;		// workspace radius about the center of arm
+	double armLengthCore = 0.3;	// core workspace radius about the center of arm (pObs = 0.0)
 // 	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
 // 	double bodyLength = 0.8;	// support polygon radius about the center of body
 // 	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
@@ -589,7 +603,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	if (bCheckObs == true)
 	{
 		// TODO TODO
-		map_ = current_goal_->map;
+// 		map_ = current_goal_->map;
 
 // 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{
@@ -753,6 +767,771 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 						if (!ret)
 // 							pWork[i][j][k] = 0.0;
 // 					}
+	}
+
+
+	// 4) total probability
+
+	for (int i=0; i<nDist; i++)
+		for (int j=0; j<nAng; j++)
+			for (int k=0; k<nYaw; k++)
+				if (bTotMax[i][j][k]==true)
+					pTot[i][j][k] = pGrasp[i][j][k] * pObs[i][j][k] * pWork[i][j][k];
+				else
+					pTot[i][j][k] = 0.0;
+
+
+	// 5) select maximum probability with min distance from robot
+	// HEURISTICALLY, minimum difference in angular coordinate wrt object, then farthest from the origin of object
+	if (bSortMetric==1 || bSortMetric==2)
+	{
+		double pTotMax = 1E-10;		// to opt out the poses with pTot[i][j][k]==0
+
+		for (int i=0; i<nDist; i++)
+			for (int j=0; j<nAng; j++)
+				for (int k=0; k<nYaw; k++)
+					if (pTot[i][j][k] > pTotMax)
+						pTotMax = pTot[i][j][k];
+		int iMax = 0, jMax = 0, kMax = 0;		// indices for the final selection of robot pose
+		int cntTotMax = 0;
+		for (int i=0; i<nDist; i++)
+			for (int j=0; j<nAng; j++)
+				for (int k=0; k<nYaw; k++)
+					if (pTot[i][j][k] == pTotMax)
+					{
+						bTotMax[i][j][k] = true;
+						iMax = i;
+						jMax = j;
+						kMax = k;
+						cntTotMax++;
+					}
+					else
+						bTotMax[i][j][k] = false;
+
+		ROS_INFO("    cntTotMax: %d",cntTotMax);
+
+
+		if (cntTotMax==0)
+		{
+			// TODO: check why the previous candidate_base_poses remain in RViz panel
+			// just set to initial robot poase
+			robxf = robx0;
+			robyf = roby0;
+			robYf = robY0;
+
+			geometry_msgs::PoseStamped candidate_base_pose;
+			candidate_base_pose.header.frame_id = "/abs_nwu";
+			candidate_base_pose.header.seq = 0;
+			candidate_base_pose.header.stamp = ros::Time::now();
+
+			candidate_base_pose.pose.position.x = robxf;
+			candidate_base_pose.pose.position.y = robyf;
+			candidate_base_pose.pose.position.z = robzf;
+
+			tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+			candidate_base_pose.pose.orientation.x = robqf[0];
+			candidate_base_pose.pose.orientation.y = robqf[1];
+			candidate_base_pose.pose.orientation.z = robqf[2];
+			candidate_base_pose.pose.orientation.w = robqf[3];
+			candidate_base_poses.push_back(candidate_base_pose);
+
+			ROS_WARN("    No candidate pose was found!");
+			return false;
+		}
+		else if (cntTotMax > 1)	// if more than one candidate poses are selected
+							// (we can select poses with pTot higher than a THRESHOLD)
+		{
+			// a) sorting by difference of angular coordinates for current and desired poses
+			// ASSUME? backward driving is allowed for husky
+			// HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
+			double angO2Rcur = atan2(roby0-objy,robx0-objx);	// current angular coordinate from object to robot
+			double angO2Rdes, angO2Rerr, angO2RerrMin = M_PI;
+			cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+					{
+						if (bTotMax[i][j][k] == true)
+						{
+							angO2Rdes = objY + angMin + angStep*j;		// desired angular coordinate from object to robot
+							angO2Rerr = wrapAngle( angO2Rdes-angO2Rcur );
+
+							if (fabs(angO2Rerr) <= angO2RerrMin)
+							{
+								angO2RerrMin = fabs(angO2Rerr);
+								iMax = i;
+								jMax = j;
+								kMax = k;
+								cntTotMax++;
+							}
+							else
+								bTotMax[i][j][k] = false;
+						}
+					}
+			// update bTotMax[i][j][k]
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k] == true)
+						{
+							angO2Rdes = objY + angMin + angStep*j;
+							angO2Rerr = wrapAngle( angO2Rdes-angO2Rcur );
+							if (fabs(angO2Rerr) != angO2RerrMin)
+							{
+								bTotMax[i][j][k] = false;
+								cntTotMax--;
+							}
+						}
+			ROS_INFO("    cntTotMax: %d",cntTotMax);
+
+			// TODO: comment these part for more candidates
+			if (bSortMetric==2)
+			{
+				if (cntTotMax > 1)	// if more than one candidate poses are still selected
+				{
+
+					// b) sorting by distance from current and desired positions
+					double xysqerr, xysqerrMin = 1E10;		// distance from current to desired robot position
+					cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
+					for (int i=0; i<nDist; i++)
+						for (int j=0; j<nAng; j++)
+							for (int k=0; k<nYaw; k++)
+							{
+								if (bTotMax[i][j][k] == true)
+								{
+									xysqerr = std::pow(robx[i][j][k]-robx0,2.0) + std::pow(roby[i][j][k]-roby0,2.0);
+
+									if (xysqerr <= xysqerrMin)
+									{
+										xysqerrMin = xysqerr;
+										iMax = i;
+										jMax = j;
+										kMax = k;
+										cntTotMax++;
+									}
+									else
+										bTotMax[i][j][k] = false;
+								}
+							}
+
+					// OPTIONAL: update bTotMax[i][j][k]
+					for (int i=0; i<nDist; i++)
+						for (int j=0; j<nAng; j++)
+							for (int k=0; k<nYaw; k++)
+								if (bTotMax[i][j][k] == true)
+								{
+									xysqerr = std::pow(robx[i][j][k]-robx0,2.0) + std::pow(roby[i][j][k]-roby0,2.0);
+									if (xysqerr != xysqerrMin)
+									{
+										bTotMax[i][j][k] = false;
+										cntTotMax--;
+									}
+								}
+					ROS_INFO("    cntTotMax: %d",cntTotMax);
+					if (cntTotMax > 1)
+						ROS_WARN("    Multiple candidate poses exist!");
+
+				}
+			}	// if (bSortMetric==2)
+		}
+
+		// 6-1) generate final desired robot poses with maximum pTot
+		ROS_INFO("Reposition Base Command Result:");
+		ROS_INFO("    Object Pose (initial): %f %f %f",objx,objy,wrapAngle(objY)*180/M_PI);
+		ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0,roby0,wrapAngle(robY0)*180/M_PI);
+		// index order regarding to sorting priority
+	// 	for (int i=0; i<nDist; i++)
+		for (int i=nDist-1; i>=0; i--)
+			for (int j=0; j<nAng; j++)
+	// 			for (int k=0; k<nYaw; k++)
+				for (int k=nYaw-1; k>=0; k--)
+					if (bTotMax[i][j][k] == true)
+					{
+						// /top_shelf pose
+						robxf = robx[i][j][k];
+						robyf = roby[i][j][k];
+						robYf = robY[i][j][k];
+						// /base_link pose
+						robxf += cos(robYf)*baseOffsetx;
+						robyf += sin(robYf)*baseOffsetx;
+						ROS_INFO("    Robot Pose (desired):  %f %f %f", robxf,robyf,wrapAngle(robYf)*180/M_PI);
+
+
+						geometry_msgs::PoseStamped candidate_base_pose;
+						candidate_base_pose.header.frame_id = "/abs_nwu";
+						candidate_base_pose.header.seq = 0;
+						candidate_base_pose.header.stamp = ros::Time::now();
+
+						candidate_base_pose.pose.position.x = robxf;
+						candidate_base_pose.pose.position.y = robyf;
+						candidate_base_pose.pose.position.z = robzf;
+
+						tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+						candidate_base_pose.pose.orientation.x = robqf[0];
+						candidate_base_pose.pose.orientation.y = robqf[1];
+						candidate_base_pose.pose.orientation.z = robqf[2];
+						candidate_base_pose.pose.orientation.w = robqf[3];
+						candidate_base_poses.push_back(candidate_base_pose);
+					}
+	}	// if (bSortMetric==1 || bSortMetric==2)
+
+	else if (bSortMetric==3)
+	{
+		// candidate prefernece by difference of angular coordinates for current and desired poses
+		// HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
+		double rob2objY = atan2(objy-roby0,objx-robx0);	// angular coordinate of displacement from robot to object
+		double diffYglob;
+		int cntTotMax = 0;
+		for (int i=0; i<nDist; i++)
+			for (int j=0; j<nAng; j++)
+				for (int k=0; k<nYaw; k++)
+					if (bTotMax[i][j][k] == true)
+					{
+						diffYglob = wrapAngle( robY[i][j][k]-rob2objY );
+// 						pTot[i][j][k] *= std::pow(1 - (scaleDiffYglob * fabs(diffYglob)/M_PI), 2.0);	// quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
+						pTot[i][j][k] *= std::max( std::pow(1 - (scaleDiffYglob * fabs(diffYglob)/M_PI), 2.0), pTotThr);	// quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
+						cntTotMax++;
+					}
+		ROS_INFO("Reposition Base Command Result:");
+// 		ROS_INFO("    cntTotMax: %d",cntTotMax);
+// 		ROS_INFO("    Number of valid candidates: %d",cntTotMax);
+
+		if (cntTotMax==0)
+		{
+			// TODO: check why the previous candidate_base_poses remain in RViz panel
+			// just set to initial robot poase
+			robxf = robx0;
+			robyf = roby0;
+			robYf = robY0;
+
+			geometry_msgs::PoseStamped candidate_base_pose;
+			candidate_base_pose.header.frame_id = "/abs_nwu";
+			candidate_base_pose.header.seq = 0;
+			candidate_base_pose.header.stamp = ros::Time::now();
+
+			candidate_base_pose.pose.position.x = robxf;
+			candidate_base_pose.pose.position.y = robyf;
+			candidate_base_pose.pose.position.z = robzf;
+
+			tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+			candidate_base_pose.pose.orientation.x = robqf[0];
+			candidate_base_pose.pose.orientation.y = robqf[1];
+			candidate_base_pose.pose.orientation.z = robqf[2];
+			candidate_base_pose.pose.orientation.w = robqf[3];
+			candidate_base_poses.push_back(candidate_base_pose);
+
+			ROS_WARN("    No valid candidate poses for grasping!");
+			return false;
+		}
+
+		// sort candidates with respect to pTot
+		RepositionBaseCandidate::candidate cand;
+		std::vector<RepositionBaseCandidate::candidate> cands;
+// 		for (int i=0; i<nDist; i++)
+// 			for (int j=0; j<nAng; j++)
+// 				for (int k=0; k<nYaw; k++)
+		for (int j=0; j<nAng; j++)
+			for (int i=nDist-1; i>=0; i--)
+				for (int k=nYaw-1; k>=0; k--)
+					if (bTotMax[i][j][k]==true)
+					{
+						cand.i = i;
+						cand.j = j;
+						cand.k = k;
+						cand.pTot = pTot[i][j][k];
+						cands.push_back(cand);
+					}
+		std::sort(cands.begin(), cands.end());
+
+
+		// 6-2) generate final desired robot poses with maximum pTot
+// 		ROS_INFO("Reposition Base Command Result:");
+		ROS_INFO("    Object Pose (initial): %f %f %f",objx,objy,wrapAngle(objY)*180/M_PI);
+		ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0,roby0,wrapAngle(robY0)*180/M_PI);
+
+		int cntTotThr = 0;	// number of candidate poses with pTot higher than threshold
+		for (std::vector<RepositionBaseCandidate::candidate>::iterator m=cands.begin(); m!=cands.end(); ++m)
+			if (m->pTot >= pTotThr)
+			{
+				int i = m->i;
+				int j = m->j;
+				int k = m->k;
+
+				// /top_shelf pose
+				robxf = robx[i][j][k];
+				robyf = roby[i][j][k];
+				robYf = robY[i][j][k];
+				// /base_link pose
+				robxf += cos(robYf)*baseOffsetx;
+				robyf += sin(robYf)*baseOffsetx;
+// 				ROS_INFO("    Robot Pose (desired):  %f %f %f", robxf,robyf,wrapAngle(robYf)*180/M_PI);
+				ROS_INFO("    Robot Pose (desired):  %f %f %f  (i:%d j:%d k:%d)    pTot: %f", robxf,robyf,wrapAngle(robYf)*180/M_PI, i,j,k, m->pTot);
+
+				geometry_msgs::PoseStamped candidate_base_pose;
+				candidate_base_pose.header.frame_id = "/abs_nwu";
+				candidate_base_pose.header.seq = 0;
+				candidate_base_pose.header.stamp = ros::Time::now();
+
+				candidate_base_pose.pose.position.x = robxf;
+				candidate_base_pose.pose.position.y = robyf;
+				candidate_base_pose.pose.position.z = robzf;
+
+				tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+				candidate_base_pose.pose.orientation.x = robqf[0];
+				candidate_base_pose.pose.orientation.y = robqf[1];
+				candidate_base_pose.pose.orientation.z = robqf[2];
+				candidate_base_pose.pose.orientation.w = robqf[3];
+				candidate_base_poses.push_back(candidate_base_pose);
+
+				//int retIKPLAN = checkIKPLAN(candidate_base_pose);
+				//printf("checkIKPLAN (%d,%d,%d): %d\n", i,j,k, retIKPLAN);
+
+				cntTotThr++;
+			}
+		if (cntTotThr==0)
+		{
+			robxf = robx0;
+			robyf = roby0;
+			robYf = robY0;
+
+			geometry_msgs::PoseStamped candidate_base_pose;
+			candidate_base_pose.header.frame_id = "/abs_nwu";
+			candidate_base_pose.header.seq = 0;
+			candidate_base_pose.header.stamp = ros::Time::now();
+
+			candidate_base_pose.pose.position.x = robxf;
+			candidate_base_pose.pose.position.y = robyf;
+			candidate_base_pose.pose.position.z = robzf;
+
+			tf::Quaternion robqf = tf::createQuaternionFromRPY(robRf,robPf,robYf);
+			candidate_base_pose.pose.orientation.x = robqf[0];
+			candidate_base_pose.pose.orientation.y = robqf[1];
+			candidate_base_pose.pose.orientation.z = robqf[2];
+			candidate_base_pose.pose.orientation.w = robqf[3];
+			candidate_base_poses.push_back(candidate_base_pose);
+
+			ROS_WARN("    No probable candidate poses higher than a threshold!");
+			return false;
+		}
+		else
+		{
+			ROS_INFO("    Number of valid candidates: %d",cntTotMax);
+			ROS_INFO("    Number of probable candidates: %d",cntTotThr);
+		}
+
+	}
+
+	return true;
+}
+
+bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses)
+{
+
+	// policy for robot pose selection
+	// 0) set search space
+	// 1) candidate pose validity for grasing
+	// 2) distance to obstacles
+	// 3) kinematics of hdt arm
+	// 4) multiplication of 1~3)
+	// 5) candidate sorting by some metrics
+	// 6) generate final candidate base poses
+
+
+	// PARAMETER SETTING
+
+	// 1) flag for pGrasp operation
+	bool bCheckGrasp = true;
+// 	bool bCheckGrasp = false;
+
+	// 2) flag for pObs operation
+	bool bCheckObs = true;		// TODO: sometimes map data is corrupted and NO candidate_base_pose can be found!
+// 	bool bCheckObs = false;
+
+	// 3) flag for pWork operation
+// 	bool bCheckWork = true;
+	bool bCheckWork = false;
+
+	// 5) flag for candidate sorting
+	int bSortMetric = 3;		// 1: angle, 2: angle, position, 3: pTot threshold (default)
+
+
+	// 0) search space
+	int nDist = 6;		// r in [0.5:0.1:1.0] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
+	double distMin = 0.5, distStep = 0.1;
+// 	int nDist = 6;		// r in [0.6:0.1:1.1] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
+// 	double distMin = 0.6, distStep = 0.1;
+	int nAng = 12;		// th in [0:30:330]
+	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
+	int nYaw = 9;		// Y in [-20:5:20]
+	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
+// 	int nYaw = 5;		// Y in [-20:5:20]
+// 	double yawMin = -10.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
+
+	// 1) grasp achievable zone 	// TODO: tune these parameters
+	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
+	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1))
+	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
+	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
+//	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
+	double secSide[2] = {-10.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+// 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+// 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+// 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
+	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+	double scalepGraspDist = 0.05;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
+
+	// 2) arm position offset for computing pObs
+// 	double armOffsety = -0.0;
+// 	double armOffsety = -0.5;
+// 	double armOffsety = -1.1;	// center of arm (when straightend)
+// 	double armLength = 1.5;		// workspace radius about the center of arm
+// 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
+	double armOffsetx = 0.3;	// center of arm (for normal grasping motion)
+	double armOffsety = -0.5;	// center of arm (for normal grasping motion)
+	double armLength = 0.5;		// workspace radius about the center of arm
+	double armLengthCore = 0.3;	// core workspace radius about the center of arm (pObs = 0.0)
+// 	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
+// 	double bodyLength = 0.8;	// support polygon radius about the center of body
+// 	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
+	double bodyOffsetx1 = -0.49+0.148975+0.27;	// center of front body (except arm)
+	double bodyOffsetx2 = -0.49+0.148975-0.27;	// center of rear body (except arm)
+	double bodyLength = 0.5;	// support polygon radius about the center of body
+	double bodyLengthCore = 0.335;	// core support polygon radius about the center of body (pObs = 0.0)
+	int mapObsThr = 1;			// threshold for classifying clear and occupied regions
+
+	// 5) candidate selection criterion
+	double scaleDiffYglob = 0.05;	// multiply a quadratic function to pTot (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
+// 	double pTotThr = 0.5;		// pTot threshold for bSortMetric==3
+	double pTotThr = 0.0;		// pTot threshold for bSortMetric==3
+
+	// 6) /base_link offset from /top_shelf for final robot pose return
+// 	double baseOffsetx = -0.0;
+// 	double baseOffsetx = -0.3;
+// 	double baseOffsetx = -0.5;
+ 	double baseOffsetx = -0.49+0.148975;	// /base_link to /base_link_front_bumper_part to /top_shelf
+//	double baseOffsetx = -0.49;				// /base_link to /base_link_front_bumper_part (in new Hokuyo setting) 	// same as in computeRobPose()
+
+
+
+////////////////////////////////////////////////////////////////////////////////////
+
+
+
+	// 0) set search space (r,th,Y)
+	// (r,th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
+	// (Y): orientation about z-axis
+
+	double pTot[nDist][nAng][nYaw], pGrasp[nDist][nAng][nYaw], pObs[nDist][nAng][nYaw], pWork[nDist][nAng][nYaw];
+	bool bTotMax[nDist][nAng][nYaw];
+	for (int i=0; i<nDist; i++)
+		for (int j=0; j<nAng; j++)
+			for (int k=0; k<nYaw; k++)
+			{
+				pTot[i][j][k] = 0.0;
+				pGrasp[i][j][k] = 1.0;
+				pObs[i][j][k] = 1.0;
+				pWork[i][j][k] = 1.0;
+				bTotMax[i][j][k] = true;	// used when 1) check candidate validity before IK (process 1~4)
+											//			 2) select the one with maximum pTot (process 5~6)
+			}
+
+	double robz0 = 0.0, robP0 = 0.0, robR0 = 0.0;
+	double robxf=robx0, robyf=roby0, robzf=robz0, robYf=robY0, robPf=robP0, robRf=robR0;	// final (computed) robot pose
+
+	double robx[nDist][nAng][nYaw], roby[nDist][nAng][nYaw], robY[nDist][nAng][nYaw];	// candidate robot poses
+	for (int i=0; i<nDist; i++)
+		for (int j=0; j<nAng; j++)
+			for (int k=0; k<nYaw; k++)
+			{
+				robx[i][j][k] = objx + cos(objY + angMin + angStep*j)*(distMin + distStep*i);
+				roby[i][j][k] = objy + sin(objY + angMin + angStep*j)*(distMin + distStep*i);
+				robY[i][j][k] = objY + (angMin + angStep*j) - M_PI - (yawMin + yawStep*k);		// angular coordinate of x-axis (frontal direction) of the robot with respect to global frame
+			}
+
+
+	// 1) probability of successful grasping
+
+	if (bCheckGrasp)
+	{
+		// heuristic probability of successful grasping
+		// a) position: the object should be within left-hand side of the robot and 45 deg angle of view
+			// exception: exclude poses at close distance, include ones in right-hand side at far distance
+		// b) orientation: the object handle should be directed to the right of the robot
+			// c) exception: allow more deviation at close distance, reject most of deviations at far distance
+
+		for (int i=0; i<nDist; i++)
+		{
+			// c) set acceptable object orientation range
+			if (i < secDist[0])
+			{
+				secAngYaw[0] = 0.0/180.0*M_PI;
+				secAngYaw[1] = 120.0/180.0*M_PI;
+// 				bestAngYaw   = 60.0/180.0*M_PI;
+				bestAngYaw   = 65.0/180.0*M_PI;
+			}
+			else if (i < secDist[1])
+			{
+				secAngYaw[0] = 0.0/180.0*M_PI;
+				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				bestAngYaw   = 45.0/180.0*M_PI;
+				bestAngYaw   = 60.0/180.0*M_PI;
+			}
+			else // if (i >= secDist[1])
+			{
+				secAngYaw[0] = 0.0/180.0*M_PI;
+// 				secAngYaw[1] = 30.0/180.0*M_PI;
+				secAngYaw[1] = 60.0/180.0*M_PI;
+// 				bestAngYaw   = 15.0/180.0*M_PI;
+				bestAngYaw   = 50.0/180.0*M_PI;
+			}
+
+			for (int j=0; j<nAng; j++)
+			{
+				for (int k=0; k<nYaw; k++)
+				{
+					// a) object position at left-hand side to the robot
+					double rob2obj = atan2(objy-roby[i][j][k], objx-robx[i][j][k]);	// angular coordinate of a vector from robot position to object position (not orientation)
+					double diffAng = wrapAngle( rob2obj-robY[i][j][k] );
+					if ( diffAng >= secSide[0] && diffAng < secSide[1] )    // left-hand side and angle of view
+					{
+						// b) object handle orientation to the right of the robot
+						double diffY = wrapAngle( objY-robY[i][j][k] );
+						double diffYMax = std::max( fabs(secAngYaw[0]-bestAngYaw), fabs(secAngYaw[1]-bestAngYaw) );
+						double diffDistMax = std::max( fabs(distMin-bestDist), fabs(distMin+distStep*(nDist-1)-bestDist) );
+						if ( diffY >= secAngYaw[0] && diffY <= secAngYaw[1] )
+						{
+							// EXCLUDE CANDIDATES WE HAVE ALREADY SEEN
+							bTotMax[i][j][k] = false;	// using bTotMax instead of pGrasp to explicitly represent candidate validity (before expensive IK test)
+
+							// higher probability around diffY==bestAngYaw
+// 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+// 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+							
+							// higher probability around diffY==bestAngYaw and diffDist==bestDist
+// 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	// 2) probability not to collide with obstacles
+	// depends on distance to obstacles considering the position offset wrt orientation
+
+	if (bCheckObs == true)
+	{
+		// TODO TODO
+// 		map_ = current_goal_->map;
+
+// 		if (bMapReceived_==1 && bRobPoseReceived_==1)
+		{
+// 			bMapReceived_ = -1;
+// 			bRobPoseReceived_ = -1;
+
+			double resolution = map_.info.resolution;
+			int width = map_.info.width;
+			int height = map_.info.height;
+            geometry_msgs::Pose origin = map_.info.origin;
+			// OccupancyGrid index usage
+			//	mapx = origin.position.x + resolution*ii;	// x-position in world_frame
+			//	mapy = origin.position.y + resolution*jj;	// y-position in world_frame
+			//	mapObs = map_.data[width*jj+ii];			// probability of occupancy in this (x,y) position 	// -1: unknown, 0: clear, 1-100: higher probability
+
+			int patchSize2 = (int)(armLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
+			double armx, army, armY;	// arm center position biased from /top_shelf by armOffsety
+			int armi, armj;				// index for patch center
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k]==true)
+						{
+// 							armx = robx[i][j][k] - sin(robY[i][j][k])*armOffsety;
+// 							army = roby[i][j][k] + cos(robY[i][j][k])*armOffsety;
+							armx = robx[i][j][k] + cos(robY[i][j][k])*armOffsetx - sin(robY[i][j][k])*armOffsety;
+							army = roby[i][j][k] + sin(robY[i][j][k])*armOffsetx + cos(robY[i][j][k])*armOffsety;
+
+							armi = (int)((armx-origin.position.x)/resolution);
+							armj = (int)((army-origin.position.y)/resolution);
+
+							if (armi>=patchSize2 && armi<width-patchSize2 && armj>=patchSize2 && armj<height-patchSize2)
+							{
+								bool bCollided = false;
+								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+										if (map_.data[width*(armj+jj)+armi+ii] >= mapObsThr)		// including unknown region
+//										if (map_.data[width*(armj+jj)+armi+ii] != 0)				// only in clear region
+										{
+											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+											if (distObs < armLengthCore)
+											{
+												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+												bCollided = true;
+											}
+											else if (distObs < armLength)
+												pObs[i][j][k] = std::min( pObs[i][j][k], std::pow( (distObs-armLengthCore)/(armLength-armLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+										}
+							}
+							else
+							{
+// 								bTotMax[i][j][k] = false;
+// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+							}
+						}
+
+			patchSize2 = (int)(bodyLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
+			double bodyx, bodyy, bodyY;		// body center position biased from /top_shelf by bodyOffsetx
+			int bodyi, bodyj;				// index for patch center
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k]==true)
+						{
+							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx1;
+							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx1;
+
+							bodyi = (int)((bodyx-origin.position.x)/resolution);
+							bodyj = (int)((bodyy-origin.position.y)/resolution);
+
+							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+							{
+								bool bCollided = false;
+								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
+										{
+											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+											if (distObs < bodyLengthCore)
+											{
+												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+												bCollided = true;
+											}
+											else if (distObs < bodyLength)
+												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+										}
+							}
+							else
+							{
+// 								bTotMax[i][j][k] = false;
+// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+							}
+						}
+// 			patchSize2 = (int)(bodyLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
+// 			double bodyx, bodyy, bodyY;		// body center position biased from /top_shelf by bodyOffsetx
+// 			int bodyi, bodyj;				// index for patch center
+			for (int i=0; i<nDist; i++)
+				for (int j=0; j<nAng; j++)
+					for (int k=0; k<nYaw; k++)
+						if (bTotMax[i][j][k]==true)
+						{
+							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx2;
+							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx2;
+
+							bodyi = (int)((bodyx-origin.position.x)/resolution);
+							bodyj = (int)((bodyy-origin.position.y)/resolution);
+
+							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+							{
+								bool bCollided = false;
+								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
+										{
+											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+											if (distObs < bodyLengthCore)
+											{
+												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+												bCollided = true;
+											}
+											else if (distObs < bodyLength)
+												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
+										}
+							}
+							else
+							{
+// 								bTotMax[i][j][k] = false;
+// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+							}
+						}
+
+
+// 			bMapReceived_ = 0;
+// 			bRobPoseReceived_ = 0;
+		}
+	}
+
+
+	// 3) robot arm workspace limit should be included here!
+
+	if (bCheckWork)
+	{
+// 		std::vector<double> pose = { 0,0,0, 0,0,0 };		// { x,y,z, r,p,y }		// TODO: check if this is wrt robot base frame
+// 		std::vector<double> start = { 0,0,0,0,0,0,0 };		// TODO: check home pose of the arm
+// 		std::vector<double> solution = { 0,0,0,0,0,0,0 };
+// 		int option = 0;
+// 		bool ret = false;
+// 
+// 		for (int i=0; i<nDist; i++)
+// 			for (int j=0; j<nAng; j++)
+// 				for (int k=0; k<nYaw; k++)
+// 					if (bTotMax[i][j][k]==true)
+// 					{
+// 						// TODO: check for arm home position and z-offset(-0.1?) from robot base to gastank handle
+// // 						pose = { objx-robx[i][j][k],objy-roby[i][j][k],-0.1, 0.0,0.0,objY-robY[i][j][k] };
+// 						pose = { objx-robx[i][j][k],objy-roby[i][j][k],-0.1, 0.0,0.0,0.0 };
+// 
+// 						ret = hdt_robot_model_->computeIK(pose,start,solution,option);
+// 						if (!ret)
+// 							pWork[i][j][k] = 0.0;
+// 					}
+
+		// check for inverse kinematics and arm planning (if object is in reachable range and within angle of view)
+		for (int i=0; i<nDist; i++)
+			for (int j=0; j<nAng; j++)
+				for (int k=0; k<nYaw; k++)
+					if (bTotMax[i][j][k]==true)
+					{
+// 						int retIKPLAN = checkIKPLAN();	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
+
+						geometry_msgs::PoseStamped gas_can_pose;
+						gas_can_pose.header.frame_id = "/abs_nwu";
+						gas_can_pose.header.seq = 0;
+						gas_can_pose.header.stamp = ros::Time::now();
+
+						gas_can_pose.pose.position.x = objx;
+						gas_can_pose.pose.position.y = objy;
+						gas_can_pose.pose.position.z = 0.0;
+
+						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY);
+						gas_can_pose.pose.orientation.x = objq[0];
+						gas_can_pose.pose.orientation.y = objq[1];
+						gas_can_pose.pose.orientation.z = objq[2];
+						gas_can_pose.pose.orientation.w = objq[3];
+
+						geometry_msgs::PoseStamped candidate_base_pose;
+						candidate_base_pose.header.frame_id = "/abs_nwu";
+						candidate_base_pose.header.seq = 0;
+						candidate_base_pose.header.stamp = ros::Time::now();
+
+						candidate_base_pose.pose.position.x = robx[i][j][k];
+						candidate_base_pose.pose.position.y = roby[i][j][k];
+						candidate_base_pose.pose.position.z = 0.0;
+
+						tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0,0.0,robY[i][j][k]);
+						candidate_base_pose.pose.orientation.x = robqf[0];
+						candidate_base_pose.pose.orientation.y = robqf[1];
+						candidate_base_pose.pose.orientation.z = robqf[2];
+						candidate_base_pose.pose.orientation.w = robqf[3];
+
+						int retIKPLAN = checkIK(gas_can_pose, candidate_base_pose);	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
+						//std::cerr << "retIKPLAN: " << retIKPLAN << std::endl;
+						if (retIKPLAN!=1) {
+							bTotMax[i][j][k] = false;
+						}
+					}
 	}
 
 
@@ -1300,6 +2079,189 @@ int RepositionBaseExecutor::checkIKPLAN(const geometry_msgs::PoseStamped& candid
                 sent_move_arm_goal_ = false; // reset for future move arm goals
             }
 
+	return 1;	// success
+}
+
+
+int RepositionBaseExecutor::checkIK(const geometry_msgs::PoseStamped& gas_can_pose, const geometry_msgs::PoseStamped& candidate_base_pose)
+{
+            ////////////////////////////////////////////////////////////////////////////////
+            // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
+            ////////////////////////////////////////////////////////////////////////////////
+
+//             if (!generated_grasps_) 
+			{
+//                 Eigen::Affine3d base_link_to_gas_canister;
+//                 tf::poseMsgToEigen(current_goal_->gas_can_in_base_link.pose, base_link_to_gas_canister);
+                Eigen::Affine3d base_link_in_map;
+                Eigen::Affine3d gas_can_in_map;
+                tf::poseMsgToEigen(gas_can_pose.pose, gas_can_in_map);
+//                 tf::poseMsgToEigen(robot_pose_world_frame_.pose, base_link_in_map);
+                tf::poseMsgToEigen(candidate_base_pose.pose, base_link_in_map);
+				Eigen::Affine3d base_link_to_gas_canister = base_link_in_map.inverse() * gas_can_in_map;
+                
+				// 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
+                int max_num_candidates = 100;
+                std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
+                ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
+
+                visualize_grasp_candidates(grasp_candidates);
+
+                // mount -> wrist = mount -> robot * robot -> wrist
+
+//                 const std::string robot_frame = current_goal_->gas_can_in_base_link.header.frame_id;
+                const std::string robot_frame = "/base_footprint";
+                const std::string kinematics_frame = "arm_mount_panel_dummy";
+                tf::StampedTransform tf_transform;
+                try {
+                    listener_.lookupTransform(robot_frame, kinematics_frame, ros::Time(0), tf_transform);
+                }
+                catch (const tf::TransformException& ex) {
+//                     hdt_msgs::GraspObjectCommandResult result;
+//                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+                    std::stringstream ss;
+                    ss << "Failed to lookup transform " << robot_frame << " -> " << kinematics_frame << "; Unable to determine grasp reachability";
+                    ROS_WARN("%s", ss.str().c_str());
+//                     as_->setAborted(result, ss.str());
+//                     status_ = GraspObjectExecutionStatus::FAULT;
+//                     break;
+					return -4;
+                }
+
+                Eigen::Affine3d robot_to_kinematics;
+                msg_utils::convert(tf_transform, robot_to_kinematics);
+
+                // 2. filter unreachable grasp candidates
+                reachable_grasp_candidates_.clear();
+                reachable_grasp_candidates_.reserve(grasp_candidates.size());
+                for (const GraspCandidate& grasp_candidate : grasp_candidates) {
+                    Eigen::Affine3d kinematics_to_grasp_candidate =
+                            robot_to_kinematics.inverse() * grasp_candidate.grasp_candidate_transform;
+
+                    std::vector<double> fake_seed(robot_model_->joint_names().size(), 0.0);
+                    std::vector<double> sol;
+                    if (robot_model_->search_nearest_ik(
+                            kinematics_to_grasp_candidate, fake_seed, sol, sbpl::utils::ToRadians(1.0)))
+                    {
+                        GraspCandidate reachable_grasp_candidate(kinematics_to_grasp_candidate, grasp_candidate.u);
+                        reachable_grasp_candidates_.push_back(reachable_grasp_candidate);
+                    }
+                }
+
+                ROS_INFO("Produced %zd reachable grasp poses", reachable_grasp_candidates_.size());
+
+                if (reachable_grasp_candidates_.empty()) {
+                    ROS_WARN("No reachable grasp candidates available");
+//                     hdt_msgs::GraspObjectCommandResult result;
+//                     result.result = hdt_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
+//                     as_->setAborted(result, "No reachable grasp candidates available");
+//                     status_ = GraspObjectExecutionStatus::FAULT;
+//                     break;
+					return -3;
+                }
+
+                const double min_u = 0.0;
+                const double max_u = 1.0;
+
+                // 3. sort grasp candidates by desirability (note: more desirable grasps are at the end of the vector)
+                std::sort(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end(),
+                          [&](const GraspCandidate& a, const GraspCandidate& b) -> bool
+                          {
+                              double mid_u = 0.5 * (min_u + max_u);
+                              return fabs(a.u - mid_u) > fabs(b.u - mid_u);
+                          });
+
+                // limit the number of grasp attempts by the configured amount
+                std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
+                while (reachable_grasp_candidates_.size() > max_grasp_candidates_) {
+                    reachable_grasp_candidates_.pop_back();
+                }
+                std::reverse(reachable_grasp_candidates_.begin(), reachable_grasp_candidates_.end()); // lol
+
+                ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
+
+                generated_grasps_ = true;
+            }
+
+/*
+            ////////////////////////////////////////////////////////////////////////////////
+            // Main loop of PLANNING_ARM_MOTION_TO_PREGRASP
+            ////////////////////////////////////////////////////////////////////////////////
+			
+            if (!sent_move_arm_goal_) {
+//                 hdt_msgs::GraspObjectCommandFeedback feedback;
+//                 feedback.status = execution_status_to_feedback_status(status_);
+//                 as_->publishFeedback(feedback);
+
+                if (reachable_grasp_candidates_.empty()) {
+                    ROS_WARN("Failed to plan to all reachable grasps");
+//                     hdt_msgs::GraspObjectCommandResult result;
+//                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+//                     as_->setAborted(result, "Failed to plan to all reachable grasps");
+//                     status_ = GraspObjectExecutionStatus::FAULT;
+//                     break;
+					return -2;
+                }
+
+                ROS_WARN("Sending Move Arm Goal to pregrasp pose");
+                if (!wait_for_action_server(
+                        move_arm_command_client_,
+                        move_arm_command_action_name_,
+                        ros::Duration(0.1),
+                        ros::Duration(5.0)))
+                {
+                    std::stringstream ss; ss << "Failed to connect to '" << move_arm_command_action_name_ << "' action server";
+                    ROS_WARN("%s", ss.str().c_str());
+//                     hdt_msgs::GraspObjectCommandResult result;
+//                     result.result = hdt_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+//                     as_->setAborted(result, ss.str());
+//                     status_ = GraspObjectExecutionStatus::FAULT;
+//                     break;
+					return -1;
+                }
+
+                const GraspCandidate& next_best_grasp = reachable_grasp_candidates_.back();
+
+                // 4. send a move arm goal for the best grasp
+                last_move_arm_pregrasp_goal_.type = hdt::MoveArmCommandGoal::EndEffectorGoal;
+                tf::poseEigenToMsg(next_best_grasp.grasp_candidate_transform, last_move_arm_pregrasp_goal_.goal_pose);
+
+				// TODO
+//                 last_move_arm_pregrasp_goal_.octomap = current_goal_->octomap;
+
+                auto result_cb = boost::bind(&RepositionBaseExecutor::move_arm_command_result_cb, this, _1, _2);
+                move_arm_command_client_->sendGoal(last_move_arm_pregrasp_goal_, result_cb);
+
+                pending_move_arm_command_ = true;
+                sent_move_arm_goal_ = true;
+
+                reachable_grasp_candidates_.pop_back();
+            }
+            else if (!pending_move_arm_command_) {
+                // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
+                // now since the move_arm action handles execution and there is
+                // presently no feedback to distinguish planning vs. execution
+
+                ROS_INFO("Move Arm Goal is no longer pending");
+                if (move_arm_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
+                    move_arm_command_result_ && move_arm_command_result_->success)
+                {
+                    ROS_INFO("Move Arm Command succeeded");
+//                     status_ = GraspObjectExecutionStatus::OPENING_GRIPPER;
+                }
+                else {
+                    ROS_INFO("Move Arm Command failed");
+                    ROS_INFO("    Simple Client Goal State: %s", move_arm_command_goal_state_.toString().c_str());
+                    ROS_INFO("    Error Text: %s", move_arm_command_goal_state_.getText().c_str());
+                    ROS_INFO("    result.success = %s", move_arm_command_result_ ? (move_arm_command_result_->success ? "TRUE" : "FALSE") : "null");
+                    // stay in PLANNING_ARM_MOTION_TO_PREGRASP until there are no more grasps
+                    // TODO: consider moving back to the stow position
+					return -0;
+                }
+
+                sent_move_arm_goal_ = false; // reset for future move arm goals
+            }
+*/
 	return 1;	// success
 }
 
