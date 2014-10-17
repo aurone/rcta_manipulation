@@ -47,6 +47,7 @@ last_status_(RepositionBaseExecutionStatus::INVALID),
     move_arm_command_result_(),
     move_arm_command_action_name_("move_arm_command"),
     move_arm_command_client_(),
+    occupancy_grid_sub_(), 	// TODO TODO
     listener_()
 {
 }
@@ -164,6 +165,21 @@ bool RepositionBaseExecutor::initialize()
 	ROS_INFO("Starting action server '%s'...", action_name_.c_str());
 	as_->start();
 	ROS_INFO("Action server started");
+
+
+	// TODO TODO
+    ROS_WARN("Waiting for occupancy grid message...");
+    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
+//     while (!map_) {
+//         ros::Duration(1.0).sleep();
+//         ros::spinOnce();
+//     }
+}
+
+// TODO TODO
+void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+    map_ = *msg;
 }
 
 
@@ -210,7 +226,13 @@ int RepositionBaseExecutor::run()
 						double objx = current_goal_->gas_can_in_map.pose.position.x;
 						double objy = current_goal_->gas_can_in_map.pose.position.y;
 						double objz = current_goal_->gas_can_in_map.pose.position.z;
-						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
+
+						Eigen::AngleAxisd objAA;
+						objAA = Eigen::Quaterniond(current_goal_->gas_can_in_map.pose.orientation.w, current_goal_->gas_can_in_map.pose.orientation.x, current_goal_->gas_can_in_map.pose.orientation.y, current_goal_->gas_can_in_map.pose.orientation.z );
+						Eigen::Vector3d objAxis = objAA.axis();
+						Eigen::Vector3d zAxis(0,0,1);
+						double objY = objAA.angle() * objAxis.dot(zAxis);
+// 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
 						objY = wrapAngle(objY-M_PI/2.0);	// M_PI/2 offset due to definition of object frame in new mesh file 
 						double objP = 0.0;
 						double objR = 0.0;
@@ -442,7 +464,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	// 5) candidate selection criterion
 	double scaleDiffYglob = 0.05;	// multiply a quadratic function to pTot (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
-	double pTotThr = 0.5;		// pTot threshold for bSortMetric==3
+// 	double pTotThr = 0.5;		// pTot threshold for bSortMetric==3
+	double pTotThr = 0.0;		// pTot threshold for bSortMetric==3
 
 	// 6) /base_link offset from /top_shelf for final robot pose return
 // 	double baseOffsetx = -0.0;
@@ -561,16 +584,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 	if (bCheckObs == true)
 	{
-		// TODO: not working with actionlib yet...
-// 		double resolution = current_goal_->map.info.resolution;
-// 		int width = current_goal_->map.info.width;
-// 		int height = current_goal_->map.info.height;
-// 		printf("width: %d   height: %d",width,height);
-// 		geometry_msgs::Pose origin = current_goal_->map.info.origin;
-// 		int i=0, j=0;
-// 		printf("Printing map data...\n");
-// 		printf("map data: %d\n",current_goal_->map.data[width*(i-1)+j]);
-		map_ = current_goal_->map;
+		// TODO TODO
+// 		map_ = current_goal_->map;
 
 // 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{

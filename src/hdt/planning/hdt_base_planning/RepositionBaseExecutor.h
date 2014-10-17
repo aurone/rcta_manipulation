@@ -172,6 +172,13 @@ private:
 	void preempt_callback();
 
     uint8_t execution_status_to_feedback_status(RepositionBaseExecutionStatus::Status status);
+
+
+	// TODO TODO
+    ros::Subscriber occupancy_grid_sub_;
+	void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+
+
 };
 
 #endif
