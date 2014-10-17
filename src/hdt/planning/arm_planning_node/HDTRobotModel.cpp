@@ -4,6 +4,7 @@
 #include <sbpl_geometry_utils/utils.h>
 #include <eigen_conversions/eigen_kdl.h>
 #include <leatherman/print.h>
+#include <leatherman/viz.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <urdf/model.h>
@@ -14,7 +15,7 @@ namespace hdt
 
 HDTRobotModel::HDTRobotModel() :
     RobotModel(),
-    robot_model_()
+    robot_model_(), nh_()
 {
     setPlanningJoints({ "arm_1_shoulder_twist",
                         "arm_2_shoulder_lift",
@@ -24,6 +25,7 @@ HDTRobotModel::HDTRobotModel() :
                         "arm_6_wrist_lift",
                         "arm_7_gripper_lift" });
     setPlanningLink("arm_7_gripper_lift_link");
+    pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
 }
 
 HDTRobotModel::~HDTRobotModel()
@@ -86,12 +88,56 @@ std::string to_string(const Eigen::Affine3d& transform)
 
 bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector<double>& start, std::vector<double>& solution, int option)
 {
+    //ROS_INFO("Pose size %zd", pose.size());
     Eigen::Affine3d eef_transform(Eigen::Affine3d::Identity());
     if (pose.size() == 6) {
         double roll = pose[3];
         double pitch = pose[4];
         double yaw = pose[5];
+        //ROS_INFO("Using RPY");
+        eef_transform = Eigen::Translation3d(pose[0], pose[1], pose[2]) *
+                        Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()) *
+                        Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+                        Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX());
+    }
+    else {
+        //ROS_INFO("Using quaternion");
+        eef_transform = Eigen::Translation3d(pose[0], pose[1], pose[2]) *
+                        Eigen::Quaterniond(pose[6], pose[3], pose[4], pose[5]);
+    }
 
+    Eigen::Affine3d T_kinematics_planning;
+    tf::transformKDLToEigen(this->T_kinematics_to_planning_, T_kinematics_planning);
+    //ROS_INFO("eef in planning frame: %s", to_string(eef_transform).c_str());
+    geometry_msgs::Pose p;
+    tf::poseEigenToMsg(eef_transform, p);
+    visualization_msgs::MarkerArray ma;
+    ma = viz::getPoseMarkerArray(p, "base_footprint", "ik_goal_bf");
+    pub_.publish(ma);
+    //ROS_INFO("kinematics->planning: %s", to_string(T_kinematics_planning).c_str());
+    // kinematics -> end effector = kinematics -> planning * planning -> end effector
+    eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
+    //ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
+    tf::poseEigenToMsg(eef_transform, p);
+    ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
+    pub_.publish(ma);
+    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
+    if (res) {
+        ROS_WARN_PRETTY("IK Succeeded");
+    }
+    else {
+        ROS_WARN_PRETTY("IK Failed");
+    }
+    return res;
+}
+
+bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector<double>& start, std::vector< std::vector<double> >& solutions, int option)
+{
+    Eigen::Affine3d eef_transform(Eigen::Affine3d::Identity());
+    if (pose.size() == 6) {
+        double roll = pose[3];
+        double pitch = pose[4];
+        double yaw = pose[5];
         eef_transform = Eigen::Translation3d(pose[0], pose[1], pose[2]) *
                         Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()) *
                         Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
@@ -104,19 +150,28 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
 
     Eigen::Affine3d T_kinematics_planning;
     tf::transformKDLToEigen(this->T_kinematics_to_planning_, T_kinematics_planning);
-
+    //ROS_INFO("eef in planning frame: %s", to_string(eef_transform).c_str());
+    geometry_msgs::Pose p;
+    tf::poseEigenToMsg(eef_transform, p);
+    visualization_msgs::MarkerArray ma;
+    ma = viz::getPoseMarkerArray(p, "base_footprint", "ik_goal_bf");
+    pub_.publish(ma);
+    //ROS_INFO("kinematics->planning: %s", to_string(T_kinematics_planning).c_str());
     // kinematics -> end effector = kinematics -> planning * planning -> end effector
     eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
-    ROS_DEBUG("eef in manipulator frame: %s", to_string(eef_transform).c_str());
+    //ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
+    tf::poseEigenToMsg(eef_transform, p);
+    ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
+    pub_.publish(ma);
 
-    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
-    if (res) {
-        ROS_DEBUG("IK Succeeded");
+    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, start, sbpl::utils::ToRadians(1.0));
+    std::vector<double> sol;
+    while(ik_gen(sol)){
+      solutions.push_back(sol);
     }
-    else {
-        ROS_WARN_PRETTY("IK Failed");
-    }
-    return res;
+
+    ROS_INFO("Generated %zd IK solutions!", solutions.size());
+    return (solutions.size()>0)?true:false;
 }
 
 } // namespace hdt

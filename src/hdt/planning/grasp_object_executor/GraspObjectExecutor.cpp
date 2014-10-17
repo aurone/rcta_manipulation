@@ -1363,8 +1363,8 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
 {
     Eigen::Vector2d mean(circle_x, circle_y);
     Eigen::Matrix2d covariance(Eigen::Matrix2d::Zero());
-    covariance(0, 0) = 0.2;
-    covariance(1, 1) = 0.2;
+    covariance(0, 0) = 0.1;
+    covariance(1, 1) = 0.1;
     Gaussian2 gauss(mean, covariance);
 
     ROS_INFO_PRETTY("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (")

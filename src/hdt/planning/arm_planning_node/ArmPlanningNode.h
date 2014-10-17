@@ -98,10 +98,10 @@ private:
     bool reinit(
             const Eigen::Affine3d& T_kinematics_planning,
             const std::string& planning_frame,
-            octomap::OcTree* octomap);
+            octomap::OcTree* octomap, std::string octomap_frame_id);
 
     bool reinit_robot(const Eigen::Affine3d& T_kinematics_planning);
-    bool reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octree);
+    bool reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octree, std::string octomap_frame_id);
     bool reinit_sbpl();
 
     void move_arm(const hdt::MoveArmCommandGoal::ConstPtr& goal);
@@ -153,7 +153,7 @@ private:
 
     bool valid_octomap(const octomap_msgs::Octomap& msg);
 
-    void addOcTreeToField(distance_field::DistanceField* df, const octomap::OcTree* octree);
+    void addOcTreeToField(distance_field::DistanceField* df, std::string df_frame_id, const octomap::OcTree* octree, std::string octree_frame_id);
 };
 
 } // namespace hdt

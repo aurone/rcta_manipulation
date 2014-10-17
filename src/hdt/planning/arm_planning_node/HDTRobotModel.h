@@ -1,10 +1,12 @@
 #ifndef hdt_HDTRobotModel_h
 #define hdt_HDTRobotModel_h
 
+#include <ros/ros.h>
 #include <Eigen/Dense>
 #include <hdt_description/RobotModel.h>
 #include <sbpl_manipulation_components/robot_model.h>
 #include <urdf/model.h>
+#include <eigen_conversions/eigen_msg.h>
 
 namespace hdt
 {
@@ -48,8 +50,12 @@ public:
 
     /* Inverse Kinematics */
     bool computeIK(const std::vector<double> &pose, const std::vector<double> &start, std::vector<double> &solution, int option=0);
+    bool computeIK(const std::vector<double> &pose, const std::vector<double> &start, std::vector< std::vector<double> > &solutions, int option=0);
 
 private:
+
+    ros::NodeHandle nh_;
+    ros::Publisher pub_;
 
     hdt::RobotModelPtr robot_model_;
 
