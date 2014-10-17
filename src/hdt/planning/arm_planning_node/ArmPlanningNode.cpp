@@ -1125,7 +1125,7 @@ bool ArmPlanningNode::plan_to_joint_goal(
     req.motion_plan_request.goal_constraints.resize(1);
 
     std::vector<double> goal_vector = goal_joint_state.position;
-    std::vector<double> goal_tolerances (7, 0.05); 
+    std::vector<double> goal_tolerances (7, 0.05);
 
     req.motion_plan_request.goal_constraints.resize(1);
     req.motion_plan_request.goal_constraints.front().joint_constraints.resize(goal_vector.size());
