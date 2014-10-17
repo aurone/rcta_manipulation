@@ -120,10 +120,10 @@ int ArmPlanningNode::run()
 bool ArmPlanningNode::reinit(
     const Eigen::Affine3d& T_kinematics_planning,
     const std::string& planning_frame,
-    octomap::OcTree* octree)
+    octomap::OcTree* octree, std::string octree_frame_id)
 {
     ROS_INFO_PRETTY("Reinitializing Planner");
-    return reinit_robot(T_kinematics_planning) && reinit_collision_model(planning_frame, octree) && reinit_sbpl();
+    return reinit_robot(T_kinematics_planning) && reinit_collision_model(planning_frame, octree, octree_frame_id) && reinit_sbpl();
 }
 
 bool ArmPlanningNode::reinit_robot(const Eigen::Affine3d& T_kinematics_planning)
@@ -135,35 +135,45 @@ bool ArmPlanningNode::reinit_robot(const Eigen::Affine3d& T_kinematics_planning)
     return true;
 }
 
-bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octomap)
+bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octomap, std::string octree_frame_id)
 {
-    ROS_INFO_PRETTY("Reinitializing collision model");
-
+    ROS_INFO_PRETTY("Reinitializing collision model for planning frame %s", planning_frame.c_str());
     // if we didn't receive an octomap, we better be planning in the robot's base frame
     assert(((bool)octomap) ? (true) : (planning_frame == robot_local_frame_));
+    if(planning_frame != robot_local_frame_) {
+      ROS_WARN_PRETTY("Planning frame (%s) does not match robot local frame (%s)!", planning_frame.c_str(), robot_local_frame_.c_str());
+    }
 
     const double max_dist_m = 0.2;
     const double cell_res_m = 0.02;
 
     // initialize the distance field
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field;
+
+    const double size_x = 3.0, size_y = 3.0, size_z = 2.0;
+    const double origin_x = -0.75, origin_y = -1.25, origin_z = 0.0;
+    std::string df_frame = robot_local_frame_;
+
+    distance_field.reset(new distance_field::PropagationDistanceField(
+               size_x, size_y, size_z, cell_res_m, origin_x, origin_y, origin_z, max_dist_m));
+    if (!distance_field) {
+      ROS_ERROR_PRETTY("Failed to instantiate Propagation Distance Field");
+      return false;
+    }
+    distance_field->reset();
+    ROS_INFO_PRETTY("Distance field initialized! Origin (%.3f, %.3f, %.3f) Size: (%.3f, %.3f, %.3f) in frame %s", origin_x, origin_y, origin_z, size_x, size_y, size_z, df_frame.c_str());
+
     if (!octomap) {
-        // still need to instantiate a distance field to check for collisions against other collision groups
+        //still need to instantiate a distance field to check for collisions against other collision groups
         ROS_WARN_PRETTY("  Octomap from message does not support OcTree type requirements");
-        ROS_WARN_PRETTY("  Planning with empty collision map in the robot frame");
-
-        const double size_x = 3.0, size_y = 3.0, size_z = 3.0;
-        const double origin_x = -0.75, origin_y = -1.25, origin_z = -1.0;
-        distance_field.reset(new distance_field::PropagationDistanceField(
-                size_x, size_y, size_z, cell_res_m, origin_x, origin_y, origin_z, max_dist_m));
-        if (!distance_field) {
-            ROS_ERROR_PRETTY("Failed to instantiate Propagation Distance Field");
-            return false;
-        }
-
-        distance_field->reset();
+        ROS_WARN_PRETTY("  Planning with empty collision map");
     }
     else {
+        ROS_INFO_PRETTY("Octree frame id: %s", octree_frame_id.c_str());
+        if(octree_frame_id.empty()){
+          ROS_ERROR("Octree frame id is empty!");
+          return false;
+        }
         ROS_INFO_PRETTY("  Octree: %p", octomap);
         size_t num_nodes = octomap->calcNumNodes();
         ROS_INFO_PRETTY("    Num Nodes: %zd", num_nodes);
@@ -259,14 +269,13 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         octomap::point3d metric_min(metric_min_x, metric_min_y, metric_min_z);
         octomap::point3d metric_max(metric_max_x, metric_max_y, metric_max_z);
 
-        distance_field.reset(new distance_field::PropagationDistanceField(*octomap, metric_min, metric_max, max_dist_m));
+        /*distance_field.reset(new distance_field::PropagationDistanceField(*octomap, metric_min, metric_max, max_dist_m));
         if (!distance_field) {
             ROS_ERROR_PRETTY("Failed to instantiate Propagation Distance Field");
             return false;
         }
-
-        distance_field->reset();
-        this->addOcTreeToField(distance_field.get(), octomap);
+        distance_field->reset();*/
+//        this->addOcTreeToField(distance_field.get(), df_frame, octomap, octree_frame_id);
 
         ROS_INFO_PRETTY("  Distance Field:");
         ROS_INFO_PRETTY("    Pointer: %p", distance_field.get());
@@ -303,7 +312,7 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         return false;
     }
 
-    grid_->setReferenceFrame(planning_frame);
+    grid_->setReferenceFrame(df_frame);
 
     ROS_INFO_PRETTY("  OccupancyGrid:");
     int num_cells_x, num_cells_y, num_cells_z;
@@ -332,6 +341,8 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         return false;
     }
 
+    this->addOcTreeToField(distance_field_.get(), df_frame, octomap, octree_frame_id);
+
     auto distance_field_markers = collision_checker_->getVisualization("distance_field");
     ROS_INFO_PRETTY("Publishing %zd distance field visualization markers", distance_field_markers.markers.size());
     ROS_INFO_PRETTY("Visualizing marker types:");
@@ -339,8 +350,10 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         ROS_INFO_PRETTY("  %s, Num Points: %zd", visualization_msgs_marker_type_to_cstr(marker.type), marker.points.size());
     }
     marker_array_pub_.publish(distance_field_markers);
+    marker_array_pub_.publish(distance_field_markers);
 
     ROS_INFO_PRETTY("Successfully reinitialized collision model");
+
     return true;
 }
 
@@ -490,16 +503,16 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 
     // create the octomap here
     std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(request->octomap));
+    std::string octree_frame_id = request->octomap.header.frame_id;
     octomap::OcTree* octree(dynamic_cast<octomap::OcTree*>(octomap.get()));
     bool valid_octomap = (bool)octree;
-
     std::string planning_frame;
+    planning_frame = robot_local_frame_;
     if (valid_octomap) {
-        planning_frame = request->octomap.header.frame_id;
+        //planning_frame = request->octomap.header.frame_id;
         ROS_INFO_PRETTY("Valid Octomap. Planning in frame '%s'", planning_frame.c_str());
     }
     else {
-        planning_frame = robot_local_frame_;
         ROS_INFO_PRETTY("Invalid Octomap. Planning in frame '%s'", planning_frame.c_str());
     }
 
@@ -550,6 +563,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // look up the transform from the kinematics frame (the frame that goals are specified in) to the planning frame
     tf::StampedTransform kinematics_to_planning_tf;
     Eigen::Affine3d T_kinematics_planning;
+    ROS_INFO_PRETTY("Looking up trasform from planning_frame (%s) to kinematics_frame (%s)", planning_frame.c_str(), kinematics_frame_.c_str());
     try {
         listener_.lookupTransform(kinematics_frame_, planning_frame, ros::Time(0), kinematics_to_planning_tf);
         msg_utils::convert(kinematics_to_planning_tf, T_kinematics_planning);
@@ -594,6 +608,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // Fill out header information for the collision map so that sbpl::manipulation doesn't get pissed off
     planning_scene_->world.collision_objects.clear();
     // planning_scene_->world.octomap = request->octomap; // todo: covered by sbpl_collision_model/occupancy grid?
+    planning_scene_->world.octomap.header = std_msgs::CreateHeader(0, ros::Time(0), planning_frame);
     planning_scene_->world.collision_map.header = std_msgs::CreateHeader(0, ros::Time(0), planning_frame);
 
     planning_scene_->is_diff = false;
@@ -602,7 +617,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // Reinitialize for updated collision model
     ////////////////////////////////////////////////////////////////////////////////
 
-    if (!reinit(T_kinematics_planning, planning_frame, octree)) {
+    if (!reinit(T_kinematics_planning, planning_frame, octree, octree_frame_id)) {
         hdt::MoveArmCommandResult result;
         result.success = false;
         move_arm_command_server_->setAborted(result, "Failed to initialize Arm Planner");
@@ -1057,6 +1072,20 @@ bool ArmPlanningNode::plan_to_eef_goal(
     const geometry_msgs::PoseStamped& goal_pose,
     trajectory_msgs::JointTrajectory& traj)
 {
+    // clamp planning joints in robot start state
+    for (size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& planning_joint = robot_model_->joint_names()[i];
+        size_t joint_idx = i;
+        for (size_t j = 0; j < scene->robot_state.joint_state.name.size(); ++j) {
+           const std::string& joint_name = scene->robot_state.joint_state.name[j];
+           if (joint_name == planning_joint) {
+              ROS_WARN_PRETTY("Clamping joint '%s' to [%0.3f, %0.3f]", joint_name.c_str(), robot_model_->min_safety_limits()[joint_idx], robot_model_->max_safety_limits()[joint_idx]);
+              scene->robot_state.joint_state.position[j] = clamp(scene->robot_state.joint_state.position[j], robot_model_->min_safety_limits()[joint_idx], robot_model_->max_safety_limits()[joint_idx]);
+              ROS_WARN_PRETTY("  %0.3f", scene->robot_state.joint_state.position[j]);
+           }
+        }
+    }
+
     // fill goal state
     moveit_msgs::GetMotionPlan::Request req;
     req.motion_plan_request.goal_constraints.resize(1);
@@ -1114,6 +1143,20 @@ bool ArmPlanningNode::plan_to_joint_goal(
     const hdt::MoveArmCommandGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
+    // clamp planning joints in robot start state
+    for (size_t i = 0; i < robot_model_->joint_names().size(); ++i) {
+        const std::string& planning_joint = robot_model_->joint_names()[i];
+        size_t joint_idx = i;
+        for (size_t j = 0; j < scene->robot_state.joint_state.name.size(); ++j) {
+           const std::string& joint_name = scene->robot_state.joint_state.name[j];
+           if (joint_name == planning_joint) {
+              ROS_WARN_PRETTY("Clamping joint '%s' to [%0.3f, %0.3f]", joint_name.c_str(), robot_model_->min_safety_limits()[joint_idx], robot_model_->max_safety_limits()[joint_idx]);
+              scene->robot_state.joint_state.position[j] = clamp(scene->robot_state.joint_state.position[j], robot_model_->min_safety_limits()[joint_idx], robot_model_->max_safety_limits()[joint_idx]);
+              ROS_WARN_PRETTY("  %0.3f", scene->robot_state.joint_state.position[j]);
+           }
+        }
+    }
+
     sensor_msgs::JointState goal_joint_state = goal.goal_joint_state;
     if (!msg_utils::reorder_joints(goal_joint_state, robot_model_->joint_names())) {
         ROS_WARN_PRETTY("Goal state contains joints other than manipulator joints");
@@ -1208,11 +1251,19 @@ bool ArmPlanningNode::valid_octomap(const octomap_msgs::Octomap& msg)
     return true;
 }
 
-void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, const octomap::OcTree* octree)
+void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::string df_frame_id, const octomap::OcTree* octree, std::string octree_frame_id)
 {
     //lower extent
+    tf::StampedTransform octree_to_df;
+    try {
+      listener_.lookupTransform(df_frame_id, octree_frame_id, ros::Time(0), octree_to_df);
+    } catch (const tf::TransformException& ex){
+      ROS_ERROR("Could not lookup transform from %s frame to %s frame", octree_frame_id.c_str(), df_frame_id.c_str());
+      return;
+    }
+
     double min_x, min_y, min_z;
-    df->gridToWorld(0,0,0, min_x, min_y, min_z);
+    df->gridToWorld(0,0,0, min_x, min_y, min_z); 
 
     octomap::point3d bbx_min(min_x, min_y, min_z);
 
@@ -1226,22 +1277,38 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, const 
 
     octomap::point3d bbx_max(max_x, max_y, max_z);
 
-    EigenSTL::vector_Vector3d points;
+    EigenSTL::vector_Vector3d points; //the points from octree transformed in df frame
 
+    int num_original_points = 0;
     for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(bbx_min,bbx_max), end=octree->end_leafs_bbx(); it!= end; ++it)
     {
         if (octree->isNodeOccupied(*it))
         {
             if(it.getSize() <= df->getResolution()) {
-                Eigen::Vector3d point(it.getX(), it.getY(), it.getZ());
-                points.push_back(point);
+                tf::Vector3 pt_octree_frame(it.getX(), it.getY(), it.getZ());
+                tf::Vector3 pt_df_frame = octree_to_df * pt_octree_frame;
+                num_original_points++;
+                if(min_x <= pt_df_frame.getX() && pt_df_frame.getX() <= max_x &&
+                   min_y <= pt_df_frame.getY() && pt_df_frame.getY() <= max_y &&
+                   min_z <= pt_df_frame.getZ() && pt_df_frame.getZ() <= max_z){
+                  Eigen::Vector3d point(pt_df_frame.getX(), pt_df_frame.getY(), pt_df_frame.getZ());
+                  points.push_back(point);
+                }
             }
             else {
                 double ceil_val = ceil(it.getSize()/df->getResolution())*df->getResolution();
                 for(double x = it.getX()-ceil_val; x < it.getX()+ceil_val; x += df->getResolution()) {
                 for(double y = it.getY()-ceil_val; y < it.getY()+ceil_val; y += df->getResolution()) {
                 for(double z = it.getZ()-ceil_val; z < it.getZ()+ceil_val; z += df->getResolution()) {
-                    points.push_back(Eigen::Vector3d(x,y,z));
+                    num_original_points++;
+                    tf::Vector3 pt_octree_frame(x, y, z);
+                    tf::Vector3 pt_df_frame = octree_to_df * pt_octree_frame;
+                    if(min_x <= pt_df_frame.getX() && pt_df_frame.getX() <= max_x &&
+                       min_y <= pt_df_frame.getY() && pt_df_frame.getY() <= max_y &&
+                       min_z <= pt_df_frame.getZ() && pt_df_frame.getZ() <= max_z){
+                      Eigen::Vector3d point(pt_df_frame.getX(), pt_df_frame.getY(), pt_df_frame.getZ());
+                      points.push_back(point);
+                    }
                 }
                 }
                 }
@@ -1249,7 +1316,7 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, const 
         }
     }
 
-    ROS_INFO_PRETTY("Adding %zd points to the distance field", points.size());
+    ROS_INFO_PRETTY("Adding %zd/%d points to the distance field", points.size(), num_original_points);
     df->addPointsToField(points);
 }
 
