@@ -181,8 +181,8 @@ private:
 
 
 	// TODO TODO
-//     ros::Subscriber occupancy_grid_sub_;
-// 	void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+    ros::Subscriber occupancy_grid_sub_;
+	void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 
 
 };

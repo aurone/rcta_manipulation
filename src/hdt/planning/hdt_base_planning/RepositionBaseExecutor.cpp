@@ -47,7 +47,7 @@ last_status_(RepositionBaseExecutionStatus::INVALID),
     move_arm_command_result_(),
     move_arm_command_action_name_("move_arm_command"),
     move_arm_command_client_(),
-//     occupancy_grid_sub_(), 	// TODO TODO
+    occupancy_grid_sub_(), 	// TODO TODO
     listener_()
 {
 }
@@ -168,19 +168,22 @@ bool RepositionBaseExecutor::initialize()
 
 
 	// TODO TODO
-//     ROS_WARN("Waiting for occupancy grid message...");
-//     occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
-// //     while (!map_) {
-// //         ros::Duration(1.0).sleep();
-// //         ros::spinOnce();
-// //     }
+    ROS_WARN("Waiting for occupancy grid message...");
+    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
+//     while (!map_) 
+	{
+        ros::Duration(1.0).sleep();
+        ros::spinOnce();
+    }
+    occupancy_grid_sub_.shutdown();
+
 }
 
 // TODO TODO
-// void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
-// {
-//     map_ = *msg;
-// }
+void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+    map_ = *msg;
+}
 
 
 int RepositionBaseExecutor::run()
@@ -462,7 +465,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-	double secSide[2] = {-10.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {-0.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
@@ -553,21 +556,21 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			// c) set acceptable object orientation range
 			if (i < secDist[0])
 			{
-				secAngYaw[0] = 0.0/180.0*M_PI;
-				secAngYaw[1] = 120.0/180.0*M_PI;
+				secAngYaw[0] = 15.0/180.0*M_PI;
+				secAngYaw[1] = 100.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
 				bestAngYaw   = 65.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
-				secAngYaw[0] = 0.0/180.0*M_PI;
+				secAngYaw[0] = 15.0/180.0*M_PI;
 				secAngYaw[1] = 90.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
 				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
-				secAngYaw[0] = 0.0/180.0*M_PI;
+				secAngYaw[0] = 15.0/180.0*M_PI;
 // 				secAngYaw[1] = 30.0/180.0*M_PI;
 				secAngYaw[1] = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
@@ -611,7 +614,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	if (bCheckObs == true)
 	{
 		// TODO TODO
-		map_ = current_goal_->map;
+// 		map_ = current_goal_->map;
 
 // 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{
@@ -1299,7 +1302,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-	double secSide[2] = {-10.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {-0.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
@@ -1390,21 +1393,21 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 			// c) set acceptable object orientation range
 			if (i < secDist[0])
 			{
-				secAngYaw[0] = 0.0/180.0*M_PI;
-				secAngYaw[1] = 120.0/180.0*M_PI;
+				secAngYaw[0] = 15.0/180.0*M_PI;
+				secAngYaw[1] = 100.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
 				bestAngYaw   = 65.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
-				secAngYaw[0] = 0.0/180.0*M_PI;
+				secAngYaw[0] = 15.0/180.0*M_PI;
 				secAngYaw[1] = 90.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
 				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
-				secAngYaw[0] = 0.0/180.0*M_PI;
+				secAngYaw[0] = 15.0/180.0*M_PI;
 // 				secAngYaw[1] = 30.0/180.0*M_PI;
 				secAngYaw[1] = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
@@ -1460,7 +1463,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 	if (bCheckObs == true)
 	{
 		// TODO TODO
-		map_ = current_goal_->map;
+// 		map_ = current_goal_->map;
 
 // 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{
@@ -1678,7 +1681,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						gas_can_pose.pose.position.y = objy;
 						gas_can_pose.pose.position.z = 0.0;
 
-						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY);
+						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY+M_PI/2.0);
 						gas_can_pose.pose.orientation.x = objq[0];
 						gas_can_pose.pose.orientation.y = objq[1];
 						gas_can_pose.pose.orientation.z = objq[2];
