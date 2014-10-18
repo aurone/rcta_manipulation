@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
     octomap_msgs 
     pluginlib
     pr2_vfh_database
+    pviz
     rosbag
     roscpp 
     rospack
@@ -107,7 +108,11 @@ generate_messages(
         std_msgs
         trajectory_msgs)
 
-catkin_package(CATKIN_DEPENDS message_runtime)
+catkin_package(INCLUDE_DIRS 
+		src/hdt/common
+	CATKIN_DEPENDS message_runtime
+	LIBRARIES 
+		hdt_viz)
 
 set(CMAKE_INCLUDE_CURRENT_DIR On)
 set(CMAKE_VERBOSE_MAKEFILE Off)

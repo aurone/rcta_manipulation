@@ -1,4 +1,5 @@
+
 add_executable(hdt_base_planning_node hdt_base_planning.cpp RepositionBaseExecutor.cpp)
-target_link_libraries(hdt_base_planning_node ${catkin_LIBRARIES} msg_utils hdt_robot_model robotiq_common)
+target_link_libraries(hdt_base_planning_node ${catkin_LIBRARIES} msg_utils hdt_robot_model robotiq_common hdt_viz)
 add_dependencies(hdt_base_planning_node hdt_generate_messages_cpp)
 

@@ -27,6 +27,7 @@
   <build_depend>octomap_msgs</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>pr2_vfh_database</build_depend>
+  <build_depend>pviz</build_depend>
   <build_depend>rosbag</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>rospack</build_depend>
@@ -40,7 +41,6 @@
   <build_depend>urdf</build_depend>
   <build_depend>urdf_parser</build_depend>
   <build_depend>visualization_msgs</build_depend>
-
   <build_depend>clearpath-husky</build_depend>
   <build_depend>libblas-dev</build_depend>
   <build_depend>libglew-dev</build_depend>
@@ -68,6 +68,7 @@
   <run_depend>octomap_msgs</run_depend>
   <run_depend>pluginlib</run_depend>
   <run_depend>pr2_vfh_database</run_depend>
+  <run_depend>pviz</run_depend>
   <run_depend>rosbag</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>rospack</run_depend>

@@ -21,6 +21,8 @@
 #include <hdt/common/hdt_description/RobotModel.h>
 #include <hdt/MoveArmCommandAction.h>
 
+//visualizations
+#include <hdt_viz/hdt_viz.h>
 
 namespace RepositionBaseCandidate
 {
@@ -78,6 +80,8 @@ public:
 
 
 private:
+    //visualizations
+    HDTViz viz;
 
     struct GraspCandidate
     {

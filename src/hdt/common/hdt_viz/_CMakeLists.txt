@@ -1,0 +1,54 @@
+cmake_minimum_required(VERSION 2.8.3)
+project(hdt_viz)
+
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+#pkg_check_modules(SBPL REQUIRED sbpl)
+
+find_package(Boost REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+
+find_package(catkin REQUIRED
+             COMPONENTS
+                geometric_shapes
+                sbpl_geometry_utils
+		eigen_conversions
+                moveit_ros_planning 
+		pviz)
+
+include_directories(${catkin_INCLUDE_DIRS})
+include_directories(${Eigen_INCLUDE_DIRS})
+
+include_directories(include)
+
+include_directories(${SBPL_INCLUDE_DIRS})
+
+link_directories(${SBPL_LIBRARY_DIRS})
+
+catkin_package(INCLUDE_DIRS include
+               CATKIN_DEPENDS
+                   geometric_shapes
+                   eigen_conversions
+		   pviz
+                   sbpl_geometry_utils
+                   moveit_ros_planning 
+               DEPENDS Boost
+               LIBRARIES ${PROJECT_NAME})
+
+#get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+#foreach(dir ${dirs})
+#  message(STATUS "dir='${dir}'")
+#endforeach()
+
+set(IKFAST_COMPILE_FLAGS "-DIK_FAST_HAS_LIBRARY -DIKFAST_NO_MAIN -Wno-unused-variable -Wno-unused-but-set-variable")
+add_library(hdt_kinematics_tmp src/hdt_kinematics/hdt_arm_transform6d.cpp src/hdt_kinematics/kinematics.cpp)
+set_target_properties(hdt_kinematics_tmp PROPERTIES COMPILE_FLAGS "${IKFAST_COMPILE_FLAGS}")
+target_link_libraries(hdt_kinematics_tmp lapack blas ${catkin_LIBRARIES})
+
+add_library(${PROJECT_NAME} src/hdt_viz.cpp src/hdt_description/RobotModel.cpp)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} hdt_kinematics_tmp)
+
+#install(TARGETS ${PROJECT_NAME}
+#        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
