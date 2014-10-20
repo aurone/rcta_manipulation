@@ -629,6 +629,12 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     ////////////////////////////////////////////////////////////////////////////////
 
     collision_checker_->setPlanningScene(*planning_scene_);
+      ////////////////////////////////////////////////////////////////////////////////
+      // Deal with attached object if any
+      ////////////////////////////////////////////////////////////////////////////////
+      if (request->has_attached_object){
+        collision_checker_->attachObject(request->attached_object);
+      }
 
     // transform the wrist goal from the kinematics frame to the planning frame
     Eigen::Affine3d T_kinematics_wrist_goal;
@@ -1265,7 +1271,6 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
     double min_x, min_y, min_z;
     df->gridToWorld(0,0,0, min_x, min_y, min_z); 
     tf::Vector3 bb_min_df_frame(min_x, min_y, min_z);
-    tf::Vector3 bb_min_oc_frame = octree_to_df * bb_min_df_frame;
 
     int num_x = df->getXNumCells();
     int num_y = df->getYNumCells();
@@ -1275,14 +1280,18 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
     double max_x, max_y, max_z;
     df->gridToWorld(num_x, num_y, num_z, max_x, max_y, max_z);
     tf::Vector3 bb_max_df_frame(max_x, max_y, max_z);
-    tf::Vector3 bb_max_oc_frame = octree_to_df * bb_max_df_frame;
 
-    octomap::point3d bbx_min(min(bb_min_oc_frame.getX(), bb_max_oc_frame.getX()),
-                             min(bb_min_oc_frame.getY(), bb_max_oc_frame.getY()),
-                             min(bb_min_oc_frame.getZ(), bb_max_oc_frame.getZ()));
-    octomap::point3d bbx_max(max(bb_min_oc_frame.getX(), bb_max_oc_frame.getX()),
-                             max(bb_min_oc_frame.getY(), bb_max_oc_frame.getY()),
-                             max(bb_min_oc_frame.getZ(), bb_max_oc_frame.getZ()));
+    tf::Vector3 df_center_oc_frame = octree_to_df.inverse() * (0.5 * tf::Vector3(min_x, min_y, min_z) + 0.5 * tf::Vector3(max_x, max_y, max_z));
+
+    //center the bounding box at the distance field center (in octree frame)
+    //make the bounding box 2x df_length, 2x df_width, 2x df_height -- a bit of an overkill, but ensures that the bounding box completely covers the whole distance field so no points are missed
+    octomap::point3d bbx_min(df_center_oc_frame.getX() - abs(max_x - min_x),
+                             df_center_oc_frame.getY() - abs(max_y - min_y),
+                             df_center_oc_frame.getZ() - abs(max_z - min_z));
+    octomap::point3d bbx_max(df_center_oc_frame.getX() + abs(max_x - min_x),
+                             df_center_oc_frame.getY() + abs(max_y - min_y),
+                             df_center_oc_frame.getZ() + abs(max_z - min_z));
+    
 
     EigenSTL::vector_Vector3d points; //the points from octree transformed in df frame
     int num_pts_total = 0;

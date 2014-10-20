@@ -2,6 +2,7 @@ planning:
   epsilon: 100
   verbose: false
   use_bfs_heuristic: true
+  use_multiple_ik_solutions: true
   group_name: right_arm
   reference_frame: base_link 
   planning_frame: base_link 

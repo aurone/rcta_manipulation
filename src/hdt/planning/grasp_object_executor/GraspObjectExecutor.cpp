@@ -841,6 +841,23 @@ int GraspObjectExecutor::run()
                 last_move_arm_stow_goal_.octomap = use_extrusion_octomap_ ?
                         *current_octomap_ : current_goal_->octomap;
 
+                //include the attached object in the goal
+                last_move_arm_stow_goal_.has_attached_object = true;
+                moveit_msgs::AttachedCollisionObject attached_object;
+                attached_object.link_name = "arm_7_gripper_lift";
+                attached_object.object.id = "gas_can";
+                attached_object.object.primitives.resize(1);
+                attached_object.object.primitive_poses.resize(1);
+                attached_object.object.primitives[0].type = shape_msgs::SolidPrimitive::BOX;
+                attached_object.object.primitives[0].dimensions.resize(3);
+                //rough gas can dimensions
+                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_X] = 0.20;
+                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.30;
+                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.32;
+                //compute the pose of attachment based on grasp
+                //attached_object.object.primitive_poses[0].position
+                attached_object.weight = 1.0; //arbitrary (not used anyways)
+
                 last_move_arm_stow_goal_.execute_path = true;
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
