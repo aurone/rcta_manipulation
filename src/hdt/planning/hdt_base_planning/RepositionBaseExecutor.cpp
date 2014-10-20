@@ -47,7 +47,7 @@ last_status_(RepositionBaseExecutionStatus::INVALID),
     move_arm_command_result_(),
     move_arm_command_action_name_("move_arm_command"),
     move_arm_command_client_(),
-    occupancy_grid_sub_(), 	// TODO TODO
+//     occupancy_grid_sub_(), 	// TODO TODO
     listener_()
 {
 }
@@ -168,22 +168,22 @@ bool RepositionBaseExecutor::initialize()
 
 
 	// TODO TODO
-    ROS_WARN("Waiting for occupancy grid message...");
-    occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
-//     while (!map_) 
-	{
-        ros::Duration(1.0).sleep();
-        ros::spinOnce();
-    }
-    occupancy_grid_sub_.shutdown();
+//     ROS_WARN("Waiting for occupancy grid message...");
+//     occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
+// //     while (!map_) 
+// 	{
+//         ros::Duration(1.0).sleep();
+//         ros::spinOnce();
+//     }
+//     occupancy_grid_sub_.shutdown();
 
 }
 
 // TODO TODO
-void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
-{
-    map_ = *msg;
-}
+// void RepositionBaseExecutor::occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+// {
+//     map_ = *msg;
+// }
 
 
 int RepositionBaseExecutor::run()
@@ -616,7 +616,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	if (bCheckObs == true)
 	{
 		// TODO TODO
-// 		map_ = current_goal_->map;
+		map_ = current_goal_->map;
 
 // 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{
@@ -1482,7 +1482,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 	if (bCheckObs == true)
 	{
 		// TODO TODO
-// 		map_ = current_goal_->map;
+		map_ = current_goal_->map;
 
 // 		if (bMapReceived_==1 && bRobPoseReceived_==1)
 		{
