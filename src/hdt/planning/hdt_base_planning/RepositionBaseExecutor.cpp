@@ -452,8 +452,10 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double distMin = 0.5, distStep = 0.1;
 // 	int nDist = 6;		// r in [0.6:0.1:1.1] + camera offset 		// TODO: define adequate sample range (frame_id: /top_shelf)
 // 	double distMin = 0.6, distStep = 0.1;
-	int nAng = 12;		// th in [0:30:330]
-	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
+// 	int nAng = 12;		// th in [0:30:330]
+// 	double angMin = 0.0, angStep = 30.0/180.0*M_PI;
+	int nAng = 24;		// th in [0:15:330]
+	double angMin = 0.0, angStep = 15.0/180.0*M_PI;
 	int nYaw = 9;		// Y in [-20:5:20]
 	double yawMin = -20.0/180.0*M_PI, yawStep = 5.0/180.0*M_PI;
 // 	int nYaw = 5;		// Y in [-20:5:20]
@@ -465,7 +467,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
 	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-	double secSide[2] = {-0.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {-05.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
@@ -1300,13 +1302,14 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 	int secDist[] = { (int)(nDist/3), (int)(nDist*2/3) };	// divide zone by distance (for acceptable object orientation setting)
 	double secAngYaw[2];							// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1))
 	double bestAngYaw;								// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
-	double bestDist = 0.70;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
+	double bestDist = 0.60;							// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
 //	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-	double secSide[2] = {-0.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
+	double secSide[2] = {-05.0/180.0*M_PI, 40.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
 // 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 // 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
-	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+// 	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+	double scalepGraspAngYaw = 0.3;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
 	double scalepGraspDist = 0.05;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
 
 	// 2) arm position offset for computing pObs
@@ -1396,14 +1399,16 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 				secAngYaw[0] = 15.0/180.0*M_PI;
 				secAngYaw[1] = 100.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
-				bestAngYaw   = 65.0/180.0*M_PI;
+// 				bestAngYaw   = 65.0/180.0*M_PI;
+				bestAngYaw   = -60.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
 				secAngYaw[0] = 15.0/180.0*M_PI;
 				secAngYaw[1] = 90.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
-				bestAngYaw   = 60.0/180.0*M_PI;
+// 				bestAngYaw   = 60.0/180.0*M_PI;
+				bestAngYaw   = -90.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
@@ -1411,7 +1416,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 				secAngYaw[1] = 30.0/180.0*M_PI;
 				secAngYaw[1] = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
-				bestAngYaw   = 50.0/180.0*M_PI;
+// 				bestAngYaw   = 50.0/180.0*M_PI;
+				bestAngYaw   = -120.0/180.0*M_PI;
 			}
 
 			for (int j=0; j<nAng; j++)
@@ -1421,12 +1427,16 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 					// a) object position at left-hand side to the robot
 					double rob2obj = atan2(objy-roby[i][j][k], objx-robx[i][j][k]);	// angular coordinate of a vector from robot position to object position (not orientation)
 					double diffAng = wrapAngle( rob2obj-robY[i][j][k] );
+					double diffAngMax = fabs(yawMin - secSide[0]);
+						// b) object handle orientation to the right of the robot
+// 						double diffY = wrapAngle( objY-robY[i][j][k] );
+// 						double diffYMax = std::max( fabs(secAngYaw[0]-bestAngYaw), fabs(secAngYaw[1]-bestAngYaw) );
+// 						double diffYMax = M_PI/1.0;
+						double diffY = wrapAngle( objY-robY[i][j][k] );
+						double diffYMax = M_PI/2.0;
+						double diffDistMax = std::max( fabs(distMin-bestDist), fabs(distMin+distStep*(nDist-1)-bestDist) );
 					if ( diffAng >= secSide[0] && diffAng < secSide[1] )    // left-hand side and angle of view
 					{
-						// b) object handle orientation to the right of the robot
-						double diffY = wrapAngle( objY-robY[i][j][k] );
-						double diffYMax = std::max( fabs(secAngYaw[0]-bestAngYaw), fabs(secAngYaw[1]-bestAngYaw) );
-						double diffDistMax = std::max( fabs(distMin-bestDist), fabs(distMin+distStep*(nDist-1)-bestDist) );
 						if ( diffY >= secAngYaw[0] && diffY <= secAngYaw[1] )
 						{
 							// EXCLUDE CANDIDATES WE HAVE ALREADY SEEN
@@ -1440,9 +1450,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							robyf += sin(robYf)*baseOffsetx;
 			                                std::vector<double> pos(3,0); 
 			                                pos[0] = robxf;
-							pos[1] = robyf;
+											pos[1] = robyf;
 			                                pos[2] = robYf;
-                                                        viz.visualizeRobotBase(pos, 0, "base_candidates_seen", base_seen_viz_id);
+                                            viz.visualizeRobotBase(pos, 0, "base_candidates_seen", base_seen_viz_id);
 							// higher probability around diffY==bestAngYaw
 // 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 // 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
@@ -1451,6 +1461,15 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 						}
 					}
+// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0) 
+// 												* std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) 
+// 												* std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
+// 										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0) 
+					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-5.0/180.0*M_PI, 0.0)/diffAngMax + 1.0, 0.0), 1.0) 
+												* std::pow( (diffYMax- std::min(fabs(wrapAngle(diffY-bestAngYaw)),fabs(wrapAngle(diffY-M_PI-bestAngYaw))) *scalepGraspAngYaw)/(diffYMax), 2.0) 
+												* std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
+										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 				}
 			}
 		}
@@ -2016,6 +2035,22 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						pTot[i][j][k] *= std::max( std::pow(1 - (scaleDiffYglob * fabs(diffYglob)/M_PI), 2.0), pTotThr);	// quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
 						cntTotMax++;
 					}
+					else
+					{
+						// /top_shelf pose
+						double robxf = robx[i][j][k];
+						double robyf = roby[i][j][k];
+						double robYf = robY[i][j][k];
+						// /base_link pose
+						robxf += cos(robYf)*baseOffsetx;
+						robyf += sin(robYf)*baseOffsetx;
+                                                std::vector<double> pos(3,0); 
+                                                pos[0] = robxf;
+												pos[1] = robyf;
+                                                pos[2] = robYf;
+                                                viz.visualizeRobotBase(pos, 0, "base_candidates_validity_reject", base_validityreject_viz_id);
+					}
+
 		ROS_INFO("Reposition Base Command Result:");
 // 		ROS_INFO("    cntTotMax: %d",cntTotMax);
 // 		ROS_INFO("    Number of valid candidates: %d",cntTotMax);
