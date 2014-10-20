@@ -73,10 +73,12 @@ private:
     struct GraspCandidate
     {
         Eigen::Affine3d grasp_candidate_transform;
+        Eigen::Affine3d T_object_grasp;
         double u;
 
-        GraspCandidate(const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(), double u = -1.0) :
+        GraspCandidate(const Eigen::Affine3d& grasp_candidate_transform, const Eigen::Affine3d& T_object_grasp, double u = -1.0) :
             grasp_candidate_transform(grasp_candidate_transform),
+            T_object_grasp(T_object_grasp),
             u(u) { }
     };
 
