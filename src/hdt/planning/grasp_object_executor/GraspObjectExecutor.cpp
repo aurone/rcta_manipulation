@@ -376,7 +376,7 @@ int GraspObjectExecutor::run()
                 if (robot_model_->search_nearest_ik(
                         kinematics_to_grasp_candidate, fake_seed, sol, sbpl::utils::ToRadians(1.0)))
                 {
-                    GraspCandidate reachable_grasp_candidate(kinematics_to_grasp_candidate, grasp_candidate.u);
+                    GraspCandidate reachable_grasp_candidate(kinematics_to_grasp_candidate, grasp_candidate.T_object_grasp, grasp_candidate.u);
                     reachable_grasp_candidates_.push_back(reachable_grasp_candidate);
                 }
             }
@@ -1198,7 +1198,7 @@ GraspObjectExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_obj
 
         ROS_INFO_PRETTY("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
 
-        grasp_candidates.push_back(GraspCandidate(candidate_wrist_transform, u));
+        grasp_candidates.push_back(GraspCandidate(candidate_wrist_transform, robot_to_object.inverse() * candidate_wrist_transform, u));
     }
 
     std::size_t original_size = grasp_candidates.size();
@@ -1206,7 +1206,8 @@ GraspObjectExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_obj
         const GraspCandidate& grasp = grasp_candidates[i];
         Eigen::Affine3d flipped_candidate_transform =
                 grasp.grasp_candidate_transform * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
-        grasp_candidates.push_back(GraspCandidate(flipped_candidate_transform, grasp.u));
+        grasp_candidates.push_back(
+                GraspCandidate(flipped_candidate_transform, robot_to_object.inverse() * flipped_candidate_transform, grasp.u));
     }
 
     return grasp_candidates;
