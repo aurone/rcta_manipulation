@@ -165,7 +165,7 @@
             <parent link="arm_4_elbow_lift_link"/>
             <child link="arm_5_wrist_twist_link"/>
             <!-- <limit lower="${-90*degrees}" upper="${90*degrees}" effort="10" velocity="0.38"/> -->
-            <limit lower="${-30*degrees}" upper="${15*degrees}" effort="10" velocity="0.38"/>
+            <limit lower="${-85*degrees}" upper="${85*degrees}" effort="10" velocity="0.38"/>
             <safety_controller soft_lower_limit="${-85*degrees}" soft_upper_limit="${85*degrees}" k_velocity="0" />
             <axis xyz="0 0 1"/>
             <origin xyz="0.0 0.0 ${length4}" rpy="${-pi/2} ${-pi/2} 0"/>

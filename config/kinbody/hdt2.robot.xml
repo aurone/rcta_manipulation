@@ -18,7 +18,7 @@
         <body name="arm_2_shoulder_lift_link" type="dynamic">
             <offsetfrom>arm_1_shoulder_twist_link</offsetfrom>
             <translation>0 0 0.1524</translation>
-            <quat>0.707107 -0.707107 0 0</quat>
+            <quat>0.707107 0.707107 0 0</quat>
             <geom type="cylinder">
                 <translation>0 0 0</translation>
                 <quat>0.707107 0.707107 0 0</quat>
@@ -51,28 +51,28 @@
         <body name="arm_5_wrist_twist_link" type="dynamic">
             <offsetfrom>arm_4_elbow_lift_link</offsetfrom>
             <translation>0 0 0.06985</translation>
-            <quat>0.707107 -0.707107 0 0</quat>
+            <quat>0.5 -0.5 -0.5 -0.5</quat>
             <geom type="cylinder">
-                <translation>0 0 0.31115</translation>
+                <translation>0 0 0.294</translation>
                 <quat>0.707107 0.707107 0 0</quat>
-                <height>0.5969</height>
+                <height>0.5626</height>
                 <radius>0.0254</radius>
             </geom>
         </body>
         <body name="arm_6_wrist_lift_link" type="dynamic">
             <offsetfrom>arm_5_wrist_twist_link</offsetfrom>
-            <translation>0 0 0.6223</translation>
+            <translation>0 0 0.588</translation>
             <quat>0.5 0.5 -0.5 0.5</quat>
             <geom type="cylinder">
                 <translation>0 0 0</translation>
                 <quat>0.707107 0.707107 0 0</quat>
-                <height>0.03175</height>
+                <height>0.045</height>
                 <radius>0.0127</radius>
             </geom>
         </body>
         <body name="arm_7_gripper_lift_link" type="dynamic">
             <offsetfrom>arm_6_wrist_lift_link</offsetfrom>
-            <translation>0.03175 0 0</translation>
+            <translation>0.045 0 0</translation>
             <quat>0.707107 -0.707107 0 0</quat>
             <geom type="cylinder">
                 <translation>0 0 0</translation>
@@ -89,7 +89,7 @@
         </joint>
         <joint name="arm_2_shoulder_lift" type="hinge">
             <offsetfrom>arm_2_shoulder_lift_link</offsetfrom>
-            <axis>0 0 1</axis>
+            <axis>0 0 -1</axis>
             <body>arm_1_shoulder_twist_link</body>
             <body>arm_2_shoulder_lift_link</body>
         </joint>
