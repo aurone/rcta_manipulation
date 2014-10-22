@@ -21,6 +21,8 @@
 #include <hdt/common/hdt_description/RobotModel.h>
 #include <hdt/MoveArmCommandAction.h>
 
+//visualizations
+#include <hdt_viz/hdt_viz.h>
 
 namespace RepositionBaseCandidate
 {
@@ -78,6 +80,8 @@ public:
 
 
 private:
+    //visualizations
+    HDTViz viz;
 
     struct GraspCandidate
     {
@@ -113,7 +117,6 @@ private:
 
 	int checkIKPLAN();
 	int checkIKPLAN(const geometry_msgs::PoseStamped& candidate_base_pose);
-	int checkIK(const geometry_msgs::PoseStamped& gas_can_pose, const geometry_msgs::PoseStamped& candidate_base_pose);
     std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
     void move_arm_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
@@ -155,7 +158,6 @@ private:
 	double sign(double val);
 	double wrapAngle(double ang);
 	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
-	bool computeRobPoseExhaustive(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 	bool bComputedRobPose_;
 	
 
@@ -174,6 +176,11 @@ private:
 	void preempt_callback();
 
     uint8_t execution_status_to_feedback_status(RepositionBaseExecutionStatus::Status status);
+
+
+	int checkIK(const geometry_msgs::PoseStamped& gas_can_pose, const geometry_msgs::PoseStamped& candidate_base_pose);
+	int checkPLAN(const geometry_msgs::PoseStamped& gas_can_pose, const geometry_msgs::PoseStamped& candidate_base_pose);
+	bool computeRobPoseExhaustive(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
 
 	// TODO TODO
