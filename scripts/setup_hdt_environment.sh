@@ -24,8 +24,8 @@ fi
 echo "Updating APT repositories listings..."
 sudo apt-get update > /dev/null
 if [ $? -ne 0 ]; then
-    echo "apt-get update failed to update some sources"
-    exit 4
+    echo "apt-get update failed to update some sources. Attempting to proceed anyway..."
+#    exit 4
 fi
 echo "Finished updating APT repository listings"
 
@@ -33,8 +33,9 @@ echo "Finished updating APT repository listings"
 echo "Creating HDT rosdep rules in /etc/ros/rosdep/sources.list.d/hdt.list"
 if [ ! -d "/etc/ros/rosdep/sources.list.d/" ]; then
     # TODO: generate hdt.list that points to rosdep.yaml in the hdt package
-    echo "/etc/ros/rosdep/sources.list.d/ does not exist. I'm not sure what means either"
-    exit 5
+    echo "/etc/ros/rosdep/sources.list.d/ does not exist. Attempting to initialize rosdep"
+    sudo rosdep init
+#    exit 5
 fi
 sudo sh -c "HDT_DIR=$HDT_DIR \
         echo 'yaml file://$HDT_DIR/rosdep.yaml' > '/etc/ros/rosdep/sources.list.d/hdt.list'"
