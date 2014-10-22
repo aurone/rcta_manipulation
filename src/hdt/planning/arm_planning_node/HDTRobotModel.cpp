@@ -9,6 +9,7 @@
 #include <tf/LinearMath/Quaternion.h>
 #include <urdf/model.h>
 #include <urdf_parser/urdf_parser.h>
+#include <hdt/common/stringifier/stringifier.h>
 
 namespace hdt
 {
@@ -121,6 +122,7 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
     tf::poseEigenToMsg(eef_transform, p);
     ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
     pub_.publish(ma);
+    std::vector<double> fake_start = start;
     bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
     if (res) {
         ROS_WARN_PRETTY("IK Succeeded");
@@ -159,12 +161,14 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
     //ROS_INFO("kinematics->planning: %s", to_string(T_kinematics_planning).c_str());
     // kinematics -> end effector = kinematics -> planning * planning -> end effector
     eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
+//    ROS_WARN_PRETTY("    eef goal: %s", ::to_string(eef_transform).c_str());
     //ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
     tf::poseEigenToMsg(eef_transform, p);
     ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
     pub_.publish(ma);
 
-    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, start, sbpl::utils::ToRadians(1.0));
+    std::vector<double> fake_start(7, 0);
+    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, fake_start, sbpl::utils::ToRadians(1.0));
     std::vector<double> sol;
     while(ik_gen(sol)){
       solutions.push_back(sol);
@@ -173,6 +177,16 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
       sortIKsolutions(solutions);
       ROS_WARN_PRETTY("First IK score: %.3f", computeIKscore(solutions.front()));
       ROS_WARN_PRETTY("Last IK score: %.3f", computeIKscore(solutions.back()));
+    }
+    else {
+        ROS_WARN_PRETTY("Failed to compute any IK solutions");
+    }
+
+    for (const auto& solution : solutions) {
+        ROS_WARN_PRETTY("    %s", ::to_string(solution).c_str());
+        Eigen::Affine3d fk_sol;
+        robot_model_->compute_fk(solution, fk_sol);
+        ROS_WARN_PRETTY("    fk: %s", ::to_string(fk_sol).c_str());
     }
     if(solutions.size() > 10){
       ROS_WARN_PRETTY("Generated %zd IK solutions!", solutions.size());
