@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="andalite">
     <include filename="$(find hdt)/config/urdf/common.xacro"/>
     <include filename="$(find husky_description)/urdf/base.urdf.xacro"/>
-    <include filename="$(find hdt)/config/urdf/hdt.xacro"/>
+    <include filename="$(find hdt)/config/urdf/hdt2.xacro"/>
     <include filename="$(find hdt)/config/urdf/fake_gripper.xacro"/>
     <include filename="$(find hdt)/config/urdf/shelf.xacro"/>
     <include filename="$(find hdt)/config/urdf/asus_camera.urdf.xacro"/>

@@ -1,0 +1,266 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:property name="length1" value="0.1524" />
+    <xacro:property name="radius1" value="0.0381" /> 
+
+    <xacro:property name="length2" value="0.0381" />
+    <xacro:property name="radius2" value="0.0381" />
+
+    <xacro:property name="length3" value="0.5461" />
+    <xacro:property name="radius3" value="0.0381" />
+
+    <xacro:property name="length4" value="0.06985" />
+    <xacro:property name="radius4" value="0.0381" />
+
+    <!-- <xacro:property name="length5" value="0.6223" /> -->
+    <xacro:property name="length5" value="0.588" />
+    <xacro:property name="radius5" value="0.0254" />
+
+    <!-- <xacro:property name="length6" value="0.03175" /> -->
+    <xacro:property name="length6" value="0.045" />
+    <xacro:property name="radius6" value="0.0127" />
+
+    <xacro:property name="length7" value="0.01905" />
+    <xacro:property name="radius7" value="0.0127" />
+
+    <include filename="$(find hdt)/config/urdf/common.xacro"/>
+
+    <!-- macro to instantiate the hdt arm -->
+    <xacro:macro name="hdt_arm" params="mounting_link mounting_origin">
+        <joint name="arm_1_shoulder_twist" type="revolute">
+            <parent link="${mounting_link}"/>
+            <child link="arm_1_shoulder_twist_link"/>
+            <!-- <limit lower="${-175*degrees}" upper="${175*degrees}" effort="10" velocity="0.38"/>  -->
+            <limit lower="${-120*degrees}" upper="${120*degrees}" effort="10" velocity="0.38"/> 
+            <safety_controller soft_lower_limit="${-110*degrees}" soft_upper_limit="${110*degrees}" k_velocity="0"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="${mounting_origin}"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_1_shoulder_twist_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${length1-radius1}" radius="${radius1}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length1/2}"/>
+                <material name="black">
+                    <color rgba="0.1 0.1 0.1 1"/>
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length1-radius1}" radius="${radius1}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length1/2}"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+                <origin xyz="0 0 ${length1/2}"/>
+            </inertial>
+        </link>
+
+        <joint name="arm_2_shoulder_lift" type="revolute">
+            <parent link="arm_1_shoulder_twist_link"/>
+            <child link="arm_2_shoulder_lift_link"/>
+            <!-- <limit lower="${-125*degrees}" upper="${125*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-110*degrees}" upper="${110*degrees}" effort="10" velocity="0.38"/> 
+            <safety_controller soft_lower_limit="${-90*degrees}" soft_upper_limit="${90*degrees}" k_velocity="0"/>
+            <axis xyz="0 0 -1"/>
+            <origin xyz="0.0 0.0 ${length1}" rpy="${pi/2} 0 0"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_2_shoulder_lift_link" >
+            <visual>
+                <geometry>
+                    <cylinder length="${length2}" radius="${radius2}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0 0"/>
+                <material name="gray">
+                    <color rgba="0.9 0.9 0.9 1"/>
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length2}" radius="${radius2}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0 0"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+                <origin xyz="0 0 0"/>
+            </inertial>
+        </link>
+
+        <joint name="arm_3_elbow_twist" type="revolute">
+            <parent link="arm_2_shoulder_lift_link"/>
+            <child link="arm_3_elbow_twist_link"/>
+            <!-- <limit lower="${-175*degrees}" upper="${175*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-150*degrees}" upper="${150*degrees}" effort="10" velocity="0.38"/>
+            <safety_controller soft_lower_limit="${-130*degrees}" soft_upper_limit="${130*degrees}" k_velocity="0" />
+            <axis xyz="0 0 1" />
+            <origin xyz="0.0 0.0 0.0" rpy="${-pi/2} 0 0" />
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_3_elbow_twist_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${length3-radius3}" radius="${radius3}"/> 
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length3/2}"/>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length3-radius3}" radius="${radius3}"/>
+                    <!-- Note: There is a bug in ODE that prevents collision detection with cylinders -->
+                    <!-- <box size="${2*radius3} ${2*radius3} ${length3-radius3}" /> -->
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length3/2}"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+                <origin xyz="0 0 ${length3/2}"/>
+            </inertial>
+        </link>
+
+        <joint name="arm_4_elbow_lift" type="revolute">
+            <parent link="arm_3_elbow_twist_link"/>
+            <child link="arm_4_elbow_lift_link"/>
+            <!-- <limit lower="${-125*degrees}" upper="${125*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-110*degrees}" upper="${110*degrees}" effort="10" velocity="0.38"/>
+            <safety_controller soft_lower_limit="${-105*degrees}" soft_upper_limit="${105*degrees}" k_velocity="0" />
+            <axis xyz="0 0 -1"/>
+            <origin xyz="0.0 0.0 ${length3}" rpy="${pi/2} ${pi/2} 0"/> 
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_4_elbow_lift_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${length4}" radius="${radius4}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length4/2}"/>
+                <material name="gray"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length4}" radius="${radius4}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length4/2}"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+                <origin xyz="0 0 ${length4/2}"/>
+            </inertial>
+        </link>
+
+        <joint name="arm_5_wrist_twist" type="revolute">
+            <parent link="arm_4_elbow_lift_link"/>
+            <child link="arm_5_wrist_twist_link"/>
+            <!-- <limit lower="${-90*degrees}" upper="${90*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-30*degrees}" upper="${15*degrees}" effort="10" velocity="0.38"/>
+            <safety_controller soft_lower_limit="${-85*degrees}" soft_upper_limit="${85*degrees}" k_velocity="0" />
+            <axis xyz="0 0 1"/>
+            <origin xyz="0.0 0.0 ${length4}" rpy="${-pi/2} ${-pi/2} 0"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_5_wrist_twist_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${length5-2*radius5}" radius="${radius5}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length5/2}"/>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length5-radius5}" radius="${radius5}"/>
+                    <!-- Note: There is a bug in ODE that prevents collision detection with cylinders -->
+                    <!-- <box size="${2*radius5} ${2*radius5} ${length5-2*radius5}" /> -->
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 ${length5/2}"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+                <origin xyz="0 0 ${length5/2}"/>
+            </inertial>
+        </link>
+
+        <joint name="arm_6_wrist_lift" type="revolute">
+            <parent link="arm_5_wrist_twist_link"/>
+            <child link="arm_6_wrist_lift_link"/>
+            <!-- <limit lower="${-60*degrees}" upper="${60*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-40*degrees}" upper="${40*degrees}" effort="10" velocity="0.38"/>
+            <safety_controller soft_lower_limit="${-40*degrees}" soft_upper_limit="${40*degrees}" k_velocity="0" />
+            <axis xyz="0 0 -1"/>
+            <origin xyz="0.0 0.0 ${length5}" rpy="${pi/2} -${pi/2} 0"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_6_wrist_lift_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${length6}" radius="${radius6}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+                <material name="gray">
+                    <color rgba="0 0 1 1"/>
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length6}" radius="${radius6}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+
+        <joint name="arm_7_gripper_lift" type="revolute">
+            <parent link="arm_6_wrist_lift_link"/>
+            <child link="arm_7_gripper_lift_link"/>
+            <!-- <limit lower="${-60*degrees}" upper="${60*degrees}" effort="10" velocity="0.38"/> -->
+            <limit lower="${-55*degrees}" upper="${55*degrees}" effort="10" velocity="0.38"/>
+            <safety_controller soft_lower_limit="${-55*degrees}" soft_upper_limit="${55*degrees}" k_velocity="0" />
+            <axis xyz="0 0 1"/>
+            <origin xyz="${length6} 0 0" rpy="${-pi/2} 0 0"/>
+            <dynamics damping="10" friction="0.1"/>
+        </joint>
+
+        <link name="arm_7_gripper_lift_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${length7}" radius="${radius7}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+                <material name="gray">
+                    <color rgba="1 1 1 1"/>
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="${length7}" radius="${radius7}"/>
+                </geometry>
+                <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+            </collision>
+            <inertial>
+                <mass value="1"/>
+                <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+            </inertial>
+        </link>
+
+        <include filename="$(find hdt)/config/urdf/hdt_transmission.xacro"/>
+    </xacro:macro>
+</robot>
