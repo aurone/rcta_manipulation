@@ -69,7 +69,7 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
+    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string, true);
     if (!robot_model_) {
         ROS_ERROR("Failed to load Robot Model from the URDF");
         return false;
@@ -170,7 +170,7 @@ bool RepositionBaseExecutor::initialize()
 	// TODO TODO
 //     ROS_WARN("Waiting for occupancy grid message...");
 //     occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
-// //     while (!map_) 
+// //     while (!map_)
 // 	{
 //         ros::Duration(1.0).sleep();
 //         ros::spinOnce();
@@ -236,7 +236,7 @@ int RepositionBaseExecutor::run()
 						Eigen::Vector3d zAxis(0,0,1);
 						double objY = objAA.angle() * objAxis.dot(zAxis);
 // 						double objY = 2.0*acos(current_goal_->gas_can_in_map.pose.orientation.w)*sign(current_goal_->gas_can_in_map.pose.orientation.z);		// assuming that rotation axis is parallel to z-axis
-						objY = wrapAngle(objY-M_PI/2.0);	// M_PI/2 offset due to definition of object frame in new mesh file 
+						objY = wrapAngle(objY-M_PI/2.0);	// M_PI/2 offset due to definition of object frame in new mesh file
 						double objP = 0.0;
 						double objR = 0.0;
 
@@ -258,11 +258,11 @@ int RepositionBaseExecutor::run()
 
 
 						std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
-					
-						
+
+
 						// check for inverse kinematics and arm planning (if object is in reachable range and within angle of view)
 						double secDist[2] = {0.3, 1.5};		// TODO: a more general than (distMin + (nDist-1)*distStep) determined in computeRobPose()
-						double distRob2Obj = std::sqrt( std::pow(objx-robx0,2) + std::pow(objy-roby0,2) );	
+						double distRob2Obj = std::sqrt( std::pow(objx-robx0,2) + std::pow(objy-roby0,2) );
 						if (distRob2Obj >= secDist[0] && distRob2Obj <= secDist[1]) {
 							double secSide[2] = {-20.0/180.0*M_PI, 45.0/180.0*M_PI};	// TODO: a more general than secSide[2] determined in computeRobPose()
 							double rob2obj = atan2(objy-roby0, objx-robx0);	// angular coordinate of a vector from robot position to object position
@@ -367,7 +367,7 @@ void RepositionBaseExecutor::goal_callback()
   }
 
 	bComputedRobPose_ = false;
-	
+
 	generated_grasps_ = false;
     sent_move_arm_goal_ = false;
     pending_move_arm_command_ = false;
@@ -599,7 +599,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							// higher probability around diffY==bestAngYaw
 // 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 // 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-							
+
 							// higher probability around diffY==bestAngYaw and diffDist==bestDist
 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 						}
@@ -668,7 +668,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 												// /base_link pose
 												robxf += cos(robYf)*baseOffsetx;
 												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0); 
+												std::vector<double> pos(3,0);
                                                         					pos[0] = robxf;
 												pos[1] = robyf;
                                                         					pos[2] = robYf;
@@ -768,7 +768,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 												// /base_link pose
 												robxf += cos(robYf)*baseOffsetx;
 												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0); 
+												std::vector<double> pos(3,0);
                                                         					pos[0] = robxf;
 												pos[1] = robyf;
                                                         					pos[2] = robYf;
@@ -801,7 +801,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 		std::vector<double> solution = { 0,0,0,0,0,0,0 };
 // 		int option = 0;
 // 		bool ret = false;
-// 
+//
 // 		for (int i=0; i<nDist; i++)
 // 			for (int j=0; j<nAng; j++)
 // 				for (int k=0; k<nYaw; k++)
@@ -810,7 +810,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 						// TODO: check for arm home position and z-offset(-0.1?) from robot base to gastank handle
 // // 						pose = { objx-robx[i][j][k],objy-roby[i][j][k],-0.1, 0.0,0.0,objY-robY[i][j][k] };
 // 						pose = { objx-robx[i][j][k],objy-roby[i][j][k],-0.1, 0.0,0.0,0.0 };
-// 
+//
 // 						ret = hdt_robot_model_->computeIK(pose,start,solution,option);
 // 						if (!ret)
 // 							pWork[i][j][k] = 0.0;
@@ -862,7 +862,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						// /base_link pose
 						robxf += cos(robYf)*baseOffsetx;
 						robyf += sin(robYf)*baseOffsetx;
-                                                std::vector<double> pos(3,0); 
+                                                std::vector<double> pos(3,0);
                                                 pos[0] = robxf;
 						pos[1] = robyf;
                                                 pos[2] = robYf;
@@ -934,7 +934,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 								// /base_link pose
 								robxf += cos(robYf)*baseOffsetx;
 								robyf += sin(robYf)*baseOffsetx;
-                           		        	        std::vector<double> pos(3,0); 
+                           		        	        std::vector<double> pos(3,0);
                           		        	        pos[0] = robxf;
 								pos[1] = robyf;
                         		                        pos[2] = robYf;
@@ -960,7 +960,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 								// /base_link pose
 								robxf += cos(robYf)*baseOffsetx;
 								robyf += sin(robYf)*baseOffsetx;
-				                                std::vector<double> pos(3,0); 
+				                                std::vector<double> pos(3,0);
 				                                pos[0] = robxf;
 								pos[1] = robyf;
 				                                pos[2] = robYf;
@@ -1004,7 +1004,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 										// /base_link pose
 										robxf += cos(robYf)*baseOffsetx;
 										robyf += sin(robYf)*baseOffsetx;
-								                std::vector<double> pos(3,0); 
+								                std::vector<double> pos(3,0);
 								                pos[0] = robxf;
 										pos[1] = robyf;
 								                pos[2] = robYf;
@@ -1029,7 +1029,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 										// /base_link pose
 										robxf += cos(robYf)*baseOffsetx;
 										robyf += sin(robYf)*baseOffsetx;
-								                std::vector<double> pos(3,0); 
+								                std::vector<double> pos(3,0);
 								                pos[0] = robxf;
 										pos[1] = robyf;
 								                pos[2] = robYf;
@@ -1083,7 +1083,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 						candidate_base_pose.pose.orientation.w = robqf[3];
 						candidate_base_poses.push_back(candidate_base_pose);
 
-                                                std::vector<double> pos(3,0); 
+                                                std::vector<double> pos(3,0);
 		                                pos[0] = robxf;
 						pos[1] = robyf;
 		                                pos[2] = robYf;
@@ -1199,7 +1199,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 				candidate_base_pose.pose.orientation.w = robqf[3];
 				candidate_base_poses.push_back(candidate_base_pose);
 
-                                std::vector<double> pos(3,0); 
+                                std::vector<double> pos(3,0);
                                 pos[0] = robxf;
 				pos[1] = robyf;
                                 pos[2] = robYf;
@@ -1448,7 +1448,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							// /base_link pose
 							robxf += cos(robYf)*baseOffsetx;
 							robyf += sin(robYf)*baseOffsetx;
-			                                std::vector<double> pos(3,0); 
+			                                std::vector<double> pos(3,0);
 			                                pos[0] = robxf;
 											pos[1] = robyf;
 			                                pos[2] = robYf;
@@ -1456,18 +1456,18 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							// higher probability around diffY==bestAngYaw
 // 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 // 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-							
+
 							// higher probability around diffY==bestAngYaw and diffDist==bestDist
 // 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 						}
 					}
-// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0) 
-// 												* std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) 
+// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
+// 												* std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0)
 // 												* std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
 // 										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0) 
-					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-5.0/180.0*M_PI, 0.0)/diffAngMax + 1.0, 0.0), 1.0) 
-												* std::pow( (diffYMax- std::min(fabs(wrapAngle(diffY-bestAngYaw)),fabs(wrapAngle(diffY-M_PI-bestAngYaw))) *scalepGraspAngYaw)/(diffYMax), 2.0) 
+// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
+					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-5.0/180.0*M_PI, 0.0)/diffAngMax + 1.0, 0.0), 1.0)
+												* std::pow( (diffYMax- std::min(fabs(wrapAngle(diffY-bestAngYaw)),fabs(wrapAngle(diffY-M_PI-bestAngYaw))) *scalepGraspAngYaw)/(diffYMax), 2.0)
 												* std::pow( (diffDistMax-fabs(distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
 										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 				}
@@ -1534,7 +1534,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 												// /base_link pose
 												robxf += cos(robYf)*baseOffsetx;
 												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0); 
+												std::vector<double> pos(3,0);
 												pos[0] = robxf;
 												pos[1] = robyf;
 												pos[2] = robYf;
@@ -1585,7 +1585,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 												// /base_link pose
 												robxf += cos(robYf)*baseOffsetx;
 												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0); 
+												std::vector<double> pos(3,0);
 												pos[0] = robxf;
 												pos[1] = robyf;
 												pos[2] = robYf;
@@ -1635,7 +1635,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 												// /base_link pose
 												robxf += cos(robYf)*baseOffsetx;
 												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0); 
+												std::vector<double> pos(3,0);
 												pos[0] = robxf;
 												pos[1] = robyf;
 												pos[2] = robYf;
@@ -1668,7 +1668,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 		std::vector<double> solution = { 0,0,0,0,0,0,0 };
 // 		int option = 0;
 // 		bool ret = false;
-// 
+//
 // 		for (int i=0; i<nDist; i++)
 // 			for (int j=0; j<nAng; j++)
 // 				for (int k=0; k<nYaw; k++)
@@ -1677,7 +1677,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 						// TODO: check for arm home position and z-offset(-0.1?) from robot base to gastank handle
 // // 						pose = { objx-robx[i][j][k],objy-roby[i][j][k],-0.1, 0.0,0.0,objY-robY[i][j][k] };
 // 						pose = { objx-robx[i][j][k],objy-roby[i][j][k],-0.1, 0.0,0.0,0.0 };
-// 
+//
 // 						ret = hdt_robot_model_->computeIK(pose,start,solution,option);
 // 						if (!ret)
 // 							pWork[i][j][k] = 0.0;
@@ -1732,7 +1732,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							// /base_link pose
 							robxf += cos(robYf)*baseOffsetx;
 							robyf += sin(robYf)*baseOffsetx;
-		                                        std::vector<double> pos(3,0); 
+		                                        std::vector<double> pos(3,0);
 		                                        pos[0] = robxf;
 							pos[1] = robyf;
 		                                        pos[2] = robYf;
@@ -1789,7 +1789,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						// /base_link pose
 						robxf += cos(robYf)*baseOffsetx;
 						robyf += sin(robYf)*baseOffsetx;
-                                                std::vector<double> pos(3,0); 
+                                                std::vector<double> pos(3,0);
                                                 pos[0] = robxf;
 						pos[1] = robyf;
                                                 pos[2] = robYf;
@@ -1861,7 +1861,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 								// /base_link pose
 								robxf += cos(robYf)*baseOffsetx;
 								robyf += sin(robYf)*baseOffsetx;
-				                                std::vector<double> pos(3,0); 
+				                                std::vector<double> pos(3,0);
 				                                pos[0] = robxf;
 								pos[1] = robyf;
 				                                pos[2] = robYf;
@@ -1887,7 +1887,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 								// /base_link pose
 								robxf += cos(robYf)*baseOffsetx;
 								robyf += sin(robYf)*baseOffsetx;
-				                                std::vector<double> pos(3,0); 
+				                                std::vector<double> pos(3,0);
 				                                pos[0] = robxf;
 								pos[1] = robyf;
 				                                pos[2] = robYf;
@@ -1931,7 +1931,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 										// /base_link pose
 										robxf += cos(robYf)*baseOffsetx;
 										robyf += sin(robYf)*baseOffsetx;
-								                std::vector<double> pos(3,0); 
+								                std::vector<double> pos(3,0);
 								                pos[0] = robxf;
 										pos[1] = robyf;
 								                pos[2] = robYf;
@@ -1957,7 +1957,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 										// /base_link pose
 										robxf += cos(robYf)*baseOffsetx;
 										robyf += sin(robYf)*baseOffsetx;
-								                std::vector<double> pos(3,0); 
+								                std::vector<double> pos(3,0);
 								                pos[0] = robxf;
 										pos[1] = robyf;
 								                pos[2] = robYf;
@@ -2010,7 +2010,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						candidate_base_pose.pose.orientation.z = robqf[2];
 						candidate_base_pose.pose.orientation.w = robqf[3];
 						candidate_base_poses.push_back(candidate_base_pose);
-						std::vector<double> pos(3,0); 
+						std::vector<double> pos(3,0);
                                               	pos[0] = robxf;
 						pos[1] = robyf;
 		                                pos[2] = robYf;
@@ -2044,7 +2044,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						// /base_link pose
 						robxf += cos(robYf)*baseOffsetx;
 						robyf += sin(robYf)*baseOffsetx;
-                                                std::vector<double> pos(3,0); 
+                                                std::vector<double> pos(3,0);
                                                 pos[0] = robxf;
 												pos[1] = robyf;
                                                 pos[2] = robYf;
@@ -2201,7 +2201,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 				candidate_base_pose.pose.orientation.w = robqf[3];
 				candidate_base_poses.push_back(candidate_base_pose);
 
-				std::vector<double> pos(3,0); 
+				std::vector<double> pos(3,0);
                               	pos[0] = robxf;
 				pos[1] = robyf;
                                 pos[2] = robYf;
@@ -2276,7 +2276,7 @@ int RepositionBaseExecutor::checkIKPLAN(const geometry_msgs::PoseStamped& candid
 //                 tf::poseMsgToEigen(robot_pose_world_frame_.pose, base_link_in_map);
                 tf::poseMsgToEigen(candidate_base_pose.pose, base_link_in_map);
 				Eigen::Affine3d base_link_to_gas_canister = base_link_in_map.inverse() * gas_can_in_map;
-                
+
 				// 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
                 int max_num_candidates = 100;
                 std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
@@ -2452,7 +2452,7 @@ int RepositionBaseExecutor::checkIK(const geometry_msgs::PoseStamped& gas_can_po
             // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
 
-            if (!generated_grasps_) 
+            if (!generated_grasps_)
 			{
 //                 Eigen::Affine3d base_link_to_gas_canister;
 //                 tf::poseMsgToEigen(current_goal_->gas_can_in_base_link.pose, base_link_to_gas_canister);
@@ -2462,7 +2462,7 @@ int RepositionBaseExecutor::checkIK(const geometry_msgs::PoseStamped& gas_can_po
 //                 tf::poseMsgToEigen(robot_pose_world_frame_.pose, base_link_in_map);
                 tf::poseMsgToEigen(candidate_base_pose.pose, base_link_in_map);
 				Eigen::Affine3d base_link_to_gas_canister = base_link_in_map.inverse() * gas_can_in_map;
-                
+
 				// 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
                 int max_num_candidates = 100;
                 std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
@@ -2550,7 +2550,7 @@ int RepositionBaseExecutor::checkIK(const geometry_msgs::PoseStamped& gas_can_po
             ////////////////////////////////////////////////////////////////////////////////
             // Main loop of PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
-			
+
             if (!sent_move_arm_goal_) {
 //                 hdt_msgs::GraspObjectCommandFeedback feedback;
 //                 feedback.status = execution_status_to_feedback_status(status_);
@@ -2636,7 +2636,7 @@ int RepositionBaseExecutor::checkPLAN(const geometry_msgs::PoseStamped& gas_can_
             // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
 
-//             if (!generated_grasps_) 
+//             if (!generated_grasps_)
 			{
 //                 Eigen::Affine3d base_link_to_gas_canister;
 //                 tf::poseMsgToEigen(current_goal_->gas_can_in_base_link.pose, base_link_to_gas_canister);
@@ -2646,7 +2646,7 @@ int RepositionBaseExecutor::checkPLAN(const geometry_msgs::PoseStamped& gas_can_
 //                 tf::poseMsgToEigen(robot_pose_world_frame_.pose, base_link_in_map);
                 tf::poseMsgToEigen(candidate_base_pose.pose, base_link_in_map);
 				Eigen::Affine3d base_link_to_gas_canister = base_link_in_map.inverse() * gas_can_in_map;
-                
+
 				// 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
                 int max_num_candidates = 100;
                 std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
@@ -2734,8 +2734,8 @@ int RepositionBaseExecutor::checkPLAN(const geometry_msgs::PoseStamped& gas_can_
             ////////////////////////////////////////////////////////////////////////////////
             // Main loop of PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
-			
-//             if (!sent_move_arm_goal_) 
+
+//             if (!sent_move_arm_goal_)
             {
 //                 hdt_msgs::GraspObjectCommandFeedback feedback;
 //                 feedback.status = execution_status_to_feedback_status(status_);
@@ -2789,7 +2789,7 @@ int RepositionBaseExecutor::checkPLAN(const geometry_msgs::PoseStamped& gas_can_
 //                 // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
 //                 // now since the move_arm action handles execution and there is
 //                 // presently no feedback to distinguish planning vs. execution
-// 
+//
 //                 ROS_INFO("Move Arm Goal is no longer pending");
 //                 if (move_arm_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
 //                     move_arm_command_result_ && move_arm_command_result_->success)
@@ -2806,7 +2806,7 @@ int RepositionBaseExecutor::checkPLAN(const geometry_msgs::PoseStamped& gas_can_
 //                     // TODO: consider moving back to the stow position
 // 					return -0;
 //                 }
-// 
+//
 //                 sent_move_arm_goal_ = false; // reset for future move arm goals
 //             }
 	return 1;	// success

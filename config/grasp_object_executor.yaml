@@ -1,6 +1,6 @@
 wrist_to_tool_transform:
     position:
-        x: 0.13 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
+        x: 0.12 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
         y: 0.0
         z: 0.0
     orientation:
@@ -12,8 +12,10 @@ wrist_to_tool_transform:
 pregrasp_to_grasp_offset_m: 0.08
 
 stow_positions:
-    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, 77.0, 1.00, -24.00 ] }
-    - { name: "two", joint_vector_degs: [ -78.00, -42.00, 11.00, 29.00, 9.00, 10.00, -29.00 ] }
+#    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, 77.0, 1.00, -24.00 ] }
+#    - { name: "two", joint_vector_degs: [ -78.00, -42.00, 11.00, 29.00, 9.00, 10.00, -29.00 ] }
+    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, -13.0, 1.00, 24.00 ] }
+    - { name: "two", joint_vector_degs: [ -73.00, -43.00, 11.00, 40.00, -85.00, 2.00, 25.00 ] }
 
 max_grasp_candidates: 4 # the number of grasps to attempt to plan to
 

@@ -708,12 +708,12 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 }
 
 void ArmPlanningNode::fill_constraint(
-    const std::vector<double>& pose,
+    const geometry_msgs::Pose& pose,
     const std::string& frame_id,
     moveit_msgs::Constraints& goals)
 {
-    if(pose.size() < 6)
-        return;
+//    if(pose.size() < 6)
+//        return;
 
     goals.position_constraints.resize(1);
     goals.orientation_constraints.resize(1);
@@ -722,15 +722,20 @@ void ArmPlanningNode::fill_constraint(
     goals.position_constraints[0].constraint_region.primitives.resize(1);
     goals.position_constraints[0].constraint_region.primitive_poses.resize(1);
     goals.position_constraints[0].constraint_region.primitives[0].type = shape_msgs::SolidPrimitive::BOX;
-    goals.position_constraints[0].constraint_region.primitive_poses[0].position.x = pose[0];
-    goals.position_constraints[0].constraint_region.primitive_poses[0].position.y = pose[1];
-    goals.position_constraints[0].constraint_region.primitive_poses[0].position.z = pose[2];
+    goals.position_constraints[0].constraint_region.primitive_poses[0].position.x = pose.position.x;
+    goals.position_constraints[0].constraint_region.primitive_poses[0].position.y = pose.position.y;
+    goals.position_constraints[0].constraint_region.primitive_poses[0].position.z = pose.position.z;
 
     //  goals.position_constraints[0].position.x = pose[0];
     //  goals.position_constraints[0].position.y = pose[1];
     //  goals.position_constraints[0].position.z = pose[2];
 
-    leatherman::rpyToQuatMsg(pose[3], pose[4], pose[5], goals.orientation_constraints[0].orientation);
+//    leatherman::rpyToQuatMsg(pose[3], pose[4], pose[5], goals.orientation_constraints[0].orientation);
+
+    goals.orientation_constraints[0].orientation.w = pose.orientation.w;
+    goals.orientation_constraints[0].orientation.x = pose.orientation.x;
+    goals.orientation_constraints[0].orientation.y = pose.orientation.y;
+    goals.orientation_constraints[0].orientation.z = pose.orientation.z;
 
     geometry_msgs::Pose p;
     p.position = goals.position_constraints[0].constraint_region.primitive_poses[0].position;
@@ -1095,8 +1100,9 @@ bool ArmPlanningNode::plan_to_eef_goal(
     // fill goal state
     moveit_msgs::GetMotionPlan::Request req;
     req.motion_plan_request.goal_constraints.resize(1);
+    ROS_WARN_PRETTY("Converting goal pose '%s' to 6dof sbpl goal", to_string(goal_pose.pose).c_str());
     std::vector<double> goal_vector = convert_to_sbpl_goal(goal_pose.pose);
-    fill_constraint(goal_vector, goal_pose.header.frame_id, req.motion_plan_request.goal_constraints[0]);
+    fill_constraint(goal_pose.pose, goal_pose.header.frame_id, req.motion_plan_request.goal_constraints[0]);
     ROS_WARN_PRETTY("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
     req.motion_plan_request.allowed_planning_time = 10.0; //2.0;
     req.motion_plan_request.start_state = scene->robot_state;
@@ -1269,7 +1275,7 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
     }
 
     double min_x, min_y, min_z;
-    df->gridToWorld(0,0,0, min_x, min_y, min_z); 
+    df->gridToWorld(0,0,0, min_x, min_y, min_z);
     tf::Vector3 bb_min_df_frame(min_x, min_y, min_z);
 
     int num_x = df->getXNumCells();

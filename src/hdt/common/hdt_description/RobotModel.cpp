@@ -113,6 +113,7 @@ bool IKSolutionGenerator::operator()(std::vector<double>& solution)
                     if (sbpl::utils::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
                         seed_[robot_model_->free_angle_index()] = up_free_angle;
                         curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
+                        seed_[robot_model_->free_angle_index()] = free_angle_seed;
                     }
                     else {
                         ROS_DEBUG("Exited upper limit of %0.3f [%0.3f]", free_angle_max, up_free_angle);
@@ -128,6 +129,7 @@ bool IKSolutionGenerator::operator()(std::vector<double>& solution)
                     if (sbpl::utils::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
                         seed_[robot_model_->free_angle_index()] = down_free_angle;
                         curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
+                        seed_[robot_model_->free_angle_index()] = free_angle_seed;
                     }
                     else {
                         ROS_DEBUG("Exited lower limit of %0.3f [%0.3f]", free_angle_min, down_free_angle);
@@ -198,11 +200,11 @@ bool RobotModel::load(const std::string& urdf_string)
             *urdf_model,
             joint_names_,
             min_limits_,
-            max_limits_, 
-            min_safety_limits_, 
-            max_safety_limits_, 
-            max_velocity_limits_, 
-            continuous_, 
+            max_limits_,
+            min_safety_limits_,
+            max_safety_limits_,
+            max_velocity_limits_,
+            continuous_,
             why))
     {
         ROS_ERROR_PRETTY("Failed to extract joint info (%s)", why.c_str());

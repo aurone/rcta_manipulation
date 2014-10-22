@@ -130,7 +130,7 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
-    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string);
+    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string, true); // enable safety limits to conservatively filter grasp locations
     if (!robot_model_) {
         ROS_ERROR("Failed to load Robot Model from the URDF");
         return false;
@@ -346,6 +346,8 @@ int GraspObjectExecutor::run()
 
             const std::string robot_frame = current_goal_->gas_can_in_base_link.header.frame_id;
             const std::string kinematics_frame = "arm_mount_panel_dummy";
+            const std::string camera_frame = "camera_rgb_frame";
+
             tf::StampedTransform tf_transform;
             try {
                 listener_.lookupTransform(robot_frame, kinematics_frame, ros::Time(0), tf_transform);
