@@ -20,7 +20,8 @@ if __name__ == '__main__':
     openravepy.RaveInitialize(True, level = openravepy.DebugLevel.Info)
     openravepy.misc.InitOpenRAVELogging()
     env = openravepy.Environment()
-    robot = env.ReadRobotXMLFile(sys.argv[1])
+    robot_filename = sys.argv[1]
+    robot = env.ReadRobotXMLFile(robot_filename)
     env.Add(robot)
 
     manipulators = []
@@ -36,10 +37,12 @@ if __name__ == '__main__':
     if not ikmodel.load():
         ikmodel.autogenerate()
 
-    proc = subprocess.Popen('rospack find hdt'.split(), stdout=subprocess.PIPE)
-    hdt_description_dir = proc.stdout.readlines()[0].rstrip() + '/kinbody/hdt.robot.xml'
+    #proc = subprocess.Popen('rospack find hdt'.split(), stdout=subprocess.PIPE)
+    #robot_filename = proc.stdout.readlines()[0].rstrip() + '/kinbody/hdt.robot.xml'
     
-    proc = subprocess.Popen(('openrave.py --database inversekinematics').split() + ['--robot=' + hdt_description_dir] + ('--iktype=transform6d --manipname=hdt_arm --getfilename').split(), stdout=subprocess.PIPE)
+    proc = subprocess.Popen(('openrave.py --database inversekinematics').split() + \
+            ['--robot=' + robot_filename] + \
+            ('--iktype=transform6d --manipname=hdt_arm --getfilename').split(), stdout=subprocess.PIPE)
 
     database_name = proc.stdout.readlines()[0]
     print 'Database found in ', database_name
@@ -54,9 +57,9 @@ if __name__ == '__main__':
 
     cpp_file = database_name[0:-3] + '.cpp'
     cpp_file = cpp_file.replace('.x86_64', '')
-    print 'Relocating {0} to the hdt_kinematics package'.format(cpp_file)
+    print 'Relocating {0} to the \'hdt\' package'.format(cpp_file)
 
     # move the sources into the hdt_kinematics package
     proc = subprocess.Popen('rospack find hdt'.split(), stdout=subprocess.PIPE)
-    dst_dir = proc.stdout.readlines()[0].rstrip() + '/src'
+    dst_dir = '.' #proc.stdout.readlines()[0].rstrip() + '/src'
     shutil.copyfile(cpp_file, dst_dir + '/hdt_arm_transform6d.cpp')
