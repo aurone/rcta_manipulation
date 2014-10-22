@@ -36,7 +36,7 @@ if __name__ == '__main__':
     if not ikmodel.load():
         ikmodel.autogenerate()
 
-    proc = subprocess.Popen('rospack find hdt_description'.split(), stdout=subprocess.PIPE)
+    proc = subprocess.Popen('rospack find hdt'.split(), stdout=subprocess.PIPE)
     hdt_description_dir = proc.stdout.readlines()[0].rstrip() + '/kinbody/hdt.robot.xml'
     
     proc = subprocess.Popen(('openrave.py --database inversekinematics').split() + ['--robot=' + hdt_description_dir] + ('--iktype=transform6d --manipname=hdt_arm --getfilename').split(), stdout=subprocess.PIPE)
@@ -57,6 +57,6 @@ if __name__ == '__main__':
     print 'Relocating {0} to the hdt_kinematics package'.format(cpp_file)
 
     # move the sources into the hdt_kinematics package
-    proc = subprocess.Popen('rospack find hdt_kinematics'.split(), stdout=subprocess.PIPE)
+    proc = subprocess.Popen('rospack find hdt'.split(), stdout=subprocess.PIPE)
     dst_dir = proc.stdout.readlines()[0].rstrip() + '/src'
     shutil.copyfile(cpp_file, dst_dir + '/hdt_arm_transform6d.cpp')
