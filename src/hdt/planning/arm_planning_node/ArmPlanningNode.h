@@ -107,7 +107,7 @@ private:
     void move_arm(const hdt::MoveArmCommandGoal::ConstPtr& goal);
 
     void fill_constraint(
-            const std::vector<double>& pose,
+            const geometry_msgs::Pose& pose,
             const std::string& frame_id,
             moveit_msgs::Constraints& goals);
 
