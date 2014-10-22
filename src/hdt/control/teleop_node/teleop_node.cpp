@@ -279,9 +279,9 @@ void TeleopNode::set_position(double value)
         joint_pos_target_[selected_joint_idx_] = joint_min_positions_[selected_joint_idx_] + 0.01;
     }
 
-    if (joint_pos_target_[selected_joint_idx_] >= joint_max_positions_[selected_joint_idx_] - 0.11) {
+    if (joint_pos_target_[selected_joint_idx_] >= joint_max_positions_[selected_joint_idx_] - 0.01) {
         ROS_WARN("Joint at max limit");
-        joint_pos_target_[selected_joint_idx_] = joint_max_positions_[selected_joint_idx_] - 0.11;
+        joint_pos_target_[selected_joint_idx_] = joint_max_positions_[selected_joint_idx_] - 0.01;
     }
 }
 
