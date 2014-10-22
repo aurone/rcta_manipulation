@@ -13,6 +13,7 @@
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
@@ -76,7 +77,7 @@ private:
         Eigen::Affine3d T_object_grasp;
         double u;
 
-        GraspCandidate(const Eigen::Affine3d& grasp_candidate_transform, const Eigen::Affine3d& T_object_grasp, double u = -1.0) :
+        GraspCandidate(const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(), const Eigen::Affine3d& T_object_grasp = Eigen::Affine3d::Identity(), double u = -1.0) :
             grasp_candidate_transform(grasp_candidate_transform),
             T_object_grasp(T_object_grasp),
             u(u) { }
@@ -123,6 +124,7 @@ private:
 
     hdt::MoveArmCommandGoal last_move_arm_pregrasp_goal_;
     hdt::MoveArmCommandGoal last_move_arm_stow_goal_;
+    GraspCandidate last_successful_grasp_;
 
     typedef actionlib::SimpleActionClient<hdt::ViservoCommandAction> ViservoCommandActionClient;
     std::string viservo_command_action_name_;

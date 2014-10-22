@@ -459,6 +459,7 @@ int GraspObjectExecutor::run()
                 last_move_arm_pregrasp_goal_.octomap = use_extrusion_octomap_ ?
                         *current_octomap_ : current_goal_->octomap;
 
+                last_move_arm_pregrasp_goal_.has_attached_object = false;
                 last_move_arm_pregrasp_goal_.execute_path = true;
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
@@ -468,6 +469,7 @@ int GraspObjectExecutor::run()
                 sent_move_arm_goal_ = true;
 
                 reachable_grasp_candidates_.pop_back();
+                last_successful_grasp_ = next_best_grasp;
             }
             else if (!pending_move_arm_command_) {
                 // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
@@ -843,21 +845,38 @@ int GraspObjectExecutor::run()
 
                 //include the attached object in the goal
                 last_move_arm_stow_goal_.has_attached_object = true;
-                moveit_msgs::AttachedCollisionObject attached_object;
-                attached_object.link_name = "arm_7_gripper_lift";
+                moveit_msgs::AttachedCollisionObject &attached_object = last_move_arm_stow_goal_.attached_object;
+                attached_object.link_name = "arm_7_gripper_lift_link";
                 attached_object.object.id = "gas_can";
-                attached_object.object.primitives.resize(1);
-                attached_object.object.primitive_poses.resize(1);
+                attached_object.object.primitives.resize(2);
+                attached_object.object.primitive_poses.resize(2);
                 attached_object.object.primitives[0].type = shape_msgs::SolidPrimitive::BOX;
                 attached_object.object.primitives[0].dimensions.resize(3);
                 //rough gas can dimensions
                 attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_X] = 0.20;
-                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.30;
-                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.32;
-                //compute the pose of attachment based on grasp
-                //attached_object.object.primitive_poses[0].position
-                attached_object.weight = 1.0; //arbitrary (not used anyways)
+                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.25;
+                attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.25;
+		//nozzle
+		attached_object.object.primitives[1].type = shape_msgs::SolidPrimitive::CYLINDER;
+                attached_object.object.primitives[1].dimensions.resize(2);
+                attached_object.object.primitives[1].dimensions[shape_msgs::SolidPrimitive::CYLINDER_HEIGHT] = 0.35;
+                attached_object.object.primitives[1].dimensions[shape_msgs::SolidPrimitive::CYLINDER_RADIUS] = 0.035;
 
+                //compute the pose of attachment based on grasp pose used
+                Eigen::Affine3d obj_body_offset_;
+                tf::Transform obj_body_offset_tf_(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, -0.05));
+		tf::poseTFToEigen(obj_body_offset_tf_, obj_body_offset_);
+                Eigen::Affine3d obj_body_in_grasp_frame = last_successful_grasp_.T_object_grasp.inverse() * obj_body_offset_; 
+                tf::poseEigenToMsg(obj_body_in_grasp_frame, attached_object.object.primitive_poses[0]);
+		//nozzle
+		Eigen::Affine3d obj_nozzle_offset_;
+		tf::Transform obj_nozzle_offset_tf_ = tf::Transform(tf::Quaternion(tf::Vector3(1,0,0), 0.25*M_PI), tf::Vector3(0.0, 0.0, -0.05)) * tf::Transform(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, 0.15));
+		tf::poseTFToEigen(obj_nozzle_offset_tf_, obj_nozzle_offset_);
+                Eigen::Affine3d obj_nozzle_in_grasp_frame = last_successful_grasp_.T_object_grasp.inverse() * obj_nozzle_offset_; 
+                tf::poseEigenToMsg(obj_nozzle_in_grasp_frame, attached_object.object.primitive_poses[1]);
+
+		//attached_object.object.primitive_poses[0].position.x = 0.13;
+                attached_object.weight = 1.0; //arbitrary (not used anyways)
                 last_move_arm_stow_goal_.execute_path = true;
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);

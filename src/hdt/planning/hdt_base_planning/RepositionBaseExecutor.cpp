@@ -2320,6 +2320,10 @@ int RepositionBaseExecutor::checkIKPLAN(const geometry_msgs::PoseStamped& candid
                     if (robot_model_->search_nearest_ik(
                             kinematics_to_grasp_candidate, fake_seed, sol, sbpl::utils::ToRadians(1.0)))
                     {
+
+
+			//TODO: check visibility
+
                         GraspCandidate reachable_grasp_candidate(kinematics_to_grasp_candidate, grasp_candidate.u);
                         reachable_grasp_candidates_.push_back(reachable_grasp_candidate);
                     }
