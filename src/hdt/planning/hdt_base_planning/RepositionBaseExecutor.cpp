@@ -48,8 +48,25 @@ last_status_(RepositionBaseExecutionStatus::INVALID),
     move_arm_command_action_name_("move_arm_command"),
     move_arm_command_client_(),
 //     occupancy_grid_sub_(), 	// TODO TODO
-    listener_()
+    listener_(),
+    cc_(NULL)
 {
+    //hard-coded robot perimeter here
+    int obs_thresh = 50;
+    int num_heading_disc = (int)(360.0 / 5.0); //5 degree discretization
+    std::vector<sbpl_2Dpt_t> footprint_polygon;
+    footprint_polygon.resize(4);
+    double robot_halfwidth = 0.40;
+    double robot_halflength = 0.60;
+    footprint_polygon[0].x = -robot_halflength;
+    footprint_polygon[0].y = -robot_halfwidth;
+    footprint_polygon[1].x =  robot_halflength;
+    footprint_polygon[1].y = -robot_halfwidth;
+    footprint_polygon[2].x =  robot_halflength;
+    footprint_polygon[2].y =  robot_halfwidth;
+    footprint_polygon[3].x = -robot_halflength;
+    footprint_polygon[3].y =  robot_halfwidth;
+    cc_ = new XYThetaCollisionChecker(footprint_polygon, obs_thresh, num_heading_disc);
 }
 
 bool RepositionBaseExecutor::initialize()
@@ -364,6 +381,16 @@ void RepositionBaseExecutor::goal_callback()
   catch (const tf::TransformException& ex) {
     ROS_ERROR("Failed to transform from 'base_footprint' to 'abs_nwu'");
     as_->setAborted();
+  }
+
+  //update collision checker if valid map
+  if(current_goal_->map.data.size() > 0){
+    //seems like valid map
+    if(cc_ != NULL){
+      cc_->UpdateOccupancyGrid(current_goal_->map);
+    }
+  } else {
+    ROS_WARN("No valid map received with goal!");
   }
 
 	bComputedRobPose_ = false;
@@ -696,42 +723,61 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							bodyx = robx[i][j][k] + cos(robY[i][j][k])*bodyOffsetx1;
 							bodyy = roby[i][j][k] + sin(robY[i][j][k])*bodyOffsetx1;
 
+							//body coords in map cells
 							bodyi = (int)((bodyx-origin.position.x)/resolution);
-							bodyj = (int)((bodyy-origin.position.y)/resolution);
+							bodyj = (int)((bodyy-origin.position.y)/resolution); 
 
-							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
-							{
-								bool bCollided = false;
-								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
-									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
-										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
-//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
-										{
-											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
-											if (distObs < bodyLengthCore)
+                                                        if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
+								ROS_WARN("Footprint collision!");
+								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+								//bCollided = true;
+								double robxf = robx[i][j][k];
+								double robyf = roby[i][j][k];
+								double robYf = robY[i][j][k];
+								// /base_link pose
+								robxf += cos(robYf)*baseOffsetx;
+								robyf += sin(robYf)*baseOffsetx;
+								std::vector<double> pos(3,0);
+                        					pos[0] = robxf;
+								pos[1] = robyf;
+                        					pos[2] = robYf;
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+							} else {
+
+								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+								{
+									bool bCollided = false;
+									for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+										for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+											if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+	//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
 											{
-												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
-												bCollided = true;
-												double robxf = robx[i][j][k];
-												double robyf = roby[i][j][k];
-												double robYf = robY[i][j][k];
-												// /base_link pose
-												robxf += cos(robYf)*baseOffsetx;
-												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0);
-                                                        					pos[0] = robxf;
-												pos[1] = robyf;
-                                                        					pos[2] = robYf;
-                                                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+												if (distObs < bodyLengthCore)
+												{
+													bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+													bCollided = true;
+													double robxf = robx[i][j][k];
+													double robyf = roby[i][j][k];
+													double robYf = robY[i][j][k];
+													// /base_link pose
+													robxf += cos(robYf)*baseOffsetx;
+													robyf += sin(robYf)*baseOffsetx;
+													std::vector<double> pos(3,0);
+		                                                					pos[0] = robxf;
+													pos[1] = robyf;
+		                                                					pos[2] = robYf;
+		                                                					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												}
+												else if (distObs < bodyLength)
+													pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
 											}
-											else if (distObs < bodyLength)
-												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
-										}
-							}
-							else
-							{
-// 								bTotMax[i][j][k] = false;
-// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
+								else
+								{
+	// 								bTotMax[i][j][k] = false;
+	// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
 							}
 						}
 // 			patchSize2 = (int)(bodyLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
@@ -748,40 +794,58 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							bodyi = (int)((bodyx-origin.position.x)/resolution);
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
-							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
-							{
-								bool bCollided = false;
-								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
-									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
-										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
-//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
-										{
-											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
-											if (distObs < bodyLengthCore)
+							if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
+								ROS_WARN("Footprint collision!");
+								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+								//bCollided = true;
+								double robxf = robx[i][j][k];
+								double robyf = roby[i][j][k];
+								double robYf = robY[i][j][k];
+								// /base_link pose
+								robxf += cos(robYf)*baseOffsetx;
+								robyf += sin(robYf)*baseOffsetx;
+								std::vector<double> pos(3,0);
+                        					pos[0] = robxf;
+								pos[1] = robyf;
+                        					pos[2] = robYf;
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+							} else {
+
+								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+								{
+									bool bCollided = false;
+									for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+										for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+											if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+	//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
 											{
-												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
-												bCollided = true;
-												// /top_shelf pose
-												double robxf = robx[i][j][k];
-												double robyf = roby[i][j][k];
-												double robYf = robY[i][j][k];
-												// /base_link pose
-												robxf += cos(robYf)*baseOffsetx;
-												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0);
-                                                        					pos[0] = robxf;
-												pos[1] = robyf;
-                                                        					pos[2] = robYf;
-                                                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+												if (distObs < bodyLengthCore)
+												{
+													bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+													bCollided = true;
+													// /top_shelf pose
+													double robxf = robx[i][j][k];
+													double robyf = roby[i][j][k];
+													double robYf = robY[i][j][k];
+													// /base_link pose
+													robxf += cos(robYf)*baseOffsetx;
+													robyf += sin(robYf)*baseOffsetx;
+													std::vector<double> pos(3,0);
+		                                                					pos[0] = robxf;
+													pos[1] = robyf;
+		                                                					pos[2] = robYf;
+		                                                					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												}
+												else if (distObs < bodyLength)
+													pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
 											}
-											else if (distObs < bodyLength)
-												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
-										}
-							}
-							else
-							{
-// 								bTotMax[i][j][k] = false;
-// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
+								else
+								{
+	// 								bTotMax[i][j][k] = false;
+	// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
 							}
 						}
 
@@ -1565,40 +1629,58 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							bodyi = (int)((bodyx-origin.position.x)/resolution);
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
-							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
-							{
-								bool bCollided = false;
-								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
-									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
-										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
-//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
-										{
-											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
-											if (distObs < bodyLengthCore)
+							if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
+								ROS_WARN("Footprint collision!");
+								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+								//bCollided = true;
+								double robxf = robx[i][j][k];
+								double robyf = roby[i][j][k];
+								double robYf = robY[i][j][k];
+								// /base_link pose
+								robxf += cos(robYf)*baseOffsetx;
+								robyf += sin(robYf)*baseOffsetx;
+								std::vector<double> pos(3,0);
+                        					pos[0] = robxf;
+								pos[1] = robyf;
+                        					pos[2] = robYf;
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+							} else {
+
+								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+								{
+									bool bCollided = false;
+									for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+										for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+											if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+	//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
 											{
-												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
-												bCollided = true;
-												// /top_shelf pose
-												double robxf = robx[i][j][k];
-												double robyf = roby[i][j][k];
-												double robYf = robY[i][j][k];
-												// /base_link pose
-												robxf += cos(robYf)*baseOffsetx;
-												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0);
-												pos[0] = robxf;
-												pos[1] = robyf;
-												pos[2] = robYf;
-                                                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+												if (distObs < bodyLengthCore)
+												{
+													bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+													bCollided = true;
+													// /top_shelf pose
+													double robxf = robx[i][j][k];
+													double robyf = roby[i][j][k];
+													double robYf = robY[i][j][k];
+													// /base_link pose
+													robxf += cos(robYf)*baseOffsetx;
+													robyf += sin(robYf)*baseOffsetx;
+													std::vector<double> pos(3,0);
+													pos[0] = robxf;
+													pos[1] = robyf;
+													pos[2] = robYf;
+		                                                					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												}
+												else if (distObs < bodyLength)
+													pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
 											}
-											else if (distObs < bodyLength)
-												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
-										}
-							}
-							else
-							{
-// 								bTotMax[i][j][k] = false;
-// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
+								else
+								{
+	// 								bTotMax[i][j][k] = false;
+	// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
 							}
 						}
 // 			patchSize2 = (int)(bodyLength/resolution);	// occupancy check for (patchSize2+1)x(patchSize2+1) cells
@@ -1615,40 +1697,58 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							bodyi = (int)((bodyx-origin.position.x)/resolution);
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
-							if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
-							{
-								bool bCollided = false;
-								for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
-									for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
-										if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
-//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
-										{
-											double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
-											if (distObs < bodyLengthCore)
+							if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
+								ROS_WARN("Footprint collision!");
+								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+								//bCollided = true;
+								double robxf = robx[i][j][k];
+								double robyf = roby[i][j][k];
+								double robYf = robY[i][j][k];
+								// /base_link pose
+								robxf += cos(robYf)*baseOffsetx;
+								robyf += sin(robYf)*baseOffsetx;
+								std::vector<double> pos(3,0);
+                        					pos[0] = robxf;
+								pos[1] = robyf;
+                        					pos[2] = robYf;
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+							} else {
+
+								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
+								{
+									bool bCollided = false;
+									for (int ii=-patchSize2; ii<=patchSize2 && !bCollided; ii++)
+										for (int jj=-patchSize2; jj<=patchSize2 && !bCollided; jj++)
+											if (map_.data[width*(bodyj+jj)+bodyi+ii] >= mapObsThr)		// including unknown region
+	//										if (map_.data[width*(bodyj+jj)+bodyi+ii] != 0)				// only in clear region
 											{
-												bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
-												bCollided = true;
-												// /top_shelf pose
-												double robxf = robx[i][j][k];
-												double robyf = roby[i][j][k];
-												double robYf = robY[i][j][k];
-												// /base_link pose
-												robxf += cos(robYf)*baseOffsetx;
-												robyf += sin(robYf)*baseOffsetx;
-												std::vector<double> pos(3,0);
-												pos[0] = robxf;
-												pos[1] = robyf;
-												pos[2] = robYf;
-                                                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												double distObs = std::sqrt((double)(ii*ii+jj*jj))*resolution;
+												if (distObs < bodyLengthCore)
+												{
+													bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
+													bCollided = true;
+													// /top_shelf pose
+													double robxf = robx[i][j][k];
+													double robyf = roby[i][j][k];
+													double robYf = robY[i][j][k];
+													// /base_link pose
+													robxf += cos(robYf)*baseOffsetx;
+													robyf += sin(robYf)*baseOffsetx;
+													std::vector<double> pos(3,0);
+													pos[0] = robxf;
+													pos[1] = robyf;
+													pos[2] = robYf;
+		                                                					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+												}
+												else if (distObs < bodyLength)
+													pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
 											}
-											else if (distObs < bodyLength)
-												pObs[i][j][k] *= std::min( pObs[i][j][k], std::pow( (distObs-bodyLengthCore)/(bodyLength-bodyLengthCore), 2.0) );	// pObs: quadratic function (1 at outer borders, 0 at inner borders)	// lowest value among the patch cells for current i,j,k
-										}
-							}
-							else
-							{
-// 								bTotMax[i][j][k] = false;
-// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
+								else
+								{
+	// 								bTotMax[i][j][k] = false;
+	// 								ROS_ERROR("    Patch for obstacle check is out of the map");
+								}
 							}
 						}
 

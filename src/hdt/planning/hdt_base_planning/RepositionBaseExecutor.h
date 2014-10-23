@@ -21,6 +21,9 @@
 #include <hdt/common/hdt_description/RobotModel.h>
 #include <hdt/MoveArmCommandAction.h>
 
+//xytheta collision checking!
+#include "xytheta_collision_checker.h"
+
 //visualizations
 #include <hdt_viz/hdt_viz.h>
 
@@ -82,6 +85,9 @@ public:
 private:
     //visualizations
     HDTViz viz;
+
+    //xytheta collision checking
+    XYThetaCollisionChecker *cc_;
 
     struct GraspCandidate
     {
