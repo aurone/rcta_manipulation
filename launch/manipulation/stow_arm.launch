@@ -1,0 +1,6 @@
+<launch>
+  <node name="stow_arm" pkg="hdt" type="stow_arm" output="screen">
+    <!-- load tuck configurations -->
+    <rosparam command="load" file="$(find hdt)/config/grasp_object_executor.yaml"/>
+  </node>
+</launch>
