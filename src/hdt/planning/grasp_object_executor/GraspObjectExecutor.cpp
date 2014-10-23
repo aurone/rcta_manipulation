@@ -1290,7 +1290,7 @@ void GraspObjectExecutor::filter_grasp_candidates(
 
         // camera -> robot * robot -> wrist * wrist -> marker = camera -> marker
         if (check_ik && check_visibility) {
-            GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.u);
+            GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.T_object_grasp, grasp_candidate.u);
             filtered_candidates.push_back(reachable_grasp_candidate);
         }
     }

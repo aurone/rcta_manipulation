@@ -102,6 +102,7 @@ generate_messages(
     DEPENDENCIES
         actionlib_msgs
         geometry_msgs
+        moveit_msgs
         nav_msgs
         octomap_msgs
         sensor_msgs

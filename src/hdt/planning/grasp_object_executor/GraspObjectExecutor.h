@@ -84,7 +84,7 @@ private:
             grasp_candidate_transform(grasp_candidate_transform),
             T_object_grasp(T_object_grasp),
             u(u) { }
-    }
+    };
 
     struct AttachedMarker
     {
