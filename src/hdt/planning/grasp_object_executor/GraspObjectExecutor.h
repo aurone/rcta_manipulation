@@ -72,12 +72,23 @@ private:
 
     struct GraspCandidate
     {
-        Eigen::Affine3d grasp_candidate_transform;
-        double u;
+    	Eigen::Affine3d grasp_candidate_transform;
+    	double u;
 
-        GraspCandidate(const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(), double u = -1.0) :
-            grasp_candidate_transform(grasp_candidate_transform),
-            u(u) { }
+    	GraspCandidate(
+    			const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
+    			double u = -1.0)
+    	: grasp_candidate_transform(grasp_candidate_transform), u(u) { }
+    };
+
+    // TODO: copypasta from attached_markers_filter, maybe this is worth putting
+    //       in the urdf as an extension along with the collision model and making it
+    //       part of an official robot state
+    struct AttachedMarker
+    {
+        int marker_id;
+        std::string attached_link;
+        Eigen::Affine3d link_to_marker;
     };
 
     ros::NodeHandle nh_;
@@ -169,6 +180,10 @@ private:
 
     int max_grasp_candidates_;
 
+    std::vector<AttachedMarker> attached_markers_;
+
+    bool download_marker_params();
+
     void goal_callback();
     void preempt_callback();
 
@@ -233,6 +248,14 @@ private:
 
     /// @brief Sample uniformly along the grasp spline to produce pregrasp poses for the wrist
     std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
+    void filter_grasp_candidates(
+    		std::vector<GraspCandidate>& candidates,
+    		const Eigen::Affine3d& T_kinematics_robot,
+    		const Eigen::Affine3d& T_camera_robot,
+    		double marker_incident_angle_threshold_rad) const;
+    void rank_grasp_candidates(std::vector<GraspCandidate>& candidates, double marker_incident_angle) const;
+    void cull_grasp_candidates(std::vector<GraspCandidate>& candidates, int max_candidates) const;
+
     void visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps) const;
 
     void clear_circle_from_grid(nav_msgs::OccupancyGrid& grid, double x, double y, double radius) const;
