@@ -95,16 +95,17 @@ void stow_request_callback(const std_msgs::String::ConstPtr& message){
 		std::string msg = message->data;
 		ROS_INFO("Got message '%s'", msg.c_str());
 		if(msg.compare("stow")==0){
+			std_msgs::String response;
 			cb_success = false;
 			if(!try_stow_arm()){
-				std_msgs::String response;
+				ROS_WARN("Arm failed to stow!");
 				response.data = std::string("error");
-				pub.publish(response);				
 			} else {
-				std_msgs::String response;
+				ROS_INFO("Arm stowed!");
 				response.data = std::string("done");
-				pub.publish(response);
 			}
+			sleep(4);
+			pub.publish(response);
 		} 
 	}
 }
@@ -149,8 +150,8 @@ int main(int argc, char* argv[])
 	actionlib::SimpleActionClient<hdt::MoveArmCommandAction> client(move_arm_command_action_name, true);
 	client_ = &client;
 
-	pub = nh.advertise<std_msgs::String>("stow_arm_response", 5);
-        sub = nh.subscribe("stow_arm_request", 1, stow_request_callback);
+	pub = nh.advertise<std_msgs::String>("/hdt/stow_arm_response", 5);
+        sub = nh.subscribe("/hdt/stow_arm_request", 1, stow_request_callback);
 
 	ROS_INFO("Initialized! Waiting on messages!");
 	ros::spin();
