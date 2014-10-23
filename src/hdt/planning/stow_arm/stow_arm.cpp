@@ -53,6 +53,8 @@ int main(int argc, char* argv[])
     //include the attached object in the goal
     move_arm_stow_goal.has_attached_object = false;
 
+    move_arm_stow_goal.execute_path = true;
+
 	auto result_cb = boost::bind(result_callback, _1, _2);
 	client.sendGoal(move_arm_stow_goal, result_cb);
 	if (!client.waitForResult()) {
