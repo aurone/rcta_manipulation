@@ -164,6 +164,9 @@ ManipulatorInterfaceROS::RunResult ManipulatorInterfaceLiveROS::run()
         ManipulatorError error(ManipulatorError::NO_ERROR());
         error = manip_.getPosition(raw_joint_positions);
 
+        // FIND THE HACK HACK HACK
+        raw_joint_positions[5] *= -1.0;
+
         if (manip_.getPosition(raw_joint_positions) != ManipulatorError::NO_ERROR() ||
             manip_.getVelocity(raw_joint_velocities) != ManipulatorError::NO_ERROR() ||
             manip_.getTorque(raw_joint_torques) != ManipulatorError::NO_ERROR() ||
@@ -295,7 +298,7 @@ void ManipulatorInterfaceLiveROS::joint_trajectory_callback(const trajectory_msg
     }
 
     if (!msg->points.empty()) {
-        std::vector<double> target = extract_target_command(*msg); 
+        std::vector<double> target = extract_target_command(*msg);
 
         if (target.empty()) { // errors logged within extract_target_command
             return;
@@ -316,6 +319,8 @@ void ManipulatorInterfaceLiveROS::joint_trajectory_callback(const trajectory_msg
             coerce(msg->points.front().velocities, float_velocities);
         }
 
+        // HACK HACK HACK BECAUSE OUR ROBOT MODEL IS BAD
+        float_positions[5] *= -1.0;
         target_position_and_velocity(float_positions, float_velocities);
     }
 }

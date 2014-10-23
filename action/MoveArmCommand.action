@@ -8,6 +8,10 @@ uint8 type
 
 octomap_msgs/Octomap octomap
 
+#if has_attached_object set, attached_object should contain valid data for the attached object
+bool has_attached_object
+moveit_msgs/AttachedCollisionObject attached_object
+
 bool execute_path
 ---
 # result

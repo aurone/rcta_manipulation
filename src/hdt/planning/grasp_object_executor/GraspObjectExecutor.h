@@ -13,6 +13,7 @@
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <hdt_msgs/GraspObjectCommandAction.h>
 #include <hdt/MoveArmCommandAction.h>
 #include <hdt/ViservoCommandAction.h>
@@ -72,18 +73,19 @@ private:
 
     struct GraspCandidate
     {
-    	Eigen::Affine3d grasp_candidate_transform;
-    	double u;
+        Eigen::Affine3d grasp_candidate_transform;
+        Eigen::Affine3d T_object_grasp;
+        double u;
 
-    	GraspCandidate(
-    			const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
-    			double u = -1.0)
-    	: grasp_candidate_transform(grasp_candidate_transform), u(u) { }
-    };
+        GraspCandidate(
+                const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
+                const Eigen::Affine3d& T_object_grasp = Eigen::Affine3d::Identity(),
+                double u = -1.0) :
+            grasp_candidate_transform(grasp_candidate_transform),
+            T_object_grasp(T_object_grasp),
+            u(u) { }
+    }
 
-    // TODO: copypasta from attached_markers_filter, maybe this is worth putting
-    //       in the urdf as an extension along with the collision model and making it
-    //       part of an official robot state
     struct AttachedMarker
     {
         int marker_id;
@@ -132,6 +134,7 @@ private:
 
     hdt::MoveArmCommandGoal last_move_arm_pregrasp_goal_;
     hdt::MoveArmCommandGoal last_move_arm_stow_goal_;
+    GraspCandidate last_successful_grasp_;
 
     typedef actionlib::SimpleActionClient<hdt::ViservoCommandAction> ViservoCommandActionClient;
     std::string viservo_command_action_name_;

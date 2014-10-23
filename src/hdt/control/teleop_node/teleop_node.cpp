@@ -274,15 +274,15 @@ void TeleopNode::set_position(double value)
 
     // NOTE: check joint limits with leq/geq so that we can report "at limits" diagnostic information
 
-    if (joint_pos_target_[selected_joint_idx_] <= joint_min_positions_[selected_joint_idx_] + 0.01) {
-        ROS_WARN("Joint at min limit");
-        joint_pos_target_[selected_joint_idx_] = joint_min_positions_[selected_joint_idx_] + 0.01;
-    }
-
-    if (joint_pos_target_[selected_joint_idx_] >= joint_max_positions_[selected_joint_idx_] - 0.01) {
-        ROS_WARN("Joint at max limit");
-        joint_pos_target_[selected_joint_idx_] = joint_max_positions_[selected_joint_idx_] - 0.01;
-    }
+//    if (joint_pos_target_[selected_joint_idx_] <= joint_min_positions_[selected_joint_idx_] + 0.01) {
+//        ROS_WARN("Joint at min limit");
+//        joint_pos_target_[selected_joint_idx_] = joint_min_positions_[selected_joint_idx_] + 0.01;
+//    }
+//
+//    if (joint_pos_target_[selected_joint_idx_] >= joint_max_positions_[selected_joint_idx_] - 0.01) {
+//        ROS_WARN("Joint at max limit");
+//        joint_pos_target_[selected_joint_idx_] = joint_max_positions_[selected_joint_idx_] - 0.01;
+//    }
 }
 
 void TeleopNode::set_velocity(double value)

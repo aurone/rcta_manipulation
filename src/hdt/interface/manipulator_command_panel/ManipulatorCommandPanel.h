@@ -174,10 +174,12 @@ private:
 
     ros::Subscriber joint_states_sub_;
     ros::Subscriber octomap_sub_;
+    ros::Subscriber occupancy_grid_sub_;
     ros::Publisher robot_markers_pub_;
 
     sensor_msgs::JointState last_joint_state_;
     octomap_msgs::Octomap::ConstPtr last_octomap_msg_;
+    nav_msgs::OccupancyGrid::ConstPtr last_occupancy_grid_msg_;
 
     std::string tip_link_;
     std::string base_link_;
@@ -252,6 +254,7 @@ private:
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
     void octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg);
+    void occupancy_grid_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const hdt::MoveArmCommandFeedback::ConstPtr& feedback);

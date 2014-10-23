@@ -89,6 +89,7 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     setup_gui();
     joint_states_sub_ = nh_.subscribe("joint_states", 1, &ManipulatorCommandPanel::joint_states_callback, this);
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
+    occupancy_grid_sub_ = nh_.subscribe("fixed_costmap_sim", 1, &ManipulatorCommandPanel::occupancy_grid_callback, this);
 }
 
 ManipulatorCommandPanel::~ManipulatorCommandPanel()
@@ -648,6 +649,10 @@ void ManipulatorCommandPanel::send_reposition_base_command()
     reposition_base_goal.base_link_in_map.header.frame_id = interactive_marker_frame();
 
     // TODO: occupancy grid
+    if (last_occupancy_grid_msg_) {
+    	ROS_INFO("Sending occupancy grid to sung");
+    	reposition_base_goal.map = *last_occupancy_grid_msg_;
+    }
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::reposition_base_command_result_cb, this, _1, _2);
     reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
@@ -1241,6 +1246,11 @@ void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointStat
 void ManipulatorCommandPanel::octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg)
 {
     last_octomap_msg_ = msg;
+}
+
+void ManipulatorCommandPanel::occupancy_grid_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+	last_occupancy_grid_msg_ = msg;
 }
 
 bool ManipulatorCommandPanel::reinit(const std::string& robot_description, std::string& why)

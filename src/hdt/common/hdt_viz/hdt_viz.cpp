@@ -3,7 +3,7 @@
 #include <hdt_viz/hdt_viz.h>
 
 using namespace boost;
-
+ 
 static std::string RIGHT_CHAIN_RTIP_NAME = "finger1";
 static std::string RIGHT_CHAIN_LTIP_NAME = "finger2";
 static std::string LEFT_CHAIN_RTIP_NAME = "finger1";
