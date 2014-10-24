@@ -6,6 +6,9 @@
 #include <ros/ros.h>
 #include <nav_msgs/OccupancyGrid.h>
 
+#define CONTXY2DISC(X, CELLSIZE) (((X)>=0)?((int) round((X)/(CELLSIZE)) ):((int) round((X)/(CELLSIZE))))
+#define DISCXY2CONT(X, CELLSIZE) ((X)*(CELLSIZE))
+
 class XYThetaCollisionChecker {
 
 public:

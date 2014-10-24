@@ -200,6 +200,11 @@ bool RepositionBaseExecutor::initialize()
 
 	msg_utils::convert(tf_robot_to_kinematics_transform, T_robot_to_kinematics);
 
+	if (!download_marker_params()) {
+		ROS_WARN("Failed to download marker params");
+		return false;
+	}
+
 	// TODO TODO
 //     ROS_WARN("Waiting for occupancy grid message...");
 //     occupancy_grid_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("fixed_costmap_sim", 1, &RepositionBaseExecutor::occupancy_grid_cb, this);
@@ -209,7 +214,7 @@ bool RepositionBaseExecutor::initialize()
 //         ros::spinOnce();
 //     }
 //     occupancy_grid_sub_.shutdown();
-
+	return true;
 }
 
 // TODO TODO
@@ -764,7 +769,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
                         					pos[0] = robxf;
 								pos[1] = robyf;
                         					pos[2] = robYf;
-                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
 							} else {
 
 								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
@@ -831,7 +836,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
                         					pos[0] = robxf;
 								pos[1] = robyf;
                         					pos[2] = robYf;
-                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
 							} else {
 
 								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
@@ -1666,7 +1671,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
                         					pos[0] = robxf;
 								pos[1] = robyf;
                         					pos[2] = robYf;
-                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
 							} else {
 
 								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
@@ -1734,7 +1739,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
                         					pos[0] = robxf;
 								pos[1] = robyf;
                         					pos[2] = robYf;
-                        					viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                        					viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
 							} else {
 
 								if (bodyi>=patchSize2 && bodyi<width-patchSize2 && bodyj>=patchSize2 && bodyj<height-patchSize2)
