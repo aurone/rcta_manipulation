@@ -92,11 +92,29 @@ private:
     struct GraspCandidate
     {
         Eigen::Affine3d grasp_candidate_transform;
+        Eigen::Affine3d T_object_grasp;
         double u;
-        GraspCandidate(const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(), double u = -1.0) :
+
+        GraspCandidate(
+                const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
+                const Eigen::Affine3d& T_object_grasp = Eigen::Affine3d::Identity(),
+                double u = -1.0) :
             grasp_candidate_transform(grasp_candidate_transform),
+            T_object_grasp(T_object_grasp),
             u(u) { }
     };
+
+    struct AttachedMarker
+    {
+        int marker_id;
+        std::string attached_link;
+        Eigen::Affine3d link_to_marker;
+    };
+
+    Eigen::Affine3d T_robot_to_kinematics;
+
+    std::vector<AttachedMarker> attached_markers_;
+
     ros::NodeHandle ph_;
     int max_grasp_candidates_;
     double gas_can_scale_;
@@ -124,6 +142,15 @@ private:
 	int checkIKPLAN();
 	int checkIKPLAN(const geometry_msgs::PoseStamped& candidate_base_pose);
     std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
+
+    	void filter_grasp_candidates(
+    		std::vector<GraspCandidate>& candidates,
+    		const Eigen::Affine3d& T_kinematics_robot,
+    		const Eigen::Affine3d& T_camera_robot,
+    		double marker_incident_angle_threshold_rad) const;
+
+	bool download_marker_params();
+
     void move_arm_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::MoveArmCommandResult::ConstPtr& result);
