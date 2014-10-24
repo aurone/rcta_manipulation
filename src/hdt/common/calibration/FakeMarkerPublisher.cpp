@@ -30,6 +30,30 @@ int FakeMarkerPublisher::run()
         return FAILED_TO_INITIALIZE;
     }
 
+    double wrist_to_marker_x = 0;
+    double wrist_to_marker_y = 0;
+    double wrist_to_marker_z = 0;
+    double wrist_to_marker_R = 0;
+    double wrist_to_marker_P = 0;
+    double wrist_to_marker_Y = 0;
+
+    ph_.param("marker_to_link_x", wrist_to_marker_x, 0.0);
+    ph_.param("marker_to_link_y", wrist_to_marker_y, 0.0);
+    ph_.param("marker_to_link_z", wrist_to_marker_z, 0.0);
+    ph_.param("marker_to_link_roll_deg", wrist_to_marker_R, 0.0);
+    ph_.param("marker_to_link_pitch_deg", wrist_to_marker_P, 0.0);
+    ph_.param("marker_to_link_yaw_deg", wrist_to_marker_Y, 0.0);
+
+    wrist_to_marker_x += 0.02 * (rand() % 101 - 50) / 50.0; //random +/- 5cm offset
+    wrist_to_marker_y += 0.02 * (rand() % 101 - 50) / 50.0; //random +/- 5cm offset
+    wrist_to_marker_z += 0.02 * (rand() % 101 - 50) / 50.0; //random +/- 5cm offset
+
+    Eigen::Affine3d wrist_to_marker_transform =
+                    Eigen::Translation3d(wrist_to_marker_x, wrist_to_marker_y, wrist_to_marker_z) *
+    				Eigen::AngleAxisd(sbpl::utils::ToRadians(wrist_to_marker_Y), Eigen::Vector3d(0, 0, 1)) *
+                    Eigen::AngleAxisd(sbpl::utils::ToRadians(wrist_to_marker_P), Eigen::Vector3d(0, 1, 0)) *
+    				Eigen::AngleAxisd(sbpl::utils::ToRadians(wrist_to_marker_R), Eigen::Vector3d(1, 0, 0));
+
     ros::Rate loop_rate(10.0);
     int marker_seqno = 0;
     while (ros::ok()) {
@@ -50,9 +74,6 @@ int FakeMarkerPublisher::run()
         pose_stamped.header.frame_id = wrist_frame_;
         pose_stamped.header.stamp = ros::Time(0);
         pose_stamped.header.seq = marker_seqno;
-        Eigen::Affine3d wrist_to_marker_transform =
-                Eigen::Translation3d(0.20, 0.0, -0.06) *
-                Eigen::AngleAxisd(sbpl::utils::ToRadians(175.0), Eigen::Vector3d(0, 1, 0));
 
         tf::poseEigenToMsg(wrist_to_marker_transform.inverse(), pose_stamped.pose);
 
