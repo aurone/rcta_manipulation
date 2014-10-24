@@ -947,10 +947,13 @@ int GraspObjectExecutor::run()
                     status_ = GraspObjectExecutionStatus::IDLE;
                 }
                 else {
-                    ROS_WARN_PRETTY("It appears that we have likely not grasped the object. Trying successive grasps");
-                    status_ = GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+                    std::string message = "It appears that we have likely not grasped the object";
+                    ROS_WARN_PRETTY("%s", message.c_str());
+                    hdt_msgs::GraspObjectCommandResult result;
+                    result.result = hdt_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+                    as_->setAborted(result, message);
+                    status_ = GraspObjectExecutionStatus::FAULT;
                 }
-
             }
 
         }   break;
