@@ -194,6 +194,7 @@ bool RepositionBaseExecutor::initialize()
 //     }
 //     occupancy_grid_sub_.shutdown();
 
+	return true;
 }
 
 // TODO TODO
@@ -585,25 +586,31 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			// c) set acceptable object orientation range
 			if (i < secDist[0])
 			{
-				secAngYaw[0] = 15.0/180.0*M_PI;
-				secAngYaw[1] = 100.0/180.0*M_PI;
-// 				bestAngYaw   = 60.0/180.0*M_PI;
-				bestAngYaw   = 65.0/180.0*M_PI;
+// 				secAngYaw[0] = 15.0/180.0*M_PI;
+// 				secAngYaw[1] = 100.0/180.0*M_PI;
+// 				bestAngYaw   = 65.0/180.0*M_PI;
+				secAngYaw[0] = 45.0/180.0*M_PI;
+				secAngYaw[1] = 90.0/180.0*M_PI;
+				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
-				secAngYaw[0] = 15.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[0] = 15.0/180.0*M_PI;
+// 				secAngYaw[0] = 45.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
+				secAngYaw[0] = 45.0/180.0*M_PI;
+				secAngYaw[1] = 90.0/180.0*M_PI;
 				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
-				secAngYaw[0] = 15.0/180.0*M_PI;
+// 				secAngYaw[0] = 15.0/180.0*M_PI;
 // 				secAngYaw[1] = 30.0/180.0*M_PI;
-				secAngYaw[1] = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
-				bestAngYaw   = 50.0/180.0*M_PI;
+// 				bestAngYaw   = 50.0/180.0*M_PI;
+				secAngYaw[0] = 45.0/180.0*M_PI;
+				secAngYaw[1] = 90.0/180.0*M_PI;
+				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 
 			for (int j=0; j<nAng; j++)
@@ -1460,28 +1467,38 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 			// c) set acceptable object orientation range
 			if (i < secDist[0])
 			{
-				secAngYaw[0] = 15.0/180.0*M_PI;
-				secAngYaw[1] = 100.0/180.0*M_PI;
+// 				secAngYaw[0] = 15.0/180.0*M_PI;
+// 				secAngYaw[1] = 100.0/180.0*M_PI;
+				secAngYaw[0] = 45.0/180.0*M_PI;
+				secAngYaw[1] = 90.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 65.0/180.0*M_PI;
-				bestAngYaw   = -60.0/180.0*M_PI;
+// 				bestAngYaw   = -60.0/180.0*M_PI;
+				bestAngYaw   = -90.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
 			{
-				secAngYaw[0] = 15.0/180.0*M_PI;
+// 				secAngYaw[0] = 15.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[0] = 45.0/180.0*M_PI;
 				secAngYaw[1] = 90.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
 				bestAngYaw   = -90.0/180.0*M_PI;
+// 				bestAngYaw   = -60.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
 			{
-				secAngYaw[0] = 15.0/180.0*M_PI;
-// 				secAngYaw[1] = 30.0/180.0*M_PI;
-				secAngYaw[1] = 60.0/180.0*M_PI;
+// 				secAngYaw[0] = 15.0/180.0*M_PI;
+// // 				secAngYaw[1] = 30.0/180.0*M_PI;
+// 				secAngYaw[1] = 60.0/180.0*M_PI;
+				secAngYaw[0] = 45.0/180.0*M_PI;
+				secAngYaw[1] = 90.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
 // 				bestAngYaw   = 50.0/180.0*M_PI;
-				bestAngYaw   = -120.0/180.0*M_PI;
+// 				bestAngYaw   = -120.0/180.0*M_PI;
+				bestAngYaw   = -90.0/180.0*M_PI;
+// 				bestAngYaw   = -60.0/180.0*M_PI;
 			}
 
 			for (int j=0; j<nAng; j++)
