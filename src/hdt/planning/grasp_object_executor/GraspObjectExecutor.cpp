@@ -843,8 +843,8 @@ int GraspObjectExecutor::run()
                 attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_X] = 0.20;
                 attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.25;
                 attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.25;
-		//nozzle
-		attached_object.object.primitives[1].type = shape_msgs::SolidPrimitive::CYLINDER;
+		        //nozzle
+		        attached_object.object.primitives[1].type = shape_msgs::SolidPrimitive::CYLINDER;
                 attached_object.object.primitives[1].dimensions.resize(2);
                 attached_object.object.primitives[1].dimensions[shape_msgs::SolidPrimitive::CYLINDER_HEIGHT] = 0.35;
                 attached_object.object.primitives[1].dimensions[shape_msgs::SolidPrimitive::CYLINDER_RADIUS] = 0.035;
@@ -852,17 +852,28 @@ int GraspObjectExecutor::run()
                 //compute the pose of attachment based on grasp pose used
                 Eigen::Affine3d obj_body_offset_;
                 tf::Transform obj_body_offset_tf_(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, -0.05));
-		tf::poseTFToEigen(obj_body_offset_tf_, obj_body_offset_);
+		        tf::poseTFToEigen(obj_body_offset_tf_, obj_body_offset_);
                 Eigen::Affine3d obj_body_in_grasp_frame = last_successful_grasp_.T_object_grasp.inverse() * obj_body_offset_;
                 tf::poseEigenToMsg(obj_body_in_grasp_frame, attached_object.object.primitive_poses[0]);
-		//nozzle
-		Eigen::Affine3d obj_nozzle_offset_;
-		tf::Transform obj_nozzle_offset_tf_ = tf::Transform(tf::Quaternion(tf::Vector3(1,0,0), 0.25*M_PI), tf::Vector3(0.0, 0.0, -0.05)) * tf::Transform(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, 0.15));
-		tf::poseTFToEigen(obj_nozzle_offset_tf_, obj_nozzle_offset_);
+		        //nozzle
+		        Eigen::Affine3d obj_nozzle_offset_;
+		        tf::Transform obj_nozzle_offset_tf_ = tf::Transform(tf::Quaternion(tf::Vector3(1,0,0), 0.25*M_PI), tf::Vector3(0.0, 0.0, -0.05)) * tf::Transform(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, 0.15));
+		        tf::poseTFToEigen(obj_nozzle_offset_tf_, obj_nozzle_offset_);
                 Eigen::Affine3d obj_nozzle_in_grasp_frame = last_successful_grasp_.T_object_grasp.inverse() * obj_nozzle_offset_;
                 tf::poseEigenToMsg(obj_nozzle_in_grasp_frame, attached_object.object.primitive_poses[1]);
 
-		//attached_object.object.primitive_poses[0].position.x = 0.13;
+                ROS_WARN("Using attached object!");
+                ROS_WARN("Object attached to xyz(%.3f, %.3f, %.3f) q_xyzw(%.3f, %.3f, %.3f, %.3f) relative to wrist!",
+                            attached_object.object.primitive_poses[0].position.x,
+                            attached_object.object.primitive_poses[0].position.y,
+                            attached_object.object.primitive_poses[0].position.z,
+                            attached_object.object.primitive_poses[0].orientation.x,
+                            attached_object.object.primitive_poses[0].orientation.y,
+                            attached_object.object.primitive_poses[0].orientation.z,
+                            attached_object.object.primitive_poses[0].orientation.w);
+
+		        attached_object.object.primitive_poses[0].position.x -= 0.15;
+                attached_object.object.primitive_poses[1].position.x -= 0.15;
                 attached_object.weight = 1.0; //arbitrary (not used anyways)
                 last_move_arm_stow_goal_.execute_path = true;
 
