@@ -154,7 +154,7 @@ private:
     void move_arm_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const hdt::MoveArmCommandResult::ConstPtr& result);
-	void visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps) const;
+	void visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps, Eigen::Affine3d T_robot_to_map, std::string ns) const;
 
     template <typename ActionType>
     bool wait_for_action_server(
