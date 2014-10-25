@@ -762,7 +762,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							bodyj = (int)((bodyy-origin.position.y)/resolution); 
 
                                                         if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
-								ROS_WARN("Footprint collision!");
+								//ROS_WARN("Footprint collision!");
 								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
 								//bCollided = true;
 								double robxf = robx[i][j][k];
@@ -829,7 +829,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
 							if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
-								ROS_WARN("Footprint collision!");
+								//ROS_WARN("Footprint collision!");
 								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
 								//bCollided = true;
 								double robxf = robx[i][j][k];
@@ -1674,7 +1674,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
 							if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
-								ROS_WARN("Footprint collision!");
+								//ROS_WARN("Footprint collision!");
 								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
 								//bCollided = true;
 								double robxf = robx[i][j][k];
@@ -1742,7 +1742,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
 							if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
-								ROS_WARN("Footprint collision!");
+								//ROS_WARN("Footprint collision!");
 								bTotMax[i][j][k] = false;	// equivalent to pObs[i][j][k] = 0;
 								//bCollided = true;
 								double robxf = robx[i][j][k];
@@ -2410,7 +2410,7 @@ void RepositionBaseExecutor::filter_grasp_candidates(
     int num_not_visible = 0;
     int i = 0;
     for (const GraspCandidate& grasp_candidate : candidates) {
-        ROS_INFO("Checking Grasp Candidate %d", i++);
+        //ROS_INFO("Checking Grasp Candidate %d", i++);
 
         // check for an ik solution to this grasp pose
         Eigen::Affine3d T_kinematics_grasp =
@@ -2424,20 +2424,20 @@ void RepositionBaseExecutor::filter_grasp_candidates(
         Eigen::Affine3d T_camera_marker = // assume link == wrist
             T_camera_robot * grasp_candidate.grasp_candidate_transform * attached_markers_[0].link_to_marker;
 
-        ROS_INFO("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
+        //ROS_INFO("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
         Eigen::Vector3d camera_view_axis(0.0, 0.0, -1.0); // negated
         Eigen::Vector3d marker_plane_normal;
         marker_plane_normal.x() = T_camera_marker(0, 2);
         marker_plane_normal.y() = T_camera_marker(1, 2);
         marker_plane_normal.z() = T_camera_marker(2, 2);
 
-        ROS_INFO("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
+        //ROS_INFO("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
 
         double dp = marker_plane_normal.dot(camera_view_axis);
-        ROS_INFO("  Marker Normal * Camera View Axis: %0.3f", dp);
+        //ROS_INFO("  Marker Normal * Camera View Axis: %0.3f", dp);
 
         double angle = acos(dp); // the optimal situation is when the camera is facing the marker directly
-        ROS_INFO("  Angle: %0.3f", angle);
+        //ROS_INFO("  Angle: %0.3f", angle);
 
         bool check_visibility = angle < marker_incident_angle_threshold_rad;
 
@@ -2471,6 +2471,7 @@ int RepositionBaseExecutor::checkIKPLAN(const geometry_msgs::PoseStamped& candid
             ////////////////////////////////////////////////////////////////////////////////
             // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
+		ROS_INFO("checkIKPLAN!");
 
             if (!generated_grasps_) {
 //                 Eigen::Affine3d base_link_to_gas_canister;
@@ -2645,7 +2646,7 @@ int RepositionBaseExecutor::checkIK(const geometry_msgs::PoseStamped& gas_can_po
             ////////////////////////////////////////////////////////////////////////////////
             // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
-
+	ROS_INFO("checkIK!");
             if (!generated_grasps_)
 	    {
 //                 Eigen::Affine3d base_link_to_gas_canister;
@@ -2820,7 +2821,7 @@ int RepositionBaseExecutor::checkPLAN(const geometry_msgs::PoseStamped& gas_can_
             ////////////////////////////////////////////////////////////////////////////////
             // Executed upon entering PLANNING_ARM_MOTION_TO_PREGRASP
             ////////////////////////////////////////////////////////////////////////////////
-
+	ROS_INFO("checkPLAN!");
 //             if (!generated_grasps_)
 			{
 //                 Eigen::Affine3d base_link_to_gas_canister;
@@ -3013,25 +3014,25 @@ RepositionBaseExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_
         if (knot_num < grasp_spline_->degree() ||
             knot_num >= grasp_spline_->knots().size() - grasp_spline_->degree())
         {
-            ROS_INFO("Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
+            //ROS_INFO("Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
             continue;
         }
 
         Eigen::Vector3d object_pos_robot_frame(robot_to_object.translation());
 
         Eigen::Vector3d sample_spline_point = (*grasp_spline_)(u);
-        ROS_INFO("    Sample Spline Point [canister frame]: %s", to_string(sample_spline_point).c_str());
+        //ROS_INFO("    Sample Spline Point [canister frame]: %s", to_string(sample_spline_point).c_str());
         Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
-        ROS_INFO("    Sample Spline Deriv [canister frame]: %s", to_string(sample_spline_deriv).c_str());
+        //ROS_INFO("    Sample Spline Deriv [canister frame]: %s", to_string(sample_spline_deriv).c_str());
 
         Eigen::Affine3d mark_to_menglong(Eigen::Affine3d::Identity());
         Eigen::Vector3d sample_spline_point_robot_frame =
                 robot_to_object * mark_to_menglong * Eigen::Scaling(gas_can_scale_) * sample_spline_point;
-        ROS_INFO("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
+        //ROS_INFO("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
 
         Eigen::Vector3d sample_spline_deriv_robot_frame =
                 robot_to_object.rotation() * sample_spline_deriv.normalized();
-        ROS_INFO("    Sample Spline Deriv [robot frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
+        //ROS_INFO("    Sample Spline Deriv [robot frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
 
         // compute the normal to the grasp spline that most points "up" in the robot frame
         Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
@@ -3051,12 +3052,12 @@ RepositionBaseExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_
             grasp_dir = up_grasp_dir;
         }
         else {
-            ROS_INFO("Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
+            //ROS_INFO("Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
             continue;
 //            grasp_dir = down_grasp_dir;
         }
 
-        ROS_INFO("    Grasp Direction [robot frame]: %s", to_string(grasp_dir).c_str());
+        //ROS_INFO("    Grasp Direction [robot frame]: %s", to_string(grasp_dir).c_str());
 
         Eigen::Vector3d grasp_candidate_dir_x = grasp_dir;
         Eigen::Vector3d grasp_candidate_dir_y = sample_spline_deriv_robot_frame;
@@ -3080,7 +3081,7 @@ RepositionBaseExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_
         // robot -> grasp candidate (desired tool) * tool -> wrist * wrist (grasp) -> pregrasp = robot -> wrist
         Eigen::Affine3d candidate_wrist_transform = grasp_candidate_rotation * wrist_to_tool_.inverse() * grasp_to_pregrasp_;
 
-        ROS_INFO("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
+        //ROS_INFO("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
 
         grasp_candidates.push_back(GraspCandidate(candidate_wrist_transform, robot_to_object.inverse() * candidate_wrist_transform, u));
     }
