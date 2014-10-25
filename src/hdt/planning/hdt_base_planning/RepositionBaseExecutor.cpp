@@ -2323,7 +2323,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 			printf("retIKPLAN: %d\n",retIKPLAN);
 		}
 // 		printf("Number of rejection: %d/%d\n",cntCheckPLANreject,cntCheckPLANMax);
-		printf("Number of rejection until finding %d feasible candidates: %d/%d\n",cntCheckPLANMax,cntCheckPLANreject);
+		printf("Number of rejection until finding %d feasible candidates: %d\n",cntCheckPLANMax,cntCheckPLANreject);
 
 
 
