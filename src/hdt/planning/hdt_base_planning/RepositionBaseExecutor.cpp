@@ -2473,6 +2473,10 @@ void RepositionBaseExecutor::filter_grasp_candidates(
         if (check_ik && check_visibility) {
             GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.T_object_grasp, grasp_candidate.u);
             filtered_candidates.push_back(reachable_grasp_candidate);
+
+			ROS_INFO("Grasp pose ori: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
+			ROS_INFO("Grasp pose in kinematics: %s", to_string(T_kinematics_grasp).c_str());
+			ROS_INFO("IK sol: %s", to_string(sol).c_str());
         }
     }
 
