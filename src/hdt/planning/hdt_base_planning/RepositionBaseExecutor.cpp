@@ -299,33 +299,44 @@ int RepositionBaseExecutor::run()
 
 
 						// check for inverse kinematics and arm planning (if object is in reachable range and within angle of view)
-						double secDist[2] = {0.3, 1.5};		// TODO: a more general than (distMin + (nDist-1)*distStep) determined in computeRobPose()
+// 						double secDist[2] = {0.3, 1.5};		// TODO: a more general than (distMin + (nDist-1)*distStep) determined in computeRobPose()
+						double secDist[2] = {0.5, 1.0};		// TODO: a more general than (distMin + (nDist-1)*distStep) determined in computeRobPose()
 						double distRob2Obj = std::sqrt( std::pow(objx-robx0,2) + std::pow(objy-roby0,2) );
 						if (distRob2Obj >= secDist[0] && distRob2Obj <= secDist[1]) {
-							double secSide[2] = {-20.0/180.0*M_PI, 45.0/180.0*M_PI};	// TODO: a more general than secSide[2] determined in computeRobPose()
+// 							double secSide[2] = {-20.0/180.0*M_PI, 45.0/180.0*M_PI};	// TODO: a more general than secSide[2] determined in computeRobPose()
+							double secSide[2] = {-05.0/180.0*M_PI, 40.0/180.0*M_PI};	// TODO: a more general than secSide[2] determined in computeRobPose()
 							double rob2obj = atan2(objy-roby0, objx-robx0);	// angular coordinate of a vector from robot position to object position
 							double diffAng = wrapAngle( rob2obj-robY0 );
 							if ( diffAng >= secSide[0] && diffAng <= secSide[1] ) {		// left-hand side and angle of view
-								int retIKPLAN = checkIKPLAN();	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
-								//std::cerr << "retIKPLAN: " << retIKPLAN << std::endl;
-								if (retIKPLAN==1) {		// you can grasp it now!
-									hdt_msgs::RepositionBaseCommandResult result;
-									result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
 
-									candidate_base_poses.push_back(robot_pose_world_frame_);
-									result.candidate_base_poses = candidate_base_poses;
-									as_->setSucceeded(result);
-									status_ = RepositionBaseExecutionStatus::IDLE;
+								double secAngYaw[2];
+								secAngYaw[0] = 45.0/180.0*M_PI;
+								secAngYaw[1] = 130.0/180.0*M_PI;
 
-									bComputedRobPose_ = true;
-									break;
-								} else {
-									std::vector<double> pos(3,0);
-                                					pos[0] = robx0;
-									pos[1] = roby0;
-                                					pos[2] = robY0;
-									int v_id = 0;
-                                					viz.visualizeRobotBase(pos, 0, "base_checkIKPLAN_fail", v_id);
+								double diffY = wrapAngle( objY-robY0 );
+								if ( diffY >= secAngYaw[0] && diffY <= secAngYaw[1] )
+								{
+									int retIKPLAN = checkIKPLAN();	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
+									//std::cerr << "retIKPLAN: " << retIKPLAN << std::endl;
+									if (retIKPLAN==1) {		// you can grasp it now!
+										hdt_msgs::RepositionBaseCommandResult result;
+										result.result = hdt_msgs::RepositionBaseCommandResult::SUCCESS;
+
+										candidate_base_poses.push_back(robot_pose_world_frame_);
+										result.candidate_base_poses = candidate_base_poses;
+										as_->setSucceeded(result);
+										status_ = RepositionBaseExecutionStatus::IDLE;
+
+										bComputedRobPose_ = true;
+										break;
+									} else {
+										std::vector<double> pos(3,0);
+														pos[0] = robx0;
+										pos[1] = roby0;
+														pos[2] = robY0;
+										int v_id = 0;
+														viz.visualizeRobotBase(pos, 0, "base_checkIKPLAN_fail", v_id);
+									}
 								}
 							}
 						}
@@ -617,7 +628,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 				secAngYaw[1] = 100.0/180.0*M_PI;
 // 				bestAngYaw   = 65.0/180.0*M_PI;
 				secAngYaw[0] = 45.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[1] = 130.0/180.0*M_PI;
 				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else if (i < secDist[1])
@@ -626,7 +638,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 				secAngYaw[0] = 45.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
 				secAngYaw[0] = 45.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[1] = 130.0/180.0*M_PI;
 				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 			else // if (i >= secDist[1])
@@ -636,7 +649,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 // 				bestAngYaw   = 15.0/180.0*M_PI;
 // 				bestAngYaw   = 50.0/180.0*M_PI;
 				secAngYaw[0] = 45.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[1] = 130.0/180.0*M_PI;
 				bestAngYaw   = 60.0/180.0*M_PI;
 			}
 
@@ -1497,7 +1511,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 				secAngYaw[0] = 15.0/180.0*M_PI;
 // 				secAngYaw[1] = 100.0/180.0*M_PI;
 				secAngYaw[0] = 45.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[1] = 130.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
 // 				bestAngYaw   = 65.0/180.0*M_PI;
 // 				bestAngYaw   = -60.0/180.0*M_PI;
@@ -1508,7 +1523,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 				secAngYaw[0] = 15.0/180.0*M_PI;
 // 				secAngYaw[1] = 90.0/180.0*M_PI;
 				secAngYaw[0] = 45.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[1] = 130.0/180.0*M_PI;
 // 				bestAngYaw   = 45.0/180.0*M_PI;
 // 				bestAngYaw   = 60.0/180.0*M_PI;
 				bestAngYaw   = -90.0/180.0*M_PI;
@@ -1520,7 +1536,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // // 				secAngYaw[1] = 30.0/180.0*M_PI;
 // 				secAngYaw[1] = 60.0/180.0*M_PI;
 				secAngYaw[0] = 45.0/180.0*M_PI;
-				secAngYaw[1] = 90.0/180.0*M_PI;
+// 				secAngYaw[1] = 90.0/180.0*M_PI;
+				secAngYaw[1] = 130.0/180.0*M_PI;
 // 				bestAngYaw   = 15.0/180.0*M_PI;
 // 				bestAngYaw   = 50.0/180.0*M_PI;
 // 				bestAngYaw   = -120.0/180.0*M_PI;
@@ -1855,6 +1872,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						candidate_base_pose.header.seq = 0;
 						candidate_base_pose.header.stamp = ros::Time::now();
 
+						double robY_base = robY[i][j][k];
+						double robx_base = robx[i][j][k] + cos(robY_base)*baseOffsetx;
+						double roby_base = roby[i][j][k] + sin(robY_base)*baseOffsetx;
 						candidate_base_pose.pose.position.x = robx[i][j][k];
 						candidate_base_pose.pose.position.y = roby[i][j][k];
 						candidate_base_pose.pose.position.z = 0.0;
@@ -2302,7 +2322,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 			}
 			printf("retIKPLAN: %d\n",retIKPLAN);
 		}
-		printf("Number of rejection: %d/%d\n",cntCheckPLANreject,cntCheckPLANMax);
+// 		printf("Number of rejection: %d/%d\n",cntCheckPLANreject,cntCheckPLANMax);
+		printf("Number of rejection until finding %d feasible candidates: %d/%d\n",cntCheckPLANMax,cntCheckPLANreject);
 
 
 
@@ -2383,8 +2404,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 		}
 		else
 		{
-			ROS_INFO("    Number of valid candidates: %d",cntTotMax);
-			ROS_INFO("    Number of probable candidates: %d",cntTotThr);
+			ROS_INFO("    Number of IK feasible candidates: %d",cntTotMax);
+			ROS_INFO("    Number of PLAN feasible candidates: %d",cntTotThr);
 		}
 
 	}
