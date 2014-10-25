@@ -991,6 +991,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			robxf = robx0;
 			robyf = roby0;
 			robYf = robY0;
+						robxf += cos(robYf)*baseOffsetx;
+						robyf += sin(robYf)*baseOffsetx;
 
 			geometry_msgs::PoseStamped candidate_base_pose;
 			candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1231,6 +1233,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			robxf = robx0;
 			robyf = roby0;
 			robYf = robY0;
+						robxf += cos(robYf)*baseOffsetx;
+						robyf += sin(robYf)*baseOffsetx;
 
 			geometry_msgs::PoseStamped candidate_base_pose;
 			candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1327,6 +1331,8 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 			robxf = robx0;
 			robyf = roby0;
 			robYf = robY0;
+						robxf += cos(robYf)*baseOffsetx;
+						robyf += sin(robYf)*baseOffsetx;
 
 			geometry_msgs::PoseStamped candidate_base_pose;
 			candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1852,20 +1858,20 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 					{
 // 						int retIKPLAN = checkIKPLAN();	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
 
-						geometry_msgs::PoseStamped gas_can_pose;
-						gas_can_pose.header.frame_id = "/abs_nwu";
-						gas_can_pose.header.seq = 0;
-						gas_can_pose.header.stamp = ros::Time::now();
-
-						gas_can_pose.pose.position.x = objx;
-						gas_can_pose.pose.position.y = objy;
-						gas_can_pose.pose.position.z = 0.0;
-
-						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY+M_PI/2.0);
-						gas_can_pose.pose.orientation.x = objq[0];
-						gas_can_pose.pose.orientation.y = objq[1];
-						gas_can_pose.pose.orientation.z = objq[2];
-						gas_can_pose.pose.orientation.w = objq[3];
+// 						geometry_msgs::PoseStamped gas_can_pose;
+// 						gas_can_pose.header.frame_id = "/abs_nwu";
+// 						gas_can_pose.header.seq = 0;
+// 						gas_can_pose.header.stamp = ros::Time::now();
+// 
+// 						gas_can_pose.pose.position.x = objx;
+// 						gas_can_pose.pose.position.y = objy;
+// 						gas_can_pose.pose.position.z = 0.0;
+// 
+// 						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY+M_PI/2.0);
+// 						gas_can_pose.pose.orientation.x = objq[0];
+// 						gas_can_pose.pose.orientation.y = objq[1];
+// 						gas_can_pose.pose.orientation.z = objq[2];
+// 						gas_can_pose.pose.orientation.w = objq[3];
 
 						geometry_msgs::PoseStamped candidate_base_pose;
 						candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1875,17 +1881,18 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 						double robY_base = robY[i][j][k];
 						double robx_base = robx[i][j][k] + cos(robY_base)*baseOffsetx;
 						double roby_base = roby[i][j][k] + sin(robY_base)*baseOffsetx;
-						candidate_base_pose.pose.position.x = robx[i][j][k];
-						candidate_base_pose.pose.position.y = roby[i][j][k];
+						candidate_base_pose.pose.position.x = robx_base;
+						candidate_base_pose.pose.position.y = roby_base;
 						candidate_base_pose.pose.position.z = 0.0;
 
-						tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0,0.0,robY[i][j][k]);
+						tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0,0.0,robY_base);
 						candidate_base_pose.pose.orientation.x = robqf[0];
 						candidate_base_pose.pose.orientation.y = robqf[1];
 						candidate_base_pose.pose.orientation.z = robqf[2];
 						candidate_base_pose.pose.orientation.w = robqf[3];
 
-						int retIKPLAN = checkIK(gas_can_pose, candidate_base_pose);	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
+// 						int retIKPLAN = checkIK(gas_can_pose, candidate_base_pose);	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
+						int retIKPLAN = checkIK(current_goal_->gas_can_in_map, candidate_base_pose);	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
 						//std::cerr << "retIKPLAN: " << retIKPLAN << std::endl;
 						if (retIKPLAN!=1) {
                                                         //checkIK failed!
@@ -1970,6 +1977,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 			robxf = robx0;
 			robyf = roby0;
 			robYf = robY0;
+						robxf += cos(robYf)*baseOffsetx;
+						robyf += sin(robYf)*baseOffsetx;
 
 			geometry_msgs::PoseStamped candidate_base_pose;
 			candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -2300,11 +2309,14 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 			candidate_base_pose.header.seq = 0;
 			candidate_base_pose.header.stamp = ros::Time::now();
 
-			candidate_base_pose.pose.position.x = robx[i][j][k];
-			candidate_base_pose.pose.position.y = roby[i][j][k];
+			double robY_base = robY[i][j][k];
+			double robx_base = robx[i][j][k] + cos(robY_base)*baseOffsetx;
+			double roby_base = roby[i][j][k] + sin(robY_base)*baseOffsetx;
+			candidate_base_pose.pose.position.x = robx_base;
+			candidate_base_pose.pose.position.y = roby_base;
 			candidate_base_pose.pose.position.z = 0.0;
 
-			tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0,0.0,robY[i][j][k]);
+			tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0,0.0,robY_base);
 			candidate_base_pose.pose.orientation.x = robqf[0];
 			candidate_base_pose.pose.orientation.y = robqf[1];
 			candidate_base_pose.pose.orientation.z = robqf[2];
