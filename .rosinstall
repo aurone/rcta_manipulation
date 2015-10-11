@@ -3,5 +3,5 @@
 - git: {local-name: ../sbpl_manipulation, uri: 'https://github.com/aurone/sbpl_manipulation.git', version: groovy}
 - git: {local-name: ../sbpl_geometry_utils, uri: 'https://github.com/sbpl/sbpl_geometry_utils.git'}
 - git: {local-name: ../leatherman, uri: 'https://github.com/aurone/leatherman.git', version: groovy}
-- git: {local-name: ../pr2_vfh_database, uri: 'git@sbpl.pc.cs.cmu.edu:pr2-grasp-database/temp-grasp-database.git', version: aurone}
+- git: {local-name: ../pr2_vfh_database, uri: 'git@sbpl.pc.cs.cmu.edu:pr2-grasp-database/temp-grasp-database.git', version: groovy-devel}
 
