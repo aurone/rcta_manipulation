@@ -12,6 +12,7 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <build_depend>ar_track_alvar</build_depend>
+  <build_depend>ar_track_alvar_msgs</build_depend>
   <build_depend>actionlib</build_depend>
   <build_depend>actionlib_msgs</build_depend>
   <build_depend>cmake_modules</build_depend>
@@ -41,6 +42,7 @@
   <build_depend>trajectory_msgs</build_depend>
   <build_depend>urdf</build_depend>
   <build_depend>liburdfdom-dev</build_depend>
+  <build_depend>libncurses-dev</build_depend>
   <build_depend>visualization_msgs</build_depend>
   <build_depend>husky_robot</build_depend>
   <build_depend>libblas-dev</build_depend>
@@ -52,8 +54,10 @@
   <build_depend>libhdt</build_depend>
   <build_depend>ntcansckplugin</build_depend>
   <build_depend>sdl2</build_depend>
+  <build_depend>pkg-config</build_depend>
 
   <run_depend>ar_track_alvar</run_depend>
+  <run_depend>ar_track_alvar_msgs</run_depend>
   <run_depend>actionlib</run_depend>
   <run_depend>actionlib_msgs</run_depend>
   <run_depend>cmake_modules</run_depend>
@@ -83,6 +87,7 @@
   <run_depend>trajectory_msgs</run_depend>
   <run_depend>urdf</run_depend>
   <run_depend>liburdfdom-dev</run_depend>
+  <run_depend>libncurses-dev</run_depend>
   <run_depend>visualization_msgs</run_depend>
   <run_depend>xacro</run_depend>
 
@@ -96,6 +101,7 @@
   <run_depend>libhdt</run_depend>
   <run_depend>ntcansckplugin</run_depend>
   <run_depend>sdl2</run_depend>
+  <run_depend>pkg-config</run_depend>
 
   <export>
     <rviz plugin="${prefix}/config/plugin_description.xml"/>

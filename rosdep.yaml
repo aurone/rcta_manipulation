@@ -1,18 +1,23 @@
 ntcansckplugin:
     ubuntu:
         precise: ntcansckplugin
+        trusty: ntcansckplugin
 libhdt:
     ubuntu:
         precise: libhdt
+        trusty: libhdt
 sdl2:
     ubuntu:
         precise: sdl2
+        trusty: sdl2
 
 lua5.2:
     ubuntu:
         precise: liblua5.2-dev
+        trusty: liblua5.2-dev
 
 libsbpl:
     ubuntu:
         precise: libsbpl
+        trusty: libsbpl
 

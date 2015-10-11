@@ -7,7 +7,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
-#include <ar_track_alvar/AlvarMarkers.h>
+#include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <geometry_msgs/Pose.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
@@ -78,6 +78,9 @@ struct JointState
 
     iterator begin() { return &a0; }
     iterator end() { return &a6 + 1; }
+
+    const_iterator begin() const { return &a0; }
+    const_iterator end() const { return &a6 + 1; }
 
     const_iterator cbegin() const { return &a0; }
     const_iterator cend() const { return &a6 + 1; }
@@ -158,7 +161,7 @@ private:
 
     Eigen::Affine3d camera_frame_to_tool_frame_rotation_;
 
-    ar_track_alvar::AlvarMarkers::ConstPtr last_markers_msg_;
+    ar_track_alvar_msgs::AlvarMarkers::ConstPtr last_markers_msg_;
     sensor_msgs::JointState::ConstPtr last_joint_state_msg_;
 
     typedef actionlib::SimpleActionClient<hdt::MoveArmCommandAction> MoveArmCommandActionClient;
@@ -194,7 +197,7 @@ private:
     std::unordered_map<SamplePose, Eigen::Affine3d, SamplePoseHash> offset_means_;
     std::unordered_map<SamplePose, Eigen::Affine3d, SamplePoseHash> offset_variance_;
 
-    void ar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
+    void ar_markers_callback(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
     bool download_params();

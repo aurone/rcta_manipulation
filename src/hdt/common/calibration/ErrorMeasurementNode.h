@@ -3,8 +3,8 @@
 
 #include <deque>
 #include <Eigen/Dense>
-#include <ar_track_alvar/AlvarMarkers.h>
-#include <ar_track_alvar/AlvarMarker.h>
+#include <ar_track_alvar_msgs/AlvarMarkers.h>
+#include <ar_track_alvar_msgs/AlvarMarker.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <hdt_description/RobotModel.h>
@@ -31,10 +31,10 @@ private:
 
     uint32_t tracked_marker_id_;
 
-    std::list<ar_track_alvar::AlvarMarker::ConstPtr> marker_msgs_;
+    std::list<ar_track_alvar_msgs::AlvarMarker::ConstPtr> marker_msgs_;
     std::list<sensor_msgs::JointState::ConstPtr> joint_state_msgs_;
 
-    ar_track_alvar::AlvarMarker::ConstPtr last_processed_marker_msg_;
+    ar_track_alvar_msgs::AlvarMarker::ConstPtr last_processed_marker_msg_;
     sensor_msgs::JointState::ConstPtr last_processed_joint_state_msg_;
 
     tf::TransformListener listener_;
@@ -60,14 +60,14 @@ private:
 
     int num_measurements_;
 
-    void alvar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
+    void alvar_markers_callback(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg);
 
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
 
     // return the interpolated transform of the marker frame in the common frame
     Eigen::Affine3d interpolated_marker_pose(
-        const ar_track_alvar::AlvarMarker::ConstPtr& first,
-        const ar_track_alvar::AlvarMarker::ConstPtr& second,
+        const ar_track_alvar_msgs::AlvarMarker::ConstPtr& first,
+        const ar_track_alvar_msgs::AlvarMarker::ConstPtr& second,
         double alpha);
 
     // return the interpolated transform of the tool frame in the common frame
@@ -83,7 +83,7 @@ private:
     Eigen::Affine3d compute_joint_state_pose(const sensor_msgs::JointState::ConstPtr& msg);
 
     // compute the pose of the marker frame in the common frame given a joint state
-    Eigen::Affine3d compute_marker_pose(const ar_track_alvar::AlvarMarker::ConstPtr& msg);
+    Eigen::Affine3d compute_marker_pose(const ar_track_alvar_msgs::AlvarMarker::ConstPtr& msg);
 
     // compute the difference (error) between two poses
     Eigen::Affine3d compute_pose_diff(const Eigen::Affine3d& a, const Eigen::Affine3d& b);

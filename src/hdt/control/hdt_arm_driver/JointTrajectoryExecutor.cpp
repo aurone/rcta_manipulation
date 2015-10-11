@@ -145,7 +145,7 @@ bool JointTrajectoryExecutor::read_constraints()
 
 bool JointTrajectoryExecutor::ready() const
 {
-    return last_controller_state_;
+    return (bool)last_controller_state_;
 }
 
 JointTrajectoryExecutor::~JointTrajectoryExecutor()

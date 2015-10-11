@@ -1,7 +1,7 @@
 #include "FakeMarkerPublisher.h"
 
 #include <Eigen/Dense>
-#include <ar_track_alvar/AlvarMarkers.h>
+#include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
 
@@ -19,7 +19,7 @@ FakeMarkerPublisher::FakeMarkerPublisher() :
 bool FakeMarkerPublisher::initialize()
 {
     const std::string marker_topic = "ar_pose_marker";
-    markers_pub_ = nh_.advertise<ar_track_alvar::AlvarMarkers>(marker_topic, 1);
+    markers_pub_ = nh_.advertise<ar_track_alvar_msgs::AlvarMarkers>(marker_topic, 1);
     return true;
 }
 
@@ -60,12 +60,12 @@ int FakeMarkerPublisher::run()
         ros::spinOnce();
         ros::Time now = ros::Time::now();
 
-        ar_track_alvar::AlvarMarkers markers;
+        ar_track_alvar_msgs::AlvarMarkers markers;
         markers.header.frame_id = camera_frame_;
         markers.header.stamp = now;
         markers.header.seq = marker_seqno;
 
-        ar_track_alvar::AlvarMarker marker;
+        ar_track_alvar_msgs::AlvarMarker marker;
         marker.header.frame_id = camera_frame_;
         marker.header.stamp = now;
         marker.header.seq = marker_seqno;

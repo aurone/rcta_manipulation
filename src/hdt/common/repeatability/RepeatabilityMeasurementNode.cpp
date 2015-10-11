@@ -382,7 +382,7 @@ int RepeatabilityMeasurementNode::run()
     return SUCCESS;
 }
 
-void RepeatabilityMeasurementNode::ar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
+void RepeatabilityMeasurementNode::ar_markers_callback(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg)
 {
     last_markers_msg_ = msg;
 }
@@ -664,7 +664,7 @@ bool RepeatabilityMeasurementNode::track_marker_pose(const ros::Duration& listen
     ROS_INFO("    Recording marker position...");
     last_markers_msg_.reset(); // only listen for fresh markers
 
-    ar_track_alvar::AlvarMarkers::ConstPtr last_processed_msg;
+    ar_track_alvar_msgs::AlvarMarkers::ConstPtr last_processed_msg;
     Eigen::Affine3d marker_transform(Eigen::Affine3d::Identity());
 
     ros::Time start = ros::Time::now();

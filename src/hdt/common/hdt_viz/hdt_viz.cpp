@@ -115,7 +115,7 @@ bool HDTViz::reinit_robot(){
     }
 
     rs_->setToDefaultValues();
-    rs_->setRootTransform(Eigen::Affine3d::Identity());
+//    rs_->setRootTransform(Eigen::Affine3d::Identity());
     rs_->updateLinkTransforms();
 
     // initialize an interactive marker for the first joint group that's a kinematic chain
@@ -207,15 +207,15 @@ bool HDTViz::gatherRobotMarkers(
 
         visualization_msgs::Marker mark;
         
-        const robot_state::LinkState* ls = robot_state.getLinkState(link_names[i]);
-        if (!ls) {
+        const robot_state::LinkModel* lm = robot_state.getLinkModel(link_names[i]);
+        if (!lm) {
             continue;
         }
 
         // add markers for attached objects
         if (include_attached) {
             std::vector<const robot_state::AttachedBody*> attached_bodies;
-            ls->getAttachedBodies(attached_bodies);
+            robot_state.getAttachedBodies(attached_bodies, lm);
             for (std::size_t j = 0; j < attached_bodies.size(); ++j) {
                 if (attached_bodies[j]->getShapes().size() > 0) {
                     visualization_msgs::Marker att_mark;
@@ -228,18 +228,19 @@ bool HDTViz::gatherRobotMarkers(
             }
         }
 
-        if (!ls->getLinkModel() || !ls->getLinkModel()->getShape()) {
+        if (!lm || lm->getShapes().empty()) {
             continue;
         }
 
         mark.header.frame_id = robot_state.getRobotModel()->getModelFrame();
         mark.header.stamp = tm;
-        tf::poseEigenToMsg(ls->getGlobalCollisionBodyTransform(), mark.pose);
+        // TODO: get transforms of other collision bodies attached to this link
+        tf::poseEigenToMsg(robot_state.getCollisionBodyTransform(lm, 0), mark.pose);
 
         // we prefer using the visual mesh, if a mesh is available
-        const std::string& mesh_resource = ls->getLinkModel()->getVisualMeshFilename();
+        const std::string& mesh_resource = lm->getVisualMeshFilename();
         if (mesh_resource.empty()) {
-            if (!shapes::constructMarkerFromShape(ls->getLinkModel()->getShape().get(), mark)) {
+            if (!shapes::constructMarkerFromShape(lm->getShapes().front().get(), mark)) {
                 continue;
             }
 
@@ -249,12 +250,12 @@ bool HDTViz::gatherRobotMarkers(
             }
         }
         else {
-            tf::poseEigenToMsg(ls->getGlobalLinkTransform(), mark.pose);
+            tf::poseEigenToMsg(robot_state.getGlobalLinkTransform(lm), mark.pose);
 
             mark.type = mark.MESH_RESOURCE;
             mark.mesh_use_embedded_materials = false;
             mark.mesh_resource = mesh_resource;
-            const Eigen::Vector3d &mesh_scale = ls->getLinkModel()->getVisualMeshScale();
+            const Eigen::Vector3d &mesh_scale = lm->getVisualMeshScale();
 
             mark.scale.x = mesh_scale[0];
             mark.scale.y = mesh_scale[1];
@@ -309,7 +310,13 @@ void HDTViz::visualizeRobot(std::vector<double> &jnt0_pos, double hue, std::stri
   visualizeRobot(jnt0_pos, base_pos, hue, ns, id, use_embedded_materials);  
 }
 
-void HDTViz::visualizeRobot(std::vector<double> &jnt0_pos, std::vector<double> &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials)
+void HDTViz::visualizeRobot(
+    std::vector<double> &jnt0_pos,
+    std::vector<double> &base_pos,
+    double hue,
+    std::string ns,
+    int &id,
+    bool use_embedded_materials)
 {
 
   double r=0,g=0,b=0;
@@ -323,13 +330,13 @@ void HDTViz::visualizeRobot(std::vector<double> &jnt0_pos, std::vector<double> &
   color.b = b;
   ros::Duration d(0);
 
-  rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&jnt0_pos[0]);
-  rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&jnt0_pos[1]);
-  rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&jnt0_pos[2]);
-  rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&jnt0_pos[3]);
-  rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&jnt0_pos[4]);
-  rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&jnt0_pos[5]);
-  rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&jnt0_pos[6]);
+  rs_->setVariablePosition("arm_1_shoulder_twist", jnt0_pos[0]);
+  rs_->setVariablePosition("arm_2_shoulder_lift", jnt0_pos[1]);
+  rs_->setVariablePosition("arm_3_elbow_twist", jnt0_pos[2]);
+  rs_->setVariablePosition("arm_4_elbow_lift", jnt0_pos[3]);
+  rs_->setVariablePosition("arm_5_wrist_twist", jnt0_pos[4]);
+  rs_->setVariablePosition("arm_6_wrist_lift", jnt0_pos[5]);
+  rs_->setVariablePosition("arm_7_gripper_lift", jnt0_pos[6]);
   rs_->updateLinkTransforms();
   //TODO: include base position as well
 
@@ -393,13 +400,13 @@ visualization_msgs::MarkerArray HDTViz::getRobotMarkers(std::vector<double> &jnt
   color.b = b;
   ros::Duration d(0);
 
-  rs_->getJointState("arm_1_shoulder_twist")->setVariableValues(&jnt0_pos[0]);
-  rs_->getJointState("arm_2_shoulder_lift")->setVariableValues(&jnt0_pos[1]);
-  rs_->getJointState("arm_3_elbow_twist")->setVariableValues(&jnt0_pos[2]);
-  rs_->getJointState("arm_4_elbow_lift")->setVariableValues(&jnt0_pos[3]);
-  rs_->getJointState("arm_5_wrist_twist")->setVariableValues(&jnt0_pos[4]);
-  rs_->getJointState("arm_6_wrist_lift")->setVariableValues(&jnt0_pos[5]);
-  rs_->getJointState("arm_7_gripper_lift")->setVariableValues(&jnt0_pos[6]);
+  rs_->setVariablePosition("arm_1_shoulder_twist", jnt0_pos[0]);
+  rs_->setVariablePosition("arm_2_shoulder_lift", jnt0_pos[1]);
+  rs_->setVariablePosition("arm_3_elbow_twist", jnt0_pos[2]);
+  rs_->setVariablePosition("arm_4_elbow_lift", jnt0_pos[3]);
+  rs_->setVariablePosition("arm_5_wrist_twist", jnt0_pos[4]);
+  rs_->setVariablePosition("arm_6_wrist_lift", jnt0_pos[5]);
+  rs_->setVariablePosition("arm_7_gripper_lift", jnt0_pos[6]);
   rs_->updateLinkTransforms();
   //TODO: include base position as well
 

@@ -46,6 +46,8 @@ find_package(Eigen REQUIRED)
 # PkgConfig
 find_package(PkgConfig REQUIRED)
 
+# TODO: lookup ncurses
+
 # urdfdom
 find_package(urdfdom REQUIRED)
 

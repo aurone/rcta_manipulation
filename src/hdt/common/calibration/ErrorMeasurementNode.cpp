@@ -98,7 +98,7 @@ int ErrorMeasurementNode::run()
         }
 
         while (!buffer_exhausted()) {
-            ar_track_alvar::AlvarMarker::ConstPtr next_marker_msg = marker_msgs_.front();
+            ar_track_alvar_msgs::AlvarMarker::ConstPtr next_marker_msg = marker_msgs_.front();
             sensor_msgs::JointState::ConstPtr next_joint_state_msg = joint_state_msgs_.front();
 
             if (next_joint_state_msg->header.stamp < next_marker_msg->header.stamp) {
@@ -166,16 +166,16 @@ int ErrorMeasurementNode::run()
     return 0;
 }
 
-void ErrorMeasurementNode::alvar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
+void ErrorMeasurementNode::alvar_markers_callback(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg)
 {
-    ar_track_alvar::AlvarMarker::Ptr interesting_marker(new ar_track_alvar::AlvarMarker);
-    for (const ar_track_alvar::AlvarMarker& marker : msg->markers) {
+    ar_track_alvar_msgs::AlvarMarker::Ptr interesting_marker(new ar_track_alvar_msgs::AlvarMarker);
+    for (const ar_track_alvar_msgs::AlvarMarker& marker : msg->markers) {
         if (marker.id == tracked_marker_id_) {
             if (marker.header.frame_id != camera_frame_) {
                 ROS_WARN("Expected the marker frames to be expressed in the camera frame '%s' (was '%s')", camera_frame_.c_str(), marker.header.frame_id.c_str());
                 return;
             }
-            interesting_marker.reset(new ar_track_alvar::AlvarMarker);
+            interesting_marker.reset(new ar_track_alvar_msgs::AlvarMarker);
             if (!interesting_marker) {
                 ROS_WARN("Failed to instantiate Alvar Marker");
                 return;
@@ -221,8 +221,8 @@ void ErrorMeasurementNode::joint_states_callback(const sensor_msgs::JointState::
 }
 
 Eigen::Affine3d ErrorMeasurementNode::interpolated_marker_pose(
-    const ar_track_alvar::AlvarMarker::ConstPtr& first,
-    const ar_track_alvar::AlvarMarker::ConstPtr& second,
+    const ar_track_alvar_msgs::AlvarMarker::ConstPtr& first,
+    const ar_track_alvar_msgs::AlvarMarker::ConstPtr& second,
     double alpha)
 {
     return interpolate(compute_marker_pose(first), compute_marker_pose(second), alpha);
@@ -253,7 +253,7 @@ Eigen::Affine3d ErrorMeasurementNode::compute_joint_state_pose(const sensor_msgs
     return base_frame_to_mount_frame_ * wrist_transform * wrist_frame_to_gripper_frame_ * gripper_frame_to_marker_frame_;
 }
 
-Eigen::Affine3d ErrorMeasurementNode::compute_marker_pose(const ar_track_alvar::AlvarMarker::ConstPtr& msg)
+Eigen::Affine3d ErrorMeasurementNode::compute_marker_pose(const ar_track_alvar_msgs::AlvarMarker::ConstPtr& msg)
 {
     Eigen::Affine3d marker_transform;
     tf::poseMsgToEigen(msg->pose.pose, marker_transform);
