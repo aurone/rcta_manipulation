@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
     ar_track_alvar
     actionlib
     actionlib_msgs
+    cmake_modules
     control_msgs 
     eigen_conversions
     geometric_shapes
@@ -37,7 +38,6 @@ find_package(catkin REQUIRED COMPONENTS
     tf 
     trajectory_msgs
     urdf 
-    urdf_parser
     visualization_msgs)
 
 # Eigen
@@ -45,6 +45,9 @@ find_package(Eigen REQUIRED)
 
 # PkgConfig
 find_package(PkgConfig REQUIRED)
+
+# urdfdom
+find_package(urdfdom REQUIRED)
 
 # lua5.2
 pkg_check_modules(lua REQUIRED lua5.2)
