@@ -180,10 +180,11 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         ROS_INFO_PRETTY("    Memory Usage: %zd bytes", octomap->memoryUsage());
         ROS_INFO_PRETTY("    Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
 
-        unsigned num_thresholded, num_other;
-        octomap->calcNumThresholdedNodes(num_thresholded, num_other);
-        ROS_INFO_PRETTY("    Num Thresholded Nodes: %u", num_thresholded);
-        ROS_INFO_PRETTY("    Num Other Nodes: %u", num_other);
+        // TODO: what is the equivalent of this in indigo?
+//        unsigned num_thresholded, num_other;
+//        octomap->calcNumThresholdedNodes(num_thresholded, num_other);
+//        ROS_INFO_PRETTY("    Num Thresholded Nodes: %u", num_thresholded);
+//        ROS_INFO_PRETTY("    Num Other Nodes: %u", num_other);
 
         const octomap::point3d octomap_min = octomap->getBBXMin();
         const octomap::point3d octomap_max = octomap->getBBXMax();
@@ -586,18 +587,18 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     moveit_msgs::RobotState robot_state;
     robot_state.joint_state = last_joint_state_;
     robot_state.multi_dof_joint_state.joint_names = { "robot_pose" };
-    robot_state.multi_dof_joint_state.joint_transforms.resize(1);
-    robot_state.multi_dof_joint_state.joint_transforms[0].translation.x = robot_pose_planning_frame.position.x;
-    robot_state.multi_dof_joint_state.joint_transforms[0].translation.y = robot_pose_planning_frame.position.y;
-    robot_state.multi_dof_joint_state.joint_transforms[0].translation.z = robot_pose_planning_frame.position.z;
-    robot_state.multi_dof_joint_state.joint_transforms[0].rotation.w = robot_pose_planning_frame.orientation.w;
-    robot_state.multi_dof_joint_state.joint_transforms[0].rotation.x = robot_pose_planning_frame.orientation.x;
-    robot_state.multi_dof_joint_state.joint_transforms[0].rotation.y = robot_pose_planning_frame.orientation.y;
-    robot_state.multi_dof_joint_state.joint_transforms[0].rotation.z = robot_pose_planning_frame.orientation.z;
+    robot_state.multi_dof_joint_state.transforms.resize(1);
+    robot_state.multi_dof_joint_state.transforms[0].translation.x = robot_pose_planning_frame.position.x;
+    robot_state.multi_dof_joint_state.transforms[0].translation.y = robot_pose_planning_frame.position.y;
+    robot_state.multi_dof_joint_state.transforms[0].translation.z = robot_pose_planning_frame.position.z;
+    robot_state.multi_dof_joint_state.transforms[0].rotation.w = robot_pose_planning_frame.orientation.w;
+    robot_state.multi_dof_joint_state.transforms[0].rotation.x = robot_pose_planning_frame.orientation.x;
+    robot_state.multi_dof_joint_state.transforms[0].rotation.y = robot_pose_planning_frame.orientation.y;
+    robot_state.multi_dof_joint_state.transforms[0].rotation.z = robot_pose_planning_frame.orientation.z;
     planning_scene_->robot_state = robot_state;
 
     planning_scene_->robot_model_name = robot_name_;
-    planning_scene_->robot_model_root = robot_local_frame_;
+//    planning_scene_->robot_model_root = robot_local_frame_;
 
     planning_scene_->fixed_frame_transforms.clear();  // todo: are these necessary?
     planning_scene_->allowed_collision_matrix;        // todo: covered by sbpl_collision_model?
@@ -609,7 +610,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     planning_scene_->world.collision_objects.clear();
     // planning_scene_->world.octomap = request->octomap; // todo: covered by sbpl_collision_model/occupancy grid?
     planning_scene_->world.octomap.header = std_msgs::CreateHeader(0, ros::Time(0), planning_frame);
-    planning_scene_->world.collision_map.header = std_msgs::CreateHeader(0, ros::Time(0), planning_frame);
+//    planning_scene_->world.collision_map.header = std_msgs::CreateHeader(0, ros::Time(0), planning_frame);
 
     planning_scene_->is_diff = false;
 

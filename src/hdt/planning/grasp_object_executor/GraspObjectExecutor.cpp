@@ -1042,7 +1042,8 @@ void GraspObjectExecutor::goal_callback()
 
     if (use_extrusion_octomap_ && current_occupancy_grid_) {
         const double HARDCODED_EXTRUSION = 2.0; // Extrude the occupancy grid from 0m to 2m
-        current_octomap_ = extruder_.extrude(*current_occupancy_grid_, HARDCODED_EXTRUSION);
+//        current_octomap_ = extruder_.extrude(*current_occupancy_grid_, HARDCODED_EXTRUSION);
+        extruder_.extrude(*current_occupancy_grid_, HARDCODED_EXTRUSION, *current_octomap_);
         if (current_octomap_) {
             extrusion_octomap_pub_.publish(current_octomap_);
         }
@@ -1180,7 +1181,10 @@ GraspObjectExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_obj
 
         Eigen::Affine3d mark_to_menglong(Eigen::Affine3d::Identity());
         Eigen::Vector3d sample_spline_point_robot_frame =
-                robot_to_object * mark_to_menglong * Eigen::Scaling(gas_can_scale_) * sample_spline_point;
+                robot_to_object * // Affine3d
+                mark_to_menglong * // Affine3d
+                Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * // Scaling
+                sample_spline_point; // Vector3d
         ROS_INFO_PRETTY("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
 
         Eigen::Vector3d sample_spline_deriv_robot_frame =

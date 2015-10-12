@@ -4,7 +4,7 @@
 #include <memory>
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
-#include <ar_track_alvar/AlvarMarkers.h>
+#include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <kdl/kdl.hpp>
 #include <kdl/chain.hpp>
 #include <kdl/chainfksolvervel_recursive.hpp>
@@ -53,7 +53,7 @@ private:
     hdt::ViservoCommandGoal::ConstPtr current_goal_;
 
     sensor_msgs::JointState::ConstPtr curr_joint_state_;
-    ar_track_alvar::AlvarMarkers::ConstPtr last_ar_markers_msg_;
+    ar_track_alvar_msgs::AlvarMarkers::ConstPtr last_ar_markers_msg_;
 
     double marker_validity_timeout_;
 
@@ -104,7 +104,7 @@ private:
     void goal_callback();
     void preempt_callback();
     void joint_states_cb(const sensor_msgs::JointState::ConstPtr& msg);
-    void ar_markers_cb(const ar_track_alvar::AlvarMarkers::ConstPtr& msg);
+    void ar_markers_cb(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg);
 
     bool lost_marker();
     bool reached_goal() const;

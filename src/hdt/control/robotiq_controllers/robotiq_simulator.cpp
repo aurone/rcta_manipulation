@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "gripper_simulator.h"
 #include "gripper_server.h"
 

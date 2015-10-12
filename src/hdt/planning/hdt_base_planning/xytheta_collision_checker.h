@@ -1,4 +1,3 @@
-
 #ifndef _XYTHETA_COLLISION_CHECKER_H_
 #define _XYTHETA_COLLISION_CHECKER_H_
 
@@ -6,13 +5,23 @@
 #include <ros/ros.h>
 #include <nav_msgs/OccupancyGrid.h>
 
+#ifndef CONTXY2DISC
 #define CONTXY2DISC(X, CELLSIZE) (((X)>=0)?((int) round((X)/(CELLSIZE)) ):((int) round((X)/(CELLSIZE))))
+#endif
+
+#ifndef DISCXY2CONT
 #define DISCXY2CONT(X, CELLSIZE) ((X)*(CELLSIZE))
+#endif
 
-class XYThetaCollisionChecker {
-
+class XYThetaCollisionChecker
+{
 public:
-    XYThetaCollisionChecker(const std::vector<sbpl_2Dpt_t> &footprint_polygon, int obs_thresh, int num_heading_disc=16);
+
+    XYThetaCollisionChecker(
+            const std::vector<sbpl_2Dpt_t> &footprint_polygon,
+            int obs_thresh,
+            int num_heading_disc=16);
+    
     ~XYThetaCollisionChecker();
 
     void UpdateOccupancyGrid(nav_msgs::OccupancyGrid new_occ_grid);
@@ -26,6 +35,7 @@ public:
     double getCollisionProbability(double x, double y, double theta);
 
 private:
+
     nav_msgs::OccupancyGrid *grid_;
     std::vector<sbpl_2Dpt_t> footprint_polygon_;
     int num_heading_disc_;

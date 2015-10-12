@@ -3071,7 +3071,7 @@ RepositionBaseExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_
 
         Eigen::Affine3d mark_to_menglong(Eigen::Affine3d::Identity());
         Eigen::Vector3d sample_spline_point_robot_frame =
-                robot_to_object * mark_to_menglong * Eigen::Scaling(gas_can_scale_) * sample_spline_point;
+                robot_to_object * mark_to_menglong * Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * sample_spline_point;
         //ROS_INFO("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
 
         Eigen::Vector3d sample_spline_deriv_robot_frame =

@@ -1,7 +1,8 @@
 - git: {local-name: ../hdt_msgs, uri: 'git@sbpl.pc.cs.cmu.edu:robots/hdt/hdt-msgs.git' }
 - git: {local-name: ../pviz, uri: 'https://github.com/aurone/pviz.git'}
-- git: {local-name: ../sbpl_manipulation, uri: 'https://github.com/aurone/sbpl_manipulation.git', version: groovy}
+- git: {local-name: ../sbpl_manipulation, uri: 'https://github.com/aurone/sbpl_manipulation.git'}
 - git: {local-name: ../sbpl_geometry_utils, uri: 'https://github.com/sbpl/sbpl_geometry_utils.git'}
-- git: {local-name: ../leatherman, uri: 'https://github.com/aurone/leatherman.git', version: groovy}
-- git: {local-name: ../pr2_vfh_database, uri: 'git@sbpl.pc.cs.cmu.edu:pr2-grasp-database/temp-grasp-database.git', version: groovy-devel}
+- git: {local-name: ../leatherman, uri: 'https://github.com/aurone/leatherman.git'}
+- git: {local-name: ../pr2_vfh_database, uri: 'git@sbpl.pc.cs.cmu.edu:pr2-grasp-database/temp-grasp-database.git'}
+- git: {local-name: ../spellbook_ros, uri: 'https://github.com/aurone/spellbook_ros.git'}
 

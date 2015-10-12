@@ -12,6 +12,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
+#include <spellbook/costmap_extruder/CostmapExtruder.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
 #include <hdt_msgs/GraspObjectCommandAction.h>
@@ -19,7 +20,6 @@
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/common/geometry/nurb/NURB.h>
 #include <hdt/common/hdt_description/RobotModel.h>
-#include <hdt/simulation/costmap_extruder/CostmapExtruder.h>
 
 namespace GraspObjectExecutionStatus
 {
@@ -100,6 +100,7 @@ private:
 
     typedef nav_msgs::OccupancyGrid::ConstPtr OccupancyGridConstPtr;
     typedef nav_msgs::OccupancyGrid::Ptr OccupancyGridPtr;
+    typedef octomap_msgs::Octomap::Ptr OctomapPtr;
     typedef octomap_msgs::Octomap::ConstPtr OctomapConstPtr;
 
     double object_filter_radius_m_;
@@ -114,7 +115,7 @@ private:
     OccupancyGridConstPtr occupancy_grid_after_grasp_;
 
     bool use_extrusion_octomap_; ///< Whether to override incoming octomaps with an extruded costmap variant
-    OctomapConstPtr current_octomap_; ///< extruded current occupancy grid
+    OctomapPtr current_octomap_; ///< extruded current occupancy grid
     CostmapExtruder extruder_;
     ros::Publisher extrusion_octomap_pub_;
 

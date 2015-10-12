@@ -37,7 +37,7 @@ GripperServer::GripperServer(
 
 void GripperServer::start_accept()
 {
-    Connection::pointer new_conn = Connection::create(acceptor_.io_service(), simulator_);
+    Connection::pointer new_conn = Connection::create(acceptor_.get_io_service(), simulator_);
     acceptor_.async_accept(new_conn->socket(), boost::bind(&GripperServer::handle_accept, this, new_conn, boost::asio::placeholders::error));
 }
 

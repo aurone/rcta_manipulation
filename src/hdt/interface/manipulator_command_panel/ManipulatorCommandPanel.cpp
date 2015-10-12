@@ -386,20 +386,20 @@ void ManipulatorCommandPanel::copy_current_state()
 void ManipulatorCommandPanel::cycle_ik_solutions()
 {
    Eigen::Affine3d new_eef_pose;
-   new_eef_pose = rs_->getLinkState(tip_link_)->getGlobalLinkTransform();
+   new_eef_pose = rs_->getGlobalLinkTransform(tip_link_);
 
    // manipulator -> eef = manipulator -> base * base -> root * root -> eef
    new_eef_pose = mount_frame_to_manipulator_frame_.inverse() * rs_->getFrameTransform(base_link_).inverse() * new_eef_pose;
 
    // get the current joint configuration to use as a seed for picking a nearby ik solution
    std::vector<double> curr_joint_angles(7);
-   curr_joint_angles[0] = rs_->getJointState("arm_1_shoulder_twist")->getVariableValues()[0];
-   curr_joint_angles[1] = rs_->getJointState("arm_2_shoulder_lift")->getVariableValues()[0];
-   curr_joint_angles[2] = rs_->getJointState("arm_3_elbow_twist")->getVariableValues()[0];
-   curr_joint_angles[3] = rs_->getJointState("arm_4_elbow_lift")->getVariableValues()[0];
-   curr_joint_angles[4] = rs_->getJointState("arm_5_wrist_twist")->getVariableValues()[0];
-   curr_joint_angles[5] = rs_->getJointState("arm_6_wrist_lift")->getVariableValues()[0];
-   curr_joint_angles[6] = rs_->getJointState("arm_7_gripper_lift")->getVariableValues()[0];
+   curr_joint_angles[0] = rs_->getVariablePosition("arm_1_shoulder_twist");
+   curr_joint_angles[1] = rs_->getVariablePosition("arm_2_shoulder_lift");
+   curr_joint_angles[2] = rs_->getVariablePosition("arm_3_elbow_twist");
+   curr_joint_angles[3] = rs_->getVariablePosition("arm_4_elbow_lift");
+   curr_joint_angles[4] = rs_->getVariablePosition("arm_5_wrist_twist");
+   curr_joint_angles[5] = rs_->getVariablePosition("arm_6_wrist_lift");
+   curr_joint_angles[6] = rs_->getVariablePosition("arm_7_gripper_lift");
 
    const double ik_search_res = sbpl::utils::ToRadians(1.0);
 
@@ -445,14 +445,15 @@ void ManipulatorCommandPanel::send_move_arm_command()
     // mounting frame -> eef = mounting_frame -> root * root -> eef
     const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
     tf::poseEigenToMsg(
-            root_to_mount_frame.inverse() * rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform(),
+            root_to_mount_frame.inverse() * 
+                    rs_->getGlobalLinkTransform("arm_7_gripper_lift_link"),
             move_arm_goal.goal_pose);
 
     // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
     Eigen::Affine3d manipulator_frame_to_eef_frame =
             mount_frame_to_manipulator_frame_.inverse() *
             root_to_mount_frame.inverse() *
-            rs_->getLinkState("arm_7_gripper_lift_link")->getGlobalLinkTransform();
+                    rs_->getGlobalLinkTransform("arm_7_gripper_lift_link");
 
     geometry_msgs::Pose eef_in_manipulator_frame;
     tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
@@ -485,7 +486,7 @@ void ManipulatorCommandPanel::send_joint_goal()
     move_arm_goal.goal_joint_state.name = robot_model_->joint_names();
     move_arm_goal.goal_joint_state.position.reserve(7);
     for (const std::string& joint_name : robot_model_->joint_names()) {
-        move_arm_goal.goal_joint_state.position.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
+        move_arm_goal.goal_joint_state.position.push_back(rs_->getVariablePosition(joint_name));
     }
 
     move_arm_goal.execute_path = true;
@@ -546,7 +547,7 @@ void ManipulatorCommandPanel::send_viservo_command()
     const std::string camera_link_name = "camera_rgb_frame";
     const std::string wrist_link_name = "arm_7_gripper_lift_link";
 
-    if (/*!rs_->hasLinkState(camera_link_name) ||*/ !rs_->hasLinkState(wrist_link_name)) {
+    if (/*!rs_->hasLinkState(camera_link_name) ||*/ !rs_->getLinkModel(wrist_link_name)) {
         ROS_ERROR("Robot State does not contain transforms for camera or wrist links");
         return;
     }
@@ -574,7 +575,7 @@ void ManipulatorCommandPanel::send_viservo_command()
 
     // construct the goal wrist pose in the camera frame; the goal pose should be the same pose as whatever pose we think we're currently at.
 //    const Eigen::Affine3d& root_to_camera = rs_->getLinkState(camera_link_name)->getGlobalLinkTransform();
-    const Eigen::Affine3d& root_to_wrist = rs_->getLinkState(wrist_link_name)->getGlobalLinkTransform();
+    const Eigen::Affine3d& root_to_wrist = rs_->getGlobalLinkTransform(wrist_link_name);
     Eigen::Affine3d camera_to_wrist = root_to_camera.inverse() * root_to_wrist;
 
     hdt::ViservoCommandGoal viservo_goal;
@@ -868,7 +869,7 @@ bool ManipulatorCommandPanel::check_robot_model_consistency(
         const std::string& parent_joint_name = hdt_model.joint_names()[i - 1];
         const std::string& child_joint_name = hdt_model.joint_names()[i];
 
-        std::vector<robot_model::JointModel*> child_joints;
+        std::vector<const robot_model::JointModel*> child_joints;
         child_joints = moveit_model.getJointModel(parent_joint_name)->getChildLinkModel()->getChildJointModels();
         if (child_joints.size() != 1) {
             ROS_ERROR("Unexpected number of child joints (%zd)", child_joints.size());
@@ -1205,7 +1206,7 @@ bool ManipulatorCommandPanel::get_joint_value(
 void ManipulatorCommandPanel::update_joint_position(int joint_index, double joint_position)
 {
     double joint_val = sbpl::utils::ToRadians(joint_position);
-    rs_->getJointState(robot_model_->joint_names()[joint_index])->setVariableValues(&joint_val);
+    rs_->setVariablePosition(robot_model_->joint_names()[joint_index], joint_val);
     update_manipulator_marker_pose();
     publish_phantom_robot_visualizations();
 }
@@ -1339,7 +1340,7 @@ bool ManipulatorCommandPanel::reinit_robot_models(const std::string& robot_descr
     }
 
     rs_->setToDefaultValues();
-    rs_->setRootTransform(Eigen::Affine3d::Identity());
+//    rs_->setRootTransform(Eigen::Affine3d::Identity()); // TODO: equivalent
     rs_->updateLinkTransforms();
 
     // update gui parameters to reflect robot
@@ -1406,13 +1407,13 @@ bool ManipulatorCommandPanel::reinit_manipulator_interactive_marker()
             interactive_marker.header.seq = 0;
             interactive_marker.header.stamp = ros::Time(0);
             interactive_marker.header.frame_id = interactive_marker_frame();
-            robot_state::LinkState* tip_link_state = rs_->getLinkState(tip_link_);
-            if (!tip_link_state) {
+            const robot_state::LinkModel* tip_link_model = rs_->getLinkModel(tip_link_);
+            if (!tip_link_model) {
                 ROS_ERROR("Failed to get Link State for tip link '%s'", tip_link_.c_str());
                 return false;
             }
 
-            Eigen::Affine3d world_to_marker = robot_transform() * tip_link_state->getGlobalLinkTransform();
+            Eigen::Affine3d world_to_marker = robot_transform() * rs_->getGlobalLinkTransform(tip_link_);
             tf::poseEigenToMsg(world_to_marker, interactive_marker.pose);
             interactive_marker.name = jmg->getName() + "_control";
             interactive_marker.description = std::string("Control of ") + tip_link_ + std::string(" of manipulator ") + jmg->getName();
@@ -1665,15 +1666,15 @@ bool ManipulatorCommandPanel::gatherRobotMarkers(
     ros::Time tm = ros::Time::now();
     for (std::size_t i = 0; i < link_names.size(); ++i) {
         visualization_msgs::Marker mark;
-        const robot_state::LinkState* ls = robot_state.getLinkState(link_names[i]);
-        if (!ls) {
+        const robot_state::LinkModel* lm = rs_->getLinkModel(link_names[i]);
+        if (!lm) {
             continue;
         }
 
         // add markers for attached objects
         if (include_attached) {
             std::vector<const robot_state::AttachedBody*> attached_bodies;
-            ls->getAttachedBodies(attached_bodies);
+            rs_->getAttachedBodies(attached_bodies, lm);
             for (std::size_t j = 0; j < attached_bodies.size(); ++j) {
                 if (attached_bodies[j]->getShapes().size() > 0) {
                     visualization_msgs::Marker att_mark;
@@ -1686,18 +1687,19 @@ bool ManipulatorCommandPanel::gatherRobotMarkers(
             }
         }
 
-        if (!ls->getLinkModel() || !ls->getLinkModel()->getShape()) {
+        if (!lm || lm->getShapes().empty()) {
             continue;
         }
 
         mark.header.frame_id = robot_state.getRobotModel()->getModelFrame();
         mark.header.stamp = tm;
-        tf::poseEigenToMsg(ls->getGlobalCollisionBodyTransform(), mark.pose);
+        // TODO: other collision bodies
+        tf::poseEigenToMsg(rs_->getCollisionBodyTransform(link_names[i], 0), mark.pose);
 
         // we prefer using the visual mesh, if a mesh is available
-        const std::string& mesh_resource = ls->getLinkModel()->getVisualMeshFilename();
+        const std::string& mesh_resource = lm->getVisualMeshFilename();
         if (mesh_resource.empty()) {
-            if (!shapes::constructMarkerFromShape(ls->getLinkModel()->getShape().get(), mark)) {
+            if (!shapes::constructMarkerFromShape(lm->getShapes().front().get(), mark)) {
                 continue;
             }
 
@@ -1707,12 +1709,12 @@ bool ManipulatorCommandPanel::gatherRobotMarkers(
             }
         }
         else {
-            tf::poseEigenToMsg(ls->getGlobalLinkTransform(), mark.pose);
+            tf::poseEigenToMsg(rs_->getGlobalLinkTransform(link_names[i]), mark.pose);
 
             mark.type = mark.MESH_RESOURCE;
             mark.mesh_use_embedded_materials = false;
             mark.mesh_resource = mesh_resource;
-            const Eigen::Vector3d &mesh_scale = ls->getLinkModel()->getVisualMeshScale();
+            const Eigen::Vector3d &mesh_scale = lm->getVisualMeshScale();
 
             mark.scale.x = mesh_scale[0];
             mark.scale.y = mesh_scale[1];
@@ -1744,13 +1746,13 @@ void ManipulatorCommandPanel::update_spinboxes()
     disconnect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
     disconnect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
     disconnect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
-    j1_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[0])->getVariableValues()[0]));
-    j2_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[1])->getVariableValues()[0]));
-    j3_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[2])->getVariableValues()[0]));
-    j4_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[3])->getVariableValues()[0]));
-    j5_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[4])->getVariableValues()[0]));
-    j6_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[5])->getVariableValues()[0]));
-    j7_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getJointState(robot_model_->joint_names()[6])->getVariableValues()[0]));
+    j1_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[0])));
+    j2_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[1])));
+    j3_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[2])));
+    j4_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[3])));
+    j5_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[4])));
+    j6_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[5])));
+    j7_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[6])));
     connect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
     connect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
     connect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
@@ -1855,7 +1857,7 @@ std::vector<double> ManipulatorCommandPanel::get_phantom_joint_angles() const
     curr_joint_angles.reserve(robot_model_->joint_names().size());
 
     for (const std::string& joint_name : robot_model_->joint_names()) {
-        curr_joint_angles.push_back(rs_->getJointState(joint_name)->getVariableValues()[0]);
+        curr_joint_angles.push_back(rs_->getVariablePosition(joint_name));
     }
 
     return curr_joint_angles;
@@ -1869,7 +1871,7 @@ bool ManipulatorCommandPanel::set_phantom_joint_angles(const std::vector<double>
 
     std::size_t i = 0;
     for (const std::string& joint_name : robot_model_->joint_names()) {
-        rs_->getJointState(joint_name)->setVariableValues(&joint_angles[i]);
+        rs_->setVariablePosition(joint_name, joint_angles[i]);
         ++i;
     }
 
@@ -1883,7 +1885,7 @@ void ManipulatorCommandPanel::update_manipulator_marker_pose()
     {
         rs_->updateLinkTransforms();
         geometry_msgs::Pose new_marker_pose;
-        tf::poseEigenToMsg(robot_transform() * rs_->getLinkState(tip_link_)->getGlobalLinkTransform(), new_marker_pose);
+        tf::poseEigenToMsg(robot_transform() * rs_->getGlobalLinkTransform(tip_link_), new_marker_pose);
         std_msgs::Header header;
         header.seq = 0;
         header.frame_id = interactive_marker_frame();

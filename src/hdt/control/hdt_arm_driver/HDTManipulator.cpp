@@ -10,6 +10,8 @@
 
 #include "HDTManipulator.h"
 
+#include <unistd.h>
+
 static std::string param_file_name("HDTManipulatorParameters.txt");
 
 /////////////////////////////////////////////////////////////////////

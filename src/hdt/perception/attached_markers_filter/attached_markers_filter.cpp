@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 #include <Eigen/Dense>
-#include <ar_track_alvar/AlvarMarkers.h>
+#include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
@@ -46,7 +46,7 @@ public:
 
         alvar_markers_sub_ = nh_.subscribe("ar_pose_marker", 5, &AttachedMarkerFilter::alvar_markers_callback, this);
         joint_state_sub_ = nh_.subscribe("joint_states", 5, &AttachedMarkerFilter::joint_states_callback, this);
-        attached_markers_pub_ = nh_.advertise<ar_track_alvar::AlvarMarkers>("attached_ar_pose_marker", 5);
+        attached_markers_pub_ = nh_.advertise<ar_track_alvar_msgs::AlvarMarkers>("attached_ar_pose_marker", 5);
         return download_marker_params();
     }
 
@@ -92,7 +92,7 @@ private:
     tf::TransformListener listener_;
     tf::TransformBroadcaster broadcaster_;
 
-    void alvar_markers_callback(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
+    void alvar_markers_callback(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg)
     {
         if (!last_joint_state_) {
             ROS_WARN("Have yet to receive a valid joint state");
@@ -113,7 +113,7 @@ private:
         }
 
 
-        ar_track_alvar::AlvarMarkers attached_markers;
+        ar_track_alvar_msgs::AlvarMarkers attached_markers;
         for (const auto& marker : msg->markers) {
             if (tracking_marker(marker.id)) {
                 // TODO: attempt to fix orientation
@@ -169,7 +169,7 @@ private:
                     });
 
                 // replace the pose of this marker with the corrected pose
-                ar_track_alvar::AlvarMarker corrected_marker = marker;
+                ar_track_alvar_msgs::AlvarMarker corrected_marker = marker;
                 tf::poseEigenToMsg(*likely_transform, corrected_marker.pose.pose);
 
                 Eigen::Quaterniond likely_quat(likely_transform->rotation());

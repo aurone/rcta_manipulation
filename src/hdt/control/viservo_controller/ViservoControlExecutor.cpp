@@ -3,10 +3,13 @@
 #include <cassert>
 #include <cmath>
 #include <sstream>
+
 #include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <urdf_parser/urdf_parser.h>
 #include <visualization_msgs/Marker.h>
+
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/utils/utils.h>
 #include <hdt/common/stringifier/stringifier.h>
@@ -633,7 +636,7 @@ void ViservoControlExecutor::joint_states_cb(const sensor_msgs::JointState::Cons
     }
 }
 
-void ViservoControlExecutor::ar_markers_cb(const ar_track_alvar::AlvarMarkers::ConstPtr& msg)
+void ViservoControlExecutor::ar_markers_cb(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg)
 {
     ROS_DEBUG("Received an AR marker message at %s", boost::posix_time::to_simple_string(msg->header.stamp.toBoost()).c_str());
     // scan the message to filter out ones that do not contain the markers we are tracking

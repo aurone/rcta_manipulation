@@ -33,6 +33,7 @@ find_package(catkin REQUIRED COMPONENTS
     rviz 
     sbpl_geometry_utils 
     sbpl_manipulation
+    spellbook_ros
     sensor_msgs 
     std_msgs 
     tf 

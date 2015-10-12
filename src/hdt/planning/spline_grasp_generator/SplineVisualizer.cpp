@@ -269,7 +269,7 @@ bool SplineVisualizer::init_control_vertex_marker()
     control_vertices_marker_.type = visualization_msgs::Marker::POINTS;
     control_vertices_marker_.action = visualization_msgs::Marker::ADD;
     for (const Vector3d& cv : grasp_spline_control_points_) {
-        Vector3d control_vertex_robot_frame = base_footprint_to_gas_canister_ * Eigen::Scaling(gas_can_scale_) * cv;
+        Vector3d control_vertex_robot_frame = base_footprint_to_gas_canister_ * Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * cv;
         geometry_msgs::Point p;
         p.x = control_vertex_robot_frame.x();
         p.y = control_vertex_robot_frame.y();
@@ -310,7 +310,7 @@ bool SplineVisualizer::init_spline_marker()
 
         ROS_INFO("    [canister frame]: (%0.3f, %0.3f, %0.3f)", spline_sample.x(), spline_sample.y(), spline_sample.z());
 
-        spline_sample = base_footprint_to_gas_canister_ * Eigen::Scaling(gas_can_scale_) * spline_sample;
+        spline_sample = base_footprint_to_gas_canister_ * Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * spline_sample;
 
         geometry_msgs::Point sample_point;
         sample_point.x = spline_sample.x();
