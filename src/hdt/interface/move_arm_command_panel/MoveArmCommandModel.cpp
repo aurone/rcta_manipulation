@@ -1,5 +1,7 @@
 #include "MoveArmCommandModel.h"
 
+#include <stack>
+
 #include <ros/console.h>
 
 MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
@@ -34,6 +36,8 @@ bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
     m_robot_state->setToDefaultValues();
     m_robot_state->updateLinkTransforms();
     m_robot_state->updateCollisionBodyTransforms();
+
+    logRobotModelInfo(*m_robot_model);
 
     Q_EMIT robotLoaded();
     return true;
@@ -79,4 +83,63 @@ void MoveArmCommandModel::setJointVariable(int jidx, double value)
         m_robot_state->updateCollisionBodyTransforms();
         Q_EMIT robotStateChanged();
     }
+}
+
+void MoveArmCommandModel::logRobotModelInfo(
+    const moveit::core::RobotModel& rm) const
+{                                                                                                                             
+    ROS_INFO("Robot Model Name: %s", rm.getName().c_str());                                                                   
+    ROS_INFO("Robot Model Frame: %s", rm.getModelFrame().c_str());                                                            
+    ROS_INFO("Root Link Name: %s", rm.getRootLinkName().c_str());                                                             
+    ROS_INFO("Root Joint Name: %s", rm.getRootJointName().c_str());                                                           
+                                                                                                                              
+    ROS_INFO("--- Robot Links ---");                                                                                          
+    std::stack<std::pair<int, const moveit::core::LinkModel*>> links;                                                         
+    links.push(std::make_pair(0, rm.getRootLink()));                                                                          
+    while (!links.empty()) {                                                                                                  
+        int depth;                                                                                                            
+        const moveit::core::LinkModel* lm;                                                                                    
+        std::tie(depth, lm) = links.top();                                                                                    
+        links.pop();                                                                                                          
+                                                                                                                              
+        std::string pad(depth, ' ');                                                                                          
+        ROS_INFO("%s%s", pad.c_str(), lm->getName().c_str());                                                                 
+                                                                                                                              
+        for (const moveit::core::JointModel* jm : lm->getChildJointModels()) {                                                
+            links.push(std::make_pair(depth+1, jm->getChildLinkModel()));                                                     
+        }                                                                                                                     
+    }                                                                                                                         
+                                                                                                                              
+    ROS_INFO("--- Robot Joints ---");                                                                                         
+    std::stack<std::pair<int, const moveit::core::JointModel*>> joints;                                                       
+    joints.push(std::make_pair(0, rm.getRootJoint()));                                                                        
+    while (!joints.empty()) {                                                                                                 
+        int depth;                                                                                                            
+        const moveit::core::JointModel* jm;                                                                                   
+        std::tie(depth, jm) = joints.top();                                                                                   
+        joints.pop();                                                                                                         
+                                                                                                                              
+        std::string pad(depth, ' ');                                                                                          
+        ROS_INFO("%s%s", pad.c_str(), jm->getName().c_str());                                                                 
+                                                                                                                              
+        const moveit::core::LinkModel* lm = jm->getChildLinkModel();                                                          
+        for (const moveit::core::JointModel* j : lm->getChildJointModels()) {                                                 
+            joints.push(std::make_pair(depth + 1, j));                                                                        
+        }                                                                                                                     
+    }                                                                                                                         
+                                                                                                                              
+    ROS_INFO("--- Robot Joint Groups ---");                                                                                   
+                                                                                                                              
+    const std::vector<const moveit::core::JointModelGroup*>& jmgs =                                                           
+            rm.getJointModelGroups();                                                                                         
+    for (const moveit::core::JointModelGroup* jmg : jmgs) {                                                                   
+        ROS_INFO("Name: %s", jmg->getName().c_str());                                                                         
+        ROS_INFO("  Joints:");                                                                                                
+        for (const std::string& name : jmg->getJointModelNames()) {                                                           
+            ROS_INFO("    %s", name.c_str());                                                                                 
+        }                                                                                                                     
+        ROS_INFO("  Chain: %s", jmg->isChain() ? "true" : "false");                                                           
+        ROS_INFO("  Only Single-DoF Joints: %s", jmg->isSingleDOFJoints() ? "true" : "false");                                
+        ROS_INFO("  End Effector: %s", jmg->isEndEffector() ? "true" : "false");                                              
+    }                                                                                                                         
 }

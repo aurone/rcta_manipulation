@@ -49,6 +49,8 @@ private:
     robot_model_loader::RobotModelLoaderPtr m_rm_loader;
     moveit::core::RobotModelPtr m_robot_model;
     moveit::core::RobotStatePtr m_robot_state;
+
+    void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
 };
 
 #endif
