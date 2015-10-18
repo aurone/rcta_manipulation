@@ -1,0 +1,8 @@
+<library path="lib/libmove_arm_command_panel_plugin">
+    <class  name="move_arm_command_panel_plugin/MoveArmCommandPanel"
+            type="MoveArmCommandPanel"
+            base_class_type="rviz::Panel">
+        <description>
+            A panel widget for controlling a phantom robot for specifying move commands
+        </description>
+</library>
