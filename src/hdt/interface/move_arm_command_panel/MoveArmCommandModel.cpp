@@ -63,6 +63,61 @@ moveit::core::RobotStateConstPtr MoveArmCommandModel::robotState() const
     return m_robot_state;
 }
 
+std::map<std::string, double>
+MoveArmCommandModel::getRightArmTorques(
+    double fx, double fy, double fz,
+    double ta, double tb, double tc) const
+{
+    // T = J^T() * forces;
+    std::map<std::string, double> torques;
+
+    const moveit::core::JointModelGroup* jmg =
+            m_robot_model->getJointModelGroup("right_arm");
+
+    Eigen::MatrixXd J;
+    J = m_robot_state->getJacobian(jmg, Eigen::Vector3d(0.17, 0.0, 0.0));
+
+    ROS_DEBUG_STREAM("Jacobian = " << J.rows() << " x " << J.cols() << '\n' << J);
+
+    typedef Eigen::Matrix<double, 6, 1> Vector6d;
+    Vector6d f;
+    f(0) = fx;
+    f(1) = fy;
+    f(2) = fz;
+    f(3) = ta;
+    f(4) = tb;
+    f(5) = tc;
+//    f << fx << fy << fz << ta << tb << tc;
+
+    Eigen::VectorXd t = J.transpose() * f;
+
+    ROS_INFO("Torques = (%0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f)", t(0), t(1), t(2), t(3), t(4), t(5), t(6));
+
+    const std::vector<std::string> rarm_joint_names =
+    {
+        "r_shoulder_pan_joint",
+        "r_shoulder_lift_joint",
+        "r_upper_arm_roll_joint",
+        "r_elbow_flex_joint",
+        "r_forearm_roll_joint",
+        "r_wrist_flex_joint",
+        "r_wrist_roll_joint"
+    };
+
+    torques =
+    {
+        { rarm_joint_names[0], t(0) },
+        { rarm_joint_names[1], t(1) },
+        { rarm_joint_names[2], t(2) },
+        { rarm_joint_names[3], t(3) },
+        { rarm_joint_names[4], t(4) },
+        { rarm_joint_names[5], t(5) },
+        { rarm_joint_names[6], t(6) },
+    };
+
+    return torques;
+}
+
 void MoveArmCommandModel::setJointVariable(int jidx, double value)
 {
     if (!isRobotLoaded()) {
@@ -142,4 +197,12 @@ void MoveArmCommandModel::logRobotModelInfo(
         ROS_INFO("  Only Single-DoF Joints: %s", jmg->isSingleDOFJoints() ? "true" : "false");                                
         ROS_INFO("  End Effector: %s", jmg->isEndEffector() ? "true" : "false");                                              
     }                                                                                                                         
+
+    ROS_INFO("--- Joint Variables ---");
+
+    for (size_t vind = 0; vind < rm.getVariableCount(); ++vind) {
+        const std::string& var_name = rm.getVariableNames()[vind];
+        const auto& var_bounds = rm.getVariableBounds(var_name);
+        ROS_INFO("%s: { min: %f, max: %f, vel: %f, acc: %f }", var_name.c_str(), var_bounds.min_position_, var_bounds.max_position_, var_bounds.max_velocity_, var_bounds.max_acceleration_);
+    }
 }

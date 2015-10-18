@@ -33,6 +33,11 @@ public:
     moveit::core::RobotModelConstPtr robotModel() const;
     moveit::core::RobotStateConstPtr robotState() const;
 
+    std::map<std::string, double>
+    getRightArmTorques(
+        double fx, double fy, double fz,
+        double ta, double tb, double tc) const;
+
 public Q_SLOTS:
 
     void setJointVariable(int jidx, double value);

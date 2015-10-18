@@ -298,6 +298,44 @@ void MoveArmCommandPanel::updateRobotVisualization()
 {
     ROS_DEBUG("Updating robot visualization");
 
+    double weight_lbs = 10.0;
+    double kg_per_lb = 1.0 / 2.2;
+    double gravity_z = -9.8;
+    std::map<std::string, double> torques;
+    torques = m_model->getRightArmTorques(
+            0.0, 0.0, gravity_z * weight_lbs * kg_per_lb,
+            0.0, 0.0, 0.0);
+
+    const std::vector<std::string> rarm_joint_names =
+    {
+        "r_shoulder_pan_joint",
+        "r_shoulder_lift_joint",
+        "r_upper_arm_roll_joint",
+        "r_elbow_flex_joint",
+        "r_forearm_roll_joint",
+        "r_wrist_flex_joint",
+        "r_wrist_roll_joint"
+    };
+
+    // TODO: derive from the URDF
+    const std::map<std::string, double> tlimits = 
+    {
+        { rarm_joint_names[0], 30.0 },
+        { rarm_joint_names[1], 30.0 },
+        { rarm_joint_names[2], 30.0 },
+        { rarm_joint_names[3], 30.0 },
+        { rarm_joint_names[4], 30.0 },
+        { rarm_joint_names[5], 10.0 },
+        { rarm_joint_names[6], 10.0 },
+    };
+
+    std::map<std::string, double> alphas;
+    for (const std::string& joint_name : rarm_joint_names) {
+        alphas.insert(std::make_pair(
+                joint_name,
+                fabs(torques.at(joint_name)) / tlimits.at(joint_name)));
+    }
+
     if (!m_model->isRobotLoaded()) {
         ROS_WARN("Robot not yet loaded");
         return;
@@ -310,13 +348,54 @@ void MoveArmCommandPanel::updateRobotVisualization()
     robot_state->getRobotMarkers(marr, robot_model->getLinkModelNames());
 
     const std::string ns =
-            robot_model->getName() + std::string("phantom");
+            robot_model->getName() + std::string("_phantom");
     int id = 0;
     for (auto& marker : marr.markers) {
+        float colormod = 0.0;
+        bool rarm_link = false;
+        // find the link associated with the given mesh filename
+        for (const moveit::core::LinkModel* lm : robot_model->getLinkModels()) {
+            if (marker.mesh_resource == lm->getVisualMeshFilename()) {
+//                ROS_INFO("Found match for %s: %s", marker.mesh_resource.c_str(), lm->getName().c_str());
+                // get the parent joint
+                const moveit::core::JointModel* jm = lm->getParentJointModel();
+                // check if the parent link is one of the links of the right arm
+//                ROS_INFO("looking for joint '%s'", jm->getName().c_str());
+                if (std::find(rarm_joint_names.begin(), rarm_joint_names.end(),
+                        jm->getName()) != rarm_joint_names.end())
+                {
+                    // look up the color modulus
+//                    ROS_INFO("Looking up torque distribution for joint %s", jm->getName().c_str());
+                    colormod = (float)alphas.at(jm->getName());
+                    rarm_link = true;
+                    break;
+                }
+            }
+        }
+
         marker.mesh_use_embedded_materials = false; //true;
-        marker.color.r = (float)255 / (float)255;
-        marker.color.g = (float)127 / (float)255;
-        marker.color.b = (float)80 / (float)255;
+
+        float r_base = 0.4f; // (float)100 / (float)255;
+        float g_base = 0.4f; // (float)159 / (float)255;
+        float b_base = 0.4f; // (float)237 / (float)255;
+        if (rarm_link) {
+            if (colormod > 1.0) {
+                marker.color.r = marker.color.g = marker.color.b = 0.0f;
+            }
+            else {
+                // as torque increases to limit, increase red channel and
+                // decrease green and blue channels
+                marker.color.r = r_base + (colormod * (1.0 - r_base));
+                marker.color.g = (1.0f - colormod) * g_base;
+                marker.color.b = (1.0f - colormod) * b_base;
+            }
+        }
+        else {
+            marker.color.r = r_base;
+            marker.color.g = g_base;
+            marker.color.b = b_base;
+        }
+
         marker.color.a = 0.8f;
         marker.ns = ns;
         marker.id = id++;
