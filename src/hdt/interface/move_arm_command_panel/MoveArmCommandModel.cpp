@@ -87,7 +87,6 @@ MoveArmCommandModel::getRightArmTorques(
     f(3) = ta;
     f(4) = tb;
     f(5) = tc;
-//    f << fx << fy << fz << ta << tb << tc;
 
     Eigen::VectorXd t = J.transpose() * f;
 

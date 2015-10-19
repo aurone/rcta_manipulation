@@ -12,7 +12,10 @@ MoveArmCommandPanel::MoveArmCommandPanel(QWidget* parent) :
     m_robot_description_line_edit(nullptr),
     m_load_robot_button(nullptr),
     m_arm_commands_group(nullptr),
-    m_marker_pub()
+    m_marker_pub(),
+    m_spinbox_to_vind(),
+    m_vind_to_spinbox(),
+    m_jmgoo("right_arm")
 {
     setupGUI();
 
@@ -129,6 +132,7 @@ void MoveArmCommandPanel::setupRobotGUI()
     ROS_INFO("Setting up the Robot GUI");
 
     moveit::core::RobotModelConstPtr robot_model = m_model->robotModel();
+    auto jmg = robot_model->getJointModelGroup(m_jmgoo);
 
     QScrollArea* scroll_area = new QScrollArea;
     QVBoxLayout* scroll_area_layout = new QVBoxLayout;
@@ -238,14 +242,18 @@ void MoveArmCommandPanel::setupRobotGUI()
             var_spinbox->setWrapping(false);
         }
 
-        joint_commands_layout->addWidget(var_label, vind, 0);
-        joint_commands_layout->addWidget(var_spinbox, vind, 1);
-
         m_spinbox_to_vind.insert(std::make_pair(var_spinbox, vind));
         m_vind_to_spinbox.push_back(var_spinbox);
 
-        connect(var_spinbox, SIGNAL(valueChanged(double)),
-                this, SLOT(setJointVariableFromSpinBox(double)));
+        if (jmg && jmg->hasJointModel(
+            robot_model->getJointOfVariable(var_name)->getName()))
+        {
+            joint_commands_layout->addWidget(var_label, vind, 0);
+            joint_commands_layout->addWidget(var_spinbox, vind, 1);
+    
+            connect(var_spinbox, SIGNAL(valueChanged(double)),
+                    this, SLOT(setJointVariableFromSpinBox(double)));
+        }
     }
 
     joint_commands_widget->setLayout(joint_commands_layout);

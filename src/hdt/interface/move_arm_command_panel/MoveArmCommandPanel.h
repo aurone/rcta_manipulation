@@ -60,6 +60,8 @@ private:
     std::map<QDoubleSpinBox*, int> m_spinbox_to_vind;
     std::vector<QDoubleSpinBox*> m_vind_to_spinbox;
 
+    std::string m_jmgoo;
+
     /// \brief Setup the baseline GUI for loading robots from URDF parameter
     void setupGUI();
 
