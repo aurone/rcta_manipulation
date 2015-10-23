@@ -456,12 +456,12 @@ bool ArmPlanningNode::init_robot()
         ROS_ERROR_PRETTY("Failed to instantiate KDL Robot Model");
     }
 
-    std::vector<std::string> planning_joints = robot_model_->joint_names();
-    if (!planner_robot_model_->init(urdf_string_, planning_joints)) {
-        ROS_ERROR_PRETTY("Failed to initialize KDL Robot Model");
-        return false;
-    }
-    planner_robot_model_->setPlanningLink(robot_model_->joint_names().back());
+//    std::vector<std::string> planning_joints = robot_model_->joint_names();
+//    if (!planner_robot_model_->init(urdf_string_, planning_joints)) {
+//        ROS_ERROR_PRETTY("Failed to initialize KDL Robot Model");
+//        return false;
+//    }
+//    planner_robot_model_->setPlanningLink(robot_model_->joint_names().back());
 
     kinematics_frame_ = "arm_mount_panel_dummy";
 
@@ -482,7 +482,7 @@ bool ArmPlanningNode::init_sbpl()
 
     ph_.getParam("action_set_filename", action_set_filename_);
 
-    sbpl_action_set_.reset(new sbpl_arm_planner::ActionSet(action_set_filename_));
+    sbpl_action_set_ = sbpl_arm_planner::ActionSet::Load(action_set_filename_);
     if (!sbpl_action_set_) {
         ROS_ERROR_PRETTY("Failed to instantiate Action Set");
         return false;

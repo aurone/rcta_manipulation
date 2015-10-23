@@ -91,9 +91,9 @@ void SimpleInteractiveMarkerServer::print_interactive_marker_feedback(
     ROS_INFO("      z: %0.3f", feedback_msg.pose.orientation.z);
     ROS_INFO("  menu_entry_id: %u", feedback_msg.menu_entry_id);
     ROS_INFO("  mouse_point:");
-    ROS_INFO("    x:", feedback_msg.mouse_point.x);
-    ROS_INFO("    y:", feedback_msg.mouse_point.y);
-    ROS_INFO("    z:", feedback_msg.mouse_point.z);
+    ROS_INFO("    x: %0.3f", feedback_msg.mouse_point.x);
+    ROS_INFO("    y: %0.3f", feedback_msg.mouse_point.y);
+    ROS_INFO("    z: %0.3f", feedback_msg.mouse_point.z);
     ROS_INFO("  mouse_point_valid: %s", feedback_msg.mouse_point_valid ? "true" : "false");
 }
 

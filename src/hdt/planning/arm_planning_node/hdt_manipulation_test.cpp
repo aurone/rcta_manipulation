@@ -160,11 +160,12 @@ int main(int argc, char** argv)
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Set up the arm planner
-    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
 
-    std::unique_ptr<sbpl_arm_planner::ActionSet> action_set(new sbpl_arm_planner::ActionSet(action_set_filename));
+    std::shared_ptr<sbpl_arm_planner::ActionSet> action_set =
+            sbpl_arm_planner::ActionSet::Load(action_set_filename);
     if (!action_set) {
         ROS_ERROR("Failed to instantiate Action Set");
         return FAILED_TO_INITIALIZE_SBPL;
