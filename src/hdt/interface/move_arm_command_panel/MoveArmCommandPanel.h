@@ -51,6 +51,7 @@ private:
     QLineEdit* m_robot_description_line_edit;
     QPushButton* m_load_robot_button;
 
+    QComboBox* m_joint_groups_combo_box;
     QGroupBox* m_arm_commands_group;
 
     ros::Publisher m_marker_pub;
