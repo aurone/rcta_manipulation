@@ -1,5 +1,5 @@
-#ifndef MoveArmCommandPanel_h
-#define MoveArmCommandPanel_h
+#ifndef MoveItCommandPanel_h
+#define MoveItCommandPanel_h
 
 // standard includes
 #include <map>
@@ -8,19 +8,21 @@
 
 // system includes
 #include <QtGui>
+#include <moveit/robot_model/robot_model.h>
 #include <ros/ros.h>
 #include <rviz/panel.h>
 
 class MoveArmCommandModel;
+class JointVariableCommandWidget;
 
-class MoveArmCommandPanel : public rviz::Panel
+class MoveItCommandPanel : public rviz::Panel
 {
     Q_OBJECT
 
 public:
 
-    MoveArmCommandPanel(QWidget* parent = 0);
-    ~MoveArmCommandPanel();
+    MoveItCommandPanel(QWidget* parent = 0);
+    ~MoveItCommandPanel();
 
     virtual void load(const rviz::Config& config);
     virtual void save(rviz::Config config) const;
@@ -41,6 +43,7 @@ public Q_SLOTS:
     void updateRobotVisualization();
 
     void setJointVariableFromSpinBox(double value);
+    void setJointGroup(const QString& joint_group_name);
 
 private:
 
@@ -56,17 +59,20 @@ private:
 
     ros::Publisher m_marker_pub;
 
-    // mapping from each qdoublespinbox to the index of the joint variable it
-    // controls
-    std::map<QDoubleSpinBox*, int> m_spinbox_to_vind;
-    std::vector<QDoubleSpinBox*> m_vind_to_spinbox;
-
-    std::string m_jmgoo;
+    JointVariableCommandWidget* m_var_cmd_widget;
 
     /// \brief Setup the baseline GUI for loading robots from URDF parameter
     void setupGUI();
 
     void setupRobotGUI();
+
+    // Create a scroll area containing spinboxes for all joint variables. Also
+    // creates a bijection between joint variable indices and spinboxes and
+    // automatically connects all spinboxes to the setJointVariableFromSpinbox
+    // slot. Assumes a robot model has already been loaded into the model.
+    JointVariableCommandWidget* setupJointVariableCommandWidget();
+    void updateJointVariableCommandWidget(const std::string& joint_group_name);
+
     void syncSpinBoxes();
 
     bool isVariableAngle(int vind) const;

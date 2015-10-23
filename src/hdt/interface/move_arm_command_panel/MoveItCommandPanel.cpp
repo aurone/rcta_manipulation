@@ -1,11 +1,13 @@
-#include "MoveArmCommandPanel.h"
+#include "MoveItCommandPanel.h"
 
 #include "MoveArmCommandModel.h"
 
 #include <sbpl_geometry_utils/utils.h>
 #include <visualization_msgs/MarkerArray.h>
 
-MoveArmCommandPanel::MoveArmCommandPanel(QWidget* parent) :
+#include "JointVariableCommandWidget.h"
+
+MoveItCommandPanel::MoveItCommandPanel(QWidget* parent) :
     rviz::Panel(parent),
     m_nh(),
     m_model(new MoveArmCommandModel),
@@ -14,9 +16,7 @@ MoveArmCommandPanel::MoveArmCommandPanel(QWidget* parent) :
     m_joint_groups_combo_box(nullptr),
     m_arm_commands_group(nullptr),
     m_marker_pub(),
-    m_spinbox_to_vind(),
-    m_vind_to_spinbox(),
-    m_jmgoo("right_arm")
+    m_var_cmd_widget(nullptr)
 {
     setupGUI();
 
@@ -30,11 +30,11 @@ MoveArmCommandPanel::MoveArmCommandPanel(QWidget* parent) :
             "visualization_marker_array", 5);
 }
 
-MoveArmCommandPanel::~MoveArmCommandPanel()
+MoveItCommandPanel::~MoveItCommandPanel()
 {
 }
 
-void MoveArmCommandPanel::load(const rviz::Config& config)
+void MoveItCommandPanel::load(const rviz::Config& config)
 {
     rviz::Panel::load(config);
 
@@ -50,7 +50,7 @@ void MoveArmCommandPanel::load(const rviz::Config& config)
     }
 }
 
-void MoveArmCommandPanel::save(rviz::Config config) const
+void MoveItCommandPanel::save(rviz::Config config) const
 {
     rviz::Panel::save(config);
 
@@ -59,9 +59,11 @@ void MoveArmCommandPanel::save(rviz::Config config) const
     config.mapSetValue(
             "robot_description",
             QString::fromStdString(m_model->robotDescription()));
+
+    // TODO: save last joint group used and the final robot state
 }
 
-void MoveArmCommandPanel::loadRobot()
+void MoveItCommandPanel::loadRobot()
 {
     std::string user_robot_description =
             m_robot_description_line_edit->text().toStdString();
@@ -83,19 +85,19 @@ void MoveArmCommandPanel::loadRobot()
     }
 }
 
-void MoveArmCommandPanel::updateRobot()
+void MoveItCommandPanel::updateRobot()
 {
     setupRobotGUI();
     syncRobot();
 }
 
-void MoveArmCommandPanel::syncRobot()
+void MoveItCommandPanel::syncRobot()
 {
     syncSpinBoxes();
     updateRobotVisualization();
 }
 
-void MoveArmCommandPanel::setupGUI()
+void MoveItCommandPanel::setupGUI()
 {
     ROS_INFO("Setting up the baseline GUI");
 
@@ -128,13 +130,13 @@ void MoveArmCommandPanel::setupGUI()
 //    main_layout->addStretch();
 }
 
-void MoveArmCommandPanel::setupRobotGUI()
+void MoveItCommandPanel::setupRobotGUI()
 {
     ROS_INFO("Setting up the Robot GUI");
 
     moveit::core::RobotModelConstPtr robot_model = m_model->robotModel();
-    auto jmg = robot_model->getJointModelGroup(m_jmgoo);
 
+    // add all joint groups as items in a combobox
     m_joint_groups_combo_box = new QComboBox;
     // set up combobox for choosing joint group to modify
     for (size_t jgind = 0;
@@ -146,139 +148,42 @@ void MoveArmCommandPanel::setupRobotGUI()
         m_joint_groups_combo_box->addItem(QString::fromStdString(jg_name));
     }
 
-    QScrollArea* scroll_area = new QScrollArea;
-    QVBoxLayout* scroll_area_layout = new QVBoxLayout;
+    // NOTE: the first item added to the combobox will become the value of the
+    // combobox
 
-    QWidget* joint_commands_widget = new QWidget(scroll_area);
-    QGridLayout* joint_commands_layout = new QGridLayout;
+    connect(m_joint_groups_combo_box,
+            SIGNAL(currentIndexChanged(const QString&)),
+            this,
+            SLOT(setJointGroup(const QString&)));
 
-    const size_t num_vars = robot_model->getVariableCount();
-    const std::vector<std::string>& var_names =
-            robot_model->getVariableNames();
-
-    // create a (label, spinbox) combo for each joint variable and add them to
-    // the layout. connect the spinbox signals to the
-    // setJointVariableFromSpinBox slot on this object and map back to variable
-    // index to dispatch the values correctly to the model
-    for (size_t vind = 0; vind < num_vars; ++vind) {
-        const std::string& var_name = var_names[vind];
-        const auto& var_bounds = robot_model->getVariableBounds(var_name);
-
-        QLabel* var_label = new QLabel(QString::fromStdString(var_name));
-        QDoubleSpinBox* var_spinbox = new QDoubleSpinBox;
-
-        // set the bounds, step, and wrapping on the spinbox
-        const moveit::core::JointModel* jm =
-                robot_model->getJointOfVariable(var_name);
-
-        if (jm->getType() == moveit::core::JointModel::REVOLUTE) {
-            if (var_bounds.position_bounded_) {
-                var_spinbox->setMinimum(
-                        sbpl::utils::ToDegrees(var_bounds.min_position_));
-                var_spinbox->setMaximum(
-                        sbpl::utils::ToDegrees(var_bounds.max_position_));
-                var_spinbox->setSingleStep(1.0);
-                var_spinbox->setWrapping(false);
-            }
-            else {
-                var_spinbox->setMinimum(0.0);
-                var_spinbox->setMaximum(359.0);
-                var_spinbox->setSingleStep(1.0);
-                var_spinbox->setWrapping(true);
-            }
-        }
-        else if (jm->getType() == moveit::core::JointModel::PRISMATIC) {
-            if (var_bounds.position_bounded_) {
-                var_spinbox->setMinimum(var_bounds.min_position_);
-                var_spinbox->setMaximum(var_bounds.max_position_);
-                const double step =
-                        (var_bounds.max_position_ - var_bounds.min_position_) /
-                        100.0;
-                // TODO: compute the number of decimals required to display a
-                // change in the joint variable or round the step up to the
-                // nearest number of decimals desired to be displayed
-                var_spinbox->setDecimals(3);
-                var_spinbox->setSingleStep(step);
-                ROS_INFO("Single step for bounded prismatic joint: %f", step);
-                var_spinbox->setWrapping(false);
-            }
-            else {
-                ROS_WARN("A prismatic joint without bounds?! This is somewhat unexpected");
-                var_spinbox->setMinimum(-100.0);
-                var_spinbox->setMaximum(100.0);
-                var_spinbox->setSingleStep(2.0);
-                var_spinbox->setWrapping(false);
-            }
-        }
-        else if (jm->getType() == moveit::core::JointModel::PLANAR) {
-            if (var_bounds.position_bounded_) {
-                ROS_WARN("A planar joint with bounds?! Assuming a position variable x or y");
-                ROS_WARN("  Joint: %s", jm->getName().c_str());
-                ROS_WARN("  Variable: %s", var_name.c_str());
-                ROS_WARN("  Min Position: %f", var_bounds.min_position_);
-                ROS_WARN("  Max Position: %f", var_bounds.max_position_);
-                var_spinbox->setMinimum(-1000.0);
-                var_spinbox->setMaximum(1000.0);
-                var_spinbox->setSingleStep(0.01);
-                var_spinbox->setWrapping(false);
-            }
-            else {
-                ROS_WARN("A planar joint without bounds. Assuming an orientation variable yaw");
-                var_spinbox->setMinimum(0.0);
-                var_spinbox->setMaximum(359.0);
-                var_spinbox->setSingleStep(1.0);
-                var_spinbox->setWrapping(true);
-            }
-        }
-        else if (jm->getType() == moveit::core::JointModel::FLOATING) {
-            if (var_bounds.position_bounded_) {
-                ROS_WARN("A floating joint with bounds?! Assuming a position variable x, y, or z");
-                var_spinbox->setMinimum(-1000.0);
-                var_spinbox->setMaximum(1000.0);
-                var_spinbox->setSingleStep(0.01);
-                var_spinbox->setWrapping(false);
-            }
-            else {
-                ROS_WARN("A planar joint without bounds. Assuming an orientation variable roll, pitch, or yaw");
-                var_spinbox->setMinimum(-360.0);
-                var_spinbox->setMaximum(360.0);
-                var_spinbox->setSingleStep(1.0);
-                var_spinbox->setWrapping(true);
-            }
-        }
-        else {
-            ROS_WARN("Unrecognized joint type");
-            var_spinbox->setMinimum(0.0);
-            var_spinbox->setMaximum(100.0);
-            var_spinbox->setSingleStep(1.0);
-            var_spinbox->setWrapping(false);
-        }
-
-        m_spinbox_to_vind.insert(std::make_pair(var_spinbox, vind));
-        m_vind_to_spinbox.push_back(var_spinbox);
-
-        if (jmg && jmg->hasJointModel(
-            robot_model->getJointOfVariable(var_name)->getName()))
-        {
-            joint_commands_layout->addWidget(var_label, vind, 0);
-            joint_commands_layout->addWidget(var_spinbox, vind, 1);
-    
-            connect(var_spinbox, SIGNAL(valueChanged(double)),
-                    this, SLOT(setJointVariableFromSpinBox(double)));
-        }
+    m_var_cmd_widget = setupJointVariableCommandWidget();
+    for (QDoubleSpinBox* spinbox : m_var_cmd_widget->spinboxes()) {
+        connect(spinbox, SIGNAL(valueChanged(double)),
+                this, SLOT(setJointVariableFromSpinBox(double)));
     }
 
-    joint_commands_widget->setLayout(joint_commands_layout);
-    scroll_area->setLayout(scroll_area_layout);
-
-    scroll_area->setWidget(joint_commands_widget);
+    updateJointVariableCommandWidget(
+        m_joint_groups_combo_box->currentText().toStdString());
 
     QVBoxLayout* vlayout = qobject_cast<QVBoxLayout*>(layout());
     vlayout->insertWidget(vlayout->count(), m_joint_groups_combo_box);
-    vlayout->insertWidget(vlayout->count(), scroll_area);
+    vlayout->insertWidget(vlayout->count(), m_var_cmd_widget);
+    vlayout->addStretch();
 }
 
-void MoveArmCommandPanel::syncSpinBoxes()
+JointVariableCommandWidget*
+MoveItCommandPanel::setupJointVariableCommandWidget()
+{
+    return new JointVariableCommandWidget(m_model.get());
+}
+
+void MoveItCommandPanel::updateJointVariableCommandWidget(
+    const std::string& joint_group_name)
+{
+    m_var_cmd_widget->displayJointGroupCommands(joint_group_name);
+}
+
+void MoveItCommandPanel::syncSpinBoxes()
 {
     if (!m_model->isRobotLoaded()) {
         ROS_WARN("Robot not yet loaded");
@@ -289,7 +194,7 @@ void MoveArmCommandPanel::syncSpinBoxes()
     auto robot_state = m_model->robotState();
 
     for (int i = 0; i < (int)robot_model->getVariableCount(); ++i) {
-        QDoubleSpinBox* spinbox = m_vind_to_spinbox[i];
+        QDoubleSpinBox* spinbox = m_var_cmd_widget->variableIndexToSpinBox(i);
 
         if (isVariableAngle(i)) {
             double value =
@@ -314,7 +219,7 @@ void MoveArmCommandPanel::syncSpinBoxes()
     }
 }
 
-void MoveArmCommandPanel::updateRobotVisualization()
+void MoveItCommandPanel::updateRobotVisualization()
 {
     ROS_DEBUG("Updating robot visualization");
 
@@ -424,7 +329,7 @@ void MoveArmCommandPanel::updateRobotVisualization()
     m_marker_pub.publish(marr);
 }
 
-void MoveArmCommandPanel::setJointVariableFromSpinBox(double value)
+void MoveItCommandPanel::setJointVariableFromSpinBox(double value)
 {
     QDoubleSpinBox* spinbox = qobject_cast<QDoubleSpinBox*>(sender());
     if (!spinbox) {
@@ -432,13 +337,11 @@ void MoveArmCommandPanel::setJointVariableFromSpinBox(double value)
         return;
     }
 
-    auto it = m_spinbox_to_vind.find(spinbox);
-    if (it == m_spinbox_to_vind.end()) {
-        ROS_WARN("setJointVariableFromSpinBox not called from a registered spinbox");
+    int vind = m_var_cmd_widget->spinboxToVariableIndex(spinbox);
+    if (vind == -1) {
+        ROS_ERROR("setJointVariableFromSpinBox called from spinbox not associated with a joint variable");
         return;
     }
-
-    int vind = it->second;
 
     ROS_DEBUG("Joint variable %d set to %f from spinbox", vind, value);
 
@@ -452,7 +355,12 @@ void MoveArmCommandPanel::setJointVariableFromSpinBox(double value)
     }
 }
 
-bool MoveArmCommandPanel::isVariableAngle(int vind) const
+void MoveItCommandPanel::setJointGroup(const QString& joint_group_name)
+{
+    updateJointVariableCommandWidget(joint_group_name.toStdString());
+}
+
+bool MoveItCommandPanel::isVariableAngle(int vind) const
 {
     auto robot_model = m_model->robotModel();
     if (!robot_model) {
@@ -478,4 +386,4 @@ bool MoveArmCommandPanel::isVariableAngle(int vind) const
 }
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(MoveArmCommandPanel, rviz::Panel)
+PLUGINLIB_EXPORT_CLASS(MoveItCommandPanel, rviz::Panel)
