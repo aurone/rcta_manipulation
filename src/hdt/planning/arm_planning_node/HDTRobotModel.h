@@ -64,7 +64,6 @@ private:
     Eigen::Affine3d mount_frame_to_manipulator_frame_;
 
     // Privatizing these methods since the OpenRAVE IK is generated only for the 7th dof
-    RobotModel::init;
     RobotModel::setPlanningJoints;
     RobotModel::setPlanningLink;
 

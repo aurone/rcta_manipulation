@@ -74,7 +74,7 @@ private:
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field_;
     std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid_;
     std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
-    std::unique_ptr<sbpl_arm_planner::ActionSet> sbpl_action_set_;
+    std::shared_ptr<sbpl_arm_planner::ActionSet> sbpl_action_set_;
     std::unique_ptr<sbpl_arm_planner::SBPLArmPlannerInterface> planner_;
 
     sensor_msgs::JointState last_joint_state_;

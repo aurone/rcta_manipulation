@@ -11,6 +11,7 @@ MoveArmCommandPanel::MoveArmCommandPanel(QWidget* parent) :
     m_model(new MoveArmCommandModel),
     m_robot_description_line_edit(nullptr),
     m_load_robot_button(nullptr),
+    m_joint_groups_combo_box(nullptr),
     m_arm_commands_group(nullptr),
     m_marker_pub(),
     m_spinbox_to_vind(),
@@ -133,6 +134,17 @@ void MoveArmCommandPanel::setupRobotGUI()
 
     moveit::core::RobotModelConstPtr robot_model = m_model->robotModel();
     auto jmg = robot_model->getJointModelGroup(m_jmgoo);
+
+    m_joint_groups_combo_box = new QComboBox;
+    // set up combobox for choosing joint group to modify
+    for (size_t jgind = 0;
+        jgind < robot_model->getJointModelGroupNames().size();
+        ++jgind)
+    {
+        const std::string& jg_name =
+                robot_model->getJointModelGroupNames()[jgind];
+        m_joint_groups_combo_box->addItem(QString::fromStdString(jg_name));
+    }
 
     QScrollArea* scroll_area = new QScrollArea;
     QVBoxLayout* scroll_area_layout = new QVBoxLayout;
@@ -262,7 +274,7 @@ void MoveArmCommandPanel::setupRobotGUI()
     scroll_area->setWidget(joint_commands_widget);
 
     QVBoxLayout* vlayout = qobject_cast<QVBoxLayout*>(layout());
-//    vlayout->insertWidget(vlayout->count() - 1, scroll_area);
+    vlayout->insertWidget(vlayout->count(), m_joint_groups_combo_box);
     vlayout->insertWidget(vlayout->count(), scroll_area);
 }
 
