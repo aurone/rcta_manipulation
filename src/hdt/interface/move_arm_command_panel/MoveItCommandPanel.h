@@ -45,6 +45,7 @@ public Q_SLOTS:
     void setJointVariableFromSpinBox(double value);
     void setJointGroup(const QString& joint_group_name);
     void planToPosition();
+    void copyCurrentState();
 
 private:
 
@@ -59,6 +60,7 @@ private:
     QGroupBox* m_arm_commands_group;
 
     QPushButton* m_plan_to_position_button;
+    QPushButton* m_copy_current_state_button;
 
     ros::Publisher m_marker_pub;
 

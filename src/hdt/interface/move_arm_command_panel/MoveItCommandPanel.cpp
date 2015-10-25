@@ -169,10 +169,15 @@ void MoveItCommandPanel::setupRobotGUI()
     connect(m_plan_to_position_button, SIGNAL(clicked()),
             this, SLOT(planToPosition()));
 
+    m_copy_current_state_button = new QPushButton(tr("Copy Current State"));
+    connect(m_copy_current_state_button, SIGNAL(clicked()),
+            this, SLOT(copyCurrentState()));
+
     QVBoxLayout* vlayout = qobject_cast<QVBoxLayout*>(layout());
     vlayout->insertWidget(vlayout->count(), m_joint_groups_combo_box);
     vlayout->insertWidget(vlayout->count(), m_var_cmd_widget);
     vlayout->insertWidget(vlayout->count(), m_plan_to_position_button);
+    vlayout->insertWidget(vlayout->count(), m_copy_current_state_button);
     vlayout->addStretch();
 }
 
@@ -370,6 +375,11 @@ void MoveItCommandPanel::planToPosition()
     std::string current_joint_group =
             m_joint_groups_combo_box->currentText().toStdString();
     m_model->planToPosition(current_joint_group);
+}
+
+void MoveItCommandPanel::copyCurrentState()
+{
+    m_model->copyCurrentState();
 }
 
 bool MoveItCommandPanel::isVariableAngle(int vind) const

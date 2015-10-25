@@ -173,6 +173,16 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
     return true;
 }
 
+bool MoveArmCommandModel::copyCurrentState()
+{
+    if (!m_last_joint_state_msg) {
+        return false;
+    }
+
+    m_robot_state->setVariableValues(*m_last_joint_state_msg);
+    Q_EMIT robotStateChanged();
+}
+
 void MoveArmCommandModel::setJointVariable(int jidx, double value)
 {
     if (!isRobotLoaded()) {

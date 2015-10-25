@@ -43,6 +43,8 @@ public:
     bool readyToPlan() const;
     bool planToPosition(const std::string& group_name);
 
+    bool copyCurrentState();
+
 public Q_SLOTS:
 
     void setJointVariable(int jidx, double value);
