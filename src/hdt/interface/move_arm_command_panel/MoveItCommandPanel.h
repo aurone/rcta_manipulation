@@ -44,6 +44,7 @@ public Q_SLOTS:
 
     void setJointVariableFromSpinBox(double value);
     void setJointGroup(const QString& joint_group_name);
+    void planToPosition();
 
 private:
 
@@ -56,6 +57,8 @@ private:
 
     QComboBox* m_joint_groups_combo_box;
     QGroupBox* m_arm_commands_group;
+
+    QPushButton* m_plan_to_position_button;
 
     ros::Publisher m_marker_pub;
 

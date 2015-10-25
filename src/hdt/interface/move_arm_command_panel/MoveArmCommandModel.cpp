@@ -2,15 +2,20 @@
 
 #include <stack>
 
+#include <eigen_conversions/eigen_msg.h>
 #include <ros/console.h>
+#include <sbpl_geometry_utils/utils.h>
 
 MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
     QObject(parent),
+    m_joint_states_sub(),
     m_robot_description(),
     m_rm_loader(),
     m_robot_model(),
     m_robot_state()
 {
+    m_joint_states_sub = m_nh.subscribe("joint_states", 5, &MoveArmCommandModel::jointStatesCallback, this);
+    m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>("plan_kinematic_path");
 }
 
 bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
@@ -38,6 +43,8 @@ bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
     m_robot_state->updateCollisionBodyTransforms();
 
     logRobotModelInfo(*m_robot_model);
+
+    clearMoveGroupRequest();
 
     Q_EMIT robotLoaded();
     return true;
@@ -115,6 +122,55 @@ MoveArmCommandModel::getRightArmTorques(
     };
 
     return torques;
+}
+
+bool MoveArmCommandModel::readyToPlan() const
+{
+    if (!isRobotLoaded()) {
+        ROS_WARN("Cannot plan with no robot loaded");
+        return false;
+    }
+
+    if (!m_last_joint_state_msg) {
+        ROS_WARN("Haven't received a JointState message yet");
+        return false;
+    }
+
+    return true;
+}
+
+bool MoveArmCommandModel::planToPosition(const std::string& group_name)
+{
+    if (!readyToPlan()) {
+        return false;
+    }
+
+    moveit_msgs::GetMotionPlan srv;
+    moveit_msgs::MotionPlanRequest& req = srv.request.motion_plan_request;
+
+    const ros::Time now = ros::Time::now();
+
+    if (!fillWorkspaceParameters(now, group_name, req) ||
+        !fillStartState(now, group_name, req) ||
+        !fillGoalConstraints(now, group_name, req) ||
+        !fillPathConstraints(now, group_name, req) ||
+        !fillTrajectoryConstraints(now, group_name, req))
+    {
+        return false;
+    }
+
+    req.planner_id = "ARA*";
+    req.group_name = group_name;
+    req.num_planning_attempts = 1;
+    req.allowed_planning_time = 10.0;
+    req.max_velocity_scaling_factor = 1.0;
+
+    if (!m_plan_path_client.call(srv)) {
+        ROS_ERROR("Service call failed");
+        return false;
+    }
+
+    return true;
 }
 
 void MoveArmCommandModel::setJointVariable(int jidx, double value)
@@ -204,4 +260,190 @@ void MoveArmCommandModel::logRobotModelInfo(
         const auto& var_bounds = rm.getVariableBounds(var_name);
         ROS_INFO("%s: { min: %f, max: %f, vel: %f, acc: %f }", var_name.c_str(), var_bounds.min_position_, var_bounds.max_position_, var_bounds.max_velocity_, var_bounds.max_acceleration_);
     }
+}
+
+void MoveArmCommandModel::jointStatesCallback(
+    const sensor_msgs::JointState::ConstPtr& msg)
+{
+    m_last_joint_state_msg = msg;
+}
+
+void MoveArmCommandModel::clearMoveGroupRequest()
+{
+    // workspace parameters dependent on the robot model
+    // start-state possibly dependent on the robot model
+    // constraints dependent on the robot model
+    // planner id dependent on plugins loaded into move_group
+    // group_name dependent on the loaded robot loaded
+    // planning attempts, planning time, and scaling factor not-dependent on anything
+}
+
+bool MoveArmCommandModel::fillWorkspaceParameters(
+    const ros::Time& now,
+    const std::string& group_name,
+    moveit_msgs::MotionPlanRequest& req)
+{
+    req.workspace_parameters.header.frame_id = m_robot_model->getModelFrame();
+    req.workspace_parameters.header.seq = 0;
+    req.workspace_parameters.header.stamp = now;
+    req.workspace_parameters.min_corner.x = -0.5;
+    req.workspace_parameters.min_corner.y = -1.0;
+    req.workspace_parameters.min_corner.z = 0.0;
+    req.workspace_parameters.max_corner.x = 1.0;
+    req.workspace_parameters.max_corner.y = 1.0;
+    req.workspace_parameters.max_corner.z = 3.0;
+    return true;
+}
+
+bool MoveArmCommandModel::fillStartState(
+    const ros::Time& now,
+    const std::string& group_name,
+    moveit_msgs::MotionPlanRequest& req) const
+{
+    req.start_state.joint_state.header.frame_id = "";
+    req.start_state.joint_state.header.seq = 0;
+    req.start_state.joint_state.header.stamp = now;
+    req.start_state.joint_state.name = m_last_joint_state_msg->name;
+    req.start_state.joint_state.position = m_last_joint_state_msg->position;
+    req.start_state.joint_state.velocity = m_last_joint_state_msg->velocity;
+    req.start_state.joint_state.effort = m_last_joint_state_msg->effort;
+
+    // for each multi-dof joint
+    //   find the transform between the parent link and the child link and set
+    //   the transform accordingly here
+    sensor_msgs::MultiDOFJointState& multi_dof_joint_state =
+            req.start_state.multi_dof_joint_state;
+    multi_dof_joint_state.header.frame_id = ""; 
+    multi_dof_joint_state.header.seq = 0;
+    multi_dof_joint_state.header.stamp = now;
+
+    const std::vector<const moveit::core::JointModel*>& multi_dof_joints =
+            m_robot_model->getMultiDOFJointModels();
+    for (size_t jind = 0; jind < multi_dof_joints.size(); ++jind) {
+        const moveit::core::JointModel* jm = multi_dof_joints[jind];
+        multi_dof_joint_state.joint_names.push_back(jm->getName());
+
+        const moveit::core::LinkModel* parent_lm = jm->getParentLinkModel();
+        const moveit::core::LinkModel* child_lm = jm->getChildLinkModel();
+
+        const Eigen::Affine3d& T_model_parent = !parent_lm ?
+                Eigen::Affine3d::Identity() :
+                m_robot_state->getFrameTransform(parent_lm->getName());
+        const Eigen::Affine3d& T_model_child =
+                m_robot_state->getFrameTransform(child_lm->getName());
+
+        Eigen::Affine3d T_parent_child =
+                T_model_parent.inverse() * T_model_child;
+
+        Eigen::Vector3d pos_parent_child(T_parent_child.translation());
+        Eigen::Quaterniond rot_parent_child(T_parent_child.rotation());
+
+        geometry_msgs::Transform trans;
+        trans.translation.x = pos_parent_child.x();
+        trans.translation.x = pos_parent_child.y();
+        trans.translation.x = pos_parent_child.z();
+        trans.rotation.w = rot_parent_child.w();
+        trans.rotation.x = rot_parent_child.x();
+        trans.rotation.y = rot_parent_child.y();
+        trans.rotation.z = rot_parent_child.z();
+
+        multi_dof_joint_state.transforms.push_back(trans);
+    }
+
+//    // TODO: attach nailgun
+//    req.start_state.attached_collision_objects; 
+
+    req.start_state.is_diff = false;
+    return true;
+}
+
+bool MoveArmCommandModel::fillGoalConstraints(
+    const ros::Time& now,
+    const std::string& group_name,
+    moveit_msgs::MotionPlanRequest& req) const
+{
+    moveit_msgs::Constraints goal_constraints;
+    goal_constraints.name = "goal_constraints";
+
+    const moveit::core::JointModelGroup* jmg =
+            m_robot_model->getJointModelGroup(group_name);
+    if (!jmg->isChain()) {
+        ROS_INFO("Planning for joint groups that are not kinematic chains is not supported");
+        return false;
+    }
+
+    auto solver = jmg->getSolverInstance();
+    const std::string& tip_link = solver->getTipFrames().front();
+    ROS_INFO("Planning for pose of tip link '%s' of kinematic chain", tip_link.c_str());
+
+    const Eigen::Affine3d& T_model_tip = m_robot_state->getGlobalLinkTransform(tip_link);
+    geometry_msgs::Pose tip_link_pose;
+    tf::poseEigenToMsg(T_model_tip, tip_link_pose);
+
+    // Position constraint on the tip link
+
+    moveit_msgs::PositionConstraint goal_pos_constraint;
+
+    goal_pos_constraint.header.frame_id = m_robot_model->getModelFrame();
+    goal_pos_constraint.header.seq = 0;
+    goal_pos_constraint.header.stamp = now;
+
+    goal_pos_constraint.link_name = tip_link;
+
+    goal_pos_constraint.target_point_offset.x = 0.0;
+    goal_pos_constraint.target_point_offset.y = 0.0;
+    goal_pos_constraint.target_point_offset.z = 0.0;
+
+    // specify region within 5cm of the goal position
+    shape_msgs::SolidPrimitive tolerance_volume;
+    tolerance_volume.type = shape_msgs::SolidPrimitive::SPHERE;
+    tolerance_volume.dimensions = { 0.05 };
+    goal_pos_constraint.constraint_region.primitives.push_back(tolerance_volume);
+    goal_pos_constraint.constraint_region.primitive_poses.push_back(tip_link_pose);
+
+    goal_pos_constraint.weight = 1.0;
+
+    // Orientation constraint on the tip link
+
+    // specify goal orientation within 5 degrees of the goal orientation
+    moveit_msgs::OrientationConstraint goal_rot_constraint;
+
+    goal_rot_constraint.header.frame_id = m_robot_model->getModelFrame();
+    goal_rot_constraint.header.seq = 0;
+    goal_rot_constraint.header.stamp = now;
+
+    goal_rot_constraint.orientation = tip_link_pose.orientation;
+
+    goal_rot_constraint.link_name = tip_link;
+
+    goal_rot_constraint.absolute_x_axis_tolerance = sbpl::utils::ToRadians(5.0);
+    goal_rot_constraint.absolute_y_axis_tolerance = sbpl::utils::ToRadians(5.0);
+    goal_rot_constraint.absolute_z_axis_tolerance = sbpl::utils::ToRadians(5.0);
+
+    goal_rot_constraint.weight = 1.0;
+
+//    goal_constraints.joint_constraints;
+    goal_constraints.position_constraints.push_back(goal_pos_constraint);
+    goal_constraints.orientation_constraints.push_back(goal_rot_constraint);
+//    goal_constraints.visibility_constraints;
+
+    req.goal_constraints.push_back(goal_constraints);
+
+    return true;
+}
+
+bool MoveArmCommandModel::fillPathConstraints(
+    const ros::Time& now,
+    const std::string& group_name,
+    moveit_msgs::MotionPlanRequest& req) const
+{
+    return true;
+}
+
+bool MoveArmCommandModel::fillTrajectoryConstraints(
+    const ros::Time& now,
+    const std::string& group_name,
+    moveit_msgs::MotionPlanRequest& req) const
+{
+    return true;
 }

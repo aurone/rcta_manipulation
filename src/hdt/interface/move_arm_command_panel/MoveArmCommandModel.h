@@ -4,10 +4,12 @@
 #include <string>
 
 #include <QtGui>
-
+#include <ros/ros.h>
+#include <sensor_msgs/JointState.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
+#include <moveit_msgs/GetMotionPlan.h>
 
 class MoveArmCommandModel : public QObject
 {
@@ -38,6 +40,9 @@ public:
         double fx, double fy, double fz,
         double ta, double tb, double tc) const;
 
+    bool readyToPlan() const;
+    bool planToPosition(const std::string& group_name);
+
 public Q_SLOTS:
 
     void setJointVariable(int jidx, double value);
@@ -46,8 +51,15 @@ Q_SIGNALS:
 
     void robotLoaded();
     void robotStateChanged();
+    void readyStatusChanged();
 
 private:
+
+    ros::NodeHandle m_nh;
+    ros::Subscriber m_joint_states_sub;
+    ros::ServiceClient m_plan_path_client;
+
+    sensor_msgs::JointState::ConstPtr m_last_joint_state_msg;
 
     std::string m_robot_description;
 
@@ -56,6 +68,31 @@ private:
     moveit::core::RobotStatePtr m_robot_state;
 
     void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
+
+    void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg);
+
+    void clearMoveGroupRequest();
+
+    bool fillWorkspaceParameters(
+        const ros::Time& now,
+        const std::string& group_name,
+        moveit_msgs::MotionPlanRequest& req);
+    bool fillStartState(
+        const ros::Time& now,
+        const std::string& group_name,
+        moveit_msgs::MotionPlanRequest& req) const;
+    bool fillGoalConstraints(
+        const ros::Time& now,
+        const std::string& group,
+        moveit_msgs::MotionPlanRequest& req) const;
+    bool fillPathConstraints(
+        const ros::Time& now,
+        const std::string& group_name,
+        moveit_msgs::MotionPlanRequest& req) const;
+    bool fillTrajectoryConstraints(
+        const ros::Time& now,
+        const std::string& group_name,
+        moveit_msgs::MotionPlanRequest& req) const;
 };
 
 #endif

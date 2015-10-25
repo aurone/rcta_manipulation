@@ -60,7 +60,7 @@ void MoveItCommandPanel::save(rviz::Config config) const
             "robot_description",
             QString::fromStdString(m_model->robotDescription()));
 
-    // TODO: save last joint group used and the final robot state
+    // TODO: save the state of the MoveArmCommandModel
 }
 
 void MoveItCommandPanel::loadRobot()
@@ -165,9 +165,14 @@ void MoveItCommandPanel::setupRobotGUI()
     updateJointVariableCommandWidget(
         m_joint_groups_combo_box->currentText().toStdString());
 
+    m_plan_to_position_button = new QPushButton(tr("Plan to Position"));
+    connect(m_plan_to_position_button, SIGNAL(clicked()),
+            this, SLOT(planToPosition()));
+
     QVBoxLayout* vlayout = qobject_cast<QVBoxLayout*>(layout());
     vlayout->insertWidget(vlayout->count(), m_joint_groups_combo_box);
     vlayout->insertWidget(vlayout->count(), m_var_cmd_widget);
+    vlayout->insertWidget(vlayout->count(), m_plan_to_position_button);
     vlayout->addStretch();
 }
 
@@ -358,6 +363,13 @@ void MoveItCommandPanel::setJointVariableFromSpinBox(double value)
 void MoveItCommandPanel::setJointGroup(const QString& joint_group_name)
 {
     updateJointVariableCommandWidget(joint_group_name.toStdString());
+}
+
+void MoveItCommandPanel::planToPosition()
+{
+    std::string current_joint_group =
+            m_joint_groups_combo_box->currentText().toStdString();
+    m_model->planToPosition(current_joint_group);
 }
 
 bool MoveItCommandPanel::isVariableAngle(int vind) const
