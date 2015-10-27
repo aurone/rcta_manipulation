@@ -293,15 +293,25 @@ bool MoveArmCommandModel::fillWorkspaceParameters(
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req)
 {
-    req.workspace_parameters.header.frame_id = m_robot_model->getModelFrame();
+//    req.workspace_parameters.header.frame_id = m_robot_model->getModelFrame();
+//    req.workspace_parameters.header.seq = 0;
+//    req.workspace_parameters.header.stamp = now;
+//    req.workspace_parameters.min_corner.x = -0.5;
+//    req.workspace_parameters.min_corner.y = -1.0;
+//    req.workspace_parameters.min_corner.z = 0.0;
+//    req.workspace_parameters.max_corner.x = 1.0;
+//    req.workspace_parameters.max_corner.y = 1.0;
+//    req.workspace_parameters.max_corner.z = 3.0;
+
+    req.workspace_parameters.header.frame_id = "torso_lift_link";
     req.workspace_parameters.header.seq = 0;
     req.workspace_parameters.header.stamp = now;
-    req.workspace_parameters.min_corner.x = -0.5;
+    req.workspace_parameters.min_corner.x = 0.0;
     req.workspace_parameters.min_corner.y = -1.0;
-    req.workspace_parameters.min_corner.z = 0.0;
-    req.workspace_parameters.max_corner.x = 1.0;
+    req.workspace_parameters.min_corner.z = -2.0;
+    req.workspace_parameters.max_corner.x = 1.5;
     req.workspace_parameters.max_corner.y = 1.0;
-    req.workspace_parameters.max_corner.z = 3.0;
+    req.workspace_parameters.max_corner.z = 1.0;
     return true;
 }
 
@@ -426,9 +436,9 @@ bool MoveArmCommandModel::fillGoalConstraints(
 
     goal_rot_constraint.link_name = tip_link;
 
-    goal_rot_constraint.absolute_x_axis_tolerance = sbpl::utils::ToRadians(5.0);
-    goal_rot_constraint.absolute_y_axis_tolerance = sbpl::utils::ToRadians(5.0);
-    goal_rot_constraint.absolute_z_axis_tolerance = sbpl::utils::ToRadians(5.0);
+    goal_rot_constraint.absolute_x_axis_tolerance = sbpl::utils::ToRadians(10.0);
+    goal_rot_constraint.absolute_y_axis_tolerance = sbpl::utils::ToRadians(10.0);
+    goal_rot_constraint.absolute_z_axis_tolerance = sbpl::utils::ToRadians(10.0);
 
     goal_rot_constraint.weight = 1.0;
 
