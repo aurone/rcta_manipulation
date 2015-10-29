@@ -412,6 +412,21 @@ void MoveItCommandPanel::copyCurrentState()
     m_model->copyCurrentState();
 }
 
+void MoveItCommandPanel::setTableX(double x)
+{
+
+}
+
+void MoveItCommandPanel::setTableY(double y)
+{
+
+}
+
+void MoveItCommandPanel::setTableZ(double z)
+{
+
+}
+
 bool MoveItCommandPanel::isVariableAngle(int vind) const
 {
     auto robot_model = m_model->robotModel();
