@@ -4,6 +4,8 @@
 
 constraint_approximations_path: ~/constraints_approximation_database
 
+use_sbpl_collision_checking: true
+
 right_arm:
   planner_configs:
     - ARAConfigDefault
