@@ -69,6 +69,8 @@ private:
     moveit::core::RobotModelPtr m_robot_model;
     moveit::core::RobotStatePtr m_robot_state;
 
+    ros::Publisher m_collision_object_pub;
+
     void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
 
     void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg);

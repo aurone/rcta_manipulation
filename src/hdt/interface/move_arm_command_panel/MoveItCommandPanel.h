@@ -47,6 +47,10 @@ public Q_SLOTS:
     void planToPosition();
     void copyCurrentState();
 
+    void setTableX(double x);
+    void setTableY(double y);
+    void setTableZ(double z);
+
 private:
 
     ros::NodeHandle m_nh;
@@ -65,6 +69,10 @@ private:
     ros::Publisher m_marker_pub;
 
     JointVariableCommandWidget* m_var_cmd_widget;
+
+    QDoubleSpinBox* m_table_x_spinbox;
+    QDoubleSpinBox* m_table_y_spinbox;
+    QDoubleSpinBox* m_table_z_spinbox;
 
     /// \brief Setup the baseline GUI for loading robots from URDF parameter
     void setupGUI();

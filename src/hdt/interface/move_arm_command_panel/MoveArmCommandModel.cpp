@@ -16,6 +16,7 @@ MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
 {
     m_joint_states_sub = m_nh.subscribe("joint_states", 5, &MoveArmCommandModel::jointStatesCallback, this);
     m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>("plan_kinematic_path");
+    m_collision_object_pub = m_nh.advertise<moveit_msgs::CollisionObject>("collision_object", 5, true);
 }
 
 bool MoveArmCommandModel::loadRobot(const std::string& robot_description)

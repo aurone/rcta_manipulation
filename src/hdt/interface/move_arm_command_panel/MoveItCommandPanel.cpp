@@ -16,7 +16,10 @@ MoveItCommandPanel::MoveItCommandPanel(QWidget* parent) :
     m_joint_groups_combo_box(nullptr),
     m_arm_commands_group(nullptr),
     m_marker_pub(),
-    m_var_cmd_widget(nullptr)
+    m_var_cmd_widget(nullptr),
+    m_table_x_spinbox(nullptr),
+    m_table_y_spinbox(nullptr),
+    m_table_z_spinbox(nullptr)
 {
     setupGUI();
 
@@ -173,11 +176,38 @@ void MoveItCommandPanel::setupRobotGUI()
     connect(m_copy_current_state_button, SIGNAL(clicked()),
             this, SLOT(copyCurrentState()));
 
+    m_table_x_spinbox = new QDoubleSpinBox;
+    m_table_x_spinbox->setMinimum(-10.0);
+    m_table_x_spinbox->setMaximum( 10.0);
+    m_table_x_spinbox->setSingleStep(0.10);
+    m_table_x_spinbox->setWrapping(false);
+    connect(m_table_x_spinbox, SIGNAL(valueChanged(double)),
+            this, SLOT(setTableX(double)));
+
+    m_table_y_spinbox = new QDoubleSpinBox;
+    m_table_y_spinbox->setMinimum(-10.0);
+    m_table_y_spinbox->setMaximum( 10.0);
+    m_table_y_spinbox->setSingleStep(0.10);
+    m_table_y_spinbox->setWrapping(false);
+    connect(m_table_y_spinbox, SIGNAL(valueChanged(double)),
+            this, SLOT(setTableY(double)));
+
+    m_table_z_spinbox = new QDoubleSpinBox;
+    m_table_z_spinbox->setMinimum(-10.0);
+    m_table_z_spinbox->setMaximum( 10.0);
+    m_table_z_spinbox->setSingleStep(0.10);
+    m_table_z_spinbox->setWrapping(false);
+    connect(m_table_z_spinbox, SIGNAL(valueChanged(double)),
+            this, SLOT(setTableZ(double)));
+
     QVBoxLayout* vlayout = qobject_cast<QVBoxLayout*>(layout());
     vlayout->insertWidget(vlayout->count(), m_joint_groups_combo_box);
     vlayout->insertWidget(vlayout->count(), m_var_cmd_widget);
     vlayout->insertWidget(vlayout->count(), m_plan_to_position_button);
     vlayout->insertWidget(vlayout->count(), m_copy_current_state_button);
+    vlayout->insertWidget(vlayout->count(), m_table_x_spinbox);
+    vlayout->insertWidget(vlayout->count(), m_table_y_spinbox);
+    vlayout->insertWidget(vlayout->count(), m_table_z_spinbox);
     vlayout->addStretch();
 }
 
