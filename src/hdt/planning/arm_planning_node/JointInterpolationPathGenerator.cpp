@@ -17,7 +17,7 @@ JointInterpolationPathGenerator::JointInterpolationPathGenerator() :
 }
 
 bool JointInterpolationPathGenerator::initialize(
-    const std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace>& collision_checker,
+    const std::shared_ptr<sbpl::collision::SBPLCollisionSpace>& collision_checker,
     const std::vector<double>& min_limits,
     const std::vector<double>& max_limits,
     const std::vector<bool>& continuous)

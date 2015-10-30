@@ -1,4 +1,8 @@
 collision_groups:
+  name: platform
+  type: voxels
+  root_name: base_footprint
+  tip_name: arm_7_gripper_lift_link
 - collision_links:
   - {name: back_left_wheel, root: back_left_wheel}
   - {name: back_right_wheel, root: back_right_wheel}
@@ -7,10 +11,10 @@ collision_groups:
   - {name: top_shelf, root: top_shelf}
   - {name: left_shelf_support, root: left_shelf_support}
   - {name: right_shelf_support, root: right_shelf_support}
-  name: platform
-  root_name: base_footprint
+  name: manipulator
+  type: spheres
+  root_name: arm_mount_panel_dummy
   tip_name: arm_7_gripper_lift_link
-  type: voxels
 - collision_links:
   - {name: arm_1_shoulder_twist_link, root: arm_1_shoulder_twist_link, spheres: l1_2
       l1_3 l1_4}
@@ -26,10 +30,7 @@ collision_groups:
   - {name: arm_6_wrist_lift_link, root: arm_6_wrist_lift_link, spheres: l6_0 l6_1}
   - {name: arm_7_gripper_lift_link, root: arm_7_gripper_lift_link, spheres: l7_0 sp_0
       sp_1 sp_2 sp_3 sp_4 sp_5 sp_6 sp_8 sp_9 sp_10 sp_11 sp_12 sp_13 sp_14 sp_17}
-  name: manipulator
-  root_name: arm_mount_panel_dummy
-  tip_name: arm_7_gripper_lift_link
-  type: spheres
+
 collision_spheres:
 - {name: l1_0, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.03}
 - {name: l1_1, priority: 5, radius: 0.0381, x: 0.0, y: 0.0, z: 0.05}

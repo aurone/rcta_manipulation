@@ -328,14 +328,19 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
     ROS_INFO_PRETTY("    Resolution: %0.3f", grid_->getResolution());
     ROS_INFO_PRETTY("    Reference Frame: %s", grid_->getReferenceFrame().c_str());
 
-    collision_checker_.reset(new sbpl_arm_planner::SBPLCollisionSpace(grid_.get()));
+    collision_checker_.reset(new sbpl::collision::SBPLCollisionSpace(grid_.get()));
     if (!collision_checker_) {
         ROS_ERROR_PRETTY("  Failed to instantiate SBPL Collision Space");
         return false;
     }
 
     const std::string group_name = "manipulator"; // This has something to do with the collision checking config file?
-    if (!collision_checker_->init(urdf_string_, group_name) ||
+    sbpl::collision::CollisionModelConfig cm_config;
+    if (!sbpl::collision::CollisionModelConfig::Load(ros::NodeHandle(), cm_config)) {
+        ROS_ERROR("Failed to initialize collision model config");
+        return false;
+    }
+    if (!collision_checker_->init(urdf_string_, group_name, cm_config) ||
         !collision_checker_->setPlanningJoints(robot_model_->joint_names()))
     {
         ROS_ERROR_PRETTY("  Failed to initialize SBPL Collision Checker");

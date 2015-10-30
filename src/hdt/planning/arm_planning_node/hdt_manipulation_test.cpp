@@ -144,13 +144,19 @@ int main(int argc, char** argv)
     std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid(new sbpl_arm_planner::OccupancyGrid(distance_field.get()));
     grid->setReferenceFrame(planning_frame);
 
-    std::unique_ptr<sbpl_arm_planner::SBPLCollisionSpace> cc(new sbpl_arm_planner::SBPLCollisionSpace(grid.get()));
+    std::unique_ptr<sbpl::collision::SBPLCollisionSpace> cc(new sbpl::collision::SBPLCollisionSpace(grid.get()));
     if (!cc) {
         ROS_ERROR("Failed to instantiate collision checker");
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }
 
-    if (!cc->init(urdf, group_name)) {
+    sbpl::collision::CollisionModelConfig cm_config;
+    if (!sbpl::collision::CollisionModelConfig::Load(ros::NodeHandle(), cm_config)) {
+        ROS_ERROR("Failed to load collision model config");
+        return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
+    }
+
+    if (!cc->init(urdf, group_name, cm_config)) {
         ROS_ERROR("Failed to initialize collision checking for HDT arm group %s", group_name.c_str());
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }

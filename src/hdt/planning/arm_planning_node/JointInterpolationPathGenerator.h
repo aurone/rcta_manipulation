@@ -6,10 +6,11 @@
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 #include <sbpl_geometry_utils/shortcut.h>
 
-namespace sbpl_arm_planner
-{
+namespace sbpl {
+namespace collision {
 class SBPLCollisionSpace;
-}
+} // namespace collision
+} // namespace sbpl
 
 namespace hdt
 {
@@ -21,7 +22,7 @@ public:
     JointInterpolationPathGenerator();
 
     bool initialize(
-        const std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace>& collision_checker,
+        const std::shared_ptr<sbpl::collision::SBPLCollisionSpace>& collision_checker,
         const std::vector<double>& min_limits,
         const std::vector<double>& max_limits,
         const std::vector<bool>& continuous);
@@ -34,7 +35,7 @@ public:
 
 private:
 
-    std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
+    std::shared_ptr<sbpl::collision::SBPLCollisionSpace> collision_checker_;
     std::vector<double> min_limits_;
     std::vector<double> max_limits_;
     std::vector<bool> continuous_;

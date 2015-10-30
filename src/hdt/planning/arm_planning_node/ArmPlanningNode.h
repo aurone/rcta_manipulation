@@ -73,7 +73,7 @@ private:
     std::unique_ptr<sbpl_arm_planner::RobotModel> planner_robot_model_;
     std::unique_ptr<distance_field::PropagationDistanceField> distance_field_;
     std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid_;
-    std::shared_ptr<sbpl_arm_planner::SBPLCollisionSpace> collision_checker_;
+    std::shared_ptr<sbpl::collision::SBPLCollisionSpace> collision_checker_;
     std::shared_ptr<sbpl_arm_planner::ActionSet> sbpl_action_set_;
     std::unique_ptr<sbpl_arm_planner::SBPLArmPlannerInterface> planner_;
 
