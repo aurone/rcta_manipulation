@@ -6,6 +6,69 @@
 #include <ros/console.h>
 #include <sbpl_geometry_utils/utils.h>
 
+static std::string to_string(moveit_msgs::MoveItErrorCodes code)
+{
+    switch (code.val) {
+    case moveit_msgs::MoveItErrorCodes::SUCCESS:
+        return "SUCCESS";
+    case moveit_msgs::MoveItErrorCodes::FAILURE:
+        return "FAILURE";
+
+    case moveit_msgs::MoveItErrorCodes::PLANNING_FAILED:
+        return "PLANNING_FAILED";
+    case moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN:
+        return "INVALID_MOTION_PLAN";
+    case moveit_msgs::MoveItErrorCodes::MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+        return "MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE";
+    case moveit_msgs::MoveItErrorCodes::CONTROL_FAILED:
+        return "CONTROL_FAILED";
+    case moveit_msgs::MoveItErrorCodes::UNABLE_TO_AQUIRE_SENSOR_DATA:
+        return "UNABLE_TO_AQUIRE_SENSOR_DATA";
+    case moveit_msgs::MoveItErrorCodes::TIMED_OUT:
+        return "TIMED_OUT";
+    case moveit_msgs::MoveItErrorCodes::PREEMPTED:
+        return "PREEMPTED";
+
+    case moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION:
+        return "START_STATE_IN_COLLISION";
+    case moveit_msgs::MoveItErrorCodes::START_STATE_VIOLATES_PATH_CONSTRAINTS:
+        return "START_STATE_VIOLATES_PATH_CONSTRAINTS";
+
+    case moveit_msgs::MoveItErrorCodes::GOAL_IN_COLLISION:
+        return "GOAL_IN_COLLISION";
+    case moveit_msgs::MoveItErrorCodes::GOAL_VIOLATES_PATH_CONSTRAINTS:
+        return "GOAL_VIOLATES_PATH_CONSTRAINTS";
+    case moveit_msgs::MoveItErrorCodes::GOAL_CONSTRAINTS_VIOLATED:
+        return "GOAL_CONSTRAINTS_VIOLATED";
+
+    case moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME:
+        return "INVALID_GROUP_NAME";
+    case moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS:
+        return "INVALID_GOAL_CONSTRAINTS";
+    case moveit_msgs::MoveItErrorCodes::INVALID_ROBOT_STATE:
+        return "INVALID_ROBOT_STATE";
+    case moveit_msgs::MoveItErrorCodes::INVALID_LINK_NAME:
+        return "INVALID_LINK_NAME";
+    case moveit_msgs::MoveItErrorCodes::INVALID_OBJECT_NAME:
+        return "INVALID_OBJECT_NAME";
+
+    case moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE:
+        return "FRAME_TRANSFORM_FAILURE";
+    case moveit_msgs::MoveItErrorCodes::COLLISION_CHECKING_UNAVAILABLE:
+        return "COLLISION_CHECKING_UNAVAILABLE";
+    case moveit_msgs::MoveItErrorCodes::ROBOT_STATE_STALE:
+        return "ROBOT_STATE_STALE";
+    case moveit_msgs::MoveItErrorCodes::SENSOR_INFO_STALE:
+        return "SENSOR_INFO_STALE";
+
+    case moveit_msgs::MoveItErrorCodes::NO_IK_SOLUTION:
+        return "NO_IK_SOLUTION";
+
+    default:
+        return "UNRECOGNIZED";
+    }
+}
+
 MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
     QObject(parent),
     m_joint_states_sub(),
@@ -170,6 +233,33 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
         ROS_ERROR("Service call failed");
         return false;
     }
+
+    const moveit_msgs::MotionPlanResponse& res = srv.response.motion_plan_response;
+    ROS_INFO("Service call returned with code '%s", to_string(res.error_code).c_str());
+    ROS_INFO("trajectory_start:");
+    ROS_INFO("group_name: %s", res.group_name.c_str());
+    ROS_INFO("trajectory:");
+    ROS_INFO("  joint_trajectory: ");
+    ROS_INFO("    header: ");
+    ROS_INFO("      seq: ");
+    ROS_INFO("      stamp: ");
+    ROS_INFO("      frame_id: %s", res.trajectory.joint_trajectory.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", res.trajectory.joint_trajectory.joint_names.size());
+    ROS_INFO("    points: %zu", res.trajectory.joint_trajectory.points.size());
+    ROS_INFO("      positions: ");
+    ROS_INFO("      velocities: ");
+    ROS_INFO("      accelerations: ");
+    ROS_INFO("      effort: ");
+    ROS_INFO("      time_from_start: ");
+    ROS_INFO("  multi_dof_joint_trajectory: ");
+    ROS_INFO("    joint_names: %zu", res.trajectory.multi_dof_joint_trajectory.joint_names.size());
+    ROS_INFO("    points: %zu", res.trajectory.multi_dof_joint_trajectory.points.size());
+    ROS_INFO("      transforms: ");
+    ROS_INFO("      velocities: ");
+    ROS_INFO("      accelerations: ");
+    ROS_INFO("      time_from_start: ");
+    ROS_INFO("planning_time: %0.6f", res.planning_time);
+    ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
 
     return true;
 }
