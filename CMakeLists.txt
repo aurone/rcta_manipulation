@@ -21,7 +21,10 @@ find_package(catkin REQUIRED COMPONENTS
     interactive_markers
     leatherman 
     message_generation 
+    moveit_core
     moveit_ros_planning 
+    moveit_ros_planning_interface
+    moveit_ros_move_group
     nav_msgs 
     octomap_msgs 
     pluginlib

@@ -24,7 +24,10 @@
   <build_depend>interactive_markers</build_depend>
   <build_depend>leatherman</build_depend>
   <build_depend>message_generation</build_depend>
+  <build_depend>moveit_core</build_depend>
   <build_depend>moveit_ros_planning</build_depend>
+  <build_depend>moveit_ros_planning_interface</build_depend>
+  <build_depend>moveit_ros_move_group</build_depend>
   <build_depend>nav_msgs</build_depend>
   <build_depend>octomap_msgs</build_depend>
   <build_depend>pluginlib</build_depend>
@@ -69,7 +72,10 @@
   <run_depend>interactive_markers</run_depend>
   <run_depend>leatherman</run_depend>
   <run_depend>message_runtime</run_depend>
+  <run_depend>moveit_core</run_depend>
   <run_depend>moveit_ros_planning</run_depend>
+  <run_depend>moveit_ros_planning_interface</run_depend>
+  <run_depend>moveit_ros_move_group</run_depend>
   <run_depend>nav_msgs</run_depend>
   <run_depend>octomap_msgs</run_depend>
   <run_depend>pluginlib</run_depend>
