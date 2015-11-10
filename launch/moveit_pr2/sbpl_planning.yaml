@@ -193,7 +193,7 @@ collision_world:
     size_y: 3.0
     size_z: 2.0
     origin_x: -0.5
-    origin_y: 0.0
+    origin_y: -1.5
     origin_z: 0.0
     res_m: 0.02
     max_distance: 0.2
