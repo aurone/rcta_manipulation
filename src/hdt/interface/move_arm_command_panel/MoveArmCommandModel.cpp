@@ -3,6 +3,7 @@
 #include <stack>
 
 #include <eigen_conversions/eigen_msg.h>
+#include <moveit_msgs/PlanningSceneWorld.h>
 #include <ros/console.h>
 #include <sbpl_geometry_utils/utils.h>
 
@@ -69,17 +70,48 @@ static std::string to_string(moveit_msgs::MoveItErrorCodes code)
     }
 }
 
+const double MoveArmCommandModel::DefaultTableSizeX = 1.0;
+const double MoveArmCommandModel::DefaultTableSizeY = 2.0;
+const double MoveArmCommandModel::DefaultTableSizeZ = 0.2;
+
 MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
     QObject(parent),
-    m_joint_states_sub(),
+    m_nh(),
     m_robot_description(),
     m_rm_loader(),
     m_robot_model(),
-    m_robot_state()
+    m_robot_state(),
+    m_joint_states_sub(),
+    m_last_joint_state_msg(),
+    m_plan_path_client(),
+    m_table_size_x(DefaultTableSizeX),
+    m_table_size_y(DefaultTableSizeY),
+    m_table_size_z(DefaultTableSizeZ),
+    m_table_origin_x(1.0),
+    m_table_origin_y(0.0),
+    m_table_origin_z(0.48),
+    m_table_name("table"),
+    m_planning_scene_world_pub(),
+    m_collision_object_pub()
 {
-    m_joint_states_sub = m_nh.subscribe("joint_states", 5, &MoveArmCommandModel::jointStatesCallback, this);
-    m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>("plan_kinematic_path");
-    m_collision_object_pub = m_nh.advertise<moveit_msgs::CollisionObject>("collision_object", 5, true);
+    m_joint_states_sub = m_nh.subscribe(
+            "joint_states", 5, &MoveArmCommandModel::jointStatesCallback, this);
+    m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>(
+            "plan_kinematic_path");
+
+    m_planning_scene_world_pub = m_nh.advertise<moveit_msgs::PlanningSceneWorld>(
+            "planning_scene_world", 5, true);
+    m_collision_object_pub = m_nh.advertise<moveit_msgs::CollisionObject>(
+            "collision_object", 5, true);
+
+    // publish an empty planning scene world
+    moveit_msgs::PlanningSceneWorld planning_scene_world;
+//    m_planning_scene_world_pub.publish(planning_scene_world);
+
+    // publish the table
+    moveit_msgs::CollisionObject table_collision_object =
+            createTableCollisionObject();
+//    m_collision_object_pub.publish(table_collision_object);
 }
 
 bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
@@ -411,7 +443,8 @@ bool MoveArmCommandModel::fillStartState(
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req) const
 {
-    req.start_state.joint_state.header.frame_id = "";
+    // copy over joint state from incoming sensor data
+    req.start_state.joint_state.header.frame_id = "ooga booga";
     req.start_state.joint_state.header.seq = 0;
     req.start_state.joint_state.header.stamp = now;
     req.start_state.joint_state.name = m_last_joint_state_msg->name;
@@ -419,12 +452,30 @@ bool MoveArmCommandModel::fillStartState(
     req.start_state.joint_state.velocity = m_last_joint_state_msg->velocity;
     req.start_state.joint_state.effort = m_last_joint_state_msg->effort;
 
+    // TODO: keep another robot state around as the "current robot state" and
+    // use it as the single point of access, rather than distinguishing here
+    // between live sources of state and sources of state from the phantom
+
+    // copy over joint
+
     // for each multi-dof joint
     //   find the transform between the parent link and the child link and set
     //   the transform accordingly here
     sensor_msgs::MultiDOFJointState& multi_dof_joint_state =
             req.start_state.multi_dof_joint_state;
-    multi_dof_joint_state.header.frame_id = ""; 
+
+    // WARN: So, I'm not really sure why a frame id is necessary here. I was
+    // under the impression the multi-DOF transform would be the transform from
+    // the parent link to the child link (which, I believe, agrees with
+    // RobotState::getJointTransform), but there's some weird stuff going on in
+    // moveit/robot_state/conversions.h that leads to believe maybe somewhere is
+    // assuming the transform is from the model frame to the child link. Either
+    // way, we're going to set the header of the joint state to be the model
+    // frame, to avoid that conversion, and then be happy with the fact that the
+    // only multi-dof joint in the pr2 model is the planar joint between /odom
+    // and base_footprint. Here there be monsters.
+
+    multi_dof_joint_state.header.frame_id = m_robot_model->getModelFrame();
     multi_dof_joint_state.header.seq = 0;
     multi_dof_joint_state.header.stamp = now;
 
@@ -432,37 +483,20 @@ bool MoveArmCommandModel::fillStartState(
             m_robot_model->getMultiDOFJointModels();
     for (size_t jind = 0; jind < multi_dof_joints.size(); ++jind) {
         const moveit::core::JointModel* jm = multi_dof_joints[jind];
+
         multi_dof_joint_state.joint_names.push_back(jm->getName());
 
-        const moveit::core::LinkModel* parent_lm = jm->getParentLinkModel();
-        const moveit::core::LinkModel* child_lm = jm->getChildLinkModel();
-
-        const Eigen::Affine3d& T_model_parent = !parent_lm ?
-                Eigen::Affine3d::Identity() :
-                m_robot_state->getFrameTransform(parent_lm->getName());
-        const Eigen::Affine3d& T_model_child =
-                m_robot_state->getFrameTransform(child_lm->getName());
-
-        Eigen::Affine3d T_parent_child =
-                T_model_parent.inverse() * T_model_child;
-
-        Eigen::Vector3d pos_parent_child(T_parent_child.translation());
-        Eigen::Quaterniond rot_parent_child(T_parent_child.rotation());
+        const Eigen::Affine3d& joint_transform = 
+                m_robot_state->getJointTransform(jm);
 
         geometry_msgs::Transform trans;
-        trans.translation.x = pos_parent_child.x();
-        trans.translation.x = pos_parent_child.y();
-        trans.translation.x = pos_parent_child.z();
-        trans.rotation.w = rot_parent_child.w();
-        trans.rotation.x = rot_parent_child.x();
-        trans.rotation.y = rot_parent_child.y();
-        trans.rotation.z = rot_parent_child.z();
+        tf::transformEigenToMsg(joint_transform, trans);
 
         multi_dof_joint_state.transforms.push_back(trans);
     }
 
-//    // TODO: attach nailgun
-//    req.start_state.attached_collision_objects; 
+    // TODO: attach nailgun
+    req.start_state.attached_collision_objects.clear();
 
     req.start_state.is_diff = false;
     return true;
@@ -557,4 +591,33 @@ bool MoveArmCommandModel::fillTrajectoryConstraints(
     moveit_msgs::MotionPlanRequest& req) const
 {
     return true;
+}
+
+moveit_msgs::CollisionObject
+MoveArmCommandModel::createTableCollisionObject() const
+{
+    moveit_msgs::CollisionObject collision_object;
+    collision_object.header.seq = 0;
+    collision_object.header.stamp = ros::Time::now();
+    collision_object.header.frame_id = "odom_combined";
+    collision_object.id = m_table_name;
+    shape_msgs::SolidPrimitive primitive;
+    primitive.type = shape_msgs::SolidPrimitive::BOX;
+    primitive.dimensions.resize(3);
+    primitive.dimensions[0] = m_table_size_x;
+    primitive.dimensions[1] = m_table_size_y;
+    primitive.dimensions[2] = m_table_size_z;
+
+    geometry_msgs::Pose table_pose;
+    table_pose.orientation.w = 1.0;
+    table_pose.orientation.x = table_pose.orientation.y = table_pose.orientation.z = 0.0;
+    table_pose.position.x = m_table_origin_x;
+    table_pose.position.y = m_table_origin_y;
+    table_pose.position.z = m_table_origin_z;
+
+    collision_object.primitives.push_back(primitive);
+    collision_object.primitive_poses.push_back(table_pose);
+
+    collision_object.operation = moveit_msgs::CollisionObject::ADD;
+    return collision_object;
 }
