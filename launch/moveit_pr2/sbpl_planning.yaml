@@ -243,7 +243,7 @@ collision_groups:
 
   - name: right_arm
     type: spheres
-    root_name: base_footprint
+    root_name: torso_lift_link
     tip_name: r_wrist_roll_link
     collision_links:
     - name: shoulder
