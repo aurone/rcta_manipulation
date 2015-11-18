@@ -119,6 +119,9 @@ private:
         moveit_msgs::MotionPlanRequest& req) const;
 
     moveit_msgs::CollisionObject createTableCollisionObject() const;
+
+    void logMotionPlanResponse(
+        const moveit_msgs::MotionPlanResponse& res) const;
 };
 
 #endif

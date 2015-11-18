@@ -266,32 +266,8 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
         return false;
     }
 
-    const moveit_msgs::MotionPlanResponse& res = srv.response.motion_plan_response;
-    ROS_INFO("Service call returned with code '%s", to_string(res.error_code).c_str());
-    ROS_INFO("trajectory_start:");
-    ROS_INFO("group_name: %s", res.group_name.c_str());
-    ROS_INFO("trajectory:");
-    ROS_INFO("  joint_trajectory: ");
-    ROS_INFO("    header: ");
-    ROS_INFO("      seq: ");
-    ROS_INFO("      stamp: ");
-    ROS_INFO("      frame_id: %s", res.trajectory.joint_trajectory.header.frame_id.c_str());
-    ROS_INFO("    joint_names: %zu", res.trajectory.joint_trajectory.joint_names.size());
-    ROS_INFO("    points: %zu", res.trajectory.joint_trajectory.points.size());
-    ROS_INFO("      positions: ");
-    ROS_INFO("      velocities: ");
-    ROS_INFO("      accelerations: ");
-    ROS_INFO("      effort: ");
-    ROS_INFO("      time_from_start: ");
-    ROS_INFO("  multi_dof_joint_trajectory: ");
-    ROS_INFO("    joint_names: %zu", res.trajectory.multi_dof_joint_trajectory.joint_names.size());
-    ROS_INFO("    points: %zu", res.trajectory.multi_dof_joint_trajectory.points.size());
-    ROS_INFO("      transforms: ");
-    ROS_INFO("      velocities: ");
-    ROS_INFO("      accelerations: ");
-    ROS_INFO("      time_from_start: ");
-    ROS_INFO("planning_time: %0.6f", res.planning_time);
-    ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
+    const auto& res = srv.response.motion_plan_response;
+    logMotionPlanResponse(res);
 
     return true;
 }
@@ -620,4 +596,66 @@ MoveArmCommandModel::createTableCollisionObject() const
 
     collision_object.operation = moveit_msgs::CollisionObject::ADD;
     return collision_object;
+}
+
+void MoveArmCommandModel::logMotionPlanResponse(
+    const moveit_msgs::MotionPlanResponse& res) const
+{
+    ROS_INFO("Service call returned with code '%s", to_string(res.error_code).c_str());
+
+    // trajectory_start
+    const auto& trajectory_start = res.trajectory_start;
+    ROS_INFO("trajectory_start:");
+    const auto& start_joint_state = trajectory_start.joint_state;
+    ROS_INFO("  joint_state:");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            start_joint_state.header.seq,
+            start_joint_state.header.stamp.toSec(),
+            start_joint_state.header.frame_id.c_str());
+    ROS_INFO("    name: %zu", start_joint_state.name.size());
+    ROS_INFO("    position: %zu", start_joint_state.position.size());
+    ROS_INFO("    velocity: %zu", start_joint_state.velocity.size());
+    ROS_INFO("    effort: %zu", start_joint_state.effort.size());
+    const auto& start_multi_dof_joint_state = trajectory_start.multi_dof_joint_state;
+    ROS_INFO("  multi_dof_joint_state:");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            start_multi_dof_joint_state.header.seq,
+            start_multi_dof_joint_state.header.stamp.toSec(),
+            start_multi_dof_joint_state.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", start_multi_dof_joint_state.joint_names.size());
+    ROS_INFO("    transforms: %zu", start_multi_dof_joint_state.transforms.size());
+    ROS_INFO("    twist: %zu", start_multi_dof_joint_state.twist.size());
+    ROS_INFO("    wrench: %zu", start_multi_dof_joint_state.wrench.size());
+    const auto& start_attached_collision_objects = trajectory_start.attached_collision_objects;
+    ROS_INFO("  attached_collision_objects: %zu", start_attached_collision_objects.size());
+    ROS_INFO("  is_diff: %s", trajectory_start.is_diff ? "true" : "false");
+
+    // group_name
+    ROS_INFO("group_name: %s", res.group_name.c_str());
+
+    // trajectory
+    const auto& trajectory = res.trajectory;
+    ROS_INFO("trajectory:");
+    const auto& joint_trajectory = trajectory.joint_trajectory;
+    ROS_INFO("  joint_trajectory: ");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            joint_trajectory.header.seq,
+            joint_trajectory.header.stamp.toSec(),
+            joint_trajectory.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", joint_trajectory.joint_names.size());
+    ROS_INFO("    points: %zu", joint_trajectory.points.size());
+    const auto& multi_dof_joint_trajectory = trajectory.multi_dof_joint_trajectory;
+    ROS_INFO("  multi_dof_joint_trajectory: ");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            multi_dof_joint_trajectory.header.seq,
+            multi_dof_joint_trajectory.header.stamp.toSec(),
+            multi_dof_joint_trajectory.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", multi_dof_joint_trajectory.joint_names.size());
+    ROS_INFO("    points: %zu", multi_dof_joint_trajectory.points.size());
+
+    // planning_time
+    ROS_INFO("planning_time: %0.6f", res.planning_time);
+
+    // error_code
+    ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
 }
