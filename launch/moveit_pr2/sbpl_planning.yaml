@@ -10,12 +10,36 @@
 #         - Planner2Config
 #         - ...
 #         - PlannerNConfig
-#      use_sbpl_collision_checking: [true|false]
-#      discretization:
+#     use_sbpl_collision_checking: [true|false]
+#     discretization:
 #          joint1_name: discretization resolution
 #          joint2_name: discretization resolution
 #          ...
 #          joint1_name: discretization resolution
+#     mprim_filename: string
+#         # path to the file describing long and short range motion primitives
+#     use_xyz_snap_mprim: bool
+#         # whether to use motions computed via interpolating from the current
+#         # state to an arm pose computed via 3-dof ik to the goal position
+#     use_rpy_snap_mprim: bool
+#         # whether to use motions computed via interpolating from the current
+#         # state to an arm pose computed via 3-dof ik to the goal orientation
+#     use_xyzrpy_snap_mprim: bool
+#         # whether to use motions computed via interpolating from the current
+#         # state to an arm pose computed via 6-dof ik to the goal pose
+#     use_short_dist_mprims: bool
+#         # whether to use short distance motion primitives
+#     xyz_snap_dist_thresh: double
+#     rpy_snap_dist_thresh: double
+#     xyzrpy_snap_dist_thresh: double
+#         # the distance from the goal at which to start using ik motion
+#         # primitives
+#     short_dist_mprims_thresh: double
+#         # the distance from the goal at which to start using short distance
+#         # motion primitves
+#     shortcut_path: bool
+#         # whether to apply a shortcutter to the discrete path to smooth the
+#         # final trajectory
 #
 # planner_configs:
 #     Planner1Config:
@@ -47,31 +71,16 @@ right_arm:
 
     ### Action Parameters ###
 
-    # path to the file describing long and short range motion primitives
-    # TODO: I guess roslaunch will have to be used to set this parameter
-    mprim_filename: /home/aurone/Projects/ros/indigo/hdt_ws/src/hdt/config/pr2.mprim
-
-    # whether to use motions computed via interpolating from the current state
-    # to an arm pose computed via 6-dof ik to the goal pose
+    # mprim_filename: uploaded via roslaunch
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
     use_xyzrpy_snap_mprim: true     
-
-    # whether to use motions computed via interpolating from the current state
-    # to an arm pose computed via 3-dof ik to the goal position
-    use_xyz_snap_mprim: true        
-
-    # the distance from the goal at which to start using ik motion primitives
-    ik_mprim_dist_thresh: 0.2       
-
-    # whether to use motions computed via interpolating from the current state
-    # to an arm pose computed via 3-dof ik to the goal orientation
-    use_rpy_snap_mprim: true        
-
-    # whether to use short distance motion primitives
-    use_multi_res_mprims: true      
-
-    # the distance from the goal at which to start using short distance motion
-    # primitves
+    use_short_dist_mprims: true      
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.0
+    xyzrpy_snap_dist_thresh: 0.2       
     short_dist_mprims_thresh: 0.4   
+    shortcut_path: true
 
 right_arm_and_torso:
     planner_configs:
@@ -86,13 +95,15 @@ right_arm_and_torso:
         r_elbow_flex_joint:     0.017453292519943
         r_wrist_flex_joint:     0.017453292519943
         r_wrist_roll_joint:     0.017453292519943
-    mprim_filename: /home/aurone/Projects/ros/indigo/hdt_ws/src/hdt/config/pr2_with_torso.mprim
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
     use_xyzrpy_snap_mprim: true
-    use_xyz_snap_mprim: true
-    ik_mprim_dist_thresh: 0.2
-    use_rpy_snap_mprim: true
-    use_multi_res_mprims: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.0
+    xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
+    shortcut_path: true
 
 left_arm: 
     planner_configs:
@@ -106,13 +117,15 @@ left_arm:
         l_elbow_flex_joint:     0.017453292519943
         l_wrist_flex_joint:     0.017453292519943
         l_wrist_roll_joint:     0.017453292519943
-    mprim_filename: /home/aurone/Projects/ros/indigo/hdt_ws/src/hdt/config/pr2.mprim
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
     use_xyzrpy_snap_mprim: true
-    use_xyz_snap_mprim: true
-    ik_mprim_dist_thresh: 0.2
-    use_rpy_snap_mprim: true
-    use_multi_res_mprims: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.0
+    xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
+    shortcut_path: true
 
 left_arm_and_torso: 
     planner_configs:
@@ -127,57 +140,15 @@ left_arm_and_torso:
         l_elbow_flex_joint:     0.017453292519943
         l_wrist_flex_joint:     0.017453292519943
         l_wrist_roll_joint:     0.017453292519943
-    mprim_filename: /home/aurone/Projects/ros/indigo/hdt_ws/src/hdt/config/pr2_with_torso.mprim
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
     use_xyzrpy_snap_mprim: true
-    use_xyz_snap_mprim: true
-    ik_mprim_dist_thresh: 0.2
-    use_rpy_snap_mprim: true
-    use_multi_res_mprims: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.0
+    xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
-
-#arms:
-#    planner_configs:
-#        - ARAConfigDefault
-#    use_sbpl_collision_checking: true
-#    discretization:
-#        l_shoulder_pan_joint:   0.017453292519943
-#        l_shoulder_lift_joint:  0.017453292519943
-#        l_upper_arm_roll_joint: 0.017453292519943
-#        l_forearm_roll_joint:   0.017453292519943
-#        l_elbow_flex_joint:     0.017453292519943
-#        l_wrist_flex_joint:     0.017453292519943
-#        l_wrist_roll_joint:     0.017453292519943
-#        r_shoulder_pan_joint:   0.017453292519943
-#        r_shoulder_lift_joint:  0.017453292519943
-#        r_upper_arm_roll_joint: 0.017453292519943
-#        r_forearm_roll_joint:   0.017453292519943
-#        r_elbow_flex_joint:     0.017453292519943
-#        r_wrist_flex_joint:     0.017453292519943
-#        r_wrist_roll_joint:     0.017453292519943
-
-#whole_body:
-#    planner_configs:
-#        - ARAConfigDefault
-#    use_sbpl_collision_checking: true
-#    discretization:
-#        world_joint/x: 0.05
-#        world_joint/y: 0.05
-#        world_joint/theta: 0.39269908169872
-#        torso_lift_joint:       0.02
-#        l_shoulder_pan_joint:   0.017453292519943
-#        l_shoulder_lift_joint:  0.017453292519943
-#        l_upper_arm_roll_joint: 0.017453292519943
-#        l_forearm_roll_joint:   0.017453292519943
-#        l_elbow_flex_joint:     0.017453292519943
-#        l_wrist_flex_joint:     0.017453292519943
-#        l_wrist_roll_joint:     0.017453292519943
-#        r_shoulder_pan_joint:   0.017453292519943
-#        r_shoulder_lift_joint:  0.017453292519943
-#        r_upper_arm_roll_joint: 0.017453292519943
-#        r_forearm_roll_joint:   0.017453292519943
-#        r_elbow_flex_joint:     0.017453292519943
-#        r_wrist_flex_joint:     0.017453292519943
-#        r_wrist_roll_joint:     0.017453292519943
+    shortcut_path: true
 
 planner_configs:
     ARAConfigDefault:
@@ -192,7 +163,7 @@ collision_world:
     size_x: 3.5
     size_y: 3.0
     size_z: 2.0
-    origin_x: -0.5
+    origin_x: -1.0
     origin_y: -1.5
     origin_z: 0.0
     res_m: 0.02
@@ -304,4 +275,3 @@ collision_spheres:
 
   - { name: lft0, x: 0.015, y: -0.005, z: 0.00, radius: 0.03, priority: 1 }
   - { name: lft1, x: 0.035, y: -0.005, z: 0.00, radius: 0.02, priority: 1 }
-

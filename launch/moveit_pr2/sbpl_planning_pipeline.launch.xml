@@ -26,11 +26,11 @@
         <param name="mprim_filename" value="$(find hdt)/config/pr2.mprim"/>
     </group>
 
-    <group ns="left_arm">
-        <param name="mprim_filename" value="$(find hdt)/config/pr2.mprim"/>
+    <group ns="right_arm_and_torso">
+        <param name="mprim_filename" value="$(find hdt)/config/pr2_with_torso.mprim"/>
     </group>
     
-    <group ns="left_arm">
-        <param name="mprim_filename" value="$(find hdt)/config/pr2.mprim"/>
+    <group ns="left_arm_and_torso">
+        <param name="mprim_filename" value="$(find hdt)/config/pr2_with_torso.mprim"/>
     </group>
 </launch>
