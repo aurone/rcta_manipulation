@@ -140,6 +140,11 @@ bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
 
     logRobotModelInfo(*m_robot_model);
 
+    m_scene_monitor.reset(
+            new planning_scene_monitor::PlanningSceneMonitor(m_rm_loader));
+    ROS_INFO("Created new Planning Scene Monitor");
+    logPlanningSceneMonitor(*m_scene_monitor);
+
     clearMoveGroupRequest();
 
     Q_EMIT robotLoaded();
@@ -354,7 +359,7 @@ void MoveArmCommandModel::logRobotModelInfo(
     for (const moveit::core::JointModelGroup* jmg : jmgs) {                                                                   
         ROS_INFO("Name: %s", jmg->getName().c_str());                                                                         
         ROS_INFO("  Joints:");                                                                                                
-        for (const std::string& name : jmg->getJointModelNames()) {                                                           
+        for (const std::string& name : jmg->getJointModelNames()) {
             ROS_INFO("    %s", name.c_str());                                                                                 
         }                                                                                                                     
         ROS_INFO("  Chain: %s", jmg->isChain() ? "true" : "false");                                                           
@@ -369,6 +374,24 @@ void MoveArmCommandModel::logRobotModelInfo(
         const auto& var_bounds = rm.getVariableBounds(var_name);
         ROS_INFO("%s: { min: %f, max: %f, vel: %f, acc: %f }", var_name.c_str(), var_bounds.min_position_, var_bounds.max_position_, var_bounds.max_velocity_, var_bounds.max_acceleration_);
     }
+}
+
+void MoveArmCommandModel::logPlanningSceneMonitor(
+    const planning_scene_monitor::PlanningSceneMonitor& monitor) const
+{
+    ROS_INFO("Planning Scene Monitor Name: %s", monitor.getName().c_str());
+    ROS_INFO("Default Attached Object Padding: %0.3f", monitor.getDefaultAttachedObjectPadding());
+    ROS_INFO("Default Object Padding: %0.3f", monitor.getDefaultObjectPadding());
+    ROS_INFO("Default Robot Scale: %0.3f", monitor.getDefaultRobotScale());
+    ROS_INFO("Last Update Time: %0.3f", monitor.getLastUpdateTime().toSec());
+    std::vector<std::string> monitored_topics;
+    monitor.getMonitoredTopics(monitored_topics);
+    ROS_INFO("Monitored Topics:");
+    for (const std::string& topic : monitored_topics) {
+        ROS_INFO("  %s", topic.c_str());
+    }
+    ROS_INFO("Planning Scene Publishing Frequency: %0.3f", monitor.getPlanningScenePublishingFrequency());
+    ROS_INFO("Robot Model: %s", monitor.getRobotModel()->getName().c_str());
 }
 
 void MoveArmCommandModel::jointStatesCallback(

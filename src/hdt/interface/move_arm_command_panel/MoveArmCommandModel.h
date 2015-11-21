@@ -7,6 +7,7 @@
 #include <QtGui>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
@@ -72,6 +73,8 @@ private:
     moveit::core::RobotModelPtr m_robot_model;
     moveit::core::RobotStatePtr m_robot_state;
 
+    planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
+
     // robot state
     ros::Subscriber m_joint_states_sub;
     sensor_msgs::JointState::ConstPtr m_last_joint_state_msg;
@@ -92,6 +95,8 @@ private:
     ros::Publisher m_collision_object_pub;
 
     void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
+    void logPlanningSceneMonitor(
+        const planning_scene_monitor::PlanningSceneMonitor& monitor) const;
 
     void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg);
 

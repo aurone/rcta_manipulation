@@ -158,6 +158,7 @@ planner_configs:
         bfs_res_x: 0.02
         bfs_res_y: 0.02
         bfs_res_z: 0.02
+        bfs_sphere_radius: 0.08
 
 collision_world:
     size_x: 3.5
