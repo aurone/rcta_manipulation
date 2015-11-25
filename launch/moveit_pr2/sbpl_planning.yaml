@@ -1,5 +1,5 @@
 ## the planner configurations; each config must have a type, which specifies
-## the planner to be used; other parameters can be specified as well, depending 
+## the planner to be used; other parameters can be specified as well, depending
 ## on the planner
 
 # The general configuration format for a joint group is as follows:
@@ -60,7 +60,7 @@ right_arm:
     ### Graph Parameters ###
 
     # angular resolution of each active joint variable
-    discretization: 
+    discretization:
         r_shoulder_pan_joint:   0.017453292519943
         r_shoulder_lift_joint:  0.017453292519943
         r_upper_arm_roll_joint: 0.017453292519943
@@ -74,12 +74,12 @@ right_arm:
     # mprim_filename: uploaded via roslaunch
     use_xyz_snap_mprim: false
     use_rpy_snap_mprim: false
-    use_xyzrpy_snap_mprim: true     
-    use_short_dist_mprims: true      
+    use_xyzrpy_snap_mprim: true
+    use_short_dist_mprims: true
     xyz_snap_dist_thresh: 0.0
     rpy_snap_dist_thresh: 0.0
-    xyzrpy_snap_dist_thresh: 0.2       
-    short_dist_mprims_thresh: 0.4   
+    xyzrpy_snap_dist_thresh: 0.2
+    short_dist_mprims_thresh: 0.4
     shortcut_path: true
 
 right_arm_and_torso:
@@ -105,7 +105,7 @@ right_arm_and_torso:
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
 
-left_arm: 
+left_arm:
     planner_configs:
         - ARAConfigDefault
     use_sbpl_collision_checking: true
@@ -127,7 +127,7 @@ left_arm:
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
 
-left_arm_and_torso: 
+left_arm_and_torso:
     planner_configs:
         - ARAConfigDefault
     use_sbpl_collision_checking: true

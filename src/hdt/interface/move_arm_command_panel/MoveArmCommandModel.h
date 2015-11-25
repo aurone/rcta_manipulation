@@ -14,6 +14,7 @@
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/GetMotionPlan.h>
+#include <moveit_planners_sbpl/moveit_robot_model.h>
 
 class MoveArmCommandModel : public QObject
 {
@@ -94,6 +95,8 @@ private:
     ros::Publisher m_planning_scene_world_pub;
     ros::Publisher m_collision_object_pub;
 
+    std::unique_ptr<sbpl_interface::MoveItRobotModel> m_robot_model_sbpl; // :(
+
     void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
     void logPlanningSceneMonitor(
         const planning_scene_monitor::PlanningSceneMonitor& monitor) const;
@@ -127,6 +130,8 @@ private:
 
     void logMotionPlanResponse(
         const moveit_msgs::MotionPlanResponse& res) const;
+
+    bool initializeCollisionDetection();
 };
 
 #endif

@@ -1,9 +1,13 @@
 #include "MoveArmCommandModel.h"
 
+// standard includes
 #include <stack>
 
+// system includes
 #include <eigen_conversions/eigen_msg.h>
+#include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/PlanningSceneWorld.h>
+#include <moveit_planners_sbpl/collision_detector_allocator_sbpl.h>
 #include <ros/console.h>
 #include <sbpl_geometry_utils/utils.h>
 
@@ -138,11 +142,39 @@ bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
     m_robot_state->updateLinkTransforms();
     m_robot_state->updateCollisionBodyTransforms();
 
-    logRobotModelInfo(*m_robot_model);
+//    logRobotModelInfo(*m_robot_model);
 
     m_scene_monitor.reset(
             new planning_scene_monitor::PlanningSceneMonitor(m_rm_loader));
     ROS_INFO("Created new Planning Scene Monitor");
+
+    m_scene_monitor->startSceneMonitor();
+    m_scene_monitor->startStateMonitor();
+    m_scene_monitor->startWorldGeometryMonitor();
+    m_scene_monitor->requestPlanningSceneState();
+
+    // create new collision detector sbpl and initialize
+    auto cc = collision_detection::CollisionDetectorAllocatorSBPL::create();
+    m_scene_monitor->getPlanningScene()->setActiveCollisionDetector(cc, true);
+
+    m_robot_model_sbpl.reset(new sbpl_interface::MoveItRobotModel);
+    if (!m_robot_model_sbpl->init(m_robot_model, "right_arm")) {
+        // TODO: this is really sad that we need to know the robot model used
+        // for planning just to be able to initialize the collision checker...
+        // because its collision checking routines are inherently linked to the
+        // joint variable vector used during planning...there should be a
+        // collision checking api that either takes in an entire robot state to
+        // collision check or maintains a state of the robot that the user must
+        // set before making calls to collision checking
+        ROS_ERROR("Failed to initialize SBPL Robot Model");
+        return false;
+    }
+
+    if (!initializeCollisionDetection()) {
+        ROS_ERROR("Failed to initialize SBPL collision detection");
+        return false;
+    }
+
     logPlanningSceneMonitor(*m_scene_monitor);
 
     clearMoveGroupRequest();
@@ -279,6 +311,29 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
 
 bool MoveArmCommandModel::copyCurrentState()
 {
+    if (!m_scene_monitor) {
+        ROS_WARN("No scene loaded");
+        return false;
+    }
+
+    m_scene_monitor->lockSceneRead();
+
+    if (!m_scene_monitor->getStateMonitor()->haveCompleteState()) {
+        ROS_WARN("Missing joint values for robot state");
+    }
+
+    planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
+
+    const robot_state::RobotState& curr_state = scene->getCurrentState();
+    sensor_msgs::JointState curr_joint_state;
+    moveit::core::robotStateToJointStateMsg(curr_state, curr_joint_state);
+    m_robot_state->setVariableValues(curr_joint_state);
+
+    m_scene_monitor->unlockSceneRead();
+
+    Q_EMIT robotStateChanged();
+    return true;
+
     if (!m_last_joint_state_msg) {
         return false;
     }
@@ -290,6 +345,7 @@ bool MoveArmCommandModel::copyCurrentState()
 void MoveArmCommandModel::setJointVariable(int jidx, double value)
 {
     if (!isRobotLoaded()) {
+        ROS_WARN("Robot model not loaded");
         return;
     }
 
@@ -300,72 +356,86 @@ void MoveArmCommandModel::setJointVariable(int jidx, double value)
 
     if (m_robot_state->getVariablePosition(jidx) != value) {
         m_robot_state->setVariablePosition(jidx, value);
+
+        // Why would this happen?
         if (m_robot_state->getVariablePosition(jidx) != value) {
             ROS_WARN("Attempt to set joint variable %d to %0.3f failed", jidx, value);
+            return;
         }
+
         m_robot_state->updateLinkTransforms();
         m_robot_state->updateCollisionBodyTransforms();
+
+        // collision check and emit visualizations
+        planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
+        if (scene->isStateColliding(*m_robot_state, "right_arm", true)) {
+            ROS_WARN("State is in collision");
+        }
+        else {
+            ROS_INFO("Robot state is fine");
+        }
+
         Q_EMIT robotStateChanged();
     }
 }
 
 void MoveArmCommandModel::logRobotModelInfo(
     const moveit::core::RobotModel& rm) const
-{                                                                                                                             
-    ROS_INFO("Robot Model Name: %s", rm.getName().c_str());                                                                   
-    ROS_INFO("Robot Model Frame: %s", rm.getModelFrame().c_str());                                                            
-    ROS_INFO("Root Link Name: %s", rm.getRootLinkName().c_str());                                                             
-    ROS_INFO("Root Joint Name: %s", rm.getRootJointName().c_str());                                                           
-                                                                                                                              
-    ROS_INFO("--- Robot Links ---");                                                                                          
-    std::stack<std::pair<int, const moveit::core::LinkModel*>> links;                                                         
-    links.push(std::make_pair(0, rm.getRootLink()));                                                                          
-    while (!links.empty()) {                                                                                                  
-        int depth;                                                                                                            
-        const moveit::core::LinkModel* lm;                                                                                    
-        std::tie(depth, lm) = links.top();                                                                                    
-        links.pop();                                                                                                          
-                                                                                                                              
-        std::string pad(depth, ' ');                                                                                          
-        ROS_INFO("%s%s", pad.c_str(), lm->getName().c_str());                                                                 
-                                                                                                                              
-        for (const moveit::core::JointModel* jm : lm->getChildJointModels()) {                                                
-            links.push(std::make_pair(depth+1, jm->getChildLinkModel()));                                                     
-        }                                                                                                                     
-    }                                                                                                                         
-                                                                                                                              
-    ROS_INFO("--- Robot Joints ---");                                                                                         
-    std::stack<std::pair<int, const moveit::core::JointModel*>> joints;                                                       
-    joints.push(std::make_pair(0, rm.getRootJoint()));                                                                        
-    while (!joints.empty()) {                                                                                                 
-        int depth;                                                                                                            
-        const moveit::core::JointModel* jm;                                                                                   
-        std::tie(depth, jm) = joints.top();                                                                                   
-        joints.pop();                                                                                                         
-                                                                                                                              
-        std::string pad(depth, ' ');                                                                                          
-        ROS_INFO("%s%s", pad.c_str(), jm->getName().c_str());                                                                 
-                                                                                                                              
-        const moveit::core::LinkModel* lm = jm->getChildLinkModel();                                                          
-        for (const moveit::core::JointModel* j : lm->getChildJointModels()) {                                                 
-            joints.push(std::make_pair(depth + 1, j));                                                                        
-        }                                                                                                                     
-    }                                                                                                                         
-                                                                                                                              
-    ROS_INFO("--- Robot Joint Groups ---");                                                                                   
-                                                                                                                              
-    const std::vector<const moveit::core::JointModelGroup*>& jmgs =                                                           
-            rm.getJointModelGroups();                                                                                         
-    for (const moveit::core::JointModelGroup* jmg : jmgs) {                                                                   
-        ROS_INFO("Name: %s", jmg->getName().c_str());                                                                         
-        ROS_INFO("  Joints:");                                                                                                
+{
+    ROS_INFO("Robot Model Name: %s", rm.getName().c_str());
+    ROS_INFO("Robot Model Frame: %s", rm.getModelFrame().c_str());
+    ROS_INFO("Root Link Name: %s", rm.getRootLinkName().c_str());
+    ROS_INFO("Root Joint Name: %s", rm.getRootJointName().c_str());
+
+    ROS_INFO("--- Robot Links ---");
+    std::stack<std::pair<int, const moveit::core::LinkModel*>> links;
+    links.push(std::make_pair(0, rm.getRootLink()));
+    while (!links.empty()) {
+        int depth;
+        const moveit::core::LinkModel* lm;
+        std::tie(depth, lm) = links.top();
+        links.pop();
+
+        std::string pad(depth, ' ');
+        ROS_INFO("%s%s", pad.c_str(), lm->getName().c_str());
+
+        for (const moveit::core::JointModel* jm : lm->getChildJointModels()) {
+            links.push(std::make_pair(depth+1, jm->getChildLinkModel()));
+        }
+    }
+
+    ROS_INFO("--- Robot Joints ---");
+    std::stack<std::pair<int, const moveit::core::JointModel*>> joints;
+    joints.push(std::make_pair(0, rm.getRootJoint()));
+    while (!joints.empty()) {
+        int depth;
+        const moveit::core::JointModel* jm;
+        std::tie(depth, jm) = joints.top();
+        joints.pop();
+
+        std::string pad(depth, ' ');
+        ROS_INFO("%s%s", pad.c_str(), jm->getName().c_str());
+
+        const moveit::core::LinkModel* lm = jm->getChildLinkModel();
+        for (const moveit::core::JointModel* j : lm->getChildJointModels()) {
+            joints.push(std::make_pair(depth + 1, j));
+        }
+    }
+
+    ROS_INFO("--- Robot Joint Groups ---");
+
+    const std::vector<const moveit::core::JointModelGroup*>& jmgs =
+            rm.getJointModelGroups();
+    for (const moveit::core::JointModelGroup* jmg : jmgs) {
+        ROS_INFO("Name: %s", jmg->getName().c_str());
+        ROS_INFO("  Joints:");
         for (const std::string& name : jmg->getJointModelNames()) {
-            ROS_INFO("    %s", name.c_str());                                                                                 
-        }                                                                                                                     
-        ROS_INFO("  Chain: %s", jmg->isChain() ? "true" : "false");                                                           
-        ROS_INFO("  Only Single-DoF Joints: %s", jmg->isSingleDOFJoints() ? "true" : "false");                                
-        ROS_INFO("  End Effector: %s", jmg->isEndEffector() ? "true" : "false");                                              
-    }                                                                                                                         
+            ROS_INFO("    %s", name.c_str());
+        }
+        ROS_INFO("  Chain: %s", jmg->isChain() ? "true" : "false");
+        ROS_INFO("  Only Single-DoF Joints: %s", jmg->isSingleDOFJoints() ? "true" : "false");
+        ROS_INFO("  End Effector: %s", jmg->isEndEffector() ? "true" : "false");
+    }
 
     ROS_INFO("--- Joint Variables ---");
 
@@ -485,7 +555,7 @@ bool MoveArmCommandModel::fillStartState(
 
         multi_dof_joint_state.joint_names.push_back(jm->getName());
 
-        const Eigen::Affine3d& joint_transform = 
+        const Eigen::Affine3d& joint_transform =
                 m_robot_state->getJointTransform(jm);
 
         geometry_msgs::Transform trans;
@@ -681,4 +751,68 @@ void MoveArmCommandModel::logMotionPlanResponse(
 
     // error_code
     ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
+}
+
+bool MoveArmCommandModel::initializeCollisionDetection()
+{
+    planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
+
+    collision_detection::CollisionWorldConstPtr cworld =
+            scene->getCollisionWorld();
+
+    const collision_detection::CollisionWorldSBPL* sbpl_cworld =
+            dynamic_cast<const collision_detection::CollisionWorldSBPL*>(
+                    cworld.get());
+
+    collision_detection::CollisionWorldSBPL* mutable_cworld =
+            const_cast<collision_detection::CollisionWorldSBPL*>(sbpl_cworld);
+
+    if (!mutable_cworld) {
+        ROS_ERROR("Collision World is not a Collision World SBPL");
+        return false;
+    }
+
+    ros::NodeHandle nh;
+    ros::NodeHandle ph("~");
+    XmlRpc::XmlRpcValue collision_world_config_params;
+    if (!ph.getParam("collision_world", collision_world_config_params)) {
+        ROS_ERROR("Failed to retrieve 'collision_world' from the param server");
+        return false;
+    }
+
+    collision_detection::CollisionWorldSBPL::CollisionWorldConfig cw_cfg;
+    cw_cfg.world_frame =  scene->getPlanningFrame();
+    cw_cfg.size_x = collision_world_config_params["size_x"];
+    cw_cfg.size_y = collision_world_config_params["size_y"];
+    cw_cfg.size_z = collision_world_config_params["size_z"];
+    cw_cfg.origin_x = collision_world_config_params["origin_x"];
+    cw_cfg.origin_y = collision_world_config_params["origin_y"];
+    cw_cfg.origin_z = collision_world_config_params["origin_z"];
+    cw_cfg.res_m = collision_world_config_params["res_m"];
+    cw_cfg.max_distance_m = collision_world_config_params["max_distance_m"];
+
+    std::string robot_description;
+    if (!nh.getParam("robot_description", robot_description)) {
+        ROS_ERROR("Failed to retrieve parameter 'robot_description'");
+        return false;
+    }
+
+    sbpl::collision::CollisionModelConfig config;
+    if (!sbpl::collision::CollisionModelConfig::Load(ph, config)) {
+        ROS_ERROR("Failed to load collision model config");
+        return false;
+    }
+
+    if (!mutable_cworld->init(
+        m_robot_model_sbpl.get(),
+        cw_cfg,
+        robot_description,
+        "right_arm",
+        config))
+    {
+        ROS_ERROR("Failed to initialize Collision World SBPL");
+        return false;
+    }
+
+    return true;
 }
