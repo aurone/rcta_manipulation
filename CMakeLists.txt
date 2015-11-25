@@ -12,36 +12,37 @@ find_package(catkin REQUIRED COMPONENTS
     actionlib
     actionlib_msgs
     cmake_modules
-    control_msgs 
+    control_msgs
     eigen_conversions
     geometric_shapes
     geometry_msgs
     #genmsg # The actionlib tutorial says this is required for building messages, but everything seems to be OK?
     hdt_msgs
     interactive_markers
-    leatherman 
-    message_generation 
+    leatherman
+    message_generation
     moveit_core
-    moveit_ros_planning 
+    moveit_planners_sbpl
+    moveit_ros_planning
     moveit_ros_planning_interface
     moveit_ros_move_group
-    nav_msgs 
-    octomap_msgs 
+    nav_msgs
+    octomap_msgs
     pluginlib
     pr2_vfh_database
     pviz
     rosbag
-    roscpp 
+    roscpp
     rospack
-    rviz 
-    sbpl_geometry_utils 
+    rviz
+    sbpl_geometry_utils
     sbpl_manipulation
     spellbook_ros
-    sensor_msgs 
-    std_msgs 
-    tf 
+    sensor_msgs
+    std_msgs
+    tf
     trajectory_msgs
-    urdf 
+    urdf
     visualization_msgs)
 
 # Eigen
@@ -88,7 +89,7 @@ find_package(GLUT REQUIRED)
 include_directories(${GLUT_INCLUDE_DIR})
 
 # required to locate compiled headers for designer forms
-include_directories(${CMAKE_CURRENT_BINARY_DIR}) 
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_action_files(
     DIRECTORY action
@@ -100,10 +101,10 @@ add_action_files(
         ViservoCommand.action)
 add_message_files(
     FILES
-        ControllerDiagnosticStatus.msg 
-        JointDiagnosticStatus.msg 
+        ControllerDiagnosticStatus.msg
+        JointDiagnosticStatus.msg
         JointState.msg
-        EmergencyStop.msg 
+        EmergencyStop.msg
         ClearEmergencyStop.msg
         AcknowledgeReset.msg
         TeleopDiagnosticStatus.msg)
@@ -118,10 +119,10 @@ generate_messages(
         std_msgs
         trajectory_msgs)
 
-catkin_package(INCLUDE_DIRS 
+catkin_package(INCLUDE_DIRS
 		src/hdt/common
 	CATKIN_DEPENDS message_runtime
-	LIBRARIES 
+	LIBRARIES
 		hdt_viz)
 
 set(CMAKE_INCLUDE_CURRENT_DIR On)
