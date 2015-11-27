@@ -498,11 +498,11 @@ bool MoveArmCommandModel::fillWorkspaceParameters(
     req.workspace_parameters.header.frame_id = "torso_lift_link";
     req.workspace_parameters.header.seq = 0;
     req.workspace_parameters.header.stamp = now;
-    req.workspace_parameters.min_corner.x = 0.0;
-    req.workspace_parameters.min_corner.y = -1.0;
+    req.workspace_parameters.min_corner.x = -0.4;
+    req.workspace_parameters.min_corner.y = -1.2;
     req.workspace_parameters.min_corner.z = -2.0;
     req.workspace_parameters.max_corner.x = 1.5;
-    req.workspace_parameters.max_corner.y = 1.0;
+    req.workspace_parameters.max_corner.y = 1.2;
     req.workspace_parameters.max_corner.z = 1.0;
     return true;
 }
