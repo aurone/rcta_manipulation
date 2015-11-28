@@ -298,6 +298,7 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
     req.allowed_planning_time = 10.0;
     req.max_velocity_scaling_factor = 1.0;
 
+    m_plan_path_client.waitForExistence();
     if (!m_plan_path_client.call(srv)) {
         ROS_ERROR("Service call failed");
         return false;
