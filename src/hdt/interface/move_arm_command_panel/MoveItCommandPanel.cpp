@@ -30,7 +30,7 @@ MoveItCommandPanel::MoveItCommandPanel(QWidget* parent) :
             this, SLOT(syncRobot()));
 
     m_marker_pub = m_nh.advertise<visualization_msgs::MarkerArray>(
-            "visualization_marker_array", 5);
+            "visualization_markers", 5);
 }
 
 MoveItCommandPanel::~MoveItCommandPanel()
@@ -283,7 +283,7 @@ void MoveItCommandPanel::updateRobotVisualization()
     };
 
     // TODO: derive from the URDF
-    const std::map<std::string, double> tlimits = 
+    const std::map<std::string, double> tlimits =
     {
         { rarm_joint_names[0], 30.0 },
         { rarm_joint_names[1], 30.0 },
@@ -443,7 +443,7 @@ bool MoveItCommandPanel::isVariableAngle(int vind) const
 
     return (jm->getType() == moveit::core::JointModel::REVOLUTE ||
         (
-            jm->getType() == moveit::core::JointModel::PLANAR && 
+            jm->getType() == moveit::core::JointModel::PLANAR &&
             !var_bounds.position_bounded_
         ) ||
         (
