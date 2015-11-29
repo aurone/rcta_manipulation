@@ -49,10 +49,13 @@
 #         plannern_param1: value
 #     ...
 
+check_torques: true
+
 right_arm:
     ### Available Search Parameters ###
     planner_configs:
         - ARAConfigDefault
+        - MHAConfigDefault
 
     ### Collision Checking Parameters ###
     use_sbpl_collision_checking: true
@@ -85,6 +88,7 @@ right_arm:
 right_arm_and_torso:
     planner_configs:
         - ARAConfigDefault
+        - MHAConfigDefault
     use_sbpl_collision_checking: true
     discretization:
         torso_lift_joint:       0.02
@@ -108,6 +112,7 @@ right_arm_and_torso:
 left_arm:
     planner_configs:
         - ARAConfigDefault
+        - MHAConfigDefault
     use_sbpl_collision_checking: true
     discretization:
         l_shoulder_pan_joint:   0.017453292519943
@@ -130,6 +135,7 @@ left_arm:
 left_arm_and_torso:
     planner_configs:
         - ARAConfigDefault
+        - MHAConfigDefault
     use_sbpl_collision_checking: true
     discretization:
         torso_lift_joint:       0.02
@@ -154,6 +160,15 @@ planner_configs:
     ARAConfigDefault:
         type: ARA*
         epsilon: 100.0
+        use_bfs_heuristic: true
+        bfs_res_x: 0.02
+        bfs_res_y: 0.02
+        bfs_res_z: 0.02
+        bfs_sphere_radius: 0.02
+    MHAConfigDefault:
+        type: MHA*
+        epsilon: 100.0
+        mha_epsilon: 2.0
         use_bfs_heuristic: true
         bfs_res_x: 0.02
         bfs_res_y: 0.02
