@@ -73,11 +73,11 @@ right_arm:
 
     # mprim_filename: uploaded via roslaunch
     use_xyz_snap_mprim: false
-    use_rpy_snap_mprim: false
+    use_rpy_snap_mprim: true
     use_xyzrpy_snap_mprim: true
     use_short_dist_mprims: true
     xyz_snap_dist_thresh: 0.0
-    rpy_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
@@ -96,11 +96,11 @@ right_arm_and_torso:
         r_wrist_flex_joint:     0.017453292519943
         r_wrist_roll_joint:     0.017453292519943
     use_xyz_snap_mprim: false
-    use_rpy_snap_mprim: false
+    use_rpy_snap_mprim: true
     use_xyzrpy_snap_mprim: true
     use_short_dist_mprims: true
     xyz_snap_dist_thresh: 0.0
-    rpy_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
@@ -118,11 +118,11 @@ left_arm:
         l_wrist_flex_joint:     0.017453292519943
         l_wrist_roll_joint:     0.017453292519943
     use_xyz_snap_mprim: false
-    use_rpy_snap_mprim: false
+    use_rpy_snap_mprim: true
     use_xyzrpy_snap_mprim: true
     use_short_dist_mprims: true
     xyz_snap_dist_thresh: 0.0
-    rpy_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
@@ -141,11 +141,11 @@ left_arm_and_torso:
         l_wrist_flex_joint:     0.017453292519943
         l_wrist_roll_joint:     0.017453292519943
     use_xyz_snap_mprim: false
-    use_rpy_snap_mprim: false
+    use_rpy_snap_mprim: true
     use_xyzrpy_snap_mprim: true
     use_short_dist_mprims: true
     xyz_snap_dist_thresh: 0.0
-    rpy_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.2
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
@@ -158,7 +158,7 @@ planner_configs:
         bfs_res_x: 0.02
         bfs_res_y: 0.02
         bfs_res_z: 0.02
-        bfs_sphere_radius: 0.08
+        bfs_sphere_radius: 0.02
 
 collision_world:
     size_x: 3.5
