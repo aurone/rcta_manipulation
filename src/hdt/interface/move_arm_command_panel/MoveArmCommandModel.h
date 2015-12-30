@@ -2,9 +2,11 @@
 #define MoveArmCommandModel_h
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include <QtGui>
+#include <actionlib/client/simple_action_client.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
@@ -14,6 +16,7 @@
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/GetMotionPlan.h>
+#include <moveit_msgs/MoveGroupAction.h>
 #include <moveit_planners_sbpl/moveit_robot_model.h>
 
 class MoveArmCommandModel : public QObject
@@ -82,6 +85,8 @@ private:
 
     // requesting plans from move_group
     ros::ServiceClient m_plan_path_client;
+    typedef actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction> MoveGroupActionClient;
+    std::unique_ptr<MoveGroupActionClient> m_move_group_client;
 
     double m_table_size_x;
     double m_table_size_y;
@@ -130,8 +135,14 @@ private:
 
     void logMotionPlanResponse(
         const moveit_msgs::MotionPlanResponse& res) const;
+    void logMotionPlanResponse(
+        const moveit_msgs::MoveGroupResult& res) const;
 
     bool initializeCollisionDetection();
+
+    void moveGroupResultCallback(
+        const actionlib::SimpleClientGoalState& state,
+        const moveit_msgs::MoveGroupResult::ConstPtr& result);
 };
 
 #endif

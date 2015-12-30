@@ -102,6 +102,7 @@ MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
             "joint_states", 5, &MoveArmCommandModel::jointStatesCallback, this);
     m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>(
             "plan_kinematic_path");
+    m_move_group_client.reset(new MoveGroupActionClient("move_group", false));
 
     m_planning_scene_world_pub = m_nh.advertise<moveit_msgs::PlanningSceneWorld>(
             "planning_scene_world", 5, true);
@@ -278,8 +279,15 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
         return false;
     }
 
-    moveit_msgs::GetMotionPlan srv;
-    moveit_msgs::MotionPlanRequest& req = srv.request.motion_plan_request;
+    if (!m_move_group_client->isServerConnected()) {
+        ROS_ERROR("Connection Failure: Unable to send Move Group Action");
+        return false;
+    }
+
+    moveit_msgs::MoveGroupGoal move_group_goal;
+
+    moveit_msgs::MotionPlanRequest& req = move_group_goal.request;
+    moveit_msgs::PlanningOptions& ops = move_group_goal.planning_options;
 
     const ros::Time now = ros::Time::now();
 
@@ -298,14 +306,17 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
     req.allowed_planning_time = 10.0;
     req.max_velocity_scaling_factor = 1.0;
 
-    m_plan_path_client.waitForExistence();
-    if (!m_plan_path_client.call(srv)) {
-        ROS_ERROR("Service call failed");
-        return false;
-    }
+    ops.look_around = false;
+    ops.look_around_attempts = 0;
+    ops.max_safe_execution_cost = 1.0;
+    ops.plan_only = true;
+    ops.replan = false;
+    ops.replan_attempts = 0;
+    ops.replan_delay = 0.0;
 
-    const auto& res = srv.response.motion_plan_response;
-    logMotionPlanResponse(res);
+    auto result_callback = boost::bind(
+            &MoveArmCommandModel::moveGroupResultCallback, this, _1, _2);
+    m_move_group_client->sendGoal(move_group_goal, result_callback);
 
     return true;
 }
@@ -695,8 +706,6 @@ MoveArmCommandModel::createTableCollisionObject() const
 void MoveArmCommandModel::logMotionPlanResponse(
     const moveit_msgs::MotionPlanResponse& res) const
 {
-    ROS_INFO("Service call returned with code '%s", to_string(res.error_code).c_str());
-
     // trajectory_start
     const auto& trajectory_start = res.trajectory_start;
     ROS_INFO("trajectory_start:");
@@ -752,6 +761,65 @@ void MoveArmCommandModel::logMotionPlanResponse(
 
     // error_code
     ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
+}
+
+void MoveArmCommandModel::logMotionPlanResponse(
+    const moveit_msgs::MoveGroupResult& res) const
+{
+    // error_code
+    ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
+
+    // trajectory_start
+    const auto& trajectory_start = res.trajectory_start;
+    ROS_INFO("trajectory_start:");
+    const auto& start_joint_state = trajectory_start.joint_state;
+    ROS_INFO("  joint_state:");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            start_joint_state.header.seq,
+            start_joint_state.header.stamp.toSec(),
+            start_joint_state.header.frame_id.c_str());
+    ROS_INFO("    name: %zu", start_joint_state.name.size());
+    ROS_INFO("    position: %zu", start_joint_state.position.size());
+    ROS_INFO("    velocity: %zu", start_joint_state.velocity.size());
+    ROS_INFO("    effort: %zu", start_joint_state.effort.size());
+    const auto& start_multi_dof_joint_state = trajectory_start.multi_dof_joint_state;
+    ROS_INFO("  multi_dof_joint_state:");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            start_multi_dof_joint_state.header.seq,
+            start_multi_dof_joint_state.header.stamp.toSec(),
+            start_multi_dof_joint_state.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", start_multi_dof_joint_state.joint_names.size());
+    ROS_INFO("    transforms: %zu", start_multi_dof_joint_state.transforms.size());
+    ROS_INFO("    twist: %zu", start_multi_dof_joint_state.twist.size());
+    ROS_INFO("    wrench: %zu", start_multi_dof_joint_state.wrench.size());
+    const auto& start_attached_collision_objects = trajectory_start.attached_collision_objects;
+    ROS_INFO("  attached_collision_objects: %zu", start_attached_collision_objects.size());
+    ROS_INFO("  is_diff: %s", trajectory_start.is_diff ? "true" : "false");
+
+    // trajectory
+    const auto& trajectory = res.planned_trajectory;
+    ROS_INFO("trajectory:");
+    const auto& joint_trajectory = trajectory.joint_trajectory;
+    ROS_INFO("  joint_trajectory: ");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            joint_trajectory.header.seq,
+            joint_trajectory.header.stamp.toSec(),
+            joint_trajectory.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", joint_trajectory.joint_names.size());
+    ROS_INFO("    points: %zu", joint_trajectory.points.size());
+    const auto& multi_dof_joint_trajectory = trajectory.multi_dof_joint_trajectory;
+    ROS_INFO("  multi_dof_joint_trajectory: ");
+    ROS_INFO("    header: { seq: %d, stamp: %0.3f, frame_id: %s }",
+            multi_dof_joint_trajectory.header.seq,
+            multi_dof_joint_trajectory.header.stamp.toSec(),
+            multi_dof_joint_trajectory.header.frame_id.c_str());
+    ROS_INFO("    joint_names: %zu", multi_dof_joint_trajectory.joint_names.size());
+    ROS_INFO("    points: %zu", multi_dof_joint_trajectory.points.size());
+
+    // TODO: executed trajectory
+
+    // planning_time
+    ROS_INFO("planning_time: %0.6f", res.planning_time);
 }
 
 bool MoveArmCommandModel::initializeCollisionDetection()
@@ -816,4 +884,12 @@ bool MoveArmCommandModel::initializeCollisionDetection()
     }
 
     return true;
+}
+
+void MoveArmCommandModel::moveGroupResultCallback(
+    const actionlib::SimpleClientGoalState& state,
+    const moveit_msgs::MoveGroupResult::ConstPtr& result)
+{
+    const auto& res = *result;
+    logMotionPlanResponse(res);
 }
