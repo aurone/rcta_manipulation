@@ -281,7 +281,7 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         ROS_INFO("  Distance Field:");
         ROS_INFO("    Pointer: %p", distance_field.get());
         ROS_INFO("    Size (m): (%0.3f, %0.3f, %0.3f)", distance_field->getSizeX(), distance_field->getSizeY(), distance_field->getSizeZ());
-        ROS_INFO("    Size (cells): (%d", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
+        ROS_INFO("    Size (cells): (%d, %d, %d)", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
         ROS_INFO("    Origin (m): (%0.3f, %0.3f, %0.3f)", distance_field->getOriginX(), distance_field->getOriginY(), distance_field->getOriginZ());
         ROS_INFO("    Resolution (m): %0.3f", distance_field->getResolution());
         ROS_INFO("    Uninitialized Distance: %0.3f", distance_field->getUninitializedDistance());
