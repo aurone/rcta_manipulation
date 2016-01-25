@@ -33,6 +33,21 @@ HDTRobotModel::~HDTRobotModel()
 {
 }
 
+double HDTRobotModel::minVarLimit(int jidx) const
+{
+    return robot_model_->min_limits()[jidx];
+}
+
+double HDTRobotModel::maxVarLimit(int jidx) const
+{
+    return robot_model_->max_limits()[jidx];
+}
+
+bool HDTRobotModel::hasVarLimit(int jidx) const
+{
+    return robot_model_->continuous()[jidx];
+}
+
 bool HDTRobotModel::init(const std::string& robot_description)
 {
     return (bool)(robot_model_ = hdt::RobotModel::LoadFromURDF(robot_description, true));

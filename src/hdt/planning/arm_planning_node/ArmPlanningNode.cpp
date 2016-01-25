@@ -340,8 +340,8 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
         ROS_ERROR("Failed to initialize collision model config");
         return false;
     }
-    if (!collision_checker_->init(urdf_string_, group_name, cm_config) ||
-        !collision_checker_->setPlanningJoints(robot_model_->joint_names()))
+    if (!collision_checker_->init(
+            urdf_string_, group_name, cm_config, robot_model_->joint_names()))
     {
         ROS_ERROR_PRETTY("  Failed to initialize SBPL Collision Checker");
         return false;
@@ -487,8 +487,7 @@ bool ArmPlanningNode::init_sbpl()
 
     ph_.getParam("action_set_filename", action_set_filename_);
 
-    sbpl_action_set_ = sbpl_arm_planner::ActionSet::Load(action_set_filename_);
-    if (!sbpl_action_set_) {
+    if (!sbpl_arm_planner::ActionSet::Load(action_set_filename_, *sbpl_action_set_)) {
         ROS_ERROR_PRETTY("Failed to instantiate Action Set");
         return false;
     }
@@ -1104,18 +1103,18 @@ bool ArmPlanningNode::plan_to_eef_goal(
     }
 
     // fill goal state
-    moveit_msgs::GetMotionPlan::Request req;
-    req.motion_plan_request.goal_constraints.resize(1);
+    moveit_msgs::MotionPlanRequest req;
+    req.goal_constraints.resize(1);
     ROS_WARN_PRETTY("Converting goal pose '%s' to 6dof sbpl goal", to_string(goal_pose.pose).c_str());
     std::vector<double> goal_vector = convert_to_sbpl_goal(goal_pose.pose);
-    fill_constraint(goal_pose.pose, goal_pose.header.frame_id, req.motion_plan_request.goal_constraints[0]);
-    ROS_WARN_PRETTY("Created a goal in the '%s' frame", req.motion_plan_request.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
-    req.motion_plan_request.allowed_planning_time = 10.0; //2.0;
-    req.motion_plan_request.start_state = scene->robot_state;
+    fill_constraint(goal_pose.pose, goal_pose.header.frame_id, req.goal_constraints[0]);
+    ROS_WARN_PRETTY("Created a goal in the '%s' frame", req.goal_constraints.front().position_constraints[0].header.frame_id.c_str());
+    req.allowed_planning_time = 10.0; //2.0;
+    req.start_state = scene->robot_state;
 
     // plan
     ROS_INFO_PRETTY("Calling solve...");
-    moveit_msgs::GetMotionPlan::Response res;
+    moveit_msgs::MotionPlanResponse res;
     bool plan_result = planner_->solve(scene, req, res);
     if (!plan_result) {
         ROS_ERROR_PRETTY("Failed to plan.");
@@ -1149,7 +1148,7 @@ bool ArmPlanningNode::plan_to_eef_goal(
     // visualize, filter, and publish plan
     if (plan_result) {
         marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
-        traj = res.motion_plan_response.trajectory.joint_trajectory;
+        traj = res.trajectory.joint_trajectory;
     }
 
     return plan_result;
@@ -1182,30 +1181,30 @@ bool ArmPlanningNode::plan_to_joint_goal(
     }
 
     // fill goal state
-    moveit_msgs::GetMotionPlan::Request req;
-    req.motion_plan_request.goal_constraints.resize(1);
+    moveit_msgs::MotionPlanRequest req;
+    req.goal_constraints.resize(1);
 
     std::vector<double> goal_vector = goal_joint_state.position;
     std::vector<double> goal_tolerances (7, 0.05);
 
-    req.motion_plan_request.goal_constraints.resize(1);
-    req.motion_plan_request.goal_constraints.front().joint_constraints.resize(goal_vector.size());
+    req.goal_constraints.resize(1);
+    req.goal_constraints.front().joint_constraints.resize(goal_vector.size());
     for(int i = 0; i < goal_vector.size(); i++){
-      req.motion_plan_request.goal_constraints.front().joint_constraints[i].position = goal_joint_state.position[i];
-      req.motion_plan_request.goal_constraints.front().joint_constraints[i].joint_name = goal_joint_state.name[i];
-      req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_above = 3.0 * M_PI / 180.0;
-      req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_below = -3.0 * M_PI / 180.0;
-      ROS_INFO_PRETTY("%s: %.3f tol(%.3f, %.3f)", goal_joint_state.name[i].c_str(), goal_joint_state.position[i], req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_below, req.motion_plan_request.goal_constraints.front().joint_constraints[i].tolerance_above);
+      req.goal_constraints.front().joint_constraints[i].position = goal_joint_state.position[i];
+      req.goal_constraints.front().joint_constraints[i].joint_name = goal_joint_state.name[i];
+      req.goal_constraints.front().joint_constraints[i].tolerance_above = 3.0 * M_PI / 180.0;
+      req.goal_constraints.front().joint_constraints[i].tolerance_below = -3.0 * M_PI / 180.0;
+      ROS_INFO_PRETTY("%s: %.3f tol(%.3f, %.3f)", goal_joint_state.name[i].c_str(), goal_joint_state.position[i], req.goal_constraints.front().joint_constraints[i].tolerance_below, req.goal_constraints.front().joint_constraints[i].tolerance_above);
     }
 
     ROS_WARN_PRETTY("Created a 7DoF goal!");
 
-    req.motion_plan_request.allowed_planning_time = 10.0; //2.0;
-    req.motion_plan_request.start_state = scene->robot_state;
+    req.allowed_planning_time = 10.0; //2.0;
+    req.start_state = scene->robot_state;
 
     // plan
     ROS_INFO_PRETTY("Calling solve...");
-    moveit_msgs::GetMotionPlan::Response res;
+    moveit_msgs::MotionPlanResponse res;
     bool plan_result = planner_->solve(scene, req, res);
     if (!plan_result) {
         ROS_ERROR_PRETTY("Failed to plan.");
@@ -1238,7 +1237,7 @@ bool ArmPlanningNode::plan_to_joint_goal(
     // visualize, filter, and publish plan
     if (plan_result) {
         marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
-        traj = res.motion_plan_response.trajectory.joint_trajectory;
+        traj = res.trajectory.joint_trajectory;
     }
 
     return plan_result;
@@ -1269,13 +1268,18 @@ bool ArmPlanningNode::valid_octomap(const octomap_msgs::Octomap& msg)
     return true;
 }
 
-void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::string df_frame_id, const octomap::OcTree* octree, std::string octree_frame_id)
+void ArmPlanningNode::addOcTreeToField(
+    distance_field::DistanceField* df,
+    std::string df_frame_id,
+    const octomap::OcTree* octree,
+    std::string octree_frame_id)
 {
-    //lower extent
+    // lower extent
     tf::StampedTransform octree_to_df;
     try {
       listener_.lookupTransform(df_frame_id, octree_frame_id, ros::Time(0), octree_to_df);
-    } catch (const tf::TransformException& ex){
+    }
+    catch (const tf::TransformException& ex){
       ROS_ERROR("Could not lookup transform from %s frame to %s frame", octree_frame_id.c_str(), df_frame_id.c_str());
       return;
     }
@@ -1288,7 +1292,7 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
     int num_y = df->getYNumCells();
     int num_z = df->getZNumCells();
 
-    //upper extent
+    // upper extent
     double max_x, max_y, max_z;
     df->gridToWorld(num_x, num_y, num_z, max_x, max_y, max_z);
     tf::Vector3 bb_max_df_frame(max_x, max_y, max_z);
@@ -1296,16 +1300,20 @@ void ArmPlanningNode::addOcTreeToField(distance_field::DistanceField* df, std::s
     tf::Vector3 df_center_oc_frame = octree_to_df.inverse() * (0.5 * tf::Vector3(min_x, min_y, min_z) + 0.5 * tf::Vector3(max_x, max_y, max_z));
 
     //center the bounding box at the distance field center (in octree frame)
-    //make the bounding box 2x df_length, 2x df_width, 2x df_height -- a bit of an overkill, but ensures that the bounding box completely covers the whole distance field so no points are missed
-    octomap::point3d bbx_min(df_center_oc_frame.getX() - abs(max_x - min_x),
-                             df_center_oc_frame.getY() - abs(max_y - min_y),
-                             df_center_oc_frame.getZ() - abs(max_z - min_z));
-    octomap::point3d bbx_max(df_center_oc_frame.getX() + abs(max_x - min_x),
-                             df_center_oc_frame.getY() + abs(max_y - min_y),
-                             df_center_oc_frame.getZ() + abs(max_z - min_z));
-    
+    //make the bounding box 2x df_length, 2x df_width, 2x df_height -- a bit of
+    //an overkill, but ensures that the bounding box completely covers the whole
+    //distance field so no points are missed
+    octomap::point3d bbx_min(
+            df_center_oc_frame.getX() - abs(max_x - min_x),
+            df_center_oc_frame.getY() - abs(max_y - min_y),
+            df_center_oc_frame.getZ() - abs(max_z - min_z));
+    octomap::point3d bbx_max(
+            df_center_oc_frame.getX() + abs(max_x - min_x),
+            df_center_oc_frame.getY() + abs(max_y - min_y),
+            df_center_oc_frame.getZ() + abs(max_z - min_z));
 
-    EigenSTL::vector_Vector3d points; //the points from octree transformed in df frame
+    // the points from octree transformed in df frame
+    EigenSTL::vector_Vector3d points;
     int num_pts_total = 0;
     for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(bbx_min,bbx_max), end=octree->end_leafs_bbx(); it!= end; ++it)
     {

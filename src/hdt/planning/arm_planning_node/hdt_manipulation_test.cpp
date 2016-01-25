@@ -46,7 +46,7 @@ int main(int argc, char** argv)
 {
     using distance_field::PropagationDistanceField;
 
-    ros::init(argc, argv, "hddt_manipulation_test");
+    ros::init(argc, argv, "hdt_manipulation_test");
     ros::NodeHandle nh;
     ros::NodeHandle ph("~");
 
@@ -57,26 +57,20 @@ int main(int argc, char** argv)
     const std::string chain_tip_link = "arm_7_gripper_lift_link";
     const std::string group_name = "hdt_arm";
 
-    // hardcoded path because rospack refuses to compile with distance_field
-    // or some nonsense like that
-    const std::string object_filename = "/home/aurone/Projects/ros_groovy/src/sbpl_manipulation/sbpl_arm_planner_test/env/tabletop_hdt.env";
-    const std::string action_set_filename = "/home/aurone/Projects/ros_groovy/src/sbpl_manipulation/sbpl_arm_planner/config/pr2.mprim";
+    // Andrew - There was a hardcoded path to the action set here...apparently
+    // because rospack was refusing to compile with distance_field. Sounds bogus
+    // to me.
+    std::string action_set_filename;
+    if (!ph.getParam("action_set_filename", action_set_filename)) {
+        ROS_ERROR("Failed to retrieve 'action_set_filename' from the param server");
+        return 1;
+    }
 
     std::vector<double> goal = { 1.1, 0.0, 0.6, 0.0, 0.0,  0.0 };
 
-    ////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////
     // Set up the robot model
-    ////////////////////////////////////////////////////////////////////////////////
-
-//    std::vector<std::string> planning_joints = {
-//        "joint1_shoulder_yaw",
-//        "joint2_shoulder_pitch",
-//        "joint3_arm_roll",
-//        "joint4_elbow",
-//        "joint5_forearm_roll",
-//        "joint6_wrist_pitch",
-//        "joint7_wrist_roll"
-//    };
+    ///////////////////////////
 
     std::vector<std::string> planning_joints = {
         "arm_1_shoulder_twist",
@@ -90,24 +84,25 @@ int main(int argc, char** argv)
 
 //    std::vector<std::string> planning_joints = ReadPlanningJointsParam();
     if (planning_joints.empty()) {
-        ROS_WARN("Did not find any planning joints on the param server. \"~planning/planning_joints\" was likely not found on the param server");
+        ROS_WARN("Planning joint names empty");
     }
 
     std::vector<double> start_angles(planning_joints.size(), 0);
     if (start_angles.size() < 7) {
-        ROS_ERROR("Found %d planning joints on the param server. I usually expect at least 7 joints...", (int)start_angles.size());
+        ROS_ERROR("Insufficent joint position variables. expected: 7, actual: %zu", start_angles.size());
         return INSUFFICIENT_START_ANGLES;
     }
 
     std::string urdf;
     if (!nh.getParam("robot_description", urdf)) {
-        ROS_ERROR("Failed to find URDF on param server via param \"robot_description\"");
+        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
         return MISSING_URDF;
     }
 
     // NOTE: It looks looks a vanilla KDLRobotModel can be instantiated here instead of needing to subclass for the HDT - Andrew
 //    std::unique_ptr<sbpl_arm_planner::RobotModel> robot_model(new HdtKdlRobotModel);
-    std::unique_ptr<sbpl_arm_planner::KDLRobotModel> robot_model(new sbpl_arm_planner::KDLRobotModel(kinematics_frame, chain_tip_link));
+    std::unique_ptr<sbpl_arm_planner::KDLRobotModel> robot_model(
+            new sbpl_arm_planner::KDLRobotModel(kinematics_frame, chain_tip_link));
     if (!robot_model) {
         ROS_ERROR("Failed to instantiate KDL Robot Model");
         return FAILED_TO_INITIALIZE_ROBOT_MODEL;
@@ -122,9 +117,9 @@ int main(int argc, char** argv)
 
     KDL::Frame f;
 
-    ////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////
     // Set up the environment and its collision model
-    ////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////
 
     double minx = 0.0, miny = 0.0, minz = 0.0;
     double maxx = 3.0, maxy = 3.0, maxz = 3.0;
@@ -135,16 +130,19 @@ int main(int argc, char** argv)
     bool propagate_negative_distances = false;
 
     std::unique_ptr<PropagationDistanceField> distance_field;
-    distance_field.reset(new PropagationDistanceField(maxx - minx, maxy - miny, maxz - minz,
-                                                      cellres_m,
-                                                      center_x, center_y, center_z,
-                                                      max_distance_m,
-                                                      propagate_negative_distances));
+    distance_field.reset(new PropagationDistanceField(
+            maxx - minx, maxy - miny, maxz - minz,
+            cellres_m,
+            center_x, center_y, center_z,
+            max_distance_m,
+            propagate_negative_distances));
 
-    std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid(new sbpl_arm_planner::OccupancyGrid(distance_field.get()));
+    std::unique_ptr<sbpl_arm_planner::OccupancyGrid> grid(
+            new sbpl_arm_planner::OccupancyGrid(distance_field.get()));
     grid->setReferenceFrame(planning_frame);
 
-    std::unique_ptr<sbpl::collision::SBPLCollisionSpace> cc(new sbpl::collision::SBPLCollisionSpace(grid.get()));
+    std::unique_ptr<sbpl::collision::SBPLCollisionSpace> cc(
+            new sbpl::collision::SBPLCollisionSpace(grid.get()));
     if (!cc) {
         ROS_ERROR("Failed to instantiate collision checker");
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
@@ -156,29 +154,24 @@ int main(int argc, char** argv)
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }
 
-    if (!cc->init(urdf, group_name, cm_config)) {
+    if (!cc->init(urdf, group_name, cm_config, planning_joints)) {
         ROS_ERROR("Failed to initialize collision checking for HDT arm group %s", group_name.c_str());
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }
 
-    if (!cc->setPlanningJoints(planning_joints)) {
-        ROS_ERROR("Failed to set planning joints for the collision checker");
-        return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////
     // Set up the arm planner
-    ////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////
 
-    std::shared_ptr<sbpl_arm_planner::ActionSet> action_set =
-            sbpl_arm_planner::ActionSet::Load(action_set_filename);
-    if (!action_set) {
-        ROS_ERROR("Failed to instantiate Action Set");
+    sbpl_arm_planner::ActionSetPtr action_set(new sbpl_arm_planner::ActionSet);
+    if (!sbpl_arm_planner::ActionSet::Load(action_set_filename, *action_set)) {
+        ROS_ERROR("Failed to load Action Set");
         return FAILED_TO_INITIALIZE_SBPL;
     }
 
     std::unique_ptr<sbpl_arm_planner::SBPLArmPlannerInterface> planner;
-    planner.reset(new sbpl_arm_planner::SBPLArmPlannerInterface(robot_model.get(), cc.get(), action_set.get(), distance_field.get()));
+    planner.reset(new sbpl_arm_planner::SBPLArmPlannerInterface(
+            robot_model.get(), cc.get(), action_set.get(), distance_field.get()));
     if (!planner) {
         ROS_ERROR("Failed to instantiate SBPL Arm Planner Interface");
         return FAILED_TO_INITIALIZE_SBPL;

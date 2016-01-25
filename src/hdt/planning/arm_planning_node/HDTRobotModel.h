@@ -19,7 +19,6 @@ public:
     ~HDTRobotModel();
 
     ///@{ Inherited RobotModel API
-    /// virtual bool init(std::string robot_description, std::vector<std::string> &planning_joints);
     /// void setPlanningJoints(const std::vector<std::string> &joints);
     /// void setPlanningLink(std::string name);
     /// std::string getPlanningLink();
@@ -39,6 +38,10 @@ public:
     /// virtual bool computeFastIK(const std::vector<double> &pose, const std::vector<double> &start, std::vector<double> &solution);
     /// virtual void printRobotModelInformation();
     ///@}
+
+    double minVarLimit(int jidx) const;
+    double maxVarLimit(int jidx) const;
+    bool hasVarLimit(int jidx) const;
 
     bool init(const std::string& robot_description);
 
@@ -74,7 +77,7 @@ private:
       HDTRobotModel* rm_;
       bool sort_asc;
       iksortstruct(HDTRobotModel* rm, bool asc) : rm_(rm), sort_asc(asc) {};
- 
+
       bool operator() ( const std::vector<double> &ik1, const std::vector<double> &ik2 ) const
       {
         double s1 = rm_->computeIKscore(ik1);
