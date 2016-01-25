@@ -1,16 +1,16 @@
-#include "MoveItCommandPanel.h"
+#include "MoveGroupCommandPanel.h"
 
-#include "MoveArmCommandModel.h"
+#include "MoveGroupCommandModel.h"
 
 #include <sbpl_geometry_utils/utils.h>
 #include <visualization_msgs/MarkerArray.h>
 
 #include "JointVariableCommandWidget.h"
 
-MoveItCommandPanel::MoveItCommandPanel(QWidget* parent) :
+MoveGroupCommandPanel::MoveGroupCommandPanel(QWidget* parent) :
     rviz::Panel(parent),
     m_nh(),
-    m_model(new MoveArmCommandModel),
+    m_model(new MoveGroupCommandModel),
     m_robot_description_line_edit(nullptr),
     m_load_robot_button(nullptr),
     m_joint_groups_combo_box(nullptr),
@@ -33,11 +33,11 @@ MoveItCommandPanel::MoveItCommandPanel(QWidget* parent) :
             "visualization_markers", 5);
 }
 
-MoveItCommandPanel::~MoveItCommandPanel()
+MoveGroupCommandPanel::~MoveGroupCommandPanel()
 {
 }
 
-void MoveItCommandPanel::load(const rviz::Config& config)
+void MoveGroupCommandPanel::load(const rviz::Config& config)
 {
     rviz::Panel::load(config);
 
@@ -53,7 +53,7 @@ void MoveItCommandPanel::load(const rviz::Config& config)
     }
 }
 
-void MoveItCommandPanel::save(rviz::Config config) const
+void MoveGroupCommandPanel::save(rviz::Config config) const
 {
     rviz::Panel::save(config);
 
@@ -63,10 +63,10 @@ void MoveItCommandPanel::save(rviz::Config config) const
             "robot_description",
             QString::fromStdString(m_model->robotDescription()));
 
-    // TODO: save the state of the MoveArmCommandModel
+    // TODO: save the state of the MoveGroupCommandModel
 }
 
-void MoveItCommandPanel::loadRobot()
+void MoveGroupCommandPanel::loadRobot()
 {
     std::string user_robot_description =
             m_robot_description_line_edit->text().toStdString();
@@ -88,19 +88,19 @@ void MoveItCommandPanel::loadRobot()
     }
 }
 
-void MoveItCommandPanel::updateRobot()
+void MoveGroupCommandPanel::updateRobot()
 {
     setupRobotGUI();
     syncRobot();
 }
 
-void MoveItCommandPanel::syncRobot()
+void MoveGroupCommandPanel::syncRobot()
 {
     syncSpinBoxes();
     updateRobotVisualization();
 }
 
-void MoveItCommandPanel::setupGUI()
+void MoveGroupCommandPanel::setupGUI()
 {
     ROS_INFO("Setting up the baseline GUI");
 
@@ -133,7 +133,7 @@ void MoveItCommandPanel::setupGUI()
 //    main_layout->addStretch();
 }
 
-void MoveItCommandPanel::setupRobotGUI()
+void MoveGroupCommandPanel::setupRobotGUI()
 {
     ROS_INFO("Setting up the Robot GUI");
 
@@ -212,18 +212,18 @@ void MoveItCommandPanel::setupRobotGUI()
 }
 
 JointVariableCommandWidget*
-MoveItCommandPanel::setupJointVariableCommandWidget()
+MoveGroupCommandPanel::setupJointVariableCommandWidget()
 {
     return new JointVariableCommandWidget(m_model.get());
 }
 
-void MoveItCommandPanel::updateJointVariableCommandWidget(
+void MoveGroupCommandPanel::updateJointVariableCommandWidget(
     const std::string& joint_group_name)
 {
     m_var_cmd_widget->displayJointGroupCommands(joint_group_name);
 }
 
-void MoveItCommandPanel::syncSpinBoxes()
+void MoveGroupCommandPanel::syncSpinBoxes()
 {
     if (!m_model->isRobotLoaded()) {
         ROS_WARN("Robot not yet loaded");
@@ -259,7 +259,7 @@ void MoveItCommandPanel::syncSpinBoxes()
     }
 }
 
-void MoveItCommandPanel::updateRobotVisualization()
+void MoveGroupCommandPanel::updateRobotVisualization()
 {
     ROS_DEBUG("Updating robot visualization");
 
@@ -369,7 +369,7 @@ void MoveItCommandPanel::updateRobotVisualization()
     m_marker_pub.publish(marr);
 }
 
-void MoveItCommandPanel::setJointVariableFromSpinBox(double value)
+void MoveGroupCommandPanel::setJointVariableFromSpinBox(double value)
 {
     QDoubleSpinBox* spinbox = qobject_cast<QDoubleSpinBox*>(sender());
     if (!spinbox) {
@@ -395,39 +395,39 @@ void MoveItCommandPanel::setJointVariableFromSpinBox(double value)
     }
 }
 
-void MoveItCommandPanel::setJointGroup(const QString& joint_group_name)
+void MoveGroupCommandPanel::setJointGroup(const QString& joint_group_name)
 {
     updateJointVariableCommandWidget(joint_group_name.toStdString());
 }
 
-void MoveItCommandPanel::planToPosition()
+void MoveGroupCommandPanel::planToPosition()
 {
     std::string current_joint_group =
             m_joint_groups_combo_box->currentText().toStdString();
     m_model->planToPosition(current_joint_group);
 }
 
-void MoveItCommandPanel::copyCurrentState()
+void MoveGroupCommandPanel::copyCurrentState()
 {
     m_model->copyCurrentState();
 }
 
-void MoveItCommandPanel::setTableX(double x)
+void MoveGroupCommandPanel::setTableX(double x)
 {
 
 }
 
-void MoveItCommandPanel::setTableY(double y)
+void MoveGroupCommandPanel::setTableY(double y)
 {
 
 }
 
-void MoveItCommandPanel::setTableZ(double z)
+void MoveGroupCommandPanel::setTableZ(double z)
 {
 
 }
 
-bool MoveItCommandPanel::isVariableAngle(int vind) const
+bool MoveGroupCommandPanel::isVariableAngle(int vind) const
 {
     auto robot_model = m_model->robotModel();
     if (!robot_model) {
@@ -453,4 +453,4 @@ bool MoveItCommandPanel::isVariableAngle(int vind) const
 }
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(MoveItCommandPanel, rviz::Panel)
+PLUGINLIB_EXPORT_CLASS(MoveGroupCommandPanel, rviz::Panel)

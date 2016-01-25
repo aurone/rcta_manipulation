@@ -1,8 +1,0 @@
-<library path="lib/libmoveit_command_panel_plugin">
-    <class  name="moveit_command_panel_plugin/MoveItCommandPanel"
-            type="MoveItCommandPanel"
-            base_class_type="rviz::Panel">
-        <description>
-            A panel widget for controlling a phantom robot for specifying move commands
-        </description>
-</library>

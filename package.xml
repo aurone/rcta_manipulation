@@ -117,6 +117,6 @@
     <rviz plugin="${prefix}/config/controller_status_panel_plugin_description.xml"/>
     <rviz plugin="${prefix}/config/pick_and_place_plugin_description.xml"/>
     <rviz plugin="${prefix}/config/temperature_status_plugin_description.xml"/>
-    <rviz plugin="${prefix}/config/move_arm_command_panel_plugin_description.xml"/>
+    <rviz plugin="${prefix}/config/move_group_command_panel_plugin_description.xml"/>
   </export>
 </package>

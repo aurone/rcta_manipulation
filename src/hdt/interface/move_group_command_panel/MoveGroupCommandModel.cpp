@@ -1,4 +1,4 @@
-#include "MoveArmCommandModel.h"
+#include "MoveGroupCommandModel.h"
 
 // standard includes
 #include <stack>
@@ -7,9 +7,11 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/PlanningSceneWorld.h>
-#include <moveit_planners_sbpl/collision_detector_allocator_sbpl.h>
 #include <ros/console.h>
 #include <sbpl_geometry_utils/utils.h>
+
+static const std::string JGOI_HACK = "manipulator";
+static const std::string WORKSPACE_BOUNDARIES_FRAME = "base_link";
 
 static std::string to_string(moveit_msgs::MoveItErrorCodes code)
 {
@@ -74,32 +76,17 @@ static std::string to_string(moveit_msgs::MoveItErrorCodes code)
     }
 }
 
-const double MoveArmCommandModel::DefaultTableSizeX = 1.0;
-const double MoveArmCommandModel::DefaultTableSizeY = 2.0;
-const double MoveArmCommandModel::DefaultTableSizeZ = 0.2;
-
-MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
+MoveGroupCommandModel::MoveGroupCommandModel(QObject* parent) :
     QObject(parent),
     m_nh(),
     m_robot_description(),
     m_rm_loader(),
     m_robot_model(),
     m_robot_state(),
-    m_joint_states_sub(),
-    m_last_joint_state_msg(),
     m_plan_path_client(),
-    m_table_size_x(DefaultTableSizeX),
-    m_table_size_y(DefaultTableSizeY),
-    m_table_size_z(DefaultTableSizeZ),
-    m_table_origin_x(1.0),
-    m_table_origin_y(0.0),
-    m_table_origin_z(0.48),
-    m_table_name("table"),
     m_planning_scene_world_pub(),
     m_collision_object_pub()
 {
-    m_joint_states_sub = m_nh.subscribe(
-            "joint_states", 5, &MoveArmCommandModel::jointStatesCallback, this);
     m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>(
             "plan_kinematic_path");
     m_move_group_client.reset(new MoveGroupActionClient("move_group", false));
@@ -112,25 +99,20 @@ MoveArmCommandModel::MoveArmCommandModel(QObject* parent) :
     // publish an empty planning scene world
     moveit_msgs::PlanningSceneWorld planning_scene_world;
 //    m_planning_scene_world_pub.publish(planning_scene_world);
-
-    // publish the table
-    moveit_msgs::CollisionObject table_collision_object =
-            createTableCollisionObject();
-//    m_collision_object_pub.publish(table_collision_object);
 }
 
-bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
+bool MoveGroupCommandModel::loadRobot(const std::string& robot_description)
 {
     if (robot_description == m_robot_description) {
         return true;
     }
 
-    // load a new robot
+    // loads a new robot
     robot_model_loader::RobotModelLoaderPtr rm_loader(
             new robot_model_loader::RobotModelLoader(robot_description, true));
 
     if (!rm_loader->getModel()) {
-        // failed to load robot from URDF
+        ROS_ERROR("Robot Model Loader failed to load Robot Model");
         return false;
     }
 
@@ -154,28 +136,6 @@ bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
     m_scene_monitor->startWorldGeometryMonitor();
     m_scene_monitor->requestPlanningSceneState();
 
-    // create new collision detector sbpl and initialize
-    auto cc = collision_detection::CollisionDetectorAllocatorSBPL::create();
-    m_scene_monitor->getPlanningScene()->setActiveCollisionDetector(cc, true);
-
-    m_robot_model_sbpl.reset(new sbpl_interface::MoveItRobotModel);
-    if (!m_robot_model_sbpl->init(m_robot_model, "right_arm")) {
-        // TODO: this is really sad that we need to know the robot model used
-        // for planning just to be able to initialize the collision checker...
-        // because its collision checking routines are inherently linked to the
-        // joint variable vector used during planning...there should be a
-        // collision checking api that either takes in an entire robot state to
-        // collision check or maintains a state of the robot that the user must
-        // set before making calls to collision checking
-        ROS_ERROR("Failed to initialize SBPL Robot Model");
-        return false;
-    }
-
-    if (!initializeCollisionDetection()) {
-        ROS_ERROR("Failed to initialize SBPL collision detection");
-        return false;
-    }
-
     logPlanningSceneMonitor(*m_scene_monitor);
 
     clearMoveGroupRequest();
@@ -184,28 +144,28 @@ bool MoveArmCommandModel::loadRobot(const std::string& robot_description)
     return true;
 }
 
-bool MoveArmCommandModel::isRobotLoaded() const
+bool MoveGroupCommandModel::isRobotLoaded() const
 {
     return (bool)m_robot_model.get();
 }
 
-const std::string& MoveArmCommandModel::robotDescription() const
+const std::string& MoveGroupCommandModel::robotDescription() const
 {
     return m_robot_description;
 }
 
-moveit::core::RobotModelConstPtr MoveArmCommandModel::robotModel() const
+moveit::core::RobotModelConstPtr MoveGroupCommandModel::robotModel() const
 {
     return m_robot_model;
 }
 
-moveit::core::RobotStateConstPtr MoveArmCommandModel::robotState() const
+moveit::core::RobotStateConstPtr MoveGroupCommandModel::robotState() const
 {
     return m_robot_state;
 }
 
 std::map<std::string, double>
-MoveArmCommandModel::getRightArmTorques(
+MoveGroupCommandModel::getRightArmTorques(
     double fx, double fy, double fz,
     double ta, double tb, double tc) const
 {
@@ -213,7 +173,7 @@ MoveArmCommandModel::getRightArmTorques(
     std::map<std::string, double> torques;
 
     const moveit::core::JointModelGroup* jmg =
-            m_robot_model->getJointModelGroup("right_arm");
+            m_robot_model->getJointModelGroup(JGOI_HACK);
 
     Eigen::MatrixXd J;
     J = m_robot_state->getJacobian(jmg, Eigen::Vector3d(0.17, 0.0, 0.0));
@@ -258,22 +218,17 @@ MoveArmCommandModel::getRightArmTorques(
     return torques;
 }
 
-bool MoveArmCommandModel::readyToPlan() const
+bool MoveGroupCommandModel::readyToPlan() const
 {
     if (!isRobotLoaded()) {
         ROS_WARN("Cannot plan with no robot loaded");
         return false;
     }
 
-    if (!m_last_joint_state_msg) {
-        ROS_WARN("Haven't received a JointState message yet");
-        return false;
-    }
-
     return true;
 }
 
-bool MoveArmCommandModel::planToPosition(const std::string& group_name)
+bool MoveGroupCommandModel::planToPosition(const std::string& group_name)
 {
     if (!readyToPlan()) {
         return false;
@@ -315,46 +270,24 @@ bool MoveArmCommandModel::planToPosition(const std::string& group_name)
     ops.replan_delay = 0.0;
 
     auto result_callback = boost::bind(
-            &MoveArmCommandModel::moveGroupResultCallback, this, _1, _2);
+            &MoveGroupCommandModel::moveGroupResultCallback, this, _1, _2);
     m_move_group_client->sendGoal(move_group_goal, result_callback);
 
     return true;
 }
 
-bool MoveArmCommandModel::copyCurrentState()
+bool MoveGroupCommandModel::copyCurrentState()
 {
-    if (!m_scene_monitor) {
-        ROS_WARN("No scene loaded");
+    if (getActualState(*m_robot_state)) {
+        Q_EMIT robotStateChanged();
+        return true;
+    }
+    else {
         return false;
     }
-
-    m_scene_monitor->lockSceneRead();
-
-    if (!m_scene_monitor->getStateMonitor()->haveCompleteState()) {
-        ROS_WARN("Missing joint values for robot state");
-    }
-
-    planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
-
-    const robot_state::RobotState& curr_state = scene->getCurrentState();
-    sensor_msgs::JointState curr_joint_state;
-    moveit::core::robotStateToJointStateMsg(curr_state, curr_joint_state);
-    m_robot_state->setVariableValues(curr_joint_state);
-
-    m_scene_monitor->unlockSceneRead();
-
-    Q_EMIT robotStateChanged();
-    return true;
-
-    if (!m_last_joint_state_msg) {
-        return false;
-    }
-
-    m_robot_state->setVariableValues(*m_last_joint_state_msg);
-    Q_EMIT robotStateChanged();
 }
 
-void MoveArmCommandModel::setJointVariable(int jidx, double value)
+void MoveGroupCommandModel::setJointVariable(int jidx, double value)
 {
     if (!isRobotLoaded()) {
         ROS_WARN("Robot model not loaded");
@@ -376,22 +309,14 @@ void MoveArmCommandModel::setJointVariable(int jidx, double value)
         }
 
         m_robot_state->updateLinkTransforms();
-        m_robot_state->updateCollisionBodyTransforms();
 
-        // collision check and emit visualizations
-        planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
-        if (scene->isStateColliding(*m_robot_state, "right_arm", true)) {
-            ROS_WARN("State is in collision");
-        }
-        else {
-            ROS_INFO("Robot state is fine");
-        }
+        // TODO: service call to check state validity function
 
         Q_EMIT robotStateChanged();
     }
 }
 
-void MoveArmCommandModel::logRobotModelInfo(
+void MoveGroupCommandModel::logRobotModelInfo(
     const moveit::core::RobotModel& rm) const
 {
     ROS_INFO("Robot Model Name: %s", rm.getName().c_str());
@@ -458,7 +383,7 @@ void MoveArmCommandModel::logRobotModelInfo(
     }
 }
 
-void MoveArmCommandModel::logPlanningSceneMonitor(
+void MoveGroupCommandModel::logPlanningSceneMonitor(
     const planning_scene_monitor::PlanningSceneMonitor& monitor) const
 {
     ROS_INFO("Planning Scene Monitor Name: %s", monitor.getName().c_str());
@@ -476,13 +401,7 @@ void MoveArmCommandModel::logPlanningSceneMonitor(
     ROS_INFO("Robot Model: %s", monitor.getRobotModel()->getName().c_str());
 }
 
-void MoveArmCommandModel::jointStatesCallback(
-    const sensor_msgs::JointState::ConstPtr& msg)
-{
-    m_last_joint_state_msg = msg;
-}
-
-void MoveArmCommandModel::clearMoveGroupRequest()
+void MoveGroupCommandModel::clearMoveGroupRequest()
 {
     // workspace parameters dependent on the robot model
     // start-state possibly dependent on the robot model
@@ -492,7 +411,7 @@ void MoveArmCommandModel::clearMoveGroupRequest()
     // planning attempts, planning time, and scaling factor not-dependent on anything
 }
 
-bool MoveArmCommandModel::fillWorkspaceParameters(
+bool MoveGroupCommandModel::fillWorkspaceParameters(
     const ros::Time& now,
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req)
@@ -507,7 +426,8 @@ bool MoveArmCommandModel::fillWorkspaceParameters(
 //    req.workspace_parameters.max_corner.y = 1.0;
 //    req.workspace_parameters.max_corner.z = 3.0;
 
-    req.workspace_parameters.header.frame_id = "torso_lift_link";
+    // TODO: this needs mad configuring
+    req.workspace_parameters.header.frame_id = WORKSPACE_BOUNDARIES_FRAME;
     req.workspace_parameters.header.seq = 0;
     req.workspace_parameters.header.stamp = now;
     req.workspace_parameters.min_corner.x = -0.4;
@@ -519,19 +439,22 @@ bool MoveArmCommandModel::fillWorkspaceParameters(
     return true;
 }
 
-bool MoveArmCommandModel::fillStartState(
+bool MoveGroupCommandModel::fillStartState(
     const ros::Time& now,
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req) const
 {
+    sensor_msgs::JointState joint_state;
+    moveit::core::robotStateToJointStateMsg(*m_robot_state, joint_state);
+
     // copy over joint state from incoming sensor data
     req.start_state.joint_state.header.frame_id = "ooga booga";
     req.start_state.joint_state.header.seq = 0;
     req.start_state.joint_state.header.stamp = now;
-    req.start_state.joint_state.name = m_last_joint_state_msg->name;
-    req.start_state.joint_state.position = m_last_joint_state_msg->position;
-    req.start_state.joint_state.velocity = m_last_joint_state_msg->velocity;
-    req.start_state.joint_state.effort = m_last_joint_state_msg->effort;
+    req.start_state.joint_state.name = joint_state.name;
+    req.start_state.joint_state.position = joint_state.position;
+    req.start_state.joint_state.velocity = joint_state.velocity;
+    req.start_state.joint_state.effort = joint_state.effort;
 
     // TODO: keep another robot state around as the "current robot state" and
     // use it as the single point of access, rather than distinguishing here
@@ -583,7 +506,7 @@ bool MoveArmCommandModel::fillStartState(
     return true;
 }
 
-bool MoveArmCommandModel::fillGoalConstraints(
+bool MoveGroupCommandModel::fillGoalConstraints(
     const ros::Time& now,
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req) const
@@ -658,7 +581,7 @@ bool MoveArmCommandModel::fillGoalConstraints(
     return true;
 }
 
-bool MoveArmCommandModel::fillPathConstraints(
+bool MoveGroupCommandModel::fillPathConstraints(
     const ros::Time& now,
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req) const
@@ -666,7 +589,7 @@ bool MoveArmCommandModel::fillPathConstraints(
     return true;
 }
 
-bool MoveArmCommandModel::fillTrajectoryConstraints(
+bool MoveGroupCommandModel::fillTrajectoryConstraints(
     const ros::Time& now,
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req) const
@@ -674,36 +597,7 @@ bool MoveArmCommandModel::fillTrajectoryConstraints(
     return true;
 }
 
-moveit_msgs::CollisionObject
-MoveArmCommandModel::createTableCollisionObject() const
-{
-    moveit_msgs::CollisionObject collision_object;
-    collision_object.header.seq = 0;
-    collision_object.header.stamp = ros::Time::now();
-    collision_object.header.frame_id = "odom_combined";
-    collision_object.id = m_table_name;
-    shape_msgs::SolidPrimitive primitive;
-    primitive.type = shape_msgs::SolidPrimitive::BOX;
-    primitive.dimensions.resize(3);
-    primitive.dimensions[0] = m_table_size_x;
-    primitive.dimensions[1] = m_table_size_y;
-    primitive.dimensions[2] = m_table_size_z;
-
-    geometry_msgs::Pose table_pose;
-    table_pose.orientation.w = 1.0;
-    table_pose.orientation.x = table_pose.orientation.y = table_pose.orientation.z = 0.0;
-    table_pose.position.x = m_table_origin_x;
-    table_pose.position.y = m_table_origin_y;
-    table_pose.position.z = m_table_origin_z;
-
-    collision_object.primitives.push_back(primitive);
-    collision_object.primitive_poses.push_back(table_pose);
-
-    collision_object.operation = moveit_msgs::CollisionObject::ADD;
-    return collision_object;
-}
-
-void MoveArmCommandModel::logMotionPlanResponse(
+void MoveGroupCommandModel::logMotionPlanResponse(
     const moveit_msgs::MotionPlanResponse& res) const
 {
     // trajectory_start
@@ -763,7 +657,7 @@ void MoveArmCommandModel::logMotionPlanResponse(
     ROS_INFO("error_code: { val: %s }", to_string(res.error_code).c_str());
 }
 
-void MoveArmCommandModel::logMotionPlanResponse(
+void MoveGroupCommandModel::logMotionPlanResponse(
     const moveit_msgs::MoveGroupResult& res) const
 {
     // error_code
@@ -822,74 +716,36 @@ void MoveArmCommandModel::logMotionPlanResponse(
     ROS_INFO("planning_time: %0.6f", res.planning_time);
 }
 
-bool MoveArmCommandModel::initializeCollisionDetection()
-{
-    planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
-
-    collision_detection::CollisionWorldConstPtr cworld =
-            scene->getCollisionWorld();
-
-    const collision_detection::CollisionWorldSBPL* sbpl_cworld =
-            dynamic_cast<const collision_detection::CollisionWorldSBPL*>(
-                    cworld.get());
-
-    collision_detection::CollisionWorldSBPL* mutable_cworld =
-            const_cast<collision_detection::CollisionWorldSBPL*>(sbpl_cworld);
-
-    if (!mutable_cworld) {
-        ROS_ERROR("Collision World is not a Collision World SBPL");
-        return false;
-    }
-
-    ros::NodeHandle nh;
-    ros::NodeHandle ph("~");
-    XmlRpc::XmlRpcValue collision_world_config_params;
-    if (!ph.getParam("collision_world", collision_world_config_params)) {
-        ROS_ERROR("Failed to retrieve 'collision_world' from the param server");
-        return false;
-    }
-
-    collision_detection::CollisionWorldSBPL::CollisionWorldConfig cw_cfg;
-    cw_cfg.world_frame =  scene->getPlanningFrame();
-    cw_cfg.size_x = collision_world_config_params["size_x"];
-    cw_cfg.size_y = collision_world_config_params["size_y"];
-    cw_cfg.size_z = collision_world_config_params["size_z"];
-    cw_cfg.origin_x = collision_world_config_params["origin_x"];
-    cw_cfg.origin_y = collision_world_config_params["origin_y"];
-    cw_cfg.origin_z = collision_world_config_params["origin_z"];
-    cw_cfg.res_m = collision_world_config_params["res_m"];
-    cw_cfg.max_distance_m = collision_world_config_params["max_distance_m"];
-
-    std::string robot_description;
-    if (!nh.getParam("robot_description", robot_description)) {
-        ROS_ERROR("Failed to retrieve parameter 'robot_description'");
-        return false;
-    }
-
-    sbpl::collision::CollisionModelConfig config;
-    if (!sbpl::collision::CollisionModelConfig::Load(ph, config)) {
-        ROS_ERROR("Failed to load collision model config");
-        return false;
-    }
-
-    if (!mutable_cworld->init(
-        m_robot_model_sbpl.get(),
-        cw_cfg,
-        robot_description,
-        "right_arm",
-        config))
-    {
-        ROS_ERROR("Failed to initialize Collision World SBPL");
-        return false;
-    }
-
-    return true;
-}
-
-void MoveArmCommandModel::moveGroupResultCallback(
+void MoveGroupCommandModel::moveGroupResultCallback(
     const actionlib::SimpleClientGoalState& state,
     const moveit_msgs::MoveGroupResult::ConstPtr& result)
 {
     const auto& res = *result;
     logMotionPlanResponse(res);
+}
+
+bool MoveGroupCommandModel::getActualState(moveit::core::RobotState& robot_state)
+{
+    if (!m_scene_monitor) {
+        ROS_WARN("No scene loaded");
+        return false;
+    }
+
+    m_scene_monitor->lockSceneRead();
+
+    if (!m_scene_monitor->getStateMonitor()->haveCompleteState()) {
+        ROS_WARN("Missing joint values for robot state");
+    }
+
+    planning_scene::PlanningScenePtr scene = m_scene_monitor->getPlanningScene();
+
+    const robot_state::RobotState& curr_state = scene->getCurrentState();
+    sensor_msgs::JointState curr_joint_state;
+    moveit::core::robotStateToJointStateMsg(curr_state, curr_joint_state);
+    robot_state.setVariableValues(curr_joint_state);
+
+    m_scene_monitor->unlockSceneRead();
+
+    Q_EMIT robotStateChanged();
+    return true;
 }

@@ -218,10 +218,10 @@ private:
         const ros::Duration& poll_duration,
         const ros::Duration& timeout)
     {
-        ROS_INFO_PRETTY("Waiting for action server '%s'", action_name.c_str());
+        ROS_INFO("Waiting for action server '%s'", action_name.c_str());
 
         if (!action_client) {
-            ROS_WARN_PRETTY("Action client is null");
+            ROS_WARN("Action client is null");
             return false;
         }
 
@@ -231,7 +231,7 @@ private:
             if (!action_client->isServerConnected()) {
                 action_client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
                 if (!action_client) {
-                    ROS_WARN_PRETTY("Failed to reinstantiate action client '%s'", action_name.c_str());
+                    ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
                     return false;
                 }
             }
@@ -242,7 +242,7 @@ private:
 
             poll_duration.sleep();
 
-            ROS_INFO_PRETTY("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
+            ROS_INFO("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
         }
 
         return false;

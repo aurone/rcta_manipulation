@@ -3,10 +3,10 @@
 #include <ros/console.h>
 #include <sbpl_geometry_utils/utils.h>
 
-#include "MoveArmCommandModel.h"
+#include "MoveGroupCommandModel.h"
 
 JointVariableCommandWidget::JointVariableCommandWidget(
-    MoveArmCommandModel* model,
+    MoveGroupCommandModel* model,
     QWidget* parent)
 :
     Base(parent),
@@ -80,7 +80,7 @@ int JointVariableCommandWidget::spinboxToVariableIndex(
 }
 
 void JointVariableCommandWidget::displayJointGroupCommands(
-    const std::string& joint_group_name) 
+    const std::string& joint_group_name)
 {
     QGridLayout* glayout = qobject_cast<QGridLayout*>(widget()->layout());
     if (!glayout) {

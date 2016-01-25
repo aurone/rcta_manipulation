@@ -9,7 +9,7 @@
 #include <QtGui>
 #include <moveit/robot_model/robot_model.h>
 
-class MoveArmCommandModel;
+class MoveGroupCommandModel;
 
 class JointVariableCommandWidget : public QScrollArea
 {
@@ -20,7 +20,7 @@ public:
     typedef QScrollArea Base;
 
     JointVariableCommandWidget(
-        MoveArmCommandModel* model,
+        MoveGroupCommandModel* model,
         QWidget* parent = 0);
     ~JointVariableCommandWidget();
 
@@ -38,7 +38,7 @@ public:
 
 private:
 
-    MoveArmCommandModel* m_model;
+    MoveGroupCommandModel* m_model;
 
     // mapping from each qdoublespinbox to the index of the joint variable it
     // controls

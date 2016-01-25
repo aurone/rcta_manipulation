@@ -15,10 +15,10 @@ octomap_msgs::Octomap::ConstPtr CostmapExtruder::extrude(const nav_msgs::Occupan
     moveit_msgs::CollisionMap collision_map = extrude_to_collision_map(grid, extrusion);
 
     // convert the collision map to a point cloud
-    ROS_INFO_PRETTY("Creating Octomap from Collision Map");
-    ROS_INFO_PRETTY("  %zd oriented bounding box cells", collision_map.boxes.size());
+    ROS_INFO("Creating Octomap from Collision Map");
+    ROS_INFO("  %zd oriented bounding box cells", collision_map.boxes.size());
     const double res = collision_map.boxes.front().extents.x;
-    ROS_INFO_PRETTY("  Resolution: %0.3f", res);
+    ROS_INFO("  Resolution: %0.3f", res);
 
     octomap::Pointcloud octomap_cloud;
     convert(collision_map, octomap_cloud);
@@ -46,7 +46,7 @@ octomap_msgs::Octomap::ConstPtr CostmapExtruder::extrude(const nav_msgs::Occupan
 moveit_msgs::CollisionMap
 CostmapExtruder::extrude_to_collision_map(const nav_msgs::OccupancyGrid& grid, double extrusion) const
 {
-    ROS_INFO_PRETTY("Extruding Occupancy Grid");
+    ROS_INFO("Extruding Occupancy Grid");
 
     moveit_msgs::CollisionMap cmap;
 
@@ -89,10 +89,10 @@ CostmapExtruder::extrude_to_collision_map(const nav_msgs::OccupancyGrid& grid, d
         }
     }
 
-    ROS_INFO_PRETTY("Extruded %d occupied cells", num_occupied_cells);
+    ROS_INFO("Extruded %d occupied cells", num_occupied_cells);
 
     moveit_msgs::OrientedBoundingBox bbx = get_bbx(cmap);
-    ROS_INFO_PRETTY("  Collision Map Bounding Box: %s", to_string(bbx).c_str());
+    ROS_INFO("  Collision Map Bounding Box: %s", to_string(bbx).c_str());
 
     return cmap;
 }
@@ -151,14 +151,14 @@ moveit_msgs::OrientedBoundingBox CostmapExtruder::get_bbx(const moveit_msgs::Col
 void CostmapExtruder::log_octomap(const octomap::OcTree& octree) const
 {
     size_t num_nodes = octree.calcNumNodes();
-    ROS_INFO_PRETTY("  Num Nodes: %zd", num_nodes);
-    ROS_INFO_PRETTY("  Memory Usage: %zd bytes", octree.memoryUsage());
-    ROS_INFO_PRETTY("  Num Leaf Nodes: %zd", octree.getNumLeafNodes());
+    ROS_INFO("  Num Nodes: %zd", num_nodes);
+    ROS_INFO("  Memory Usage: %zd bytes", octree.memoryUsage());
+    ROS_INFO("  Num Leaf Nodes: %zd", octree.getNumLeafNodes());
 
     unsigned num_thresholded, num_other;
     octree.calcNumThresholdedNodes(num_thresholded, num_other);
-    ROS_INFO_PRETTY("  Num Thresholded Nodes: %u", num_thresholded);
-    ROS_INFO_PRETTY("  Num Other Nodes: %u", num_other);
+    ROS_INFO("  Num Thresholded Nodes: %u", num_thresholded);
+    ROS_INFO("  Num Other Nodes: %u", num_other);
 
     const octomap::point3d octomap_min = octree.getBBXMin();
     const octomap::point3d octomap_max = octree.getBBXMax();
@@ -166,12 +166,12 @@ void CostmapExtruder::log_octomap(const octomap::OcTree& octree) const
     double clamping_thresh_min = octree.getClampingThresMin();
     double clamping_thresh_max = octree.getClampingThresMax();
 
-    ROS_INFO_PRETTY("  Bounding Box Set: %s", octree.bbxSet() ? "TRUE" : "FALSE");
-    ROS_INFO_PRETTY("  Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
-    ROS_INFO_PRETTY("  Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
-    ROS_INFO_PRETTY("  Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
-    ROS_INFO_PRETTY("  Clamping Threshold Min: %0.3f", clamping_thresh_min);
-    ROS_INFO_PRETTY("  Clamping Threshold Max: %0.3f", clamping_thresh_max);
+    ROS_INFO("  Bounding Box Set: %s", octree.bbxSet() ? "TRUE" : "FALSE");
+    ROS_INFO("  Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
+    ROS_INFO("  Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
+    ROS_INFO("  Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
+    ROS_INFO("  Clamping Threshold Min: %0.3f", clamping_thresh_min);
+    ROS_INFO("  Clamping Threshold Max: %0.3f", clamping_thresh_max);
 
     double metric_min_x, metric_min_y, metric_min_z;
     double metric_max_x, metric_max_y, metric_max_z;
@@ -179,19 +179,19 @@ void CostmapExtruder::log_octomap(const octomap::OcTree& octree) const
     octree.getMetricMin(metric_min_x, metric_min_y, metric_min_z);
     octree.getMetricMax(metric_max_x, metric_max_y, metric_max_z);
 
-    ROS_INFO_PRETTY("  Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
-    ROS_INFO_PRETTY("  Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
+    ROS_INFO("  Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
+    ROS_INFO("  Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
 
     octree.getMetricSize(metric_size_x, metric_size_y, metric_size_z);
-    ROS_INFO_PRETTY("  Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
+    ROS_INFO("  Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
 
-    ROS_INFO_PRETTY("  Node Size (max depth): %0.6f", octree.getNodeSize(octree.getTreeDepth()));
-    ROS_INFO_PRETTY("  Occupancy Threshold: %0.3f", octree.getOccupancyThres());
-    ROS_INFO_PRETTY("  Probability Hit: %0.3f", octree.getProbHit());
-    ROS_INFO_PRETTY("  Probability Miss: %0.3f", octree.getProbMiss());
-    ROS_INFO_PRETTY("  Resolution: %0.3f", octree.getResolution());
-    ROS_INFO_PRETTY("  Depth: %u", octree.getTreeDepth());
-    ROS_INFO_PRETTY("  Tree Type: %s", octree.getTreeType().c_str());
+    ROS_INFO("  Node Size (max depth): %0.6f", octree.getNodeSize(octree.getTreeDepth()));
+    ROS_INFO("  Occupancy Threshold: %0.3f", octree.getOccupancyThres());
+    ROS_INFO("  Probability Hit: %0.3f", octree.getProbHit());
+    ROS_INFO("  Probability Miss: %0.3f", octree.getProbMiss());
+    ROS_INFO("  Resolution: %0.3f", octree.getResolution());
+    ROS_INFO("  Depth: %u", octree.getTreeDepth());
+    ROS_INFO("  Tree Type: %s", octree.getTreeType().c_str());
 }
 
 void CostmapExtruder::convert(const moveit_msgs::CollisionMap& collision_map, octomap::Pointcloud& octomap_cloud) const

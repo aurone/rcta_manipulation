@@ -1,5 +1,5 @@
-#ifndef MoveArmCommandModel_h
-#define MoveArmCommandModel_h
+#ifndef MoveGroupCommandModel_h
+#define MoveGroupCommandModel_h
 
 #include <map>
 #include <memory>
@@ -17,19 +17,14 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/GetMotionPlan.h>
 #include <moveit_msgs/MoveGroupAction.h>
-#include <moveit_planners_sbpl/moveit_robot_model.h>
 
-class MoveArmCommandModel : public QObject
+class MoveGroupCommandModel : public QObject
 {
     Q_OBJECT
 
 public:
 
-    static const double DefaultTableSizeX;
-    static const double DefaultTableSizeY;
-    static const double DefaultTableSizeZ;
-
-    MoveArmCommandModel(QObject* parent = 0);
+    MoveGroupCommandModel(QObject* parent = 0);
 
     /// \brief Load a robot into the command model.
     ///
@@ -79,34 +74,18 @@ private:
 
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
 
-    // robot state
-    ros::Subscriber m_joint_states_sub;
-    sensor_msgs::JointState::ConstPtr m_last_joint_state_msg;
-
     // requesting plans from move_group
     ros::ServiceClient m_plan_path_client;
     typedef actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction> MoveGroupActionClient;
     std::unique_ptr<MoveGroupActionClient> m_move_group_client;
 
-    double m_table_size_x;
-    double m_table_size_y;
-    double m_table_size_z;
-    double m_table_origin_x;
-    double m_table_origin_y;
-    double m_table_origin_z;
-    std::string m_table_name;
-
     // for dictating the planning scene to the move_group node
     ros::Publisher m_planning_scene_world_pub;
     ros::Publisher m_collision_object_pub;
 
-    std::unique_ptr<sbpl_interface::MoveItRobotModel> m_robot_model_sbpl; // :(
-
     void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
     void logPlanningSceneMonitor(
         const planning_scene_monitor::PlanningSceneMonitor& monitor) const;
-
-    void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg);
 
     void clearMoveGroupRequest();
 
@@ -131,18 +110,17 @@ private:
         const std::string& group_name,
         moveit_msgs::MotionPlanRequest& req) const;
 
-    moveit_msgs::CollisionObject createTableCollisionObject() const;
-
     void logMotionPlanResponse(
         const moveit_msgs::MotionPlanResponse& res) const;
     void logMotionPlanResponse(
         const moveit_msgs::MoveGroupResult& res) const;
 
-    bool initializeCollisionDetection();
-
     void moveGroupResultCallback(
         const actionlib::SimpleClientGoalState& state,
         const moveit_msgs::MoveGroupResult::ConstPtr& result);
+
+    // Get the state of the real robot, if it's available
+    bool getActualState(moveit::core::RobotState& robot_state);
 };
 
 #endif

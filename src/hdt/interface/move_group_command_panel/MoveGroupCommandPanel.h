@@ -12,17 +12,17 @@
 #include <ros/ros.h>
 #include <rviz/panel.h>
 
-class MoveArmCommandModel;
+class MoveGroupCommandModel;
 class JointVariableCommandWidget;
 
-class MoveItCommandPanel : public rviz::Panel
+class MoveGroupCommandPanel : public rviz::Panel
 {
     Q_OBJECT
 
 public:
 
-    MoveItCommandPanel(QWidget* parent = 0);
-    ~MoveItCommandPanel();
+    MoveGroupCommandPanel(QWidget* parent = 0);
+    ~MoveGroupCommandPanel();
 
     virtual void load(const rviz::Config& config);
     virtual void save(rviz::Config config) const;
@@ -55,7 +55,7 @@ private:
 
     ros::NodeHandle m_nh;
 
-    std::unique_ptr<MoveArmCommandModel> m_model;
+    std::unique_ptr<MoveGroupCommandModel> m_model;
 
     QLineEdit* m_robot_description_line_edit;
     QPushButton* m_load_robot_button;

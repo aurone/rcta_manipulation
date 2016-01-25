@@ -61,9 +61,9 @@ double calc_prob_successful_grasp(
     covariance(1, 1) = 0.2;
     Gaussian2 gauss(mean, covariance);
 
-    ROS_INFO_PRETTY("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (")
+    ROS_INFO("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (%0.3f, %0.3f)", mean.x(), mean.y(), covariance(0, 0), covariance(1, 1));
 
-    ROS_INFO_PRETTY("Evaluating circle at (%0.3f, %0.3f) with radius %0.3f from costmap", circle_x, circle_y, circle_radius);
+    ROS_INFO("Evaluating circle at (%0.3f, %0.3f) with radius %0.3f from costmap", circle_x, circle_y, circle_radius);
     Eigen::Vector2d circle_center(circle_x, circle_y);
 
     // get the min and max grid coordinates to scan
@@ -75,7 +75,7 @@ double calc_prob_successful_grasp(
 
     int num_x_cells = max_grid(0) - min_grid(0);
     int num_y_cells = max_grid(1) - min_grid(1);
-    ROS_INFO_PRETTY("Instantiating %d x %d probability mask", num_x_cells, num_y_cells);
+    ROS_INFO("Instantiating %d x %d probability mask", num_x_cells, num_y_cells);
     Eigen::MatrixXd mask(num_x_cells, num_y_cells);
     for (int i = 0; i < num_x_cells; ++i) {
         for (int j = 0; j < num_y_cells; ++j) {
@@ -83,7 +83,7 @@ double calc_prob_successful_grasp(
         }
     }
 
-    ROS_INFO_PRETTY("Initializing probability mask over [%d, %d] x [%d, %d]", min_grid(0), min_grid(1), max_grid(0), max_grid(1));
+    ROS_INFO("Initializing probability mask over [%d, %d] x [%d, %d]", min_grid(0), min_grid(1), max_grid(0), max_grid(1));
     // initialize the mask to the gaussian values in each cell
     double sum = 0.0;
     for (int grid_x = min_grid(0); grid_x < max_grid(0); ++grid_x) {
@@ -91,7 +91,7 @@ double calc_prob_successful_grasp(
 
             Eigen::Vector2i gp(grid_x, grid_y);
             if (!within_bounds(grid, gp(0), gp(1))) {
-                ROS_WARN_PRETTY("Grid point (%d, %d) is outside of costmap bounds", gp(0), gp(1));
+                ROS_WARN("Grid point (%d, %d) is outside of costmap bounds", gp(0), gp(1));
                 continue;
             }
 
@@ -133,12 +133,12 @@ double calc_prob_successful_grasp(
             if (grid_at(grid, grid_x, grid_y) >= obsthresh) {
                 ROS_INFO("Obstacle cell detected. probmask = %0.6f", probmask);
                 probability *= (1.0 - probmask);
-                ROS_INFO_PRETTY("  Probability = %0.3f", 100 * probability);
+                ROS_INFO("  Probability = %0.3f", 100 * probability);
 
             }
             else {
                 ROS_INFO("Free cell detected. probmask = %0.6f", probmask);
-                ROS_INFO_PRETTY("  Probability = %0.3f", 100 * probability);
+                ROS_INFO("  Probability = %0.3f", 100 * probability);
             }
         }
     }
