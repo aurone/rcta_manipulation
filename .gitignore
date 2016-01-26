@@ -1,0 +1,7 @@
+src/*
+!src/hdt
+devel/*
+build/*
+install/*
+!.gitignore
+.catkin_workspace
