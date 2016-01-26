@@ -120,7 +120,7 @@ private:
         const moveit_msgs::MoveGroupResult::ConstPtr& result);
 
     // Get the state of the real robot, if it's available
-    bool getActualState(moveit::core::RobotState& robot_state);
+    bool getActualState(moveit::core::RobotState& robot_state) const;
 };
 
 #endif

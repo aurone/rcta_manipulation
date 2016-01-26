@@ -444,8 +444,14 @@ bool MoveGroupCommandModel::fillStartState(
     const std::string& group_name,
     moveit_msgs::MotionPlanRequest& req) const
 {
+    moveit::core::RobotState robot_state(m_robot_model);
+    if (!getActualState(robot_state)) {
+        ROS_ERROR("Failed to get start state");
+        return false;
+    }
+
     sensor_msgs::JointState joint_state;
-    moveit::core::robotStateToJointStateMsg(*m_robot_state, joint_state);
+    moveit::core::robotStateToJointStateMsg(robot_state, joint_state);
 
     // copy over joint state from incoming sensor data
     req.start_state.joint_state.header.frame_id = "ooga booga";
@@ -724,7 +730,8 @@ void MoveGroupCommandModel::moveGroupResultCallback(
     logMotionPlanResponse(res);
 }
 
-bool MoveGroupCommandModel::getActualState(moveit::core::RobotState& robot_state)
+bool MoveGroupCommandModel::getActualState(
+    moveit::core::RobotState& robot_state) const
 {
     if (!m_scene_monitor) {
         ROS_WARN("No scene loaded");
@@ -746,6 +753,5 @@ bool MoveGroupCommandModel::getActualState(moveit::core::RobotState& robot_state
 
     m_scene_monitor->unlockSceneRead();
 
-    Q_EMIT robotStateChanged();
     return true;
 }
