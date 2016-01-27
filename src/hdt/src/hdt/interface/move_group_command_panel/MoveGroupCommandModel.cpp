@@ -6,6 +6,7 @@
 // system includes
 #include <eigen_conversions/eigen_msg.h>
 #include <moveit/robot_state/conversions.h>
+#include <moveit_msgs/GetStateValidity.h>
 #include <moveit_msgs/PlanningSceneWorld.h>
 #include <ros/console.h>
 #include <sbpl_geometry_utils/utils.h>
@@ -83,22 +84,13 @@ MoveGroupCommandModel::MoveGroupCommandModel(QObject* parent) :
     m_rm_loader(),
     m_robot_model(),
     m_robot_state(),
-    m_plan_path_client(),
-    m_planning_scene_world_pub(),
-    m_collision_object_pub()
+    m_validity(boost::indeterminate),
+    m_scene_monitor(),
+    m_check_state_validity_client(),
+    m_move_group_client()
 {
-    m_plan_path_client = m_nh.serviceClient<moveit_msgs::GetMotionPlan>(
-            "plan_kinematic_path");
+    reinitCheckStateValidityService();
     m_move_group_client.reset(new MoveGroupActionClient("move_group", false));
-
-    m_planning_scene_world_pub = m_nh.advertise<moveit_msgs::PlanningSceneWorld>(
-            "planning_scene_world", 5, true);
-    m_collision_object_pub = m_nh.advertise<moveit_msgs::CollisionObject>(
-            "collision_object", 5, true);
-
-    // publish an empty planning scene world
-    moveit_msgs::PlanningSceneWorld planning_scene_world;
-//    m_planning_scene_world_pub.publish(planning_scene_world);
 }
 
 bool MoveGroupCommandModel::loadRobot(const std::string& robot_description)
@@ -247,13 +239,16 @@ bool MoveGroupCommandModel::planToPosition(const std::string& group_name)
     const ros::Time now = ros::Time::now();
 
     if (!fillWorkspaceParameters(now, group_name, req) ||
-        !fillStartState(now, group_name, req) ||
+//        !fillStartState(now, group_name, req) ||
         !fillGoalConstraints(now, group_name, req) ||
         !fillPathConstraints(now, group_name, req) ||
         !fillTrajectoryConstraints(now, group_name, req))
     {
         return false;
     }
+
+    req.start_state.is_diff = true;
+    ops.planning_scene_diff.robot_state.is_diff = true;
 
     req.planner_id = "ARA*";
     req.group_name = group_name;
@@ -264,7 +259,7 @@ bool MoveGroupCommandModel::planToPosition(const std::string& group_name)
     ops.look_around = false;
     ops.look_around_attempts = 0;
     ops.max_safe_execution_cost = 1.0;
-    ops.plan_only = true;
+    ops.plan_only = false;
     ops.replan = false;
     ops.replan_attempts = 0;
     ops.replan_delay = 0.0;
@@ -310,10 +305,45 @@ void MoveGroupCommandModel::setJointVariable(int jidx, double value)
 
         m_robot_state->updateLinkTransforms();
 
-        // TODO: service call to check state validity function
+        if (!m_check_state_validity_client->isValid()) {
+            reinitCheckStateValidityService();
+        }
+
+        if (m_check_state_validity_client->exists()) {
+            moveit_msgs::GetStateValidity::Request req;
+            moveit_msgs::GetStateValidity::Response res;
+
+            moveit::core::robotStateToRobotStateMsg(*m_robot_state, req.robot_state);
+            req.group_name = JGOI_HACK;
+            // req.constraints;
+
+            if (!m_check_state_validity_client->call(req, res)) {
+                ROS_WARN("Failed to call service '%s'", m_check_state_validity_client->getService().c_str());
+                m_validity = boost::indeterminate;
+            }
+            else {
+                if (res.valid) {
+                    m_validity = true;
+                }
+                else {
+                    m_validity = false;
+                }
+            }
+        }
+        else {
+            m_validity = boost::indeterminate;
+        }
 
         Q_EMIT robotStateChanged();
     }
+}
+
+void MoveGroupCommandModel::reinitCheckStateValidityService()
+{
+    m_check_state_validity_client.reset(new ros::ServiceClient);
+    *m_check_state_validity_client =
+            m_nh.serviceClient<moveit_msgs::GetStateValidity>(
+                    "check_state_validity");
 }
 
 void MoveGroupCommandModel::logRobotModelInfo(
