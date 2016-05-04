@@ -5,8 +5,10 @@
 #include <memory>
 #include <string>
 
+
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
+#include <boost/logic/tribool.hpp>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
@@ -47,6 +49,8 @@ public:
         double fx, double fy, double fz,
         double ta, double tb, double tc) const;
 
+    boost::tribool robotStateValidity() const { return m_validity; }
+
     bool readyToPlan() const;
     bool planToPosition(const std::string& group_name);
 
@@ -72,16 +76,17 @@ private:
     moveit::core::RobotModelPtr m_robot_model;
     moveit::core::RobotStatePtr m_robot_state;
 
+    boost::tribool m_validity;
+
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
 
-    // requesting plans from move_group
-    ros::ServiceClient m_plan_path_client;
+    // move_group API
+    std::unique_ptr<ros::ServiceClient> m_check_state_validity_client;
+
     typedef actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction> MoveGroupActionClient;
     std::unique_ptr<MoveGroupActionClient> m_move_group_client;
 
-    // for dictating the planning scene to the move_group node
-    ros::Publisher m_planning_scene_world_pub;
-    ros::Publisher m_collision_object_pub;
+    void reinitCheckStateValidityService();
 
     void logRobotModelInfo(const moveit::core::RobotModel& rm) const;
     void logPlanningSceneMonitor(

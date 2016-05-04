@@ -343,6 +343,18 @@ void MoveGroupCommandPanel::updateRobotVisualization()
         float r_base = 0.4f; // (float)100 / (float)255;
         float g_base = 0.4f; // (float)159 / (float)255;
         float b_base = 0.4f; // (float)237 / (float)255;
+        boost::tribool valid = m_model->robotStateValidity();
+        if (valid) {
+            g_base = 1.0f;
+        }
+        else if (!valid) {
+            r_base = 1.0f;
+        }
+        else {
+            r_base = 1.0f;
+            g_base = 1.0f;
+        }
+
         if (rarm_link) {
             if (colormod > 1.0) {
                 marker.color.r = marker.color.g = marker.color.b = 0.0f;
