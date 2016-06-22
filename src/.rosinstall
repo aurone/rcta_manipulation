@@ -3,7 +3,6 @@
 - git: {local-name: moveit_planners_sbpl, uri: 'https://github.com/aurone/moveit_planners_sbpl.git'}
 - git: {local-name: moveit_tests, uri: 'git@sbpl.pc.cs.cmu.edu:people/andrew/moveit-tests.git'}
 - git: {local-name: pr2_sbpl_interface_config, uri: 'https://github.com/aurone/pr2_sbpl_interface_config.git'}
-- git: {local-name: pviz, uri: 'https://github.com/aurone/pviz.git'}
 - git: {local-name: sbpl_geometry_utils, uri: 'https://github.com/sbpl/sbpl_geometry_utils.git'}
 - git: {local-name: sbpl_geometry_utils_tests, uri: 'git@sbpl.pc.cs.cmu.edu:people/andrew/sbpl-geometry-utils-tests.git'}
 - git: {local-name: sbpl_manipulation, uri: 'https://github.com/aurone/sbpl_manipulation.git'}
