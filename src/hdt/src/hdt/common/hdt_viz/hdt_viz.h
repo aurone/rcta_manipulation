@@ -19,7 +19,7 @@ class HDTViz : public PVizGeneric
 
     void HSVtoRGB( double *r, double *g, double *b, double h, double s, double v );
 
-    /* \brief constructor takes in the desired topic name */    
+    /* \brief constructor takes in the desired topic name */
     HDTViz(const std::string &ns = std::string());
 
     ~HDTViz();
@@ -27,7 +27,7 @@ class HDTViz : public PVizGeneric
     void getMaptoRobotTransform(double x, double y, double theta, KDL::Frame &frame);
 
     /**************** Robot Meshes ****************/
-   
+
     void visualizeRobot(std::vector<double> &arm_pos, std::vector<double> &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials = false);
 
     void visualizeRobot(std::vector<double> &arm_pos, BodyPose &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials = false);
@@ -35,7 +35,7 @@ class HDTViz : public PVizGeneric
     void visualizeRobot(std::vector<double> &arm_pos, double hue, std::string ns, int &id, bool use_embedded_materials = false);
 
     void visualizeRobots(std::vector<std::vector<double> > &arm_pos, double hue, std::string ns, int &id, int throttle, bool use_embedded_materials = false);
- 
+
     void visualizeRobotBase(BodyPose &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials = false);
     void visualizeRobotBase(std::vector<double> &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials=false);
 

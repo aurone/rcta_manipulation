@@ -7,5 +7,5 @@ add_subdirectory(msg_utils)
 add_subdirectory(repeatability)
 add_subdirectory(rosbag_utils)
 add_subdirectory(world_model)
-add_subdirectory(hdt_viz)
+#add_subdirectory(hdt_viz)
 
