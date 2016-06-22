@@ -1,3 +1,2 @@
 add_subdirectory(attached_markers_filter)
-add_subdirectory(pick_and_place_node)
-
+#add_subdirectory(pick_and_place_node)

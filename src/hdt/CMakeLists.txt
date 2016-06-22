@@ -29,7 +29,6 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     octomap_msgs
     pluginlib
-    pr2_vfh_database
     pviz
     rosbag
     roscpp
