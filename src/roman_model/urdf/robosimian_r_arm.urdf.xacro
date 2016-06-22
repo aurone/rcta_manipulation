@@ -1,0 +1,284 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="$(find roman_model)/gazebo/robosimian_r_arm.gazebo.xacro"/>
+    <xacro:include filename="$(find roman_model)/control/robosimian_r_arm.transmission.xacro"/>
+
+    <xacro:macro name="robosimian_r_arm" params="name parent *origin namespace">
+        <link name="limb_right_link0">
+            <inertial>
+                <mass value="0.000000"/>
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_fts.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="-.025 0 0"/>
+                <geometry>
+                    <cylinder length="0.145" radius="0.05"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link1">
+            <inertial>
+                <mass value="0.429000"/>
+                <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_pitch_link.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+                <geometry>
+                    <cylinder length="0.07" radius="0.055"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link2">
+            <inertial>
+                <mass value="3.975000"/>
+                <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0"/>
+                <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_roll_link.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+                <geometry>
+                    <cylinder length="0.24" radius="0.055"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+                <geometry>
+                    <cylinder length="0.075" radius="0.055"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link3">
+            <inertial>
+                <mass value="0.429000"/>
+                <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_pitch_link.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+                <geometry>
+                    <cylinder length="0.07" radius="0.055"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link4">
+            <inertial>
+                <mass value="3.975000"/>
+                <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0"/>
+                <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_roll_link.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+                <geometry>
+                    <cylinder length="0.24" radius="0.055"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+                <geometry>
+                    <cylinder length="0.075" radius="0.055"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link5">
+            <inertial>
+                <mass value="0.429000"/>
+                <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_pitch_link.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+                <geometry>
+                    <cylinder length="0.07" radius="0.055"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link6">
+            <inertial>
+                <mass value="3.975000"/>
+                <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0"/>
+                <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.000000 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/robosim_roll_link.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+                <geometry>
+                    <cylinder length="0.24" radius="0.055"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+                <geometry>
+                    <cylinder length="0.075" radius="0.055"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="limb_right_link7">
+            <inertial>
+                <mass value="1.250000"/>
+                <origin xyz="0.060125 0.002176 -0.006854" rpy="0 0 0"/>
+                <inertia ixx="0.003190" ixy="0.000303" ixz="-0.000796" iyy="0.007459" iyz="-0.000709" izz="0.007727"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.087500 0 0" rpy="0.000000 3.141593 -1.570796"/>
+                <geometry>
+                    <box size="0.13 0.13 0.11"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="0.0875 0 0"/>
+                <geometry>
+                    <box size="0.13 0.13 0.11"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="limb_right_joint0" type="fixed">
+            <insert_block name="origin"/>
+            <parent link="${parent}"/>
+            <child link="limb_right_link0"/>
+            <axis xyz="0 0 1"/>
+            <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+            <dynamics damping="0" friction="0"/>
+        </joint>
+
+        <joint name="limb_right_joint1" type="revolute">
+            <origin xyz="0.17203 0.00000 0.00000" rpy="3.14159 -0.00000 0.00000"/>
+            <axis xyz="1 0 0"/>
+            <parent link="limb_right_link0"/>
+            <child link="limb_right_link1"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <joint name="limb_right_joint2" type="revolute">
+            <origin xyz="0.00000 0.00000 0.00000" rpy="0.00000 -0.00000 0.00000"/>
+            <axis xyz="0 -1 0"/>
+            <parent link="limb_right_link1"/>
+            <child link="limb_right_link2"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <joint name="limb_right_joint3" type="revolute">
+            <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000"/>
+            <axis xyz="1 0 0"/>
+            <parent link="limb_right_link2"/>
+            <child link="limb_right_link3"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <joint name="limb_right_joint4" type="revolute">
+            <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000"/>
+            <axis xyz="0 -1 0"/>
+            <parent link="limb_right_link3"/>
+            <child link="limb_right_link4"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <joint name="limb_right_joint5" type="revolute">
+            <origin xyz="0.28650 -0.11700 0.00000" rpy="0.00000 -0.00000 0.00000"/>
+            <axis xyz="1 0 0"/>
+            <parent link="limb_right_link4"/>
+            <child link="limb_right_link5"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <joint name="limb_right_joint6" type="revolute">
+            <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000"/>
+            <axis xyz="0 -1 0"/>
+            <parent link="limb_right_link5"/>
+            <child link="limb_right_link6"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <joint name="limb_right_joint7" type="revolute">
+            <origin xyz="0.19250 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000"/>
+            <axis xyz="1 0 0"/>
+            <parent link="limb_right_link6"/>
+            <child link="limb_right_link7"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <xacro:robosimian_r_arm_gazebo name="${name}" namespace="${namespace}"/>
+        <xacro:robosimian_r_arm_transmission name="${name}" namespace="${namespace}"/>
+    </xacro:macro>
+</robot>

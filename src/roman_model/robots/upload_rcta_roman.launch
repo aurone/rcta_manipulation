@@ -1,0 +1,3 @@
+<launch>
+    <param name="robot_description" command="$(find xacro)/xacro.py '$(find roman_model)/robots/rcta_roman.urdf.xacro'"/>
+</launch>

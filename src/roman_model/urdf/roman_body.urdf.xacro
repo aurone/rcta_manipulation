@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="$(find roman_model)/gazebo/roman_body.gazebo.xacro"/>
+    <xacro:include filename="$(find roman_model)/control/roman_body.transmission.xacro"/>
+
+    <xacro:macro name="roman_body" params="name parent *origin namespace">
+        <link name="torso_link0">
+            <inertial>
+                <mass value="0.000000"/>
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.593 0 0" rpy="1.57080 1.57080 0"/>
+                <geometry>
+                    <box size="0.1 0.1 0.1"/>
+<!--                    <mesh filename="package://roman_model/meshes/roman_torso_scaled.stl" scale="1 1 1"/> -->
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="3.1415 -1.57080 0" xyz="-.025 0 0"/>
+                <geometry>
+                    <cylinder length="0.145" radius="0.05"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="torso_joint0" type="fixed">
+            <insert_block name="origin"/>
+            <parent link="${parent}"/>
+            <child link="torso_link0"/>
+            <axis xyz="0 0 1"/>
+            <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+            <dynamics damping="0" friction="0"/>
+        </joint>
+
+        <joint name="torso_joint1" type="revolute">
+<!--            <origin xyz="0.17203 0.00000 0.00000"  rpy="3.14159 -0.00000 0.00000"/> -->
+            <origin xyz="0.593 0.00000 0.00000"  rpy="3.14159 -0.00000 0.00000"/>
+            <axis xyz="1 0 0"/>
+            <parent link="torso_link0"/>
+            <child link="chest"/>
+            <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+            <dynamics damping="1.000000" friction="10.000000"/>
+        </joint>
+
+        <link name="chest">
+            <inertial>
+                <mass value="10.000000"/>
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+            </inertial>
+            <visual>
+                <origin xyz="0.013000 0.000000 0.000000" rpy="-1.570796 1.570796 0.000000"/>
+                <geometry>
+                    <mesh filename="package://roman_model/meshes/sg_chest.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0.006500 0.000000 0.000000" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.013000 0.100000 0.250000"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <xacro:roman_body_gazebo name="${name}" namespace="${namespace}"/>
+        <xacro:roman_body_transmission name="${name}" namespace="${namespace}"/>
+    </xacro:macro>
+</robot>

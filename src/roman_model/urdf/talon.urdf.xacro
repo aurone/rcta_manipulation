@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="$(find roman_model)/gazebo/talon.gazebo.xacro"/>
+    <xacro:include filename="$(find roman_model)/control/talon.transmission.xacro"/>
+
+    <xacro:macro name="talon" params="name namespace">
+        <link name="${name}_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0 0 0"/>
+                </geometry>
+                <material name="white">
+                    <color rgba="1 1 1 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin rpy="0 0 0" xyz="0 0 0"/>
+                <geometry>
+                    <box size="0 0 0"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="${name}_joint" type="fixed">
+            <origin xyz="0 0 0" rpy="3.14 0 0"/>
+            <parent link="${name}_link"/>
+            <child link="talon"/>
+        </joint>
+
+        <link name="talon">
+            <inertial>
+                <mass value="40.000000"/>
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+            </inertial>
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+<!--                    <box size="0.900000 0.600000 0.260000"/> -->
+                    <mesh filename="package://roman_model/meshes/talon.stl" scale="1 1 1"/>
+                </geometry>
+                <material name="grey">
+                    <color rgba=".8 .8 .8 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.900000 0.600000 0.260000"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin xyz="0.000000 0.260000 0.000000" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.900000 0.080000 0.300000"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin xyz="0.000000 -0.260000 0.000000" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.900000 0.080000 0.300000"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin xyz="-0.325000 0.000000 -0.180000" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.250000 0.600000 0.100000"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="track_left">
+            <inertial>
+                <mass value="0.000000" />
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+            </inertial>
+        </link>
+
+        <joint name="track_left_joint" type="revolute">
+            <origin xyz="0.00000 0.00000 0.00000" rpy="0.00000 0.00000 0.00000"/>
+            <axis xyz="0 0 1"/>
+            <parent link="talon"/>
+            <child link="track_left"/>
+            <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+            <dynamics damping="0.0" friction="0.0"/>
+        </joint>
+
+        <link name="track_right">
+            <inertial>
+                <mass value="0.000000"/>
+                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+            </inertial>
+        </link>
+
+        <joint name="track_right_joint" type="revolute">
+            <origin xyz="0.00000 0.00000 0.00000" rpy="0.00000 0.00000 0.00000"/>
+            <axis xyz="0 0 1"/>
+            <parent link="talon"/>
+            <child link="track_right"/>
+            <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+            <dynamics damping="0.0" friction="0.0"/>
+        </joint>
+
+        <xacro:talon_gazebo name="${name}" namespace="${namespace}"/>
+        <xacro:talon_transmission name="${name}" namespace="${namespace}"/>
+    </xacro:macro>
+</robot>

@@ -1,0 +1,12 @@
+<package format="2">
+    <name>roman_model</name>
+    <version>0.0.0</version>
+    <description>roman_model</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <exec_depend>xacro</exec_depend>
+</package>

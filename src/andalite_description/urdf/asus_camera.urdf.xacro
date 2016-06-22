@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<root xmlns:xacro="http://ros.org/wiki/xacro">
+    <!-- Provides:
+        one fixed transform for the base of the asus:
+            ${name}_mount_joint
+        one revolute joint for the asus neck:
+            ${name}_tilt one fixed transform to
+        the canonical frame of the camera
+            ${name}_frame_joint
+        multiple fixed transforms for convenient sensor frames:
+            ${name}_depth_frame_joint
+            ${name}_rgb_frame_joint
+            ${name}_depth_optical_frame_joint
+            ${name}_rgb_optical_frame_joint
+    -->
+
+    <xacro:macro name="asus_xtion_pro_live" params="name parent *origin">
+        <!-- fixed joint from mount link to base link -->
+        <joint name="${name}_mount_joint" type="fixed">
+            <insert_block name="origin" />
+            <parent link="${parent}"/>
+            <child link="${name}_frame"/>
+        </joint>
+
+        <!-- fixed joint from tilt frame to camera frame -->
+        <!--
+        <joint name="${name}_frame_joint" type="fixed">
+            <parent link="${name}_base_link" />
+            <child link="${name}_frame" />
+            <origin xyz="0.0 0.0 0" rpy="0 0 0" />
+        </joint>
+        -->
+
+        <!-- camera frame -> depth frame -->
+        <joint name="${name}_depth_frame_joint" type="fixed">
+            <parent link="${name}_frame" />
+            <child link="${name}_depth_frame" />
+            <origin xyz="0 0.01287 0" />
+        </joint>
+
+        <!-- camera frame -> rgb frame -->
+        <joint name="${name}_rgb_frame_joint" type="fixed">
+            <parent link="${name}_frame" />
+            <child link="${name}_rgb_frame" />
+            <origin xyz="0 -0.01287 0" />
+        </joint>
+
+        <!-- depth frame -> depth optical frame -->
+        <joint name="${name}_depth_optical_frame_joint" type="fixed">
+            <parent link="${name}_depth_frame" />
+            <child link="${name}_depth_optical_frame" />
+            <origin xyz="${cal_kinect_x} ${cal_kinect_y} ${cal_kinect_z}"
+                    rpy="${-M_PI/2+cal_kinect_roll} ${0.0+cal_kinect_pitch} ${-M_PI/2+cal_kinect_yaw}" />
+        </joint>
+
+        <!-- rgb frame -> rgb optical frame -->
+        <joint name="${name}_rgb_optical_frame_joint" type="fixed">
+            <parent link="${name}_rgb_frame" />
+            <child link="${name}_rgb_optical_frame" />
+            <origin xyz="${cal_kinect_x} ${cal_kinect_y} ${cal_kinect_z}"
+                    rpy="${-M_PI/2+cal_kinect_roll} ${0.0+cal_kinect_pitch} ${-M_PI/2+cal_kinect_yaw}" />
+        </joint>
+
+        <!-- base link -->
+        <!-- <link name="${name}_base_link" /> -->
+
+        <!-- camera frame -->
+        <link name="${name}_frame">
+            <inertial>
+                <mass value="0.1" />
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+            </inertial>
+
+            <visual>
+                <origin xyz="0.0 0.0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://andalite_description/meshes/kinect_v0/kinect_head.dae" scale="0.001
+                        0.001 0.001" />
+                </geometry>
+            </visual>
+
+            <collision>
+                <origin xyz="0.0 0.0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="package://andalite_description/meshes/kinect_v0/kinect_head.dae" scale="0.001
+                        0.001 0.001" />
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="${name}_depth_frame" />
+        <link name="${name}_rgb_frame" />
+        <link name="${name}_depth_optical_frame"/>
+        <link name="${name}_rgb_optical_frame"/>
+
+        <!-- extensions -->
+        <xacro:kinect_camera_gazebo_v0 name="${name}" />
+    </xacro:macro>
+</root>
+

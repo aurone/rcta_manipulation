@@ -1,0 +1,1823 @@
+<robot name="surrogate">
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+       <box size="0 0 0"/>
+      </geometry>
+        <material name="white">
+	      <color rgba="1 1 1 1" />
+        </material>
+    </visual>
+    <collision group="default">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+         <box size="0 0 0"/>
+      </geometry>
+    </collision>
+  </link>
+
+
+   <joint name="base_joint" type="fixed">
+      <origin xyz="0 0 0"  rpy="3.14 0 0" />
+      <parent link="base_link" />
+      <child link="talon" />
+   </joint>
+   <link name="talon">
+      <inertial>
+        <mass value="40.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/talon.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <geometry>           <box size="0.900000 0.600000 0.260000"/>        </geometry>
+      </collision>
+      <collision group="other">
+        <origin xyz="0.000000 0.260000 0.000000" rpy="0 0 0" />
+        <geometry>           <box size="0.900000 0.080000 0.300000"/>        </geometry>
+      </collision>
+      <collision group="other">
+        <origin xyz="0.000000 -0.260000 0.000000" rpy="0 0 0" />
+        <geometry>           <box size="0.900000 0.080000 0.300000"/>        </geometry>
+      </collision>
+   </link>
+
+   <link name="battery_comm_link">
+      <inertial>
+        <mass value="18.140000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>           <box size="0.350000 0.240000 0.200000"/>        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <geometry>           <box size="0.350000 0.240000 0.200000"/>        </geometry>
+      </collision>
+      <collision group="other">
+        <origin xyz="-0.195000 0.000000 -0.190000" rpy="0 0 0" />
+        <geometry>
+           <cylinder length="0.580000" radius="0.020000"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="battery_comm_joint" type="fixed">
+      <origin xyz="-0.38500 0.00000 -0.10000"  rpy="0.00000 -0.00000 0.00000" />
+      <parent link="talon" />
+      <child link="battery_comm_link" />
+      <axis xyz="0 0 1" />
+      <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+   <link name="torso_link0">
+      <inertial>
+        <mass value="2.500000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_fts.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-.025 0 0"/>
+        <geometry>
+          <cylinder length="0.145" radius="0.05"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="torso_link1">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="torso_link2">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="torso_link3">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="torso_link4">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="torso_link5">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="torso_link6">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="torso_joint0" type="fixed">
+      <origin xyz="0.27000 0.00000 -0.05000"  rpy="0.00000 1.57080 1.57080" />
+      <parent link="talon" />
+      <child link="torso_link0" />
+      <axis xyz="0 0 1" />
+      <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+   <joint name="torso_joint1" type="revolute">
+      <origin xyz="0.17203 0.00000 0.00000"  rpy="3.14159 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="torso_link0" />
+      <child link="torso_link1" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="torso_joint2" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="torso_link1" />
+      <child link="torso_link2" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="torso_joint3" type="revolute">
+      <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="torso_link2" />
+      <child link="torso_link3" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="torso_joint4" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="torso_link3" />
+      <child link="torso_link4" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="torso_joint5" type="revolute">
+      <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="torso_link4" />
+      <child link="torso_link5" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="torso_joint6" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="torso_link5" />
+      <child link="torso_link6" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="torso_joint7" type="revolute">
+      <origin xyz="0.19250 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <parent link="torso_link6" />
+      <child link="chest" />
+      <axis xyz="1 0 0" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <link name="chest">
+      <inertial>
+        <mass value="1.500000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.013000 0.000000 0.000000" rpy="-1.570796 1.570796 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/sg_chest.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin xyz="0.006500 0.000000 0.000000" rpy="0 0 0" />
+        <geometry>
+           <box size="0.013000 0.100000 0.250000"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link0">
+      <inertial>
+        <mass value="2.500000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_fts.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-.025 0 0"/>
+        <geometry>
+          <cylinder length="0.145" radius="0.05"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link1">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link2">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link3">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link4">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link5">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link6">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_link7">
+      <inertial>
+        <mass value="1.250000" />
+        <origin xyz="0.060125 0.002176 -0.006854" rpy="0 0 0" />
+        <inertia ixx="0.003190" ixy="0.000303" ixz="-0.000796" iyy="0.007459" iyz="-0.000709" izz="0.007727" />
+      </inertial>
+      <visual>
+        <origin xyz="0.087500 0 0" rpy="0.000000 3.141593 -1.570796" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_palm.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.0875 0 0"/>
+        <geometry>
+          <box size="0.13 0.13 0.11"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.0875 0 0"/>
+        <geometry>
+          <cylinder length="0.0325" radius="0.05"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="limb_left_joint0" type="fixed">
+      <origin xyz="0.07050 0.02500 -0.10000"  rpy="0.00000 0.78540 -1.57080" />
+      <parent link="chest" />
+      <child link="limb_left_link0" />
+      <axis xyz="0 0 1" />
+      <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+   <joint name="limb_left_joint1" type="revolute">
+      <origin xyz="0.17203 0.00000 0.00000"  rpy="3.14159 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_left_link0" />
+      <child link="limb_left_link1" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_left_joint2" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="limb_left_link1" />
+      <child link="limb_left_link2" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_left_joint3" type="revolute">
+      <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_left_link2" />
+      <child link="limb_left_link3" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_left_joint4" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="limb_left_link3" />
+      <child link="limb_left_link4" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_left_joint5" type="revolute">
+      <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_left_link4" />
+      <child link="limb_left_link5" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_left_joint6" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="limb_left_link5" />
+      <child link="limb_left_link6" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_left_joint7" type="revolute">
+      <origin xyz="0.19250 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_left_link6" />
+      <child link="limb_left_link7" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <link name="limb_right_link0">
+      <inertial>
+        <mass value="2.500000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_fts.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-.025 0 0"/>
+        <geometry>
+          <cylinder length="0.145" radius="0.05"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link1">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link2">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link3">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link4">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link5">
+      <inertial>
+        <mass value="0.429000" />
+        <origin xyz="-0.050402 0.012816 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000741" ixy="-0.000215" ixz="0.000000" iyy="0.002044" iyz="0.000000" izz="0.001885" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_pitch_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.07 0 0"/>
+        <geometry>
+          <cylinder length="0.07" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link6">
+      <inertial>
+        <mass value="3.975000" />
+        <origin xyz="0.067354 -0.096472 0.000262" rpy="0 0 0" />
+        <inertia ixx="0.044712" ixy="-0.030354" ixz="0.000012" iyy="0.033445" iyz="-0.000141" izz="0.074293" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_roll_link.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.065 -0.12 0"/>
+        <geometry>
+          <cylinder length="0.24" radius="0.055"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin rpy="1.57080 1.57080 0.0" xyz="0.0 -0.035 0"/>
+        <geometry>
+          <cylinder length="0.075" radius="0.055"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_link7">
+      <inertial>
+        <mass value="1.250000" />
+        <origin xyz="0.060125 0.002176 -0.006854" rpy="0 0 0" />
+        <inertia ixx="0.003190" ixy="0.000303" ixz="-0.000796" iyy="0.007459" iyz="-0.000709" izz="0.007727" />
+      </inertial>
+      <visual>
+        <origin xyz="0.032500 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_hand.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin rpy="3.1415 -1.57080 0" xyz="0.073 0 0"/>
+        <geometry>
+          <cylinder length="0.146" radius="0.05"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="limb_right_joint0" type="fixed">
+      <origin xyz="0.07050 0.02500 0.10000"  rpy="0.00000 -0.78540 -1.57080" />
+      <parent link="chest" />
+      <child link="limb_right_link0" />
+      <axis xyz="0 0 1" />
+      <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+   <joint name="limb_right_joint1" type="revolute">
+      <origin xyz="0.17203 0.00000 0.00000"  rpy="3.14159 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_right_link0" />
+      <child link="limb_right_link1" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_joint2" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="limb_right_link1" />
+      <child link="limb_right_link2" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_joint3" type="revolute">
+      <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_right_link2" />
+      <child link="limb_right_link3" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_joint4" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="limb_right_link3" />
+      <child link="limb_right_link4" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_joint5" type="revolute">
+      <origin xyz="0.28650 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_right_link4" />
+      <child link="limb_right_link5" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_joint6" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 -1 0" />
+      <parent link="limb_right_link5" />
+      <child link="limb_right_link6" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_joint7" type="revolute">
+      <origin xyz="0.19250 -0.11700 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="1 0 0" />
+      <parent link="limb_right_link6" />
+      <child link="limb_right_link7" />
+      <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <link name="limb_left_finger0_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_left_scissor_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_left_finger0_link0">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.020000 0.000000 0.000000" rpy="0 0 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link0.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0" xyz="0.004714 0.007938 0"/>
+        <geometry>
+           <box size="0.043105 0.044450 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger0_link1">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.050000 -0.028000 0.000000" rpy="0 0 -0.520000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link1.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 -0.52" xyz="0.020477 -0.023993 0.000000"/>
+        <geometry>
+           <box size="0.105099 0.045175 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger0_link2">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.039000 0.000000 0.007500" rpy="0 0 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link2.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0" xyz="0.011875 -0.010212 -0.000547"/>
+        <geometry>
+           <box size="0.071823 0.035409 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger0_link3">
+      <inertial>
+        <mass value="0.055000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0.520000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link3.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0.52" xyz="0.011269 0.000810 0.000000"/>
+        <geometry>
+           <box size="0.055837 0.025669 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger1_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_left_finger1_link0">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.020000 0.000000 0.000000" rpy="0 0 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link0.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0" xyz="0.004714 0.007938 0"/>
+        <geometry>
+           <box size="0.043105 0.044450 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger1_link1">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.050000 -0.028000 0.000000" rpy="0 0 -0.520000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link1.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 -0.52" xyz="0.020477 -0.023993 0.000000"/>
+        <geometry>
+           <box size="0.105099 0.045175 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger1_link2">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.039000 0.000000 0.007500" rpy="0 0 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link2.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0" xyz="0.011875 -0.010212 -0.000547"/>
+        <geometry>
+           <box size="0.071823 0.035409 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger1_link3">
+      <inertial>
+        <mass value="0.055000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0.520000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link3.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0.52" xyz="0.011269 0.000810 0.000000"/>
+        <geometry>
+           <box size="0.055837 0.025669 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger2_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_left_finger2_link0">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.020000 0.000000 0.000000" rpy="0 0 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link0.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0" xyz="0.004714 0.007938 0"/>
+        <geometry>
+           <box size="0.043105 0.044450 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger2_link1">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.050000 -0.028000 0.000000" rpy="0 0 -0.520000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link1.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 -0.52" xyz="0.020477 -0.023993 0.000000"/>
+        <geometry>
+           <box size="0.105099 0.045175 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger2_link2">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.039000 0.000000 0.007500" rpy="0 0 0.000000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link2.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0" xyz="0.011875 -0.010212 -0.000547"/>
+        <geometry>
+           <box size="0.071823 0.035409 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_left_finger2_link3">
+      <inertial>
+        <mass value="0.055000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0.520000" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robotiq_link3.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="0 0 0.52" xyz="0.011269 0.000810 0.000000"/>
+        <geometry>
+           <box size="0.055837 0.025669 0.030734"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="limb_left_scissor_actuator" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_scissor_link_actuator" />
+   </joint>
+
+   <joint name="limb_left_finger0_actuator" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_finger0_link_actuator" />
+   </joint>
+
+   <joint name="limb_left_palm_finger0_joint" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_finger0_link0" />
+      <axis xyz="0 1 0" />
+      <origin xyz="0.10890 -0.04550 -0.03600"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="-0.16" upper="0.25" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger1_actuator" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_finger1_link_actuator" />
+   </joint>
+
+   <joint name="limb_left_palm_finger1_joint" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_finger1_link0" />
+      <axis xyz="0 1 0" />
+      <origin xyz="0.10890 -0.04550 0.03600"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="-0.16" upper="0.25" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger2_actuator" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_finger2_link_actuator" />
+   </joint>
+
+   <joint name="limb_left_palm_finger2_joint" type="continuous">
+      <parent link="limb_left_link7" />
+      <child link="limb_left_finger2_link0" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.10890 0.04550 0.00000"  rpy="3.14159 -0.00000 0.00000" />
+      <limit effort="100.0" lower="-0.16" upper="0.25" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger0_joint0" type="revolute">
+      <parent link="limb_left_finger0_link0"/>
+      <child link="limb_left_finger0_link1" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.02000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger1_joint0" type="revolute">
+      <parent link="limb_left_finger1_link0"/>
+      <child link="limb_left_finger1_link1" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.02000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger2_joint0" type="revolute">
+      <parent link="limb_left_finger2_link0"/>
+      <child link="limb_left_finger2_link1" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.02000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger0_joint1" type="revolute">
+      <parent link="limb_left_finger0_link1"/>
+      <child link="limb_left_finger0_link2" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.05000 -0.02800 0.00000"  rpy="0.00000 0.00000 -0.52000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger1_joint1" type="revolute">
+      <parent link="limb_left_finger1_link1"/>
+      <child link="limb_left_finger1_link2" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.05000 -0.02800 0.00000"  rpy="0.00000 0.00000 -0.52000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger2_joint1" type="revolute">
+      <parent link="limb_left_finger2_link1"/>
+      <child link="limb_left_finger2_link2" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.05000 -0.02800 0.00000"  rpy="0.00000 0.00000 -0.52000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger0_joint2" type="revolute">
+      <parent link="limb_left_finger0_link2"/>
+      <child link="limb_left_finger0_link3" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.03900 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger1_joint2" type="revolute">
+      <parent link="limb_left_finger1_link2"/>
+      <child link="limb_left_finger1_link3" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.03900 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <joint name="limb_left_finger2_joint2" type="revolute">
+      <parent link="limb_left_finger2_link2"/>
+      <child link="limb_left_finger2_link3" />
+      <axis xyz="0 0 1" />
+      <origin xyz="0.03900 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <limit effort="100.0" lower="0.000000" upper="3.141593" velocity="0.5"/>
+   </joint>
+
+   <link name="limb_right_finger0_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_right_scissor_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_right_finger0_link0">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link1.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.029 0 0"/>
+        <geometry>
+           <cylinder length="0.058" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger0_link1">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link2.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.021 0 0"/>
+        <geometry>
+           <cylinder length="0.042" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger0_link2">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link3.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.014 0 0"/>
+        <geometry>
+           <cylinder length="0.028" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger1_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_right_finger1_link0">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link1.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.029 0 0"/>
+        <geometry>
+           <cylinder length="0.058" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger1_link1">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link2.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.021 0 0"/>
+        <geometry>
+           <cylinder length="0.042" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger1_link2">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link3.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.014 0 0"/>
+        <geometry>
+           <cylinder length="0.028" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger2_link_actuator">
+      <inertial>
+        <mass value="0" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+      </inertial>
+   </link>
+
+   <link name="limb_right_finger2_link0">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link1.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.029 0 0"/>
+        <geometry>
+           <cylinder length="0.058" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger2_link1">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link2.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.021 0 0"/>
+        <geometry>
+           <cylinder length="0.042" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <link name="limb_right_finger2_link2">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/robosim_simple_finger_link3.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="default">
+        <origin rpy="3.1415 -1.57080 0" xyz="-0.014 0 0"/>
+        <geometry>
+           <cylinder length="0.028" radius="0.011"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="limb_right_scissor_actuator" type="continuous">
+      <parent link="limb_right_link7" />
+      <child link="limb_right_scissor_link_actuator" />
+   </joint>
+
+   <joint name="limb_right_finger0_actuator" type="continuous">
+      <parent link="limb_right_link7" />
+      <child link="limb_right_finger0_link_actuator" />
+   </joint>
+
+   <joint name="limb_right_finger1_actuator" type="continuous">
+      <parent link="limb_right_link7" />
+      <child link="limb_right_finger1_link_actuator" />
+   </joint>
+
+   <joint name="limb_right_finger2_actuator" type="continuous">
+      <parent link="limb_right_link7" />
+      <child link="limb_right_finger2_link_actuator" />
+   </joint>
+
+   <joint name="limb_right_finger0_joint0" type="revolute">
+      <origin xyz="0.11868 0.03800 0.02750"  rpy="0.00000 -0.00000 3.14159" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_link7" />
+      <child link="limb_right_finger0_link0" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger1_joint0" type="revolute">
+      <origin xyz="0.11868 -0.03800 0.02750"  rpy="-3.14159 -0.00000 -3.14159" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_link7" />
+      <child link="limb_right_finger1_link0" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger2_joint0" type="revolute">
+      <origin xyz="0.11868 -0.03800 -0.02750"  rpy="-3.14159 -0.00000 -3.14159" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_link7" />
+      <child link="limb_right_finger2_link0" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger0_joint1" type="revolute">
+      <origin xyz="-0.05000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_finger0_link0"/>
+      <child link="limb_right_finger0_link1" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger0_joint2" type="revolute">
+      <origin xyz="-0.03500 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_finger0_link1"/>
+      <child link="limb_right_finger0_link2" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger1_joint1" type="revolute">
+      <origin xyz="-0.05000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_finger1_link0"/>
+      <child link="limb_right_finger1_link1" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger1_joint2" type="revolute">
+      <origin xyz="-0.03500 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_finger1_link1"/>
+      <child link="limb_right_finger1_link2" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger2_joint1" type="revolute">
+      <origin xyz="-0.05000 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_finger2_link0"/>
+      <child link="limb_right_finger2_link1" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <joint name="limb_right_finger2_joint2" type="revolute">
+      <origin xyz="-0.03500 0.00000 0.00000"  rpy="0.00000 -0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="limb_right_finger2_link1"/>
+      <child link="limb_right_finger2_link2" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="1.000000" friction="10.000000"/>
+   </joint>
+
+   <link name="track_left">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+   </link>
+
+   <joint name="track_left_joint" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="talon"/>
+      <child link="track_left" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="0.0" friction="0.0"/>
+   </joint>
+
+   <link name="track_right">
+      <inertial>
+        <mass value="0.000000" />
+        <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000" />
+      </inertial>
+   </link>
+
+   <joint name="track_right_joint" type="revolute">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 0.00000 0.00000" />
+      <axis xyz="0 0 1" />
+      <parent link="talon"/>
+      <child link="track_right" />
+      <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
+      <dynamics damping="0.0" friction="0.0"/>
+   </joint>
+
+   <link name="head_mount">
+      <inertial>
+        <mass value="0.422000" />
+        <origin xyz="0.089100 0.002200 0.000000" rpy="0 0 0" />
+        <inertia ixx="0.001619" ixy="-0.000023" ixz="0.000000" iyy="0.000935" iyz="0.000000" izz="0.001679" />
+      </inertial>
+      <visual>
+        <origin xyz="0.109270 -0.071400 -0.032530" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/lower_subassembly.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin xyz="0.065000 0.000000 0.000000" rpy="0 0 0" />
+        <geometry>
+           <box size="0.130000 0.150000 0.100000"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="head_mount_joint" type="fixed">
+      <origin xyz="0.00000 0.00000 0.00000"  rpy="0.00000 0.00000 0.00000" />
+      <parent link="chest" />
+      <child link="head_mount" />
+      <axis xyz="0 0 1" />
+      <limit effort="1000.0" lower="-3.4906" upper="3.4906" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+   <link name="head_pan">
+      <inertial>
+        <mass value="0.832800" />
+        <origin xyz="-0.008780 0.040300 -0.004660" rpy="0 0 0" />
+        <inertia ixx="0.000657" ixy="-0.000083" ixz="0.000016" iyy="0.000179" iyz="-0.000042" izz="0.000614" />
+      </inertial>
+      <visual>
+        <origin xyz="-0.043930 0.007150 -0.034290" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/middle_subassembly.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin xyz="0.000000 0.090000 0.000000" rpy="0 0 0" />
+        <geometry>
+           <box size="0.090000 0.180000 0.100000"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="head_pan_joint" type="revolute">
+      <origin xyz="0.11950 0.00000 0.00000"  rpy="0.00000 -1.57080 -1.57080" />
+      <parent link="head_mount" />
+      <child link="head_pan" />
+      <axis xyz="0 -1 0" />
+      <limit effort="1000.0" lower="-1.570796" upper="1.570796" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+   <link name="head_tilt">
+      <inertial>
+        <mass value="6.837000" />
+        <origin xyz="0.009630 -0.017200 0.062700" rpy="0 0 0" />
+        <inertia ixx="0.041000" ixy="-0.000208" ixz="-0.000016" iyy="0.043630" iyz="0.000707" izz="0.066550" />
+      </inertial>
+      <visual>
+        <origin xyz="0.015090 -0.086180 0.050800" rpy="0 0 0" />
+        <geometry>
+           <mesh filename="package://surrogate_model/meshes/upper_subassembly.stl" scale="1 1 1" />
+        </geometry>
+        <material name="grey">
+	      <color rgba=".8 .8 .8 1" />
+        </material>
+      </visual>
+      <collision group="other">
+        <origin xyz="0.015090 -0.016000 0.010000" rpy="0 0 0" />
+        <geometry>
+           <cylinder length="0.100000" radius="0.150000"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin xyz="0.015090 -0.016000 0.135000" rpy="0 0 0" />
+        <geometry>
+           <cylinder length="0.150000" radius="0.055000"/>
+        </geometry>
+      </collision>
+      <collision group="other">
+        <origin xyz="0.015000 0.125000 0.010000" rpy="-0.392700 0 0" />
+        <geometry>
+           <box size="0.225000 0.100000 0.060000"/>
+        </geometry>
+      </collision>
+   </link>
+
+   <joint name="head_tilt_joint" type="revolute">
+      <origin xyz="-0.03758 0.14685 -0.00064"  rpy="-1.57080 0.00000 0.00000" />
+      <parent link="head_pan" />
+      <child link="head_tilt" />
+      <axis xyz="-1 0 0" />
+      <limit effort="1000.0" lower="-1.570796" upper="1.570796" velocity="0.5"/>
+      <dynamics damping="0" friction="0"/>
+   </joint>
+
+</robot>

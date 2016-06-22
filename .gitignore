@@ -1,5 +1,7 @@
 src/*
 !src/hdt
+!src/andalite_description
+!src/roman_model
 devel/*
 build/*
 install/*

@@ -1,0 +1,15 @@
+<package format="2">
+    <name>andalite_description</name>
+    <version>0.0.0</version>
+    <description>andalite_description</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <exec_depend>gazebo_ros_pkgs</exec_depend>
+    <exec_depend>husky_description</exec_depend>
+    <exec_depend>pr2_mechanism_model</exec_depend>
+    <exec_depend>xacro</exec_depend>
+</package>
