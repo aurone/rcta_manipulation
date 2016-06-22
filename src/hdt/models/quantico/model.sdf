@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<sdf version="1.5">
+    <model name="quantico">
+        <pose>0 0 0 0 0 0</pose>
+        <static>true</static>
+        <link name="base_link">
+            <inertial>
+                <mass>1.0</mass>
+                <inertia>
+                    <ixx>1.0</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>1.0</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>1.0</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                    <mesh>
+                        <uri>file://quantico/meshes/quantico.dae</uri>
+                    </mesh>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>file://quantico/meshes/quantico.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+</sdf>

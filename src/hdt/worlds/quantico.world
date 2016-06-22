@@ -1,0 +1,17 @@
+<sdf version="1.5">
+    <world name="quantico">
+        <include>
+            <uri>model://sun</uri>
+        </include>
+        <include>
+            <uri>model://quantico</uri>
+        </include>
+        <gui fullscreen='0'>
+            <camera name='user_camera'>
+                <pose frame=''>-9.13548 -25.567 19.8036 -0 0.891644 1.57619</pose>
+                <view_controller>orbit</view_controller>
+                <projection_type>perspective</projection_type>
+            </camera>
+        </gui>
+    </world>
+</sdf>

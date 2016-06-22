@@ -109,7 +109,11 @@
   <run_depend>sdl2</run_depend>
   <run_depend>pkg-config</run_depend>
 
+  <run_depend>gazebo_ros</run_depend>
+
   <export>
+    <gazebo_ros gazebo_media_path="${prefix}/models"/>
+    <gazebo_ros gazebo_model_path="${prefix}/models"/>
     <rviz plugin="${prefix}/config/plugin_description.xml"/>
     <rviz plugin="${prefix}/config/hdt_command_plugin_description.xml"/>
     <rviz plugin="${prefix}/config/controller_status_panel_plugin_description.xml"/>

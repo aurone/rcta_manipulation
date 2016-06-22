@@ -1,0 +1,70 @@
+# all joint states
+joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50
+
+# left arm
+limb_left_joint1_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint1
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_left_joint2_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint2
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_left_joint3_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint3
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_left_joint4_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint4
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_left_joint5_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint5
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_left_joint5_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint6
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_left_joint6_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_left_joint7
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+
+# right arm
+limb_right_joint1_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint1
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_right_joint2_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint2
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_right_joint3_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint3
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_right_joint4_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint4
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_right_joint5_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint5
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_right_joint5_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint6
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+limb_right_joint6_controller:
+    type: effort_controllers/JointPositionController
+    joint: limb_right_joint7
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
+
+# torso
+torso_joint1_controller:
+    type: effort_controllers/JointPositionController
+    joint: torso_joint1
+    pid: { p: 10.0, i: 0.01, d: 1.0 }
