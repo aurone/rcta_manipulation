@@ -3,10 +3,12 @@ project(hdt)
 
 ### EXTERNAL DEPENDENCIES ###
 
-# Boost
 find_package(Boost REQUIRED system thread)
+find_package(GLUT REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(PkgConfig REQUIRED)
+find_package(Qt4 REQUIRED COMPONENTS QtCore QtGui)
 
-# catkin
 find_package(catkin REQUIRED COMPONENTS
     ar_track_alvar
     actionlib
@@ -33,8 +35,9 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     rospack
     rviz
+    sbpl_arm_planner
+    sbpl_collision_checking
     sbpl_geometry_utils
-    sbpl_manipulation
     spellbook_ros
     sensor_msgs
     std_msgs
@@ -43,51 +46,40 @@ find_package(catkin REQUIRED COMPONENTS
     urdf
     visualization_msgs)
 
-# Eigen
+# has to come after cmake_modules component is found by find_package(catkin ...
 find_package(Eigen REQUIRED)
 
-# PkgConfig
-find_package(PkgConfig REQUIRED)
-
-# TODO: lookup ncurses
-
-# urdfdom
+pkg_check_modules(glew REQUIRED glew)
+pkg_check_modules(lua REQUIRED lua5.2)
+pkg_check_modules(ncurses REQUIRED ncurses)
+pkg_check_modules(openni REQUIRED libopenni)
+find_package(sbpl REQUIRED)
+pkg_check_modules(sdl REQUIRED sdl2)
 find_package(urdfdom REQUIRED)
 
-# lua5.2
-pkg_check_modules(lua REQUIRED lua5.2)
+# project settings
+set(CMAKE_INCLUDE_CURRENT_DIR On)
+set(CMAKE_VERBOSE_MAKEFILE Off)
+set(CMAKE_COLOR_MAKEFILE On)
 
-# sdl2
-pkg_check_modules(sdl REQUIRED sdl2)
+set(BUILD_SHARED_LIBS On)
+list(APPEND CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_BUILD_TYPE Release)
 
-# Openni
-pkg_check_modules(openni REQUIRED libopenni)
-include_directories(${openni_INCLUDE_DIRS})
-link_directories(${openni_LIBRARY_DIRS})
-
-# Qt4
-find_package(Qt4 REQUIRED COMPONENTS QtCore QtGui)
 include(${QT_USE_FILE})
+
 add_definitions(-DQT_NO_KEYWORDS)
 
-# OpenGL
-find_package(OpenGL REQUIRED)
+include_directories(${openni_INCLUDE_DIRS})
 include_directories(${OPENGL_INCLUDE_DIR})
-
-# glew
-pkg_check_modules(glew REQUIRED glew)
 include_directories(${glew_INCLUDE_DIRS})
-link_directories(${glew_LIBRARY_DIRS})
-
-# SBPL
-find_package(sbpl REQUIRED)
 include_directories(${SBPL_INCLUDE_DIRS})
-
-find_package(GLUT REQUIRED)
 include_directories(${GLUT_INCLUDE_DIR})
-
 # required to locate compiled headers for designer forms
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+link_directories(${openni_LIBRARY_DIRS})
+link_directories(${glew_LIBRARY_DIRS})
 
 add_action_files(
     DIRECTORY action
@@ -117,20 +109,13 @@ generate_messages(
         std_msgs
         trajectory_msgs)
 
-catkin_package(INCLUDE_DIRS
+catkin_package(
+    INCLUDE_DIRS
 		src/hdt/common
-	CATKIN_DEPENDS message_runtime
+	CATKIN_DEPENDS
+        message_runtime
 	LIBRARIES
 		hdt_viz)
 
-set(CMAKE_INCLUDE_CURRENT_DIR On)
-set(CMAKE_VERBOSE_MAKEFILE Off)
-set(CMAKE_COLOR_MAKEFILE On)
-
-set(BUILD_SHARED_LIBS On)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
-
 add_subdirectory(src)
 add_subdirectory(config)
-

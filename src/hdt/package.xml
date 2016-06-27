@@ -1,124 +1,74 @@
 <?xml version="1.0"?>
-<package>
-  <name>hdt</name>
-  <version>0.0.0</version>
-  <description>The HDT package</description>
+<package format="2">
+    <name>hdt</name>
+    <version>0.0.0</version>
+    <description>The HDT package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
 
-  <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
-  <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <buildtool_depend>catkin</buildtool_depend>
 
-  <license>TODO</license>
+    <build_depend>cmake_modules</build_depend>
+    <build_depend>message_generation</build_depend>
 
-  <buildtool_depend>catkin</buildtool_depend>
+    <exec_depend>message_runtime</exec_depend>
+    <exec_depend>xacro</exec_depend>
+    <exec_depend>gazebo_ros</exec_depend>
 
-  <build_depend>ar_track_alvar</build_depend>
-  <build_depend>ar_track_alvar_msgs</build_depend>
-  <build_depend>actionlib</build_depend>
-  <build_depend>actionlib_msgs</build_depend>
-  <build_depend>cmake_modules</build_depend>
-  <build_depend>control_msgs</build_depend>
-  <build_depend>eigen_conversions</build_depend>
-  <build_depend>geometric_shapes</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>hdt_msgs</build_depend>
-  <build_depend>interactive_markers</build_depend>
-  <build_depend>leatherman</build_depend>
-  <build_depend>message_generation</build_depend>
-  <build_depend>moveit_core</build_depend>
-  <build_depend>moveit_planners_sbpl</build_depend>
-  <build_depend>moveit_ros_planning</build_depend>
-  <build_depend>moveit_ros_planning_interface</build_depend>
-  <build_depend>moveit_ros_move_group</build_depend>
-  <build_depend>nav_msgs</build_depend>
-  <build_depend>octomap_msgs</build_depend>
-  <build_depend>pluginlib</build_depend>
-  <build_depend>pr2_vfh_database</build_depend>
-  <build_depend>rosbag</build_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospack</build_depend>
-  <build_depend>rviz</build_depend>
-  <build_depend>sbpl_geometry_utils</build_depend>
-  <build_depend>sbpl_manipulation</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>tf</build_depend>
-  <build_depend>trajectory_msgs</build_depend>
-  <build_depend>urdf</build_depend>
-  <build_depend>liburdfdom-dev</build_depend>
-  <build_depend>libncurses-dev</build_depend>
-  <build_depend>visualization_msgs</build_depend>
-  <build_depend>husky_robot</build_depend>
-  <build_depend>libblas-dev</build_depend>
-  <build_depend>libglew-dev</build_depend>
-  <build_depend>liblapack-dev</build_depend>
-  <build_depend>libopenni-dev</build_depend>
-  <build_depend>libsbpl</build_depend>
-  <build_depend>lua5.2</build_depend>
-  <build_depend>libhdt</build_depend>
-  <build_depend>ntcansckplugin</build_depend>
-  <build_depend>sdl2</build_depend>
-  <build_depend>pkg-config</build_depend>
+    <depend>actionlib</depend>
+    <depend>actionlib_msgs</depend>
+    <depend>ar_track_alvar</depend>
+    <depend>ar_track_alvar_msgs</depend>
+    <depend>control_msgs</depend>
+    <depend>eigen_conversions</depend>
+    <depend>geometric_shapes</depend>
+    <depend>geometry_msgs</depend>
+    <depend>hdt_msgs</depend>
+    <depend>interactive_markers</depend>
+    <depend>leatherman</depend>
+    <depend>libblas-dev</depend>
+    <depend>libglew-dev</depend>
+    <depend>libhdt</depend>
+    <depend>liblapack-dev</depend>
+    <depend>libncurses-dev</depend>
+    <depend>libopenni-dev</depend>
+    <depend>libsbpl</depend>
+    <depend>liburdfdom-dev</depend>
+    <depend>lua5.2</depend>
+    <depend>moveit_core</depend>
+    <depend>moveit_planners_sbpl</depend>
+    <depend>moveit_ros_move_group</depend>
+    <depend>moveit_ros_planning</depend>
+    <depend>moveit_ros_planning_interface</depend>
+    <depend>nav_msgs</depend>
+    <depend>ntcansckplugin</depend>
+    <depend>octomap_msgs</depend>
+    <depend>pkg-config</depend>
+    <depend>pluginlib</depend>
+    <depend>rosbag</depend>
+    <depend>roscpp</depend>
+    <depend>rospack</depend>
+    <depend>rviz</depend>
+    <depend>sbpl_arm_planner</depend>
+    <depend>sbpl_collision_checking</depend>
+    <depend>sbpl_geometry_utils</depend>
+    <depend>sdl2</depend>
+    <depend>sensor_msgs</depend>
+    <depend>std_msgs</depend>
+    <depend>tf</depend>
+    <depend>trajectory_msgs</depend>
+    <depend>urdf</depend>
+    <depend>visualization_msgs</depend>
 
-  <run_depend>ar_track_alvar</run_depend>
-  <run_depend>ar_track_alvar_msgs</run_depend>
-  <run_depend>actionlib</run_depend>
-  <run_depend>actionlib_msgs</run_depend>
-  <run_depend>cmake_modules</run_depend>
-  <run_depend>control_msgs</run_depend>
-  <run_depend>eigen_conversions</run_depend>
-  <run_depend>geometric_shapes</run_depend>
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>hdt_msgs</run_depend>
-  <run_depend>interactive_markers</run_depend>
-  <run_depend>leatherman</run_depend>
-  <run_depend>message_runtime</run_depend>
-  <run_depend>moveit_core</run_depend>
-  <run_depend>moveit_planners_sbpl</run_depend>
-  <run_depend>moveit_ros_planning</run_depend>
-  <run_depend>moveit_ros_planning_interface</run_depend>
-  <run_depend>moveit_ros_move_group</run_depend>
-  <run_depend>nav_msgs</run_depend>
-  <run_depend>octomap_msgs</run_depend>
-  <run_depend>pluginlib</run_depend>
-  <run_depend>pr2_vfh_database</run_depend>
-  <run_depend>rosbag</run_depend>
-  <run_depend>roscpp</run_depend>
-  <run_depend>rospack</run_depend>
-  <run_depend>rviz</run_depend>
-  <run_depend>sbpl_geometry_utils</run_depend>
-  <run_depend>sbpl_manipulation</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>tf</run_depend>
-  <run_depend>trajectory_msgs</run_depend>
-  <run_depend>urdf</run_depend>
-  <run_depend>liburdfdom-dev</run_depend>
-  <run_depend>libncurses-dev</run_depend>
-  <run_depend>visualization_msgs</run_depend>
-  <run_depend>xacro</run_depend>
-
-  <run_depend>husky_robot</run_depend>
-  <run_depend>libblas-dev</run_depend>
-  <run_depend>libglew-dev</run_depend>
-  <run_depend>liblapack-dev</run_depend>
-  <run_depend>libopenni-dev</run_depend>
-  <run_depend>libsbpl</run_depend>
-  <run_depend>lua5.2</run_depend>
-  <run_depend>libhdt</run_depend>
-  <run_depend>ntcansckplugin</run_depend>
-  <run_depend>sdl2</run_depend>
-  <run_depend>pkg-config</run_depend>
-
-  <run_depend>gazebo_ros</run_depend>
-
-  <export>
-    <gazebo_ros gazebo_media_path="${prefix}/models"/>
-    <gazebo_ros gazebo_model_path="${prefix}/models"/>
-    <rviz plugin="${prefix}/config/plugin_description.xml"/>
-    <rviz plugin="${prefix}/config/hdt_command_plugin_description.xml"/>
-    <rviz plugin="${prefix}/config/controller_status_panel_plugin_description.xml"/>
-    <rviz plugin="${prefix}/config/pick_and_place_plugin_description.xml"/>
-    <rviz plugin="${prefix}/config/temperature_status_plugin_description.xml"/>
-    <rviz plugin="${prefix}/config/move_group_command_panel_plugin_description.xml"/>
-  </export>
+    <export>
+        <gazebo_ros gazebo_media_path="${prefix}/models"/>
+        <gazebo_ros gazebo_model_path="${prefix}/models"/>
+        <rviz plugin="${prefix}/config/plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/hdt_command_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/controller_status_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/pick_and_place_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/temperature_status_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/move_group_command_panel_plugin_description.xml"/>
+    </export>
 </package>
