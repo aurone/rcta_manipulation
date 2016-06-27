@@ -16,4 +16,6 @@
             args="-param robot_description -urdf -model rcta_roman
                   -x $(arg start_x) -y $(arg start_y) -z $(arg start_z)
                   -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
+
+    <include file="$(find hdt)/launch/roman_control.launch"/>
 </launch>
