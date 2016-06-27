@@ -4,23 +4,7 @@
     <xacro:include filename="$(find roman_model)/control/talon.transmission.xacro"/>
 
     <xacro:macro name="talon" params="name namespace">
-        <link name="${name}_link">
-            <visual>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <geometry>
-                    <box size="0 0 0"/>
-                </geometry>
-                <material name="white">
-                    <color rgba="1 1 1 1"/>
-                </material>
-            </visual>
-            <collision>
-                <origin rpy="0 0 0" xyz="0 0 0"/>
-                <geometry>
-                    <box size="0 0 0"/>
-                </geometry>
-            </collision>
-        </link>
+        <link name="${name}_link"/>
 
         <joint name="${name}_joint" type="fixed">
             <origin xyz="0 0 0" rpy="3.14 0 0"/>
@@ -41,7 +25,7 @@
                     <mesh filename="package://roman_model/meshes/talon.stl" scale="1 1 1"/>
                 </geometry>
                 <material name="grey">
-                    <color rgba=".8 .8 .8 1"/>
+                    <color rgba="0.8 0.8 0.8 1"/>
                 </material>
             </visual>
             <collision>
@@ -72,7 +56,7 @@
 
         <link name="track_left">
             <inertial>
-                <mass value="0.000000" />
+                <mass value="0.000000"/>
                 <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
                 <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
             </inertial>
