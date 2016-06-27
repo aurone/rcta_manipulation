@@ -13,7 +13,7 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <hdt/ViservoCommandAction.h>
 #include <hdt/common/hdt_description/RobotModel.h>
-#include <sbpl_manipulation_components/kdl_robot_model.h>
+#include <sbpl_kdl_robot_model/kdl_robot_model.h>
 
 class ViservoControlExecutor
 {
@@ -37,7 +37,7 @@ private:
 
     hdt::RobotModelPtr robot_model_;
 
-    typedef std::unique_ptr<sbpl_arm_planner::KDLRobotModel> KDLRobotModelPtr;
+    typedef std::unique_ptr<sbpl::manip::KDLRobotModel> KDLRobotModelPtr;
     KDLRobotModelPtr kdl_robot_model_;
 
     std::string action_name_;

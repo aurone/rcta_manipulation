@@ -1,4 +1,5 @@
 #include "HDTRobotModel.h"
+
 #include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <sbpl_geometry_utils/utils.h>
@@ -27,25 +28,11 @@ HDTRobotModel::HDTRobotModel() :
                         "arm_7_gripper_lift" });
     setPlanningLink("arm_7_gripper_lift_link");
     pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
+    m_T_planning_kinematics = Eigen::Affine3d::Identity();
 }
 
 HDTRobotModel::~HDTRobotModel()
 {
-}
-
-double HDTRobotModel::minVarLimit(int jidx) const
-{
-    return robot_model_->min_limits()[jidx];
-}
-
-double HDTRobotModel::maxVarLimit(int jidx) const
-{
-    return robot_model_->max_limits()[jidx];
-}
-
-bool HDTRobotModel::hasVarLimit(int jidx) const
-{
-    return robot_model_->continuous()[jidx];
 }
 
 bool HDTRobotModel::init(const std::string& robot_description)
@@ -53,13 +40,52 @@ bool HDTRobotModel::init(const std::string& robot_description)
     return (bool)(robot_model_ = hdt::RobotModel::LoadFromURDF(robot_description, true));
 }
 
-bool HDTRobotModel::checkJointLimits(const std::vector<double>& angles)
+double HDTRobotModel::minPosLimit(int jidx) const
+{
+    return robot_model_->min_limits()[jidx];
+}
+
+double HDTRobotModel::maxPosLimit(int jidx) const
+{
+    return robot_model_->max_limits()[jidx];
+}
+
+bool HDTRobotModel::hasPosLimit(int jidx) const
+{
+    return robot_model_->continuous()[jidx];
+}
+
+double HDTRobotModel::velLimit(int jidx) const
+{
+    // TODO: implement
+    return 0.0;
+}
+
+double HDTRobotModel::accLimit(int jidx) const
+{
+    // TODO: implement
+    return 0.0;
+}
+
+bool HDTRobotModel::checkJointLimits(
+    const std::vector<double>& angles,
+    bool verbose)
 {
     return robot_model_->within_safety_joint_limits(angles);
 //    return robot_model_->within_joint_limits(angles);
 }
 
-bool HDTRobotModel::computePlanningLinkFK(const std::vector<double>& angles, std::vector<double>& pose)
+bool HDTRobotModel::computeFK(
+    const std::vector<double>& angles,
+    const std::string& name,
+    std::vector<double>& pose)
+{
+    return false;
+}
+
+bool HDTRobotModel::computePlanningLinkFK(
+    const std::vector<double>& angles,
+    std::vector<double>& pose)
 {
     Eigen::Affine3d res_transform;
     bool res = robot_model_->compute_fk(angles, res_transform);
@@ -68,10 +94,8 @@ bool HDTRobotModel::computePlanningLinkFK(const std::vector<double>& angles, std
         return false;
     }
 
-    Eigen::Affine3d T_planning_kinematics;
-    tf::transformKDLToEigen(this->T_planning_to_kinematics_, T_planning_kinematics);
     // kinematics -> eef = planning -> kinematics * mount_frame -> manipulator_frame * manipulator -> eef
-    res_transform = T_planning_kinematics * robot_model_->mount_to_manipulator_transform() * res_transform;
+    res_transform = m_T_planning_kinematics * robot_model_->mount_to_manipulator_transform() * res_transform;
 
     Eigen::Vector3d eef_pos(res_transform.translation());
     Eigen::Quaterniond eef_orient(res_transform.rotation());
@@ -102,8 +126,17 @@ std::string to_string(const Eigen::Affine3d& transform)
     return ss.str();
 }
 
-bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector<double>& start, std::vector<double>& solution, int option)
+bool HDTRobotModel::computeIK(
+    const std::vector<double>& pose,
+    const std::vector<double>& start,
+    std::vector<double>& solution,
+    sbpl::manip::ik_option::IkOption option)
 {
+    if (option != sbpl::manip::ik_option::UNRESTRICTED) {
+        ROS_WARN_ONCE("HDTRobotModel does not support restricted IK queries");
+        return false;
+    }
+
     //ROS_INFO("Pose size %zd", pose.size());
     Eigen::Affine3d eef_transform(Eigen::Affine3d::Identity());
     if (pose.size() == 6) {
@@ -122,17 +155,15 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
                         Eigen::Quaterniond(pose[6], pose[3], pose[4], pose[5]);
     }
 
-    Eigen::Affine3d T_kinematics_planning;
-    tf::transformKDLToEigen(this->T_kinematics_to_planning_, T_kinematics_planning);
     //ROS_INFO("eef in planning frame: %s", to_string(eef_transform).c_str());
     geometry_msgs::Pose p;
     tf::poseEigenToMsg(eef_transform, p);
     visualization_msgs::MarkerArray ma;
     ma = viz::getPoseMarkerArray(p, "base_footprint", "ik_goal_bf");
     pub_.publish(ma);
-    //ROS_INFO("kinematics->planning: %s", to_string(T_kinematics_planning).c_str());
+    //ROS_INFO("kinematics->planning: %s", to_string(m_T_planning_kinematics).c_str());
     // kinematics -> end effector = kinematics -> planning * planning -> end effector
-    eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
+    eef_transform = m_T_planning_kinematics * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
     //ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
     tf::poseEigenToMsg(eef_transform, p);
     ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
@@ -148,8 +179,17 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
     return res;
 }
 
-bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector<double>& start, std::vector< std::vector<double> >& solutions, int option)
+bool HDTRobotModel::computeIK(
+    const std::vector<double>& pose,
+    const std::vector<double>& start,
+    std::vector<std::vector<double>>& solutions,
+    sbpl::manip::ik_option::IkOption option)
 {
+    if (option != sbpl::manip::ik_option::UNRESTRICTED) {
+        ROS_WARN_ONCE("HDTRobotModel does not support unrestricted IK calls");
+        return false;
+    }
+
     Eigen::Affine3d eef_transform(Eigen::Affine3d::Identity());
     if (pose.size() == 6) {
         double roll = pose[3];
@@ -165,17 +205,15 @@ bool HDTRobotModel::computeIK(const std::vector<double>& pose, const std::vector
                         Eigen::Quaterniond(pose[6], pose[3], pose[4], pose[5]);
     }
 
-    Eigen::Affine3d T_kinematics_planning;
-    tf::transformKDLToEigen(this->T_kinematics_to_planning_, T_kinematics_planning);
     //ROS_INFO("eef in planning frame: %s", to_string(eef_transform).c_str());
     geometry_msgs::Pose p;
     tf::poseEigenToMsg(eef_transform, p);
     visualization_msgs::MarkerArray ma;
     ma = viz::getPoseMarkerArray(p, "base_footprint", "ik_goal_bf");
     pub_.publish(ma);
-    //ROS_INFO("kinematics->planning: %s", to_string(T_kinematics_planning).c_str());
+    //ROS_INFO("kinematics->planning: %s", to_string(m_T_planning_kinematics).c_str());
     // kinematics -> end effector = kinematics -> planning * planning -> end effector
-    eef_transform = T_kinematics_planning * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
+    eef_transform = m_T_planning_kinematics * robot_model_->mount_to_manipulator_transform().inverse() * eef_transform;
 //    ROS_WARN("    eef goal: %s", ::to_string(eef_transform).c_str());
     //ROS_INFO("eef in manipulator frame: %s", to_string(eef_transform).c_str());
     tf::poseEigenToMsg(eef_transform, p);

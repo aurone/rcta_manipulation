@@ -1,15 +1,17 @@
 #ifndef hdt_RobotModel_h
 #define hdt_RobotModel_h
 
+// standard includes
 #include <memory>
 #include <string>
 #include <vector>
-#include <Eigen/Dense>
+
+// system includes
 #include <boost/shared_ptr.hpp>
+#include <Eigen/Dense>
 #include <urdf/model.h>
 
-namespace hdt
-{
+namespace hdt {
 
 class RobotModel;
 typedef std::shared_ptr<RobotModel> RobotModelPtr;
@@ -69,6 +71,7 @@ private:
 
 double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std::vector<double>& joints2);
 
+/// \brief Class providing information about the HDT structure and kinematics
 class RobotModel : public std::enable_shared_from_this<RobotModel>
 {
 public:

@@ -1,7 +1,11 @@
 #include "ArmPlanningNode.h"
+
+// standard includes
 #include <cassert>
 #include <cstdio>
 #include <queue>
+
+// system includes
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_kdl.h>
 #include <eigen_conversions/eigen_msg.h>
@@ -12,38 +16,37 @@
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <trajectory_msgs/JointTrajectory.h>
+
+// project includes
 #include <hdt/common/msg_utils/msg_utils.h>
 #include <hdt/common/hdt_description/RobotModel.h>
 #include <hdt/common/stringifier/stringifier.h>
 #include <hdt/common/utils/utils.h>
-#include "HDTRobotModel.h"
 
-namespace hdt
-{
+namespace hdt {
 
 ArmPlanningNode::ArmPlanningNode() :
-    nh_(),
-    ph_("~"),
-    marker_array_pub_(),
-    joint_trajectory_pub_(),
-    joint_states_sub_(),
-    move_arm_command_server_(),
-    follow_trajectory_client_("arm_controller/joint_trajectory_action"),
-    use_action_server_(false),
-    action_set_filename_(),
-    kinematics_frame_(),
-    planning_frame_(),
-    object_filename_(),
-    urdf_string_(),
+    m_nh(),
+    m_ph("~"),
+    m_marker_array_pub(),
+    m_joint_trajectory_pub(),
+    m_joint_states_sub(),
+    m_move_arm_command_server(),
+    m_follow_trajectory_client("arm_controller/joint_trajectory_action"),
+    m_use_action_server(false),
+    m_action_set_filename(),
+    m_kinematics_frame(),
+    m_planning_frame(),
+    m_object_filename(),
+    m_urdf_string(),
     robot_name_(),
     robot_local_frame_(),
     robot_model_(),
-    planner_robot_model_(),
-    distance_field_(),
+    m_planner_robot_model(),
     grid_(),
-    collision_checker_(),
-    sbpl_action_set_(),
-    planner_(),
+    m_collision_checker(),
+    m_action_set(),
+    m_planner(),
     last_joint_state_(),
     received_joint_state_(),
     listener_(),
@@ -79,32 +82,32 @@ bool ArmPlanningNode::init()
         return false;
     }
 
-    ph_.param("use_action_server", use_action_server_, true);
-    if (use_action_server_) {
+    m_ph.param("use_action_server", m_use_action_server, true);
+    if (m_use_action_server) {
         ROS_INFO("Using action server 'arm_controller/joint_trajectory_action'");
     }
     else {
         ROS_INFO("Publishing joint trajectories to command");
     }
 
-    ph_.param("apply_shortcutting", apply_shortcutting_, true);
+    m_ph.param("apply_shortcutting", apply_shortcutting_, true);
     ROS_INFO("Apply Shortcutting: %s", boolstr(apply_shortcutting_));
 
-    marker_array_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 500);
-    joint_trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("command", 1);
-    joint_states_sub_ = nh_.subscribe("joint_states", 1, &ArmPlanningNode::joint_states_callback, this);
+    m_marker_array_pub = m_nh.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 500);
+    m_joint_trajectory_pub = m_nh.advertise<trajectory_msgs::JointTrajectory>("command", 1);
+    m_joint_states_sub = m_nh.subscribe("joint_states", 1, &ArmPlanningNode::joint_states_callback, this);
 
     auto move_command_callback = boost::bind(&ArmPlanningNode::move_arm, this, _1);
-    move_arm_command_server_.reset(new MoveArmActionServer("move_arm_command", move_command_callback, false));
-    if (!move_arm_command_server_) {
+    m_move_arm_command_server.reset(new MoveArmActionServer("move_arm_command", move_command_callback, false));
+    if (!m_move_arm_command_server) {
         ROS_ERROR("Failed to instantiate Move Arm Action Server");
         return false;
     }
 
-    move_arm_command_server_->start();
+    m_move_arm_command_server->start();
 
     ROS_INFO("Waiting for action client \"arm_controller/joint_trajectory_action\"");
-    follow_trajectory_client_.waitForServer();
+    m_follow_trajectory_client.waitForServer();
 
     return true;
 }
@@ -120,243 +123,108 @@ int ArmPlanningNode::run()
 bool ArmPlanningNode::reinit(
     const Eigen::Affine3d& T_kinematics_planning,
     const std::string& planning_frame,
-    octomap::OcTree* octree, std::string octree_frame_id)
+    const octomap_msgs::Octomap& octomap)
 {
+    // Reset here out of paranoia to make sure there's no way the planner can
+    // attempt to reference the occupancy grid or the collision checker while
+    // we're constructing fresh ones
+    m_planner.reset();
+
     ROS_INFO("Reinitializing Planner");
-    return reinit_robot(T_kinematics_planning) && reinit_collision_model(planning_frame, octree, octree_frame_id) && reinit_sbpl();
+    return reinit_robot(T_kinematics_planning) &&
+            reinit_collision_model(planning_frame, octomap) &&
+            reinit_sbpl();
 }
 
 bool ArmPlanningNode::reinit_robot(const Eigen::Affine3d& T_kinematics_planning)
 {
     ROS_INFO("Reinitializing Robot");
-    KDL::Frame F_kinematics_planning;
-    tf::transformEigenToKDL(T_kinematics_planning, F_kinematics_planning);
-    planner_robot_model_->setKinematicsToPlanningTransform(F_kinematics_planning, kinematics_frame_); // todo: is this what string its asking for?
+    m_planner_robot_model.setPlanningToKinematicsTransform(T_kinematics_planning);
     return true;
 }
 
-bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, octomap::OcTree* octomap, std::string octree_frame_id)
+bool ArmPlanningNode::reinit_collision_model(
+    const std::string& planning_frame,
+    const octomap_msgs::Octomap& octomap)
 {
+    // Reset here for the same reasons as resetting the planner. see reinit()
+    grid_.reset();
+
     ROS_INFO("Reinitializing collision model for planning frame %s", planning_frame.c_str());
     // if we didn't receive an octomap, we better be planning in the robot's base frame
-    assert(((bool)octomap) ? (true) : (planning_frame == robot_local_frame_));
-    if(planning_frame != robot_local_frame_) {
-      ROS_WARN("Planning frame (%s) does not match robot local frame (%s)!", planning_frame.c_str(), robot_local_frame_.c_str());
+    assert(!octomap.header.frame_id.empty() ? (true) : (planning_frame == robot_local_frame_));
+    if (planning_frame != robot_local_frame_) {
+        ROS_WARN("Planning frame '%s' does not match robot local frame '%s'!", planning_frame.c_str(), robot_local_frame_.c_str());
     }
 
-    const double max_dist_m = 0.2;
-    const double cell_res_m = 0.02;
+    ROS_INFO("Initializing Distance Field");
 
     // initialize the distance field
-    std::unique_ptr<distance_field::PropagationDistanceField> distance_field;
-
     const double size_x = 3.0, size_y = 3.0, size_z = 2.0;
+    const double cell_res_m = 0.02;
     const double origin_x = -0.75, origin_y = -1.25, origin_z = 0.0;
-    std::string df_frame = robot_local_frame_;
+    const double max_dist_m = 0.2;
 
-    distance_field.reset(new distance_field::PropagationDistanceField(
-               size_x, size_y, size_z, cell_res_m, origin_x, origin_y, origin_z, max_dist_m));
-    if (!distance_field) {
-      ROS_ERROR("Failed to instantiate Propagation Distance Field");
-      return false;
-    }
-    distance_field->reset();
-    ROS_INFO("Distance field initialized! Origin (%.3f, %.3f, %.3f) Size: (%.3f, %.3f, %.3f) in frame %s", origin_x, origin_y, origin_z, size_x, size_y, size_z, df_frame.c_str());
+    auto df = std::make_shared<distance_field::PropagationDistanceField>(
+            size_x, size_y, size_z,
+            cell_res_m,
+            origin_x, origin_y, origin_z,
+            max_dist_m);
 
-    if (!octomap) {
-        //still need to instantiate a distance field to check for collisions against other collision groups
-        ROS_WARN("  Octomap from message does not support OcTree type requirements");
-        ROS_WARN("  Planning with empty collision map");
-    }
-    else {
-        ROS_INFO("Octree frame id: %s", octree_frame_id.c_str());
-        if(octree_frame_id.empty()){
-          ROS_ERROR("Octree frame id is empty!");
-          return false;
-        }
-        ROS_INFO("  Octree: %p", octomap);
-        size_t num_nodes = octomap->calcNumNodes();
-        ROS_INFO("    Num Nodes: %zd", num_nodes);
-        ROS_INFO("    Memory Usage: %zd bytes", octomap->memoryUsage());
-        ROS_INFO("    Num Leaf Nodes: %zd", octomap->getNumLeafNodes());
-
-        // TODO: what is the equivalent of this in indigo?
-//        unsigned num_thresholded, num_other;
-//        octomap->calcNumThresholdedNodes(num_thresholded, num_other);
-//        ROS_INFO("    Num Thresholded Nodes: %u", num_thresholded);
-//        ROS_INFO("    Num Other Nodes: %u", num_other);
-
-        const octomap::point3d octomap_min = octomap->getBBXMin();
-        const octomap::point3d octomap_max = octomap->getBBXMax();
-        const octomap::point3d octomap_center = octomap->getBBXCenter();
-        double clamping_thresh_min = octomap->getClampingThresMin();
-        double clamping_thresh_max = octomap->getClampingThresMax();
-
-        ROS_INFO("    Bounding Box Set: %s", octomap->bbxSet() ? "TRUE" : "FALSE");
-        ROS_INFO("    Bounding Box Min: (%0.3f, %0.3f, %0.3f)", octomap_min.x(), octomap_min.y(), octomap_min.z());
-        ROS_INFO("    Bounding Box Max: (%0.3f, %0.3f, %0.3f)", octomap_max.x(), octomap_max.y(), octomap_max.z());
-        ROS_INFO("    Bounding Box Center: (%0.3f, %0.3f, %0.3f)", octomap_center.x(), octomap_center.y(), octomap_center.z());
-        ROS_INFO("    Clamping Threshold Min: %0.3f", clamping_thresh_min);
-        ROS_INFO("    Clamping Threshold Max: %0.3f", clamping_thresh_max);
-
-        double metric_min_x, metric_min_y, metric_min_z;
-        double metric_max_x, metric_max_y, metric_max_z;
-        double metric_size_x, metric_size_y, metric_size_z;
-        octomap->getMetricMin(metric_min_x, metric_min_y, metric_min_z);
-        octomap->getMetricMax(metric_max_x, metric_max_y, metric_max_z);
-
-        ROS_INFO("    Metric Min: (%0.3f, %0.3f, %0.3f)", metric_min_x, metric_min_y, metric_min_z);
-        ROS_INFO("    Metric Max: (%0.3f, %0.3f, %0.3f)", metric_max_x, metric_max_y, metric_max_z);
-
-        octomap->getMetricSize(metric_size_x, metric_size_y, metric_size_z);
-        ROS_INFO("    Metric Size: (%0.3f, %0.3f, %0.3f)", metric_size_x, metric_size_y, metric_size_z);
-
-        ROS_INFO("    Node Size (max depth): %0.6f", octomap->getNodeSize(octomap->getTreeDepth()));
-        ROS_INFO("    Occupancy Threshold: %0.3f", octomap->getOccupancyThres());
-        ROS_INFO("    Probability Hit: %0.3f", octomap->getProbHit());
-        ROS_INFO("    Probability Miss: %0.3f", octomap->getProbMiss());
-        ROS_INFO("    Resolution: %0.3f", octomap->getResolution());
-        ROS_INFO("    Depth: %u", octomap->getTreeDepth());
-        ROS_INFO("    Tree Type: %s", octomap->getTreeType().c_str());
-
-        // gather octree statistics
-        int num_occupied_octree_cells = 0;
-        std::map<double, int> occupancy_hist;
-        std::map<float, int> value_hist;
-        std::map<bool, int> occupied_hist;
-        for (auto tit = octomap->begin(); tit != octomap->end(); ++tit) {
-            const octomap::OcTreeNode& node = *tit;
-
-            double occupancy = node.getOccupancy();
-            if (occupancy_hist.find(occupancy) == occupancy_hist.end()) {
-                occupancy_hist[occupancy] = 0;
-            }
-            else {
-                ++occupancy_hist[occupancy];
-            }
-
-            float value = node.getValue();
-            if (value_hist.find(value) == value_hist.end()) {
-                value_hist[value] = 0;
-            }
-            else {
-                ++value_hist[value];
-            }
-
-            bool occupied = octomap->isNodeOccupied(node);
-            if (occupied_hist.find(occupied) == occupied_hist.end()) {
-                occupied_hist[occupied] = 0;
-            }
-            else {
-                ++occupied_hist[occupied];
-            }
-        }
-
-        ROS_INFO("    Occupancy Histogram:");
-        for (const auto& entry : occupancy_hist) {
-            ROS_INFO("      %0.3f: %d", entry.first, entry.second);
-        }
-
-        ROS_INFO("    Value Histogram:");
-        for (const auto& entry : value_hist) {
-            ROS_INFO("      %0.3f: %d", entry.first, entry.second);
-        }
-
-        ROS_INFO("    Occupied Histogram:");
-        for (const auto& entry : occupied_hist) {
-            ROS_INFO("      %s: %d", boolstr(entry.first), entry.second);
-        }
-
-        octomap::point3d metric_min(metric_min_x, metric_min_y, metric_min_z);
-        octomap::point3d metric_max(metric_max_x, metric_max_y, metric_max_z);
-
-        /*distance_field.reset(new distance_field::PropagationDistanceField(*octomap, metric_min, metric_max, max_dist_m));
-        if (!distance_field) {
-            ROS_ERROR("Failed to instantiate Propagation Distance Field");
-            return false;
-        }
-        distance_field->reset();*/
-//        this->addOcTreeToField(distance_field.get(), df_frame, octomap, octree_frame_id);
-
-        ROS_INFO("  Distance Field:");
-        ROS_INFO("    Pointer: %p", distance_field.get());
-        ROS_INFO("    Size (m): (%0.3f, %0.3f, %0.3f)", distance_field->getSizeX(), distance_field->getSizeY(), distance_field->getSizeZ());
-        ROS_INFO("    Size (cells): (%d, %d, %d)", distance_field->getXNumCells(), distance_field->getYNumCells(), distance_field->getZNumCells());
-        ROS_INFO("    Origin (m): (%0.3f, %0.3f, %0.3f)", distance_field->getOriginX(), distance_field->getOriginY(), distance_field->getOriginZ());
-        ROS_INFO("    Resolution (m): %0.3f", distance_field->getResolution());
-        ROS_INFO("    Uninitialized Distance: %0.3f", distance_field->getUninitializedDistance());
-
-        int num_invalid_cells = 0;
-        for (int x = 0; x < distance_field->getXNumCells(); ++x) {
-            for (int y = 0; y < distance_field->getYNumCells(); ++y) {
-                for (int z = 0; z < distance_field->getZNumCells(); ++z) {
-                    if (!distance_field->getDistance(x, y, z) <= 0.0) {
-                        ++num_invalid_cells;
-                    }
-                }
-            }
-        }
-
-        int num_cells = distance_field->getXNumCells() * distance_field->getYNumCells() * distance_field->getZNumCells();
-
-        ROS_INFO("    Num Cells: %d", num_cells);
-        ROS_INFO("      Num Invalid Cells: %d", num_invalid_cells);
-        ROS_INFO("      Num Valid Cells: %d", num_cells - num_invalid_cells);
-    }
-
-    distance_field_ = std::move(distance_field);
+    ROS_INFO("Initialized Distance Field! origin: (%0.3f, %0.3f, %0.3f), size: (%0.3f, %0.3f, %0.3f)", origin_x, origin_y, origin_z, size_x, size_y, size_z);
 
     ROS_INFO("Initializing Occupancy Grid");
-    grid_.reset(new sbpl_arm_planner::OccupancyGrid(distance_field_.get()));
-    if (!grid_) {
-        ROS_ERROR("Failed to instantiate Occupancy Grid");
-        return false;
-    }
+    grid_ = std::make_shared<sbpl::OccupancyGrid>(df);
 
+    const std::string df_frame = robot_local_frame_;
     grid_->setReferenceFrame(df_frame);
 
     ROS_INFO("  OccupancyGrid:");
-    int num_cells_x, num_cells_y, num_cells_z;
-    grid_->getGridSize(num_cells_x, num_cells_y, num_cells_z);
-    ROS_INFO("    Dimensions (cells): (%d, %d, %d)", num_cells_x, num_cells_y, num_cells_z);
-    double grid_size_x, grid_size_y, grid_size_z;
-    grid_->getWorldSize(grid_size_x, grid_size_y, grid_size_z);
-    ROS_INFO("    Dimensions (m): (%0.3f, %0.3f, %0.3f)", grid_size_x, grid_size_y, grid_size_z);
-    double grid_origin_x, grid_origin_y, grid_origin_z;
-    grid_->getOrigin(grid_origin_x, grid_origin_y, grid_origin_z);
-    ROS_INFO("    Origin (m): (%0.3f, %0.3f, %0.3f)", grid_origin_x, grid_origin_y, grid_origin_z);
-    ROS_INFO("    Resolution: %0.3f", grid_->getResolution());
-    ROS_INFO("    Reference Frame: %s", grid_->getReferenceFrame().c_str());
-
-    collision_checker_.reset(new sbpl::collision::SBPLCollisionSpace(grid_.get()));
-    if (!collision_checker_) {
-        ROS_ERROR("  Failed to instantiate SBPL Collision Space");
-        return false;
+    {
+        int num_cells_x, num_cells_y, num_cells_z;
+        grid_->getGridSize(num_cells_x, num_cells_y, num_cells_z);
+        ROS_INFO("    Dimensions (cells): (%d, %d, %d)", num_cells_x, num_cells_y, num_cells_z);
+        double grid_size_x, grid_size_y, grid_size_z;
+        grid_->getWorldSize(grid_size_x, grid_size_y, grid_size_z);
+        ROS_INFO("    Dimensions (m): (%0.3f, %0.3f, %0.3f)", grid_size_x, grid_size_y, grid_size_z);
+        double grid_origin_x, grid_origin_y, grid_origin_z;
+        grid_->getOrigin(grid_origin_x, grid_origin_y, grid_origin_z);
+        ROS_INFO("    Origin (m): (%0.3f, %0.3f, %0.3f)", grid_origin_x, grid_origin_y, grid_origin_z);
+        ROS_INFO("    Resolution: %0.3f", grid_->getResolution());
+        ROS_INFO("    Reference Frame: %s", grid_->getReferenceFrame().c_str());
     }
 
-    const std::string group_name = "manipulator"; // This has something to do with the collision checking config file?
-    sbpl::collision::CollisionModelConfig cm_config;
-    if (!sbpl::collision::CollisionModelConfig::Load(ros::NodeHandle(), cm_config)) {
+    ROS_INFO("Initialized Occupancy Grid");
+
+    // load the collision checking config
+    // TODO: only need to do this once
+    sbpl::collision::CollisionModelConfig cm_cfg;
+    if (!sbpl::collision::CollisionModelConfig::Load(m_nh, cm_cfg)) {
         ROS_ERROR("Failed to initialize collision model config");
         return false;
     }
-    if (!collision_checker_->init(
-            urdf_string_, group_name, cm_config, robot_model_->joint_names()))
+
+    m_collision_checker = std::make_shared<sbpl::collision::CollisionSpace>(
+            grid_.get());
+
+    const std::string group_name = "manipulator";
+    const std::vector<std::string>& planning_joints =
+            robot_model_->joint_names();
+    if (!m_collision_checker->init(
+            m_urdf_string, group_name, cm_cfg, planning_joints))
     {
         ROS_ERROR("  Failed to initialize SBPL Collision Checker");
         return false;
     }
 
-    this->addOcTreeToField(distance_field_.get(), df_frame, octomap, octree_frame_id);
-
-    auto distance_field_markers = collision_checker_->getVisualization("distance_field");
-    ROS_INFO("Publishing %zd distance field visualization markers", distance_field_markers.markers.size());
-    ROS_INFO("Visualizing marker types:");
-    for (const auto& marker : distance_field_markers.markers) {
-        ROS_INFO("  %s, Num Points: %zd", visualization_msgs_marker_type_to_cstr(marker.type), marker.points.size());
+    octomap_msgs::OctomapWithPose octomap_msg;
+    octomap_msg.header = octomap.header;
+    octomap_msg.origin.orientation.w = 1.0;
+    octomap_msg.octomap = octomap;
+    if (!m_collision_checker->processOctomapMsg(octomap_msg)) {
+        ROS_ERROR("Failed to add octomap to the collision checker");
+        return false;
     }
-    marker_array_pub_.publish(distance_field_markers);
-    marker_array_pub_.publish(distance_field_markers);
 
     ROS_INFO("Successfully reinitialized collision model");
 
@@ -366,15 +234,51 @@ bool ArmPlanningNode::reinit_collision_model(const std::string& planning_frame, 
 bool ArmPlanningNode::reinit_sbpl()
 {
     ROS_INFO("Reinitializing SBPL");
-    planner_.reset(new sbpl_arm_planner::SBPLArmPlannerInterface(
-            planner_robot_model_.get(), collision_checker_.get(), sbpl_action_set_.get(), distance_field_.get()));
+    m_planner.reset(new sbpl::manip::ArmPlannerInterface(
+            &m_planner_robot_model,
+            m_collision_checker.get(),
+            &m_action_set,
+            grid_.get()));
 
-    if (!planner_) {
+    if (!m_planner) {
         ROS_ERROR("Failed to instantiate SBPL Arm Planner Interface");
         return false;
     }
 
-    if (!planner_->init()) {
+    sbpl::manip::PlanningParams params;
+    params.planning_frame_ = "base_link";
+    params.num_joints_;
+    params.planning_joints_;
+    params.coord_vals_;
+    params.coord_delta_;
+    params.use_multiple_ik_solutions_;
+//    params.cost_multiplier_;
+//    params.cost_per_cell_;
+//    params.cost_per_meter_;
+//    params.cost_per_second_;
+//    params.time_per_cell_;
+//    params.max_mprim_offset_;
+    params.use_bfs_heuristic_;
+    params.planning_link_sphere_radius_;
+    params.planner_name_;
+    params.epsilon_;
+    params.allowed_time_;
+    params.search_mode_;
+    params.shortcut_path_ = apply_shortcutting_;
+    params.interpolate_path_ = sbpl::manip::ShortcutType::JOINT_SPACE;
+    params.waypoint_time_;
+    params.shortcut_type;
+    params.print_path_;
+    params.verbose_;
+    params.verbose_heuristics_;
+    params.verbose_collisions_;
+//    params.graph_log_;
+//    params.heuristic_log_;
+//    params.expands_log_;
+//    params.rmodel_log_;
+//    params.post_processing_log_;
+//    params.solution_log_;
+    if (!m_planner->init()) {
         ROS_ERROR("Failed to initialize SBPL Arm Planner Interface");
         return false;
     }
@@ -386,14 +290,14 @@ bool ArmPlanningNode::init_robot()
 {
     ROS_INFO("Initializing Robot Models");
 
-    if (!nh_.hasParam("robot_description")) {
+    if (!m_nh.hasParam("robot_description")) {
         ROS_ERROR("Missing parameter \"robot_description\"");
         return false;
     }
 
-    nh_.getParam("robot_description", urdf_string_);
+    m_nh.getParam("robot_description", m_urdf_string);
 
-    boost::shared_ptr<urdf::ModelInterface> urdf_model = urdf::parseURDF(urdf_string_);
+    boost::shared_ptr<urdf::ModelInterface> urdf_model = urdf::parseURDF(m_urdf_string);
     if (!urdf_model) {
         ROS_ERROR("Failed to parse URDF");
         return false;
@@ -444,31 +348,26 @@ bool ArmPlanningNode::init_robot()
     received_joint_state_ = std::vector<ros::Time>(num_nonfixed_joints, ros::Time(0));
 
     // Initialize Robot Model
-    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string_);
+    robot_model_ = hdt::RobotModel::LoadFromURDF(m_urdf_string);
     if (!robot_model_) {
         ROS_ERROR("Failed to load Robot Model from URDF");
         return false;
     }
 
     // Initialize Planning Robot Model
-    HDTRobotModel* hdt_robot_model = new HDTRobotModel;
-    if (!hdt_robot_model || !hdt_robot_model->init(urdf_string_)) {
+    if (!m_planner_robot_model.init(m_urdf_string)) {
         ROS_ERROR("Failed to initialize HDT Robot Model");
         return false;
     }
-    planner_robot_model_.reset(hdt_robot_model);
-    if (!planner_robot_model_) {
-        ROS_ERROR("Failed to instantiate KDL Robot Model");
-    }
 
 //    std::vector<std::string> planning_joints = robot_model_->joint_names();
-//    if (!planner_robot_model_->init(urdf_string_, planning_joints)) {
+//    if (!planner_robot_model_->init(m_urdf_string, planning_joints)) {
 //        ROS_ERROR("Failed to initialize KDL Robot Model");
 //        return false;
 //    }
 //    planner_robot_model_->setPlanningLink(robot_model_->joint_names().back());
 
-    kinematics_frame_ = "arm_mount_panel_dummy";
+    m_kinematics_frame = "arm_mount_panel_dummy";
 
     return true;
 }
@@ -480,14 +379,14 @@ bool ArmPlanningNode::init_collision_model()
 
 bool ArmPlanningNode::init_sbpl()
 {
-    if (!ph_.hasParam("action_set_filename")) {
+    if (!m_ph.hasParam("action_set_filename")) {
         ROS_ERROR("Missing parameter \"action_set_filename\"");
         return false;
     }
 
-    ph_.getParam("action_set_filename", action_set_filename_);
+    m_ph.getParam("action_set_filename", m_action_set_filename);
 
-    if (!sbpl_arm_planner::ActionSet::Load(action_set_filename_, *sbpl_action_set_)) {
+    if (!sbpl::manip::ActionSet::Load(m_action_set_filename, m_action_set)) {
         ROS_ERROR("Failed to instantiate Action Set");
         return false;
     }
@@ -506,24 +405,17 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     ros::Time now = ros::Time::now();
     ROS_INFO("Received Move Arm Command Goal at %s", boost::posix_time::to_simple_string(now.toBoost()).c_str());
 
-    // create the octomap here
-    std::shared_ptr<octomap::AbstractOcTree> octomap(octomap_msgs::fullMsgToMap(request->octomap));
-    std::string octree_frame_id = request->octomap.header.frame_id;
-    octomap::OcTree* octree(dynamic_cast<octomap::OcTree*>(octomap.get()));
-    bool valid_octomap = (bool)octree;
     std::string planning_frame;
-    planning_frame = robot_local_frame_;
-    if (valid_octomap) {
-        //planning_frame = request->octomap.header.frame_id;
-        ROS_INFO("Valid Octomap. Planning in frame '%s'", planning_frame.c_str());
+    if (!request->octomap.header.frame_id.empty()) {
+        planning_frame = request->octomap.header.frame_id;
     }
     else {
-        ROS_INFO("Invalid Octomap. Planning in frame '%s'", planning_frame.c_str());
+        planning_frame = robot_local_frame_;
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Check for up-to-date state
-    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////
+    // Check for up-to-date state //
+    ////////////////////////////////
 
     // check for recent joint information
     for (size_t i = 0; i < received_joint_state_.size(); ++i) {
@@ -535,7 +427,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
             ss << "Joint information for joint '" << last_joint_state_.name[i]
                << "' is more than " << joint_staleness_threshold_.toSec() << " seconds old";
             ROS_WARN("%s", ss.str().c_str());
-            move_arm_command_server_->setAborted(result, ss.str());
+            m_move_arm_command_server->setAborted(result, ss.str());
             return;
         }
     }
@@ -558,7 +450,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
         catch (const tf::TransformException& ex) {
             hdt::MoveArmCommandResult result;
             result.success = false;
-            move_arm_command_server_->setAborted(result, ex.what());
+            m_move_arm_command_server->setAborted(result, ex.what());
             return;
         }
     }
@@ -568,23 +460,23 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     // look up the transform from the kinematics frame (the frame that goals are specified in) to the planning frame
     tf::StampedTransform kinematics_to_planning_tf;
     Eigen::Affine3d T_kinematics_planning;
-    ROS_INFO("Looking up trasform from planning_frame (%s) to kinematics_frame (%s)", planning_frame.c_str(), kinematics_frame_.c_str());
+    ROS_INFO("Looking up trasform from planning_frame (%s) to kinematics_frame (%s)", planning_frame.c_str(), m_kinematics_frame.c_str());
     try {
-        listener_.lookupTransform(kinematics_frame_, planning_frame, ros::Time(0), kinematics_to_planning_tf);
+        listener_.lookupTransform(m_kinematics_frame, planning_frame, ros::Time(0), kinematics_to_planning_tf);
         msg_utils::convert(kinematics_to_planning_tf, T_kinematics_planning);
     }
     catch (const tf::TransformException& ex) {
         hdt::MoveArmCommandResult result;
         result.success = false;
-        move_arm_command_server_->setAborted(result, ex.what());
+        m_move_arm_command_server->setAborted(result, ex.what());
         return;
     }
 
     ROS_INFO("  Kinematics -> Planning: %s", to_string(T_kinematics_planning).c_str());
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Set up the planning scene
-    ////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////
+    // Set up the planning scene //
+    ///////////////////////////////
 
     planning_scene_->name = "manipulation_planning_scene";
 
@@ -618,27 +510,27 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
 
     planning_scene_->is_diff = false;
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Reinitialize for updated collision model
-    ////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////
+    // Reinitialize for updated collision model //
+    //////////////////////////////////////////////
 
-    if (!reinit(T_kinematics_planning, planning_frame, octree, octree_frame_id)) {
+    if (!reinit(T_kinematics_planning, planning_frame, request->octomap)) {
         hdt::MoveArmCommandResult result;
         result.success = false;
-        move_arm_command_server_->setAborted(result, "Failed to initialize Arm Planner");
+        m_move_arm_command_server->setAborted(result, "Failed to initialize Arm Planner");
         return;
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Plan to the received goal state
-    ////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////
+    // Plan to the received goal state //
+    /////////////////////////////////////
 
-    collision_checker_->setPlanningScene(*planning_scene_);
-      ////////////////////////////////////////////////////////////////////////////////
-      // Deal with attached object if any
-      ////////////////////////////////////////////////////////////////////////////////
+    m_collision_checker->setPlanningScene(*planning_scene_);
+      //////////////////////////////////////
+      // Deal with attached object if any //
+      //////////////////////////////////////
       if (request->has_attached_object){
-        collision_checker_->attachObject(request->attached_object);
+        m_collision_checker->attachObject(request->attached_object);
       }
 
     // transform the wrist goal from the kinematics frame to the planning frame
@@ -665,15 +557,15 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
         success = plan_to_eef_goal(planning_scene_, wrist_goal_planning_frame, result_traj);
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Post-process the plan and send to the joint trajectory follower
-    ////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////
+    // Post-process the plan and send to the joint trajectory follower //
+    /////////////////////////////////////////////////////////////////////
 
     if (!success) {
         hdt::MoveArmCommandResult result;
         result.success = false;
         result.trajectory;
-        move_arm_command_server_->setAborted(result, "Failed to plan path");
+        m_move_arm_command_server->setAborted(result, "Failed to plan path");
         return;
     }
 
@@ -681,10 +573,6 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     for (int i = 0; i < (int)result_traj.points.size(); ++i) {
         const trajectory_msgs::JointTrajectoryPoint& joint_state = result_traj.points[i];
         ROS_INFO("    Point %3d: %s", i, to_string(joint_state.positions).c_str());
-    }
-
-    if (apply_shortcutting_) {
-        apply_shortcutting(result_traj);
     }
 
     ROS_INFO("Shortcut trajectory (%zd points):", result_traj.points.size());
@@ -698,7 +586,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
         ROS_ERROR("Failed to interpolate joint trajectory");
         hdt::MoveArmCommandResult result;
         result.success = false;
-        move_arm_command_server_->setAborted(result, "Failed to interpolate joint trajectory");
+        m_move_arm_command_server->setAborted(result, "Failed to interpolate joint trajectory");
         return;
     }
 
@@ -709,7 +597,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
     hdt::MoveArmCommandResult result;
     result.success = true;
     result.trajectory = result_traj;
-    move_arm_command_server_->setSucceeded(result);
+    m_move_arm_command_server->setSucceeded(result);
 }
 
 void ArmPlanningNode::fill_constraint(
@@ -813,7 +701,9 @@ ArmPlanningNode::get_collision_cubes(
 }
 
 std::vector<moveit_msgs::CollisionObject>
-ArmPlanningNode::get_collision_objects(const std::string& filename, const std::string& frame_id)
+ArmPlanningNode::get_collision_objects(
+    const std::string& filename,
+    const std::string& frame_id)
 {
     char sTemp[1024];
     int num_obs = 0;
@@ -856,7 +746,8 @@ ArmPlanningNode::get_collision_objects(const std::string& filename, const std::s
     return get_collision_cubes(objects, object_ids, frame_id);
 }
 
-void ArmPlanningNode::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
+void ArmPlanningNode::joint_states_callback(
+    const sensor_msgs::JointState::ConstPtr& msg)
 {
     ros::Time now = ros::Time::now();
     for (size_t i = 0; i < msg->name.size(); ++i) {
@@ -880,7 +771,8 @@ void ArmPlanningNode::joint_states_callback(const sensor_msgs::JointState::Const
     }
 }
 
-bool ArmPlanningNode::add_interpolation_to_plan(trajectory_msgs::JointTrajectory& res_traj) const
+bool ArmPlanningNode::add_interpolation_to_plan(
+    trajectory_msgs::JointTrajectory& res_traj) const
 {
     if (robot_model_->min_limits().size() != robot_model_->num_joints() ||
         robot_model_->max_limits().size() != robot_model_->num_joints() ||
@@ -986,7 +878,8 @@ bool ArmPlanningNode::add_interpolation_to_plan(trajectory_msgs::JointTrajectory
     return true;
 }
 
-void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory& joint_trajectory)
+void ArmPlanningNode::publish_trajectory(
+    const trajectory_msgs::JointTrajectory& joint_trajectory)
 {
     const std::vector<std::string> joint_names = {
             "arm_1_shoulder_twist",
@@ -1042,44 +935,20 @@ void ArmPlanningNode::publish_trajectory(const trajectory_msgs::JointTrajectory&
         ++pidx;
     }
 
-    if (!use_action_server_) {
+    if (!m_use_action_server) {
         ROS_INFO("Publishing trajectory to the arm controller");
-        joint_trajectory_pub_.publish(traj);
+        m_joint_trajectory_pub.publish(traj);
     }
     else {
         ROS_INFO("Sending trajectory goal via actionlib");
         control_msgs::FollowJointTrajectoryGoal goal;
         goal.trajectory = std::move(traj);
-        follow_trajectory_client_.sendGoal(goal);
-        follow_trajectory_client_.waitForResult();
-        if (follow_trajectory_client_.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+        m_follow_trajectory_client.sendGoal(goal);
+        m_follow_trajectory_client.waitForResult();
+        if (m_follow_trajectory_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_INFO("Yay! The dishes are now clean");
         }
-        ROS_INFO("Current State: %s", follow_trajectory_client_.getState().toString().c_str());
-    }
-}
-
-void ArmPlanningNode::apply_shortcutting(trajectory_msgs::JointTrajectory& joint_trajectory) const
-{
-    std::vector<int> costs(joint_trajectory.points.size() - 1, 1);
-
-    JointInterpolationPathGenerator generator;
-    if (!generator.initialize(collision_checker_, robot_model_->min_limits(), robot_model_->max_limits(), robot_model_->continuous())) {
-        ROS_ERROR("Failed to initialize Joint Interpolation Path Generator");
-        return;
-    }
-
-    std::vector<JointInterpolationPathGenerator> generators;
-    generators.push_back(generator);
-
-    std::vector<trajectory_msgs::JointTrajectoryPoint> new_points;
-    bool shortcut_res = sbpl::shortcut::ShortcutPath(joint_trajectory.points, costs, generators, new_points);
-
-    if (!shortcut_res) {
-        ROS_ERROR("Failed to shortcut trajectory");
-    }
-    else {
-        joint_trajectory.points = std::move(new_points);
+        ROS_INFO("Current State: %s", m_follow_trajectory_client.getState().toString().c_str());
     }
 }
 
@@ -1115,7 +984,7 @@ bool ArmPlanningNode::plan_to_eef_goal(
     // plan
     ROS_INFO("Calling solve...");
     moveit_msgs::MotionPlanResponse res;
-    bool plan_result = planner_->solve(scene, req, res);
+    bool plan_result = m_planner->solve(scene, req, res);
     if (!plan_result) {
         ROS_ERROR("Failed to plan.");
     }
@@ -1124,7 +993,7 @@ bool ArmPlanningNode::plan_to_eef_goal(
     }
 
     // print statistics
-    std::map<std::string, double> planning_stats = planner_->getPlannerStats();
+    std::map<std::string, double> planning_stats = m_planner->getPlannerStats();
 
     ROS_INFO("Planning statistics");
     for (const auto& statistic : statistic_names_) {
@@ -1138,16 +1007,16 @@ bool ArmPlanningNode::plan_to_eef_goal(
     }
 
     // visualizations
-    marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
-    auto distance_field_markers = collision_checker_->getVisualization("distance_field");
+    m_marker_array_pub.publish(m_collision_checker->getVisualization("bounds"));
+    auto distance_field_markers = m_collision_checker->getVisualization("distance_field");
     ROS_INFO("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
-    marker_array_pub_.publish(distance_field_markers);
-    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
-    marker_array_pub_.publish(planner_->getVisualization("goal"));
+    m_marker_array_pub.publish(distance_field_markers);
+    m_marker_array_pub.publish(m_collision_checker->getVisualization("collision_objects"));
+    m_marker_array_pub.publish(m_planner->getVisualization("goal"));
 
     // visualize, filter, and publish plan
     if (plan_result) {
-        marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
+        m_marker_array_pub.publish(m_planner->getCollisionModelTrajectoryMarker());
         traj = res.trajectory.joint_trajectory;
     }
 
@@ -1205,7 +1074,7 @@ bool ArmPlanningNode::plan_to_joint_goal(
     // plan
     ROS_INFO("Calling solve...");
     moveit_msgs::MotionPlanResponse res;
-    bool plan_result = planner_->solve(scene, req, res);
+    bool plan_result = m_planner->solve(scene, req, res);
     if (!plan_result) {
         ROS_ERROR("Failed to plan.");
     }
@@ -1214,7 +1083,7 @@ bool ArmPlanningNode::plan_to_joint_goal(
     }
 
     // print statistics
-    std::map<std::string, double> planning_stats = planner_->getPlannerStats();
+    std::map<std::string, double> planning_stats = m_planner->getPlannerStats();
 
     ROS_INFO("Planning statistics");
     for (const auto& statistic : statistic_names_) {
@@ -1228,22 +1097,23 @@ bool ArmPlanningNode::plan_to_joint_goal(
     }
 
     // visualizations
-    marker_array_pub_.publish(collision_checker_->getVisualization("bounds"));
-    auto distance_field_markers = collision_checker_->getVisualization("distance_field");
+    m_marker_array_pub.publish(m_collision_checker->getVisualization("bounds"));
+    auto distance_field_markers = m_collision_checker->getVisualization("distance_field");
     ROS_INFO("Distance Field Visualization contains %zd markers", distance_field_markers.markers.front().points.size());
-    marker_array_pub_.publish(distance_field_markers);    marker_array_pub_.publish(collision_checker_->getVisualization("collision_objects"));
-    marker_array_pub_.publish(planner_->getVisualization("goal"));
+    m_marker_array_pub.publish(distance_field_markers);    m_marker_array_pub.publish(m_collision_checker->getVisualization("collision_objects"));
+    m_marker_array_pub.publish(m_planner->getVisualization("goal"));
 
     // visualize, filter, and publish plan
     if (plan_result) {
-        marker_array_pub_.publish(planner_->getCollisionModelTrajectoryMarker());
+        m_marker_array_pub.publish(m_planner->getCollisionModelTrajectoryMarker());
         traj = res.trajectory.joint_trajectory;
     }
 
     return plan_result;
 }
 
-std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(const geometry_msgs::Pose& pose)
+std::vector<double> ArmPlanningNode::convert_to_sbpl_goal(
+    const geometry_msgs::Pose& pose)
 {
     tf::Quaternion goal_quat(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
     tf::Matrix3x3 goal_rotation_matrix(goal_quat);
@@ -1261,98 +1131,6 @@ void ArmPlanningNode::clamp_to_joint_limits(
     for (std::size_t i = 0; i < joint_vector.size(); ++i) {
         joint_vector[i] = clamp(joint_vector[i], robot_model_->min_limits()[i], robot_model_->max_limits()[i]);
     }
-}
-
-bool ArmPlanningNode::valid_octomap(const octomap_msgs::Octomap& msg)
-{
-    return true;
-}
-
-void ArmPlanningNode::addOcTreeToField(
-    distance_field::DistanceField* df,
-    std::string df_frame_id,
-    const octomap::OcTree* octree,
-    std::string octree_frame_id)
-{
-    // lower extent
-    tf::StampedTransform octree_to_df;
-    try {
-      listener_.lookupTransform(df_frame_id, octree_frame_id, ros::Time(0), octree_to_df);
-    }
-    catch (const tf::TransformException& ex){
-      ROS_ERROR("Could not lookup transform from %s frame to %s frame", octree_frame_id.c_str(), df_frame_id.c_str());
-      return;
-    }
-
-    double min_x, min_y, min_z;
-    df->gridToWorld(0,0,0, min_x, min_y, min_z);
-    tf::Vector3 bb_min_df_frame(min_x, min_y, min_z);
-
-    int num_x = df->getXNumCells();
-    int num_y = df->getYNumCells();
-    int num_z = df->getZNumCells();
-
-    // upper extent
-    double max_x, max_y, max_z;
-    df->gridToWorld(num_x, num_y, num_z, max_x, max_y, max_z);
-    tf::Vector3 bb_max_df_frame(max_x, max_y, max_z);
-
-    tf::Vector3 df_center_oc_frame = octree_to_df.inverse() * (0.5 * tf::Vector3(min_x, min_y, min_z) + 0.5 * tf::Vector3(max_x, max_y, max_z));
-
-    //center the bounding box at the distance field center (in octree frame)
-    //make the bounding box 2x df_length, 2x df_width, 2x df_height -- a bit of
-    //an overkill, but ensures that the bounding box completely covers the whole
-    //distance field so no points are missed
-    octomap::point3d bbx_min(
-            df_center_oc_frame.getX() - abs(max_x - min_x),
-            df_center_oc_frame.getY() - abs(max_y - min_y),
-            df_center_oc_frame.getZ() - abs(max_z - min_z));
-    octomap::point3d bbx_max(
-            df_center_oc_frame.getX() + abs(max_x - min_x),
-            df_center_oc_frame.getY() + abs(max_y - min_y),
-            df_center_oc_frame.getZ() + abs(max_z - min_z));
-
-    // the points from octree transformed in df frame
-    EigenSTL::vector_Vector3d points;
-    int num_pts_total = 0;
-    for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(bbx_min,bbx_max), end=octree->end_leafs_bbx(); it!= end; ++it)
-    {
-        if (octree->isNodeOccupied(*it))
-        {
-            if(it.getSize() <= df->getResolution()) {
-                tf::Vector3 pt_octree_frame(it.getX(), it.getY(), it.getZ());
-                tf::Vector3 pt_df_frame = octree_to_df * pt_octree_frame;
-                num_pts_total++;
-                if(min_x <= pt_df_frame.getX() && pt_df_frame.getX() <= max_x &&
-                   min_y <= pt_df_frame.getY() && pt_df_frame.getY() <= max_y &&
-                   min_z <= pt_df_frame.getZ() && pt_df_frame.getZ() <= max_z){
-                  Eigen::Vector3d point(pt_df_frame.getX(), pt_df_frame.getY(), pt_df_frame.getZ());
-                  points.push_back(point);
-                }
-            }
-            else {
-                double ceil_val = ceil(it.getSize()/df->getResolution())*df->getResolution();
-                for(double x = it.getX()-ceil_val; x < it.getX()+ceil_val; x += df->getResolution()) {
-                for(double y = it.getY()-ceil_val; y < it.getY()+ceil_val; y += df->getResolution()) {
-                for(double z = it.getZ()-ceil_val; z < it.getZ()+ceil_val; z += df->getResolution()) {
-                    tf::Vector3 pt_octree_frame(x, y, z);
-                    tf::Vector3 pt_df_frame = octree_to_df * pt_octree_frame;
-                    num_pts_total++;
-                    if(min_x <= pt_df_frame.getX() && pt_df_frame.getX() <= max_x &&
-                       min_y <= pt_df_frame.getY() && pt_df_frame.getY() <= max_y &&
-                       min_z <= pt_df_frame.getZ() && pt_df_frame.getZ() <= max_z){
-                      Eigen::Vector3d point(pt_df_frame.getX(), pt_df_frame.getY(), pt_df_frame.getZ());
-                      points.push_back(point);
-                    }
-                }
-                }
-                }
-            }
-        }
-    }
-
-    ROS_INFO("Adding %zd/%d points to the distance field", points.size(), num_pts_total);
-    df->addPointsToField(points);
 }
 
 } //namespace hdt

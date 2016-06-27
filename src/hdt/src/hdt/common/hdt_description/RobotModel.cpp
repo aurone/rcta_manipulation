@@ -1,11 +1,16 @@
 #include <hdt_description/RobotModel.h>
 
+// standard includes
 #include <cassert>
 #include <utility>
+
+// system includes
 #include <leatherman/print.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <urdf_parser/urdf_parser.h>
+
+// project includes
 #include <hdt/common/hdt_kinematics/kinematics.h>
 
 #define RM_DEBUG 0
@@ -15,8 +20,7 @@
 #define RM_ASSERT(cond) do { (void) sizeof((cond)); } while(0) // assert implementation borrowed from SDL
 #endif
 
-namespace hdt
-{
+namespace hdt {
 
 double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std::vector<double>& joints2)
 {
