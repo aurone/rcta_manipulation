@@ -1,4 +1,15 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:macro name="roman_body_transmission" params="name namespace"/>
+    <xacro:macro name="roman_body_transmission" params="name namespace">
+        <transmission name="torso_joint1_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="torso_joint1">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="torso_joint1_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
 </robot>

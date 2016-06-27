@@ -13,18 +13,18 @@
 
     <xacro:roman_body name="roman_body" parent="talon" namespace="$(arg namespace)">
         <!--
-        <origin xyz="0.27000 0.00000 -0.05000" rpy="0.00000 1.57080 1.57080"/>
+        <origin xyz="0.27 0 -0.05" rpy="0 1.5708 1.5708"/>
         -->
-        <origin xyz="0.27000 0.00000 0.06" rpy="3.14 1.57080 1.57080"/>
+        <origin xyz="0.27 0 0.06" rpy="3.14 1.5708 1.5708"/>
     </xacro:roman_body>
 
+    <!-- robosimian_l_arm origin was rpy="0 0.7854 -1.5708?"-->
     <xacro:robosimian_l_arm name="robosimian_l_arm" parent="chest" namespace="$(arg namespace)">
-        <!-- was rpy="0.00000 0.78540 -1.57080?"-->
-        <origin xyz="0.07050 0.02500 -0.10000" rpy="0.00000 1.57080 -1.57080"/>
+        <origin xyz="0.0705 0.025 -0.1" rpy="0 1.5708 -1.5708"/>
     </xacro:robosimian_l_arm>
 
+    <!-- robosimian_r_arm origin was rpy="0 0.7854 -1.5708" ?-->
     <xacro:robosimian_r_arm name="robosimian_r_arm" parent="chest" namespace="$(arg namespace)">
-        <!-- was rpy="0.00000 0.78540 -1.57080" ?-->
-        <origin xyz="0.07050 0.02500 0.10000" rpy="0.00000 -1.57080 -1.57080"/>
+        <origin xyz="0.0705 0.025 0.1" rpy="0 -1.57080 -1.5708"/>
     </xacro:robosimian_r_arm>
 </robot>

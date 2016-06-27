@@ -1,4 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:macro name="talon_gazebo" params="name namespace"/>
+    <xacro:macro name="talon_gazebo" params="name namespace">
+        <gazebo reference="talon">
+            <mu1>0.9</mu1>
+            <mu2>0.9</mu2>
+            <minDepth>0.01</minDepth>
+        </gazebo>
+    </xacro:macro>
 </robot>

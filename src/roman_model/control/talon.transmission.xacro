@@ -1,4 +1,26 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:macro name="talon_transmission" params="name namespace"/>
+    <xacro:macro name="talon_transmission" params="name namespace">
+        <transmission name="track_left_joint_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="track_left_joint">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="track_left_joint_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="track_right_joint_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="track_right_joint">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="track_right_joint_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
 </robot>

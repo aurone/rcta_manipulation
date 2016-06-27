@@ -1,4 +1,81 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:macro name="robosimian_l_arm_transmission" params="name namespace"/>
+    <xacro:macro name="robosimian_l_arm_transmission" params="name namespace">
+        <transmission name="limb_left_joint1_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint1">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint1_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="limb_left_joint2_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint2">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint2_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="limb_left_joint3_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint3">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint3_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="limb_left_joint4_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint4">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint4_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="limb_left_joint5_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint5">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint5_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="limb_left_joint6_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint6">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint6_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+
+        <transmission name="limb_left_joint7_transmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="limb_left_joint7">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="limb_left_joint7_motor">
+                <hardwareInterface>EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
 </robot>

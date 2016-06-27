@@ -14,56 +14,54 @@
 
         <link name="talon">
             <inertial>
-                <mass value="40.000000"/>
-                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
-                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+                <mass value="40.0"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <!-- NOTE: dummy values for moment of inertia to keep the -->
+                <!-- base from spinning in gazebo -->
+                <inertia ixx="1.0" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.0"/>
             </inertial>
             <visual>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <geometry>
-<!--                    <box size="0.900000 0.600000 0.260000"/> -->
+<!--                    <box size="0.9 0.6 0.26"/> -->
                     <mesh filename="package://roman_model/meshes/talon.stl" scale="1 1 1"/>
                 </geometry>
                 <material name="grey">
                     <color rgba="0.8 0.8 0.8 1"/>
                 </material>
             </visual>
+            <!-- body -->
             <collision>
-                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
                 <geometry>
-                    <box size="0.900000 0.600000 0.260000"/>
+                    <box size="0.9 0.6 0.26"/>
                 </geometry>
             </collision>
+            <!-- left track -->
             <collision>
-                <origin xyz="0.000000 0.260000 0.000000" rpy="0 0 0"/>
+                <origin xyz="0 0.26 0" rpy="0 0 0"/>
                 <geometry>
-                    <box size="0.900000 0.080000 0.300000"/>
+                    <box size="0.9 0.08 0.3"/>
                 </geometry>
             </collision>
+            <!-- right track -->
             <collision>
-                <origin xyz="0.000000 -0.260000 0.000000" rpy="0 0 0"/>
+                <origin xyz="0 -0.26 0" rpy="0 0 0"/>
                 <geometry>
-                    <box size="0.900000 0.080000 0.300000"/>
+                    <box size="0.9 0.08 0.3"/>
                 </geometry>
             </collision>
+            <!-- back -->
             <collision>
-                <origin xyz="-0.325000 0.000000 -0.180000" rpy="0 0 0"/>
+                <origin xyz="-0.325 0 -0.18" rpy="0 0 0"/>
                 <geometry>
-                    <box size="0.250000 0.600000 0.100000"/>
+                    <box size="0.25 0.6 0.1"/>
                 </geometry>
             </collision>
-        </link>
-
-        <link name="track_left">
-            <inertial>
-                <mass value="0.000000"/>
-                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
-                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
-            </inertial>
         </link>
 
         <joint name="track_left_joint" type="revolute">
-            <origin xyz="0.00000 0.00000 0.00000" rpy="0.00000 0.00000 0.00000"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <axis xyz="0 0 1"/>
             <parent link="talon"/>
             <child link="track_left"/>
@@ -71,22 +69,30 @@
             <dynamics damping="0.0" friction="0.0"/>
         </joint>
 
-        <link name="track_right">
+        <link name="track_left">
             <inertial>
-                <mass value="0.000000"/>
-                <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0"/>
-                <inertia ixx="0.000000" ixy="0.000000" ixz="0.000000" iyy="0.000000" iyz="0.000000" izz="0.000000"/>
+                <mass value="0.003141"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.003141" ixy="0" ixz="0" iyy="0.003141" iyz="0" izz="0.003141"/>
             </inertial>
         </link>
 
         <joint name="track_right_joint" type="revolute">
-            <origin xyz="0.00000 0.00000 0.00000" rpy="0.00000 0.00000 0.00000"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <axis xyz="0 0 1"/>
             <parent link="talon"/>
             <child link="track_right"/>
             <limit effort="1000.0" lower="-3.141593" upper="3.141593" velocity="0.5"/>
             <dynamics damping="0.0" friction="0.0"/>
         </joint>
+
+        <link name="track_right">
+            <inertial>
+                <mass value="0.003141"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.003141" ixy="0" ixz="0" iyy="0.003141" iyz="0" izz="0.003141"/>
+            </inertial>
+        </link>
 
         <xacro:talon_gazebo name="${name}" namespace="${namespace}"/>
         <xacro:talon_transmission name="${name}" namespace="${namespace}"/>
