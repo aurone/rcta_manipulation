@@ -1,0 +1,63 @@
+right_arm:
+    ### Available Search Parameters ###
+    planner_configs:
+        - ARAConfigDefault
+        - MHAConfigDefault
+        - LARAConfigDefault
+
+    ### Collision Checking Parameters ###
+    use_sbpl_collision_checking: false
+
+    ### Graph Parameters ###
+
+    # angular resolution of each active joint variable
+    discretization:
+        limb_right_joint1: 0.017453292519943
+        limb_right_joint2: 0.017453292519943
+        limb_right_joint3: 0.017453292519943
+        limb_right_joint4: 0.017453292519943
+        limb_right_joint5: 0.017453292519943
+        limb_right_joint6: 0.017453292519943
+        limb_right_joint7: 0.017453292519943
+
+    ### Action Parameters ###
+
+    # mprim_filename: uploaded via roslaunch
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
+    use_xyzrpy_snap_mprim: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
+    xyzrpy_snap_dist_thresh: 0.2
+    short_dist_mprims_thresh: 0.4
+    shortcut_path: true
+    shortcut_type: euclidean
+    interpolate_path: true
+
+planner_configs:
+    ARAConfigDefault:
+        type: ARA*
+        epsilon: 100.0
+        use_bfs_heuristic: true
+        bfs_res_x: 0.015
+        bfs_res_y: 0.015
+        bfs_res_z: 0.015
+        bfs_sphere_radius: 0.02
+    MHAConfigDefault:
+        type: MHA*
+        epsilon: 100.0
+        mha_epsilon: 2.0
+        use_bfs_heuristic: true
+        bfs_res_x: 0.015
+        bfs_res_y: 0.015
+        bfs_res_z: 0.015
+        bfs_sphere_radius: 0.02
+    LARAConfigDefault:
+        type: LARA*
+        epsilon: 100.0
+        use_bfs_heuristic: true
+        bfs_res_x: 0.015
+        bfs_res_y: 0.015
+        bfs_res_z: 0.015
+        bfs_sphere_radius: 0.02
