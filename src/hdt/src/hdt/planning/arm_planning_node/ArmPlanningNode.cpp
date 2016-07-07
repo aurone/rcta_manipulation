@@ -530,7 +530,7 @@ void ArmPlanningNode::move_arm(const hdt::MoveArmCommandGoal::ConstPtr& request)
       // Deal with attached object if any //
       //////////////////////////////////////
       if (request->has_attached_object){
-        m_collision_checker->attachObject(request->attached_object);
+        m_collision_checker->processAttachedCollisionObject(request->attached_object);
       }
 
     // transform the wrist goal from the kinematics frame to the planning frame
