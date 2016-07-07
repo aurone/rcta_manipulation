@@ -29,7 +29,7 @@ right_arm:
     use_short_dist_mprims: true
     xyz_snap_dist_thresh: 0.0
     rpy_snap_dist_thresh: 0.04
-    xyzrpy_snap_dist_thresh: 0.2
+    xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
     shortcut_path: true
     shortcut_type: euclidean
