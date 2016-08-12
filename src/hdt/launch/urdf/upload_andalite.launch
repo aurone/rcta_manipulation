@@ -23,7 +23,7 @@
     </group>
 
     <!-- Upload SRDF -->
-    <param name="robot_description_semantic" textfile="$(find hdt)/config/moveit/husky_roboto.srdf"/>
+    <param name="robot_description_semantic" textfile="$(find hdt)/config/robots/husky_roboto/moveit/husky_roboto.srdf"/>
 
     <!-- Upload MoveIt! kinematics plugin parameters -->
     <rosparam command="load" file="$(find hdt)/config/moveit/kinematics.yaml"/>

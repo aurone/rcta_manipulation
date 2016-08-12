@@ -15,7 +15,7 @@
     <param name="request_adapters" value="$(arg planning_adapters)"/>
     <param name="start_state_max_bounds_error" value="$(arg start_state_max_bounds_error)"/>
 
-    <rosparam command="load" file="$(find hdt)/config/robots/roman/sbpl_planning.yaml"/>
+    <rosparam command="load" file="$(find hdt)/config/robots/roman/moveit/sbpl_planning.yaml"/>
     <group ns="right_arm">
         <param name="mprim_filename" value="$(find hdt)/config/robots/roman/right_arm.mprim"/>
     </group>

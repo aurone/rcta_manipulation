@@ -1,6 +1,6 @@
 <launch>
     <param name="robot_description" command="$(find xacro)/xacro.py '$(find hdt)/config/urdf/hdt_standalone.xacro'"/>
-    <param name="robot_description_semantic" textfile="$(find hdt)/config/moveit/phantom_arm_robot.srdf"/>
+    <param name="robot_description_semantic" textfile="$(find hdt)/config/robots/phantom_arm_robot/moveit/phantom_arm_robot.srdf"/>
     <rosparam command="load" file="$(find hdt)/config/moveit/kinematics.yaml"/>
 </launch>
 

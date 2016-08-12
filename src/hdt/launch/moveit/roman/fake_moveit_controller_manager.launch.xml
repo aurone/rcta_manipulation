@@ -1,5 +1,5 @@
 <launch>
     <!-- the controller plugin -->
     <param name="moveit_controller_manager" value="moveit_fake_controller_manager/MoveItFakeControllerManager"/>
-    <rosparam file="$(find hdt)/config/robots/roman/fake_controllers.yaml"/>
+    <rosparam file="$(find hdt)/config/robots/roman/moveit/fake_controllers.yaml"/>
 </launch>
