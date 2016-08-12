@@ -1,6 +1,0 @@
-<launch>
-    <node name="static_world_publisher" pkg="hdt" type="static_world_publisher" output="screen">
-        <rosparam command="load" file="$(find hdt)/config/static_world_publisher.yaml"/>
-    </node>
-</launch>
-

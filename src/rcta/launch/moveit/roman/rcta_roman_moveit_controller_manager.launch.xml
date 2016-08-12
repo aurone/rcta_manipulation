@@ -1,0 +1,4 @@
+<launch>
+    <param name="moveit_controller_manager" value="moveit_simple_controller_manager/MoveItSimpleControllerManager"/>
+    <rosparam file="$(find rcta)/config/robots/roman/moveit/controllers.yaml"/>
+</launch>

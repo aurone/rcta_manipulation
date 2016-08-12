@@ -1,0 +1,55 @@
+<launch>
+    <arg name="sim" default="false"/>
+    <arg name="kinect_sensor" default="false"/> <!-- false = asus, true = kinect -->
+    <arg name="standalone" default="false"/>
+
+    <!-- UPLOAD URDF -->
+    <include file="$(find rcta)/launch/urdf/upload_andalite.launch">
+        <arg name="sim" value="$(arg sim)"/>
+        <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
+    </include>
+
+    <!-- LAUNCH OPENNI IN LIVE MODE -->
+    <group if="$(arg standalone)">
+        <group unless="$(arg sim)">
+            <include file="$(find rcta)/launch/perception/openni.launch">
+                <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
+            </include>
+        </group>
+    </group>
+
+    <!-- LAUNCH ARM DRIVER UNDER SIM, LAUNCH SEPARATELY AS ROOT IN LIVE MODE -->
+    <group if="$(arg sim)">
+        <include file="$(find rcta)/launch/hdt_arm_driver.launch">
+            <arg name="sim" value="$(arg sim)"/>
+        </include>
+    </group>
+
+    <!-- LAUNCH ARM STATE FILTER -->
+    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter">
+        <rosparam command="load" file="$(find rcta)/config/joint_states_filter.yaml"/>
+    </node>
+
+    <!-- LAUNCH GRIPPER DRIVER -->
+    <include file="$(find rcta)/launch/robotiq_gripper.launch">
+        <arg name="sim" value="$(arg sim)"/>
+    </include>
+
+    <!-- SURROGATE PROVIDERS OF /joint_states -->
+    <include file="$(find rcta)/launch/sim/husky_simulator.launch"/>
+    <include file="$(find rcta)/launch/sim/tilt_mount_simulator.launch"/>
+
+    <group if="$(arg kinect_sensor)">
+        <node name="kinect_simulator" pkg="hdt" type="kinect_simulator" args="--mode=static 0"/>
+    </group>
+
+    <!-- Global Frame Functionality -->
+    <group if="$(arg standalone)">
+        <include file="$(find rcta)/launch/localization_simulator.launch"/>
+    </group>
+    <!-- <node name="reposition_base_simulator" pkg="hdt" type="reposition_base_simulator"/> -->
+    <!-- <node name="reposition_base_executor" pkg="hdt" type="hdt_base_planning_node"/> -->
+
+    <!-- launch robot_state_publisher to translate urdf + /joint_states to /tf -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+</launch>

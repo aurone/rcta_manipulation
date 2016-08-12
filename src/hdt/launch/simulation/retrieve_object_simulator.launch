@@ -1,7 +1,0 @@
-<launch>
-    <node name="retrieve_object_simulator" pkg="hdt" type="retrieve_object_simulator" output="screen">
-        <rosparam command="load" file="$(find hdt)/config/retrieve_object_simulator.yaml"/>
-        <rosparam command="load" file="$(find hdt)/config/gas_canister_v2.yaml"/>
-        <remap from="fixed_occupancy_grid" to="fixed_costmap_sim"/>
-    </node>
-</launch>

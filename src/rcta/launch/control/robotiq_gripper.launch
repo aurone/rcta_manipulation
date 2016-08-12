@@ -1,0 +1,12 @@
+<launch>
+    <arg name="sim" default="false"/>
+
+    <include file="$(find rcta)/launch/gripper_command_action.launch">
+        <arg name="sim" value="$(arg sim)"/>
+    </include>
+
+    <group if="$(arg sim)">
+        <node name="robotiq_simulator" pkg="hdt" type="robotiq_simulator"/>
+    </group>
+</launch>
+

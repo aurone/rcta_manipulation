@@ -1,6 +1,0 @@
-<launch>
-    <node name="spline_visualizer" pkg="hdt" type="spline_grasp_generator">
-        <rosparam command="load" file="$(find hdt)/config/gas_canister.yaml"/>
-    </node>
-</launch>
-

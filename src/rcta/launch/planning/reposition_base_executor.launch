@@ -1,0 +1,8 @@
+<launch>
+    <node name="reposition_base_command" pkg="hdt" type="hdt_base_planning_node" output="screen"> 
+    <!--node name="reposition_base_command" pkg="hdt" type="hdt_base_planning_node" output="log" launch-prefix="gdb ex - -args" -->
+        <rosparam command="load" file="$(find rcta)/config/gas_canister_v2.yaml"/>
+        <rosparam command="load" file="$(find rcta)/config/grasp_object_executor.yaml"/>
+		<param name="max_grasp_candidates" value="100"/>
+	</node>
+</launch>

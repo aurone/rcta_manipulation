@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find rcta)/launch/track_marker_in_gripper.launch">
+        <arg name="cam_image_topic" value="/kinect_depth_registered_points"/>
+        <arg name="cam_info_topic" value="/kinect/rgb/camera_info"/>
+    </include>
+</launch>

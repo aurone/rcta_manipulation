@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find rcta)/launch/husky_simulator.launch"/>
+    <include file="$(find rcta)/launch/hdt_simulator.launch"/>
+    <include file="$(find rcta)/launch/robotiq_s_model_simulator.launch"/>
+</launch>
+
