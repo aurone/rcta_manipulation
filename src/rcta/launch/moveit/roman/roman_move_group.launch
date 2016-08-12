@@ -21,10 +21,6 @@
         <rosparam param="/source_list">[/move_group/fake_controller_joint_states]</rosparam>
     </node>
 
-    <!-- broadcast static tf for virtual joint between world and robot -->
-    <node pkg="tf" type="static_transform_publisher" name="virtual_joint_broadcaster_0"
-            args="0 0 0 0 0 0 odom_combined base_link 100"/>
-
     <!-- Planning Functionality -->
     <include ns="move_group" file="$(find rcta)/config/moveit/roman/planning_pipeline.launch.xml">
         <arg name="pipeline" value="sbpl"/>
