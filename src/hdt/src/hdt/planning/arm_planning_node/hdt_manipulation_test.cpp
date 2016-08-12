@@ -82,14 +82,12 @@ int main(int argc, char** argv)
     const double max_distance_m = 0.2;
     const bool propagate_negative_distances = false;
 
-    auto df = std::make_shared<distance_field::PropagationDistanceField>(
-        maxx - minx, maxy - miny, maxz - minz,
-        cellres_m,
-        origin_x, origin_y, origin_z,
-        max_distance_m,
-        propagate_negative_distances);
-
-    sbpl::OccupancyGrid grid(df);
+    sbpl::OccupancyGrid grid(
+            maxx - minx, maxy - miny, maxz - minz,
+            cellres_m,
+            origin_x, origin_y, origin_z,
+            max_distance_m,
+            propagate_negative_distances);
     grid.setReferenceFrame(planning_frame);
 
     ///////////////////////
@@ -105,8 +103,10 @@ int main(int argc, char** argv)
     // group of collision links to collision check as specified via collision
     // model config
     const std::string group_name = "hdt_arm";
-    sbpl::collision::CollisionSpace cc(&grid);
-    if (!cc.init(robot_description, group_name, cm_cfg, planning_joints)) {
+
+    sbpl::collision::CollisionSpaceBuilder builder;
+    auto cspace = builder.build(&grid, robot_description, cm_cfg, group_name, planning_joints);
+    if (!cspace) {
         ROS_ERROR("Failed to initialize collision checking for HDT arm group %s", group_name.c_str());
         return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
     }
@@ -123,7 +123,7 @@ int main(int argc, char** argv)
     for (size_t jidx = 0; jidx < planning_joints.size(); ++jidx) {
         const std::string& joint_name = planning_joints[jidx];
         double joint_position = start_angles[jidx];
-        if (!cc.setJointPosition(joint_name, joint_position)) {
+        if (!cspace->setJointPosition(joint_name, joint_position)) {
             ROS_ERROR("Failed to set the initial state for joint '%s'", joint_name.c_str());
             return FAILED_TO_INITIALIZE_COLLISION_CHECKER;
         }
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
     // Planning Interface //
     ////////////////////////
 
-    sbpl::manip::ArmPlannerInterface planner(&robot_model, &cc, &as, &grid);
+    sbpl::manip::ArmPlannerInterface planner(&robot_model, cspace.get(), &as, &grid);
 
     sbpl::manip::PlanningParams params;
     // TODO: fill in planning params

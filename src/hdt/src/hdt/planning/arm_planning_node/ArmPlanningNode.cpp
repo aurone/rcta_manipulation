@@ -204,16 +204,15 @@ bool ArmPlanningNode::reinit_collision_model(
         return false;
     }
 
-    m_collision_checker = std::make_shared<sbpl::collision::CollisionSpace>(
-            grid_.get());
+    sbpl::collision::CollisionSpaceBuilder builder;
 
     const std::string group_name = "manipulator";
     const std::vector<std::string>& planning_joints =
             robot_model_->joint_names();
-    if (!m_collision_checker->init(
-            m_urdf_string, group_name, cm_cfg, planning_joints))
-    {
-        ROS_ERROR("  Failed to initialize SBPL Collision Checker");
+    m_collision_checker = builder.build(
+            grid_.get(), m_urdf_string, cm_cfg, group_name, planning_joints);
+    if (!m_collision_checker) {
+        ROS_ERROR("Failed to build Collision Space for group '%s'", group_name.c_str());
         return false;
     }
 
