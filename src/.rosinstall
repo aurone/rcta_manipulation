@@ -11,8 +11,8 @@
     local-name: moveit_planners_sbpl
     uri: https://github.com/aurone/moveit_planners_sbpl.git
 - git:
-    local-name: moveit_tests
-    uri: git@sbpl.pc.cs.cmu.edu:people/andrew/moveit-tests.git
+    local-name: moveit_scenarios
+    uri: https://github.com/aurone/moveit_scenarios.git
 - git:
     local-name: sbpl_geometry_utils
     uri: https://github.com/sbpl/sbpl_geometry_utils.git
