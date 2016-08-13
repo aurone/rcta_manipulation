@@ -4,6 +4,14 @@
     <xacro:include filename="$(find roman_model)/control/talon.transmission.xacro"/>
 
     <xacro:macro name="talon" params="name namespace">
+        <link name="${name}_footprint"/>
+
+        <joint name="${name}_footprint_joint" type="fixed">
+            <origin xyz="0 0 0.15203" rpy="0 0 0"/>
+            <parent link="${name}_footprint"/>
+            <child link="${name}_link"/>
+        </joint>
+
         <link name="${name}_link"/>
 
         <joint name="${name}_joint" type="fixed">
