@@ -21,7 +21,6 @@ add_executable(robotiq_controller robotiq_controller.cpp)
 target_link_libraries(
     robotiq_controller
     ${Boost_LIBRARIES}
-    ${catkin_LIBRARIES}
     pthread robotiq_common)
 
 add_executable(gripper_command_action gripper_command_action.cpp)

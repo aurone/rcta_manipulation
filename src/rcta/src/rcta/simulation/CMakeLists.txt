@@ -1,4 +1,4 @@
-add_subdirectory(costmap_extruder)
+#add_subdirectory(costmap_extruder)
 add_subdirectory(depth_sensor_simulator)
 add_subdirectory(localization_simulator)
 add_subdirectory(joint_state_simulator)

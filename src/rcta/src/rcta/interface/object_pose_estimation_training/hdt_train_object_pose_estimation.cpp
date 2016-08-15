@@ -1,4 +1,7 @@
+// standard includes
 #include <string>
+
+// system includes
 #include <ros/ros.h>
 #include <pr2_vfh_database/VFHPoseEstimationTrainer.h>
 
@@ -18,7 +21,7 @@ int main(int argc, char *argv[])
     VFHPoseEstimationTrainer trainer;
 
     if (!trainer.initialize(database_file)) {
-        return 2;   
+        return 2;
     }
 
     const std::string features_filename = "training_features.h5";

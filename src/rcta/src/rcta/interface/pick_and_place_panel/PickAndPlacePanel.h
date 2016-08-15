@@ -1,12 +1,15 @@
 #ifndef hdt_PickAndPlacePanel_h
 #define hdt_PickAndPlacePanel_h
 
+// standard includes
 #include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
+
+// system includes
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
@@ -23,8 +26,12 @@
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+
+// project includes
 #include <rcta/ObjectDetectionAction.h>
 #include <rcta/MoveArmCommandAction.h>
+
+// module includes
 #include "SimpleInteractiveMarkerServer.h"
 #include "GraspMarkerSelection.h"
 

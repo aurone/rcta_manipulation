@@ -1,13 +1,15 @@
 #include "RepositionBaseExecutor.h"
 
+// standard includes
+#include <algorithm>
+
+// systemm includes
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
-#include <rcta/common/msg_utils/msg_utils.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/utils/RunUponDestruction.h>
+#include <spellbook/stringifier/stringifier.h>
 #include <tf_conversions/tf_eigen.h>
-
-#include <rcta/common/utils/RunUponDestruction.h>
-#include <rcta/common/stringifier/stringifier.h>
-#include <algorithm>
 
 namespace RepositionBaseExecutionStatus
 {
@@ -773,7 +775,7 @@ bool RepositionBaseExecutor::computeRobPose(double objx, double objy, double obj
 
 							//body coords in map cells
 							bodyi = (int)((bodyx-origin.position.x)/resolution);
-							bodyj = (int)((bodyy-origin.position.y)/resolution); 
+							bodyj = (int)((bodyy-origin.position.y)/resolution);
 
                                                         if (!cc_->isValidState((double)(bodyi * resolution), (double)(bodyj * resolution), (double)robY[i][j][k])){
 								//ROS_WARN("Footprint collision!");
@@ -1862,11 +1864,11 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(double objx, double objy, 
 // 						gas_can_pose.header.frame_id = "/abs_nwu";
 // 						gas_can_pose.header.seq = 0;
 // 						gas_can_pose.header.stamp = ros::Time::now();
-// 
+//
 // 						gas_can_pose.pose.position.x = objx;
 // 						gas_can_pose.pose.position.y = objy;
 // 						gas_can_pose.pose.position.z = 0.0;
-// 
+//
 // 						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY+M_PI/2.0);
 // 						gas_can_pose.pose.orientation.x = objq[0];
 // 						gas_can_pose.pose.orientation.y = objq[1];

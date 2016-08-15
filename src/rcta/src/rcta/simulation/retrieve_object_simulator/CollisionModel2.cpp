@@ -1,6 +1,10 @@
 #include "CollisionModel2.h"
+
+// standard includes
 #include <cassert>
 #include <limits>
+
+// system includes
 #include <ros/ros.h>
 #include <sbpl/utils/utils.h>
 

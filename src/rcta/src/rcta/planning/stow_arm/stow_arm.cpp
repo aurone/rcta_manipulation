@@ -6,13 +6,15 @@
 
 // system includes
 #include <actionlib/client/simple_action_client.h>
-#include <rcta/MoveArmCommandAction.h>
-#include <rcta/common/hdt_description/RobotModel.h>
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/utils.h>
+
+// project includes
+#include <rcta/MoveArmCommandAction.h>
+#include <rcta/common/hdt_description/RobotModel.h>
 
 struct StowPosition
 {

@@ -1,10 +1,17 @@
+// standard includes
 #include <unordered_set>
+
+// system includes
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
 #include <pcl_ros/transforms.h>
 #include <tf/transform_broadcaster.h>
+
+// project includes
 #include <rcta/control/robotiq_controllers/gripper_model.h>
+
+// module includes
 #include "PickAndPlacePanel.h"
 #include "SimpleInteractiveMarker.h"
 #include "GraspMarkerSelectionMarker.h"

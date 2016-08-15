@@ -1,8 +1,11 @@
 #ifndef SimpleInteractiveMarker_h
 #define SimpleInteractiveMarker_h
 
+// standard includes
 #include <cstdint>
 #include <string>
+
+// system includes
 #include <std_msgs/Header.h>
 #include <visualization_msgs/InteractiveMarker.h>
 

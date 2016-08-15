@@ -1,3 +1,3 @@
 add_executable(joint_state_simulator joint_state_simulator.cpp)
-target_link_libraries(joint_state_simulator ${catkin_LIBRARIES})
+target_link_libraries(joint_state_simulator ${roscpp_LIBRARIES})
 

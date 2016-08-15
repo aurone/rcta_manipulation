@@ -1,19 +1,24 @@
 #ifndef PickAndPlaceNode_h
 #define PickAndPlaceNode_h
 
+// standard includes
 #include <cstdio>
 #include <string>
 #include <memory>
 #include <vector>
+
+// system includes
 #include <actionlib/server/simple_action_server.h>
-#include <rcta/ObjectDetectionAction.h>
 #include <message_filters/subscriber.h>
+#include <pr2_vfh_database/ObjectFinder.h>
 #include <pr2_vfh_database/ObjectFinder.h>
 #include <pr2_vfh_database/pr2_grasp_database.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/message_filter.h>
 #include <tf/transform_listener.h>
-#include <pr2_vfh_database/ObjectFinder.h>
+
+// project includes
+#include <rcta/ObjectDetectionAction.h>
 
 /// Basic node that subscribes to point clouds and returns the best match in the
 /// given object database for each received point cloud.

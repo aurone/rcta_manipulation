@@ -1,10 +1,13 @@
 #ifndef SimpleInteractiveMarkerServer_h
 #define SimpleInteractiveMarkerServer_h
 
+// standard includes
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
+
+// system includes
 #include <interactive_markers/interactive_marker_server.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 

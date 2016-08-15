@@ -1,6 +1,8 @@
+#include "PickAndPlaceNode.h"
+
+// system includes
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <visualization_msgs/MarkerArray.h>
-#include "PickAndPlaceNode.h"
 
 PickAndPlaceNode::PickAndPlaceNode() :
     nh_(),

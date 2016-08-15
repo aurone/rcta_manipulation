@@ -1,7 +1,10 @@
 #ifndef WorldSimulator_h
 #define WorldSimulator_h
 
+// standard includes
 #include <string>
+
+// system includes
 #include <moveit_msgs/CollisionObject.h>
 
 class WorldSimulator

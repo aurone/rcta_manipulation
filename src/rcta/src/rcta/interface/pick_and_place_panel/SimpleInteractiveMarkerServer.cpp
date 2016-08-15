@@ -1,7 +1,10 @@
 #include "SimpleInteractiveMarkerServer.h"
 
+// system includes
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <ros/ros.h>
+
+// module includes
 #include "SimpleInteractiveMarker.h"
 
 SimpleInteractiveMarkerServer::SimpleInteractiveMarkerServer(const std::string &name) :
