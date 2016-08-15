@@ -1,5 +1,6 @@
 <launch>
     <arg name="sim" default="false"/>
+    <arg name="fake" default="false"/>
 
     <!-- move_group parameters -->
     <arg name="allow_trajectory_execution"          default="true"/>
@@ -7,7 +8,7 @@
     <arg name="jiggle_fraction"                     default="0.05"/>
     <arg name="publish_monitored_planning_scene"    default="true"/>
 
-    <arg name="fake_execution"                      value="$(arg sim)"/>
+    <arg name="fake_execution"                      value="$(arg fake)"/>
 
     <!-- Load the URDF, SRDF and other .yaml configuration files on the -->
     <!-- param server -->
