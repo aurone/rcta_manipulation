@@ -1,4 +1,4 @@
 add_executable(grasp_object_executor grasp_object_executor.cpp GraspObjectExecutor.cpp)
 target_link_libraries(grasp_object_executor ${catkin_LIBRARIES} msg_utils hdt_robot_model robotiq_common costmap_extruder)
-add_dependencies(grasp_object_executor hdt_generate_messages_cpp)
+add_dependencies(grasp_object_executor ${PROJECT_NAME}_generate_messages_cpp)
 

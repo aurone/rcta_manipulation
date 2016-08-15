@@ -15,7 +15,7 @@ target_link_libraries(
     ${QT_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
     qwt)
-add_dependencies(hdt_controller_plugins hdt_generate_messages_cpp)
+add_dependencies(hdt_controller_plugins ${PROJECT_NAME}_generate_messages_cpp)
 
 install(TARGETS hdt_controller_plugins
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

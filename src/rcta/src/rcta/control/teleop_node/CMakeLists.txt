@@ -6,7 +6,7 @@ target_link_libraries(
     ${urdf_parser_LIBRARIES}
     config_block
     InputDevice)
-add_dependencies(hdt_arm_teleop hdt_generate_msgs_cpp)
+add_dependencies(hdt_arm_teleop ${PROJECT_NAME}_generate_messages_cpp)
 
 install(
     TARGETS hdt_arm_teleop

@@ -47,4 +47,4 @@ target_link_libraries(
     ${hdt_LIBRARIES}
     config_block
     hdt_robot_model)
-add_dependencies(hdt_arm_driver hdt_generate_messages_cpp)
+add_dependencies(hdt_arm_driver ${PROJECT_NAME}_generate_messages_cpp)

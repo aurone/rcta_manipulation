@@ -11,6 +11,7 @@ target_link_libraries(
     ${QT_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${rviz_LIBRARIES})
+add_dependencies(hdt_arm_teleop_plugin ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 install(
     TARGETS hdt_arm_teleop_plugin

@@ -12,6 +12,7 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${rviz_LIBRARIES}
     qwt)
+add_dependencies(temperature_status_plugin ${PROJECT_NAME}_generate_messages_cpp)
 
 install(
     TARGETS temperature_status_plugin
