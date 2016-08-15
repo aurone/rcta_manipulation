@@ -1,6 +1,11 @@
+// standard includes
 #include <cstdio>
 #include <iomanip>
+
+// system includes
 #include <boost/bind.hpp>
+
+// module includes
 #include "gripper_server.h"
 #include "gripper_simulator.h"
 #include "gripper_msgs.h"

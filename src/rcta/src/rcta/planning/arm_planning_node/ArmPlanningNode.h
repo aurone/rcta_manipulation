@@ -22,14 +22,16 @@
 #include <sbpl_arm_planner/occupancy_grid.h>
 #include <sbpl_collision_checking/collision_space.h>
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
+#include <spellbook/stringifier/stringifier.h>
 #include <tf/transform_listener.h>
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
 
 // project includes
 #include <rcta/MoveArmCommandAction.h>
-#include <rcta/common/stringifier/stringifier.h>
 #include <rcta/common/hdt_description/RobotModel.h>
+
+// module includes
 #include "HDTRobotModel.h"
 
 namespace hdt {

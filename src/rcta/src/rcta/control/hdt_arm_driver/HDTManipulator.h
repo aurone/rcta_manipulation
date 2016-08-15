@@ -21,7 +21,6 @@
 #include <cmath>
 #include <chrono>
 
-
 // special includes
 #include <ncurses.h>
 

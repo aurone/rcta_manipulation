@@ -32,12 +32,15 @@
 #ifndef hdt_JointTrajectoryExecutor_h
 #define hdt_JointTrajectoryExecutor_h
 
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/server/action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
+
+// project includes
 #include <rcta/common/hdt_description/RobotModel.h>
 
 namespace hdt

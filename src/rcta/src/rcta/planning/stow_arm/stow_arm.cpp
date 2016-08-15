@@ -1,15 +1,18 @@
 #ifndef stow_arm_h
 #define stow_arm_h
 
+// standard includes
 #include <cstdlib>
+
+// system includes
 #include <actionlib/client/simple_action_client.h>
 #include <rcta/MoveArmCommandAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
 #include <ros/ros.h>
 #include <std_msgs/String.h>
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/stringifier/stringifier.h>
-#include <rcta/common/utils/utils.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/utils/utils.h>
 
 struct StowPosition
 {
@@ -106,7 +109,7 @@ void stow_request_callback(const std_msgs::String::ConstPtr& message){
 			}
 			sleep(4);
 			pub.publish(response);
-		} 
+		}
 	}
 }
 

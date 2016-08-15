@@ -1,7 +1,10 @@
 #ifndef ViservoControlExecutor_h
 #define ViservoControlExecutor_h
 
+// standard includes
 #include <memory>
+
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
@@ -11,9 +14,11 @@
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_listener.h>
 #include <trajectory_msgs/JointTrajectory.h>
+#include <sbpl_kdl_robot_model/kdl_robot_model.h>
+
+// project includes
 #include <rcta/ViservoCommandAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
-#include <sbpl_kdl_robot_model/kdl_robot_model.h>
 
 class ViservoControlExecutor
 {

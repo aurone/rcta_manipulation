@@ -1,20 +1,27 @@
+// standard includes
 #include <string>
 #include <vector>
+
+// system includes
 #include <Eigen/Dense>
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <sensor_msgs/JointState.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/stringifier/stringifier.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/hdt_description/RobotModel.h>
-#include <rcta/common/stringifier/stringifier.h>
 
-/// This node listens to all incoming messages on /ar_pose_marker and publishes only the messages for markers that
-/// are currently attached to the robot (dictated by config). It also attempts to fix the AR marker-flipping by
-/// snapping the marker to the most likely rotation given the joint state of the arm
+// project includes
+#include <rcta/common/hdt_description/RobotModel.h>
+
+/// This node listens to all incoming messages on /ar_pose_marker and publishes
+/// only the messages for markers that are currently attached to the robot
+/// (dictated by config). It also attempts to fix the AR marker-flipping by
+/// snapping the marker to the most likely rotation given the joint state of the
+/// arm
 class AttachedMarkerFilter
 {
 public:

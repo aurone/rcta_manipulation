@@ -1,9 +1,16 @@
+// standard includes
 #include <chrono>
+
+// system includes
 #include <RADMessages.h>
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <sensor_msgs/JointState.h>
+
+// project includes
 #include <rcta/ControllerDiagnosticStatus.h>
+
+// module includes
 #include "manipulator_interface_sim_ros.h"
 
 namespace hdt
@@ -373,7 +380,7 @@ const std::vector<double>& ManipulatorInterfaceSimROS::max_velocity_limits() con
 void ManipulatorInterfaceSimROS::goal_callback()
 {
     auto current_goal = as_->acceptNewGoal();
-    
+
     if (current_goal->joint_state.position.size() != 7) {
         as_->setAborted();
         return;

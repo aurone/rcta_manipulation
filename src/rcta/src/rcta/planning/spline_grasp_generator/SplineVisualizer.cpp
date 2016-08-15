@@ -1,17 +1,22 @@
 #include "SplineVisualizer.h"
 
+// standard includes
 #include <cmath>
 #include <limits>
 #include <string>
+
+// system includes
 #include <Eigen/Dense>
 #include <GL/freeglut.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <rospack/rospack.h>
 #include <visualization_msgs/Marker.h>
 #include <sbpl_geometry_utils/utils.h>
-#include <rcta/common/stringifier/stringifier.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/msg_utils/msg_utils.h>
+
+// project includes
 #include <rcta/common/matplotpp/matplotpp.h>
-#include <rcta/common/msg_utils/msg_utils.h>
 
 using namespace Eigen;
 

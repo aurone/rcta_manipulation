@@ -1,10 +1,13 @@
 #ifndef RepeatabilityMeasurementNode_h
 #define RepeatabilityMeasurementNode_h
 
+// standard includes
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
@@ -12,6 +15,8 @@
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_listener.h>
+
+// project includes
 #include <rcta/MoveArmCommandAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
 

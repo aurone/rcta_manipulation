@@ -1,9 +1,14 @@
+// standard includes
 #include <cstdio>
 #include <iomanip>
 #include <sstream>
 #include <string>
+
+// system includes
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+
+// module includes
 #include "gripper_simulator.h"
 
 static double signd(double d)

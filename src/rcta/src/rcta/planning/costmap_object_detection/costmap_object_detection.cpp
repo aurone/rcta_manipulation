@@ -1,16 +1,16 @@
-// C/C++ headers
+// standard headers
 #include <cstdint>
 #include <cstdio>
 #include <vector>
 
-// System headers
+// system headers
 #include <ros/ros.h>
+#include <spellbook/random/gaussian.h>
 #include <leatherman/print.h>
 #include <nav_msgs/OccupancyGrid.h>
 
-// Project headers
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/random/gaussian.h>
+// project headers
+#include <spellbook/msg_utils/msg_utils.h>
 
 bool within_bounds(const nav_msgs::OccupancyGrid& grid, int x, int y)
 {

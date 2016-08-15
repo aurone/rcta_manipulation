@@ -1,10 +1,13 @@
 #include "RetrieveObjectSimulator.h"
 
+// system includes
 #include <sbpl/utils/utils.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <rcta/common/stringifier/stringifier.h>
-#include <rcta/common/utils/utils.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/utils/utils.h>
+
+// project includes
 #include <rcta/common/hdt_description/RobotModel.h>
 
 RetrieveObjectSimulator::RetrieveObjectSimulator() :

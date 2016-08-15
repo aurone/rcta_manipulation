@@ -1,11 +1,16 @@
+// standard includes
 #include <cstdio>
 #include <string>
+
+// system includes
 #include <boost/shared_ptr.hpp>
 #include <kdl/kdl.hpp>
 #include <kdl/chain.hpp>
 #include <kdl/chainfksolvervel_recursive.hpp>
 #include <ros/ros.h>
 #include <urdf_parser/urdf_parser.h>
+
+// project includes
 #include <rcta/common/hdt_description/RobotModel.h>
 
 typedef boost::shared_ptr<urdf::Link> LinkPtr;

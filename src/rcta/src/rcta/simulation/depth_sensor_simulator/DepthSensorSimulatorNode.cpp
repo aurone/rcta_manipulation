@@ -1,5 +1,6 @@
 #include "DepthSensorSimulatorNode.h"
 
+// standard includes
 #include <cmath>
 #include <chrono>
 #include <fstream>
@@ -7,12 +8,14 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+// system includes
 #include <Eigen/Dense>
 #include <SDL.h>
 #include <GL/glew.h>
 #include <rospack/rospack.h>
 #include <sbpl_geometry_utils/utils.h>
-#include <rcta/common/utils/RunUponDestruction.h>
+#include <spellbook/utils/RunUponDestruction.h>
 
 #define GL_CALL(fun, ...) fun(__VA_ARGS__); if (glGetError() != GL_NO_ERROR) { ROS_ERROR("Call to " #fun " return an error"); }
 

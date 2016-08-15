@@ -1,4 +1,7 @@
+// standard includes
 #include <cstring>
+
+// module includes
 #include "gripper_msgs.h"
 
 const uint16_t GripperRequest::PROTOCOL_ID = 0x0000;
@@ -50,27 +53,27 @@ GripperResponse::~GripperResponse()
 
 uint16_t GripperResponse::trans_id() const
 {
-    return combine(response_msg_[0], response_msg_[1]); 
+    return combine(response_msg_[0], response_msg_[1]);
 }
 
 uint16_t GripperResponse::protocol_id() const
 {
-    return combine(response_msg_[2], response_msg_[3]); 
+    return combine(response_msg_[2], response_msg_[3]);
 }
 
 uint16_t GripperResponse::length() const
 {
-    return combine(response_msg_[4], response_msg_[5]); 
+    return combine(response_msg_[4], response_msg_[5]);
 }
 
 uint8_t GripperResponse::slave_id() const
 {
-    return response_msg_[6]; 
+    return response_msg_[6];
 }
 
 uint8_t GripperResponse::op_code() const
 {
-    return response_msg_[7]; 
+    return response_msg_[7];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -309,7 +312,7 @@ bool GripperStatusResponse::act_on() const
 
 bool GripperStatusResponse::gto_on() const
 {
-    return data()[0] & (1 << 3); 
+    return data()[0] & (1 << 3);
 }
 
 Status GripperStatusResponse::status() const

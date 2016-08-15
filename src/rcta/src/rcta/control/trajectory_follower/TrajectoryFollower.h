@@ -1,12 +1,17 @@
 #ifndef TrajectoryFollower_h
 #define TrajectoryFollower_h
 
+// standard includes
 #include <string>
+
+// system includes
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <ros/ros.h>
-#include <rcta/common/hdt_description/RobotModel.h>
 #include <trajectory_msgs/JointTrajectory.h>
+
+// project includes
+#include <rcta/common/hdt_description/RobotModel.h>
 
 class TrajectoryFollower
 {

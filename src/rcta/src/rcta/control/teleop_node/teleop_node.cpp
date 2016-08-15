@@ -1,11 +1,18 @@
+// standard includes
 #include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
+
+// system includes
 #include <trajectory_msgs/JointTrajectory.h>
 #include <rcta/TeleopDiagnosticStatus.h>
 #include <rcta/AcknowledgeReset.h>
+
+// project includes
 #include <config_block/config_block.h>
+
+// module includes
 #include "teleop_node.h"
 #include "controller.h"
 

@@ -1,11 +1,16 @@
 #ifndef hdt_TeleopStatusPanel_h
 #define hdt_TeleopStatusPanel_h
 
+// standard includes
 #include <string>
+
+// system includes
 #include <QLabel>
 #include <QWidget>
 #include <rviz/panel.h>
 #include <ros/ros.h>
+
+// project includes
 #include <rcta/TeleopDiagnosticStatus.h>
 
 namespace Ui

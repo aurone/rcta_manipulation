@@ -1,13 +1,18 @@
 #ifndef GripperAction_h
 #define GripperAction_h
 
+// standard includes
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
+
+// system includes
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <ros/ros.h>
+
+// project includes
 #include <rcta/control/robotiq_controllers/gripper_model.h>
 
 class GripperInterface;

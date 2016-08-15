@@ -1,6 +1,7 @@
 #ifndef hdt_ManipulatorCommandPanel_h
 #define hdt_ManipulatorCommandPanel_h
 
+// standard includes
 #include <atomic>
 #include <array>
 #include <map>
@@ -8,24 +9,28 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+
+// system includes
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
-#include <hdt_description/RobotModel.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
+#include <rcta_msgs/GraspObjectCommandAction.h>
+#include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <rviz/panel.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
+
+// project includes
+#include <hdt_description/RobotModel.h>
 #include <rcta/MoveArmCommandAction.h>
 #include <rcta/ViservoCommandAction.h>
-#include <rcta_msgs/GraspObjectCommandAction.h>
-#include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <rcta/TeleportAndaliteCommandAction.h>
 #include <rcta/TeleportHDTCommandAction.h>
 

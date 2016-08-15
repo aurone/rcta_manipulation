@@ -1,4 +1,6 @@
 #include "generic_xbox_pad.h"
+
+// project includes
 #include <config_block/config_block.h>
 
 namespace hdt

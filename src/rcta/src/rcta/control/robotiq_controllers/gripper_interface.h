@@ -1,8 +1,11 @@
 #ifndef GripperInterface_h
 #define GripperInterface_h
 
+// standard includes
 #include <chrono>
 #include <memory>
+
+// module includes
 #include "gripper_connection.h"
 #include "gripper_model.h"
 #include "gripper_status.h"

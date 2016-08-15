@@ -1,8 +1,11 @@
 #ifndef hdt_GenericXboxPad_h
 #define hdt_GenericXboxPad_h
 
+// standard includes
 #include <map>
 #include <string>
+
+// module includes
 #include "controller.h"
 
 namespace au

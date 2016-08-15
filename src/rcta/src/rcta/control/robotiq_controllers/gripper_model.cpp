@@ -1,5 +1,8 @@
+// standard includes
 #include <cmath>
 #include <limits>
+
+// module includes
 #include "gripper_model.h"
 
 const double GripperModel::GRIPPER_MIN_POS_M_ = 0.0;
@@ -117,7 +120,7 @@ static inline double clamp(double d, double min, double max)
     else if (d > max) {
         return max;
     }
-    else { 
+    else {
         return d;
     }
 }

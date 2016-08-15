@@ -1,9 +1,12 @@
 #ifndef hdt_TeleopNode_h
 #define hdt_TeleopNode_h
 
+// standard includes
 #include <functional>
 #include <map>
 #include <memory>
+
+// system includes
 #include <LinuxJoystick.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
@@ -28,7 +31,7 @@ public:
 
     enum RunResult
     {
-        SUCCESS = 0, 
+        SUCCESS = 0,
         FAILED_TO_INITIALIZE
     };
 

@@ -1,24 +1,29 @@
 #include "ManipulatorCommandPanel.h"
 
+// standard includes
 #include <cassert>
 #include <algorithm>
 #include <functional>
 #include <limits>
 #include <queue>
 #include <sstream>
+
+// system includes
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <sbpl_geometry_utils/interpolation.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <sensor_msgs/JointState.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/utils/utils.h>
 #include <std_msgs/ColorRGBA.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <geometric_shapes/shape_operations.h>
-#include <rcta/common/stringifier/stringifier.h>
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/utils/utils.h>
+
+// project includes
 #include <rcta/control/robotiq_controllers/gripper_model.h>
 
 namespace hdt
@@ -445,7 +450,7 @@ void ManipulatorCommandPanel::send_move_arm_command()
     // mounting frame -> eef = mounting_frame -> root * root -> eef
     const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
     tf::poseEigenToMsg(
-            root_to_mount_frame.inverse() * 
+            root_to_mount_frame.inverse() *
                     rs_->getGlobalLinkTransform("arm_7_gripper_lift_link"),
             move_arm_goal.goal_pose);
 

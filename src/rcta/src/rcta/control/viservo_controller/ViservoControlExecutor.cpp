@@ -1,19 +1,20 @@
 #include "ViservoControlExecutor.h"
 
+// standard includes
 #include <cassert>
 #include <cmath>
 #include <sstream>
 
+// system includes
 #include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/utils/RunUponDestruction.h>
+#include <spellbook/utils/utils.h>
 #include <urdf_parser/urdf_parser.h>
 #include <visualization_msgs/Marker.h>
-
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/utils/utils.h>
-#include <rcta/common/stringifier/stringifier.h>
-#include <rcta/common/utils/RunUponDestruction.h>
 
 typedef boost::shared_ptr<urdf::Link> LinkPtr;
 typedef boost::shared_ptr<const urdf::Link> LinkConstPtr;

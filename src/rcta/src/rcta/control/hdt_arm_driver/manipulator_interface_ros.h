@@ -1,8 +1,11 @@
 #ifndef hdt_ManipulatorInterfaceROS_h
 #define hdt_ManipulatorInterfaceROS_h
 
+// standard includes
 #include <string>
 #include <vector>
+
+// system includes
 #include <ManipulatorError.h>
 #include <ManipulatorParameters.h>
 #include <trajectory_msgs/JointTrajectory.h>

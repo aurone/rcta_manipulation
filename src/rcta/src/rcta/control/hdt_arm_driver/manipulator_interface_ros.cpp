@@ -1,6 +1,11 @@
+// standard includes
 #include <fstream>
 #include <ros/ros.h>
+
+// project includes
 #include <config_block/config_block.h>
+
+// module includes
 #include "manipulator_interface_ros.h"
 
 namespace hdt

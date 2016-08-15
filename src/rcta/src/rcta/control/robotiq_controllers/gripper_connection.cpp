@@ -1,9 +1,14 @@
+// standard includes
 #include <cerrno>
 #include <cstring>
 #include <iomanip>
 #include <sstream>
+
+// systemm includes
 #include <netinet/in.h>
 #include <sys/socket.h>
+
+// module includes
 #include "gripper_connection.h"
 
 GripperConnection::GripperConnection(const ConnectionOptions& options) :

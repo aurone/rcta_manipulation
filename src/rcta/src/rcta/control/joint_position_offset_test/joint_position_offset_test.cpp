@@ -1,10 +1,15 @@
+// standard includes
 #include <string>
+
+// system includes
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/stringifier/stringifier.h>
 #include <trajectory_msgs/JointTrajectory.h>
+
+// project includes
 #include <rcta/common/hdt_description/RobotModel.h>
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/stringifier/stringifier.h>
 
 sensor_msgs::JointState::ConstPtr last_msg;
 hdt::RobotModelPtr robot_model;

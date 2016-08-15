@@ -1,7 +1,10 @@
+// standard includes
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+
+// system includes
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -10,6 +13,7 @@
 #include <netdb.h>
 #include <unistd.h>
 
+// module includes
 #include "gripper_interface.h"
 #include "gripper_connection.h"
 #include "gripper_msgs.h"
@@ -78,7 +82,7 @@ int main(int argc, char *argv[])
 
     if (!default_conn->connected()) {
         fprintf(stderr, "Connection succeeded but gripper is not connected. Wtf?!?!\n");
-        return 2;   
+        return 2;
     }
 
     GripperInterface gripper(default_conn);

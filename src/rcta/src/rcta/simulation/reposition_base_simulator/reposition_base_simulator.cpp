@@ -1,13 +1,16 @@
+// standard includes
 #include <cmath>
 #include <memory>
+
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <sbpl_geometry_utils/utils.h>
-#include <rcta/common/utils/RunUponDestruction.h>
-#include <rcta_msgs/RepositionBaseCommandAction.h>
-#include <rcta/common/msg_utils/msg_utils.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/utils/RunUponDestruction.h>
 
 class RepositionBaseSimulator
 {

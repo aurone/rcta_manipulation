@@ -1,9 +1,12 @@
 #ifndef gripper_msgs_h
 #define gripper_msgs_h
 
+// standard includes
 #include <cstdint>
 #include <string>
 #include <vector>
+
+// module includes
 #include "gripper_status.h"
 
 inline uint8_t hi(uint16_t val)

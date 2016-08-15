@@ -1,5 +1,7 @@
+// standard includes
 #include <iostream>
 
+// module includes
 #include "gripper_simulator.h"
 #include "gripper_server.h"
 

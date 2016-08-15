@@ -1,10 +1,15 @@
 #ifndef GripperConnection_h
 #define GripperConnection_h
 
+// standard includes
 #include <cstdint>
 #include <string>
 #include <vector>
+
+// system includes
 #include <boost/asio.hpp>
+
+// module includes
 #include "gripper_msgs.h"
 
 class GripperConnection

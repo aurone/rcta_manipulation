@@ -1,10 +1,15 @@
 #ifndef GripperSimulator_h
 #define GripperSimulator_h
 
+// standard includes
 #include <cstdint>
 #include <chrono>
 #include <memory>
+
+// system includes
 #include <boost/asio.hpp>
+
+// module includes
 #include "gripper_server.h"
 #include "gripper_model.h"
 
@@ -19,7 +24,7 @@ public:
     void start();
     void update();
 
-    /// @brief Read 
+    /// @brief Read
     std::vector<uint8_t> read_registers(int offset, int num_registers) const;
     void write_registers(int offset, const std::vector<uint8_t>& data);
 

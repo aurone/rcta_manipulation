@@ -1,8 +1,11 @@
 add_library(world_model WorldModel.cpp)
-target_link_libraries(world_model ${catkin_LIBRARIES})
 
 add_executable(world_model_node WorldModelNode.cpp world_model_node.cpp)
-target_link_libraries(world_model_node world_model ${catkin_LIBRARIES})
+target_link_libraries(
+    world_model_node
+    ${actionlib_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    world_model)
 
 install(TARGETS world_model world_model_node
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

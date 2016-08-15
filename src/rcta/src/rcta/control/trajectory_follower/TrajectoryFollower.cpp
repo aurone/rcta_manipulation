@@ -1,12 +1,15 @@
 #include "TrajectoryFollower.h"
 
+// standard includes
 #include <algorithm>
+
+// system includes
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
-#include <rcta/common/utils/RunUponDestruction.h>
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/stringifier/stringifier.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/utils/RunUponDestruction.h>
 
 TrajectoryFollower::TrajectoryFollower() :
     nh_(),

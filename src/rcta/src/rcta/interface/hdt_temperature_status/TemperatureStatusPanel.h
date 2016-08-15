@@ -1,8 +1,11 @@
 #ifndef TemperatureStatusPanel_h
 #define TemperatureStatusPanel_h
 
+// system includes
 #include <ros/ros.h>
 #include <rviz/panel.h>
+
+// project includes
 #include <rcta/ControllerDiagnosticStatus.h>
 
 namespace Ui

@@ -1,5 +1,8 @@
+// standard includes
 #include <limits>
 #include <thread>
+
+// module includes
 #include "gripper_interface.h"
 
 GripperInterface::GripperInterface(const std::shared_ptr<GripperConnection>& conn, double throttle_rate) :

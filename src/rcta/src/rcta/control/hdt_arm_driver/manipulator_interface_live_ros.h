@@ -1,13 +1,20 @@
 #ifndef hdt_ManipulatorInterfaceLiveROS_h
 #define hdt_ManipulatorInterfaceLiveROS_h
 
+// standard includes
 #include <vector>
+
+// system includes
 #include <HDTManipulatorInterface.h>
 #include <ros/ros.h>
+
+// project includes
 #include <rcta/AcknowledgeReset.h>
 #include <rcta/ClearEmergencyStop.h>
 #include <rcta/EmergencyStop.h>
 #include <hdt_description/RobotModel.h>
+
+// module includes
 #include "manipulator_interface_ros.h"
 
 namespace hdt

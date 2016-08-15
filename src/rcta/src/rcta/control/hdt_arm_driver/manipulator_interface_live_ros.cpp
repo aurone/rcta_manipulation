@@ -1,13 +1,20 @@
+// standard includes
 #include <cmath>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <sstream>
+
+// system includes
 #include <RADMessages.h>
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 #include <sensor_msgs/JointState.h>
+
+// project includes
 #include <rcta/ControllerDiagnosticStatus.h>
 #include <rcta/JointState.h>
+
+// module includes
 #include "manipulator_interface_live_ros.h"
 
 template <typename T, typename S>

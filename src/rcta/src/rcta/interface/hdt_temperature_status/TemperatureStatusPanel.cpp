@@ -1,5 +1,9 @@
 #include "TemperatureStatusPanel.h"
+
+// system includes
 #include <qwt_thermo.h>
+
+// module includes
 #include "ui_TemperatureStatusPanelWidget.h"
 
 TemperatureStatusPanel::TemperatureStatusPanel(QWidget *parent) :

@@ -1,12 +1,19 @@
 #ifndef hdt_ManipulatorInterfaceSimROS_h
 #define hdt_ManipulatorInterfaceSimROS_h
 
+// standard includes
 #include <random>
 #include <string>
+
+// system includes
 #include <actionlib/server/simple_action_server.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
+
+// project includes
 #include <rcta/TeleportHDTCommandAction.h>
+
+// module includes
 #include "manipulator_interface_ros.h"
 
 namespace hdt

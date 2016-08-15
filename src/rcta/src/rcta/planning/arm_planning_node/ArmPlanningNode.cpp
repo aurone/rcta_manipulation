@@ -13,15 +13,15 @@
 #include <leatherman/print.h>
 #include <octomap_msgs/conversions.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/utils/utils.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <trajectory_msgs/JointTrajectory.h>
 
 // project includes
-#include <rcta/common/msg_utils/msg_utils.h>
 #include <rcta/common/hdt_description/RobotModel.h>
-#include <rcta/common/stringifier/stringifier.h>
-#include <rcta/common/utils/utils.h>
 
 namespace hdt {
 

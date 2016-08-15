@@ -1,8 +1,11 @@
 #ifndef WorldModel_h
 #define WorldModel_h
 
+// standard includes
 #include <string>
 #include <unordered_map>
+
+// system includes
 #include <moveit_msgs/CollisionObject.h>
 
 class WorldModel

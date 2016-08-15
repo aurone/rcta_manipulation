@@ -1,10 +1,13 @@
 #include "WorldSimulatorNode.h"
 
+// standard includes
 #include <map>
 #include <vector>
+
+// system includes
 #include <Eigen/Dense>
 #include <moveit_msgs/CollisionObject.h>
-#include <rcta/common/msg_utils/msg_utils.h>
+#include <spellbook/msg_utils/msg_utils.h>
 
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, EulerAngles& angles)
 {

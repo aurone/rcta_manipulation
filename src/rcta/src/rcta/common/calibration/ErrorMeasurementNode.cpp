@@ -1,8 +1,11 @@
 #include "ErrorMeasurementNode.h"
 
+// standard includes
 #include <cmath>
+
+// system includes
 #include <eigen_conversions/eigen_msg.h>
-#include <stringifier/stringifier.h>
+#include <spellbook/stringifier/stringifier.h>
 
 ErrorMeasurementNode::ErrorMeasurementNode() :
     nh_(),

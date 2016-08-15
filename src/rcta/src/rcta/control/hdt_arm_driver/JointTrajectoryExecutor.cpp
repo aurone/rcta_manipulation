@@ -31,8 +31,11 @@
 
 #include "JointTrajectoryExecutor.h"
 
+// standard includes
 #include <cmath>
-#include <rcta/common/stringifier/stringifier.h>
+
+// system includes
+#include <spellbook/stringifier/stringifier.h>
 
 namespace hdt
 {

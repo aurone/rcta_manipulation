@@ -1,18 +1,23 @@
 #ifndef LocalizationSimulator_h
 #define LocalizationSimulator_h
 
+// standard includes
 #include <cmath>
 #include <memory>
+
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/utils/RunUponDestruction.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
-#include <rcta/common/utils/RunUponDestruction.h>
+
+// project includes
 #include <rcta/TeleportAndaliteCommandAction.h>
-#include <rcta/common/msg_utils/msg_utils.h>
 
 class LocalizationSimulator
 {

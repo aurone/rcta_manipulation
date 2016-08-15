@@ -1,20 +1,27 @@
 #ifndef RetrieveObjectSimulator_h
 #define RetrieveObjectSimulator_h
 
+// standard includes
 #include <memory>
+
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
-#include <ros/ros.h>
 #include <rcta_msgs/GraspObjectCommandAction.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
-#include <nav_msgs/OccupancyGrid.h>
+#include <ros/ros.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/utils/RunUponDestruction.h>
+
+// project includes
 #include <rcta/TeleportAndaliteCommandAction.h>
 #include <rcta/TeleportHDTCommandAction.h>
-#include <rcta/common/msg_utils/msg_utils.h>
-#include <rcta/common/utils/RunUponDestruction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
+
+// module includes
 #include "CollisionModel2.h"
 
 namespace RetrieveObjectExecutionStatus

@@ -1,7 +1,12 @@
+// standard includes
 #include <sstream>
 #include <string>
 #include <ros/ros.h>
+
+// project includes
 #include <config_block/config_block.h>
+
+// module includes
 #include "controller.h"
 // #include "generic_xbox_pad.h"
 

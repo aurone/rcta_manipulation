@@ -1,11 +1,16 @@
+// standard includes
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <vector>
+
+// system includes
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
-#include <rcta/common/stringifier/stringifier.h>
+#include <spellbook/stringifier/stringifier.h>
+
+// module includes
 #include "HDTManipulator.h"
 
 enum MainResult

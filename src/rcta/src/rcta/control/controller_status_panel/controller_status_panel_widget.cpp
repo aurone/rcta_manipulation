@@ -1,10 +1,17 @@
+#include "controller_status_panel_widget.h"
+
+// standard includes
 #include <cassert>
 #include <functional>
+
+// system includes
 #include <boost/algorithm/string.hpp>
 #include <sbpl_geometry_utils/utils.h>
+
+// project includes
 #include <rcta/ClearEmergencyStop.h>
 #include <rcta/EmergencyStop.h>
-#include "controller_status_panel_widget.h"
+
 #include "ui_controller_status_panel_widget.h"
 
 namespace hdt

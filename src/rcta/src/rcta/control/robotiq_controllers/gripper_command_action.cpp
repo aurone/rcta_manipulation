@@ -1,6 +1,9 @@
+// system includes
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <sensor_msgs/JointState.h>
+
+// module includes
 #include "gripper_command_action.h"
 #include "gripper_interface.h"
 #include "gripper_connection.h"

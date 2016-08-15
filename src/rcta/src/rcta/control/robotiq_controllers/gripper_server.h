@@ -1,8 +1,11 @@
 #ifndef GripperServer_h
 #define GripperServer_h
 
+// standard includes
 #include <memory>
 #include <vector>
+
+// system includes
 #include <boost/asio.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
