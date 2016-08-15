@@ -31,6 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     octomap_msgs
     pluginlib
+    roman_client_ros_utils
     rosbag
     roscpp
     rospack
