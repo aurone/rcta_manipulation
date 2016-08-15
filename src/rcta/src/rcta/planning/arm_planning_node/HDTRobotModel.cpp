@@ -35,6 +35,11 @@ HDTRobotModel::~HDTRobotModel()
 {
 }
 
+void HDTRobotModel::setPlanningLink(const std::string& link_name)
+{
+    m_planning_link = link_name;
+}
+
 bool HDTRobotModel::init(const std::string& robot_description)
 {
     return (bool)(robot_model_ = hdt::RobotModel::LoadFromURDF(robot_description, true));

@@ -14,7 +14,10 @@
 namespace hdt {
 
 /// \brief Implements the RobotModel interface for use with sbpl planners
-class HDTRobotModel : public sbpl::manip::RobotModel
+class HDTRobotModel :
+    public virtual sbpl::manip::RobotModel,
+    public virtual sbpl::manip::ForwardKinematicsInterface,
+    public virtual sbpl::manip::InverseKinematicsInterface
 {
 public:
 
@@ -73,9 +76,9 @@ private:
 
     Eigen::Affine3d m_T_planning_kinematics;
 
+    std::string m_planning_link;
+
     // Privatizing these methods since the OpenRAVE IK is generated only for the 7th dof
-    using RobotModel::setPlanningJoints;
-    using RobotModel::setPlanningLink;
 
     // sorts the vector of ik solutions -- best ones should be at the end!
     struct iksortstruct
@@ -99,6 +102,8 @@ private:
     };
 
     void sortIKsolutions(std::vector<std::vector<double>>& solutions);
+
+    void setPlanningLink(const std::string& link_name);
 };
 
 inline
