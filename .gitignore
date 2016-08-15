@@ -2,6 +2,7 @@ src/*
 !src/hdt
 !src/andalite_description
 !src/roman_model
+!src/roman_client_ros_utils
 devel/*
 build/*
 install/*
