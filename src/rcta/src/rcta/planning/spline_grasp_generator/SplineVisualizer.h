@@ -1,15 +1,18 @@
 #ifndef SplineVisualizer_h
 #define SplineVisualizer_h
 
+// standard includes
 #include <cstdio>
 #include <string>
 #include <memory>
 #include <vector>
+
+// system includes
 #include <Eigen/Dense>
-#include <ros/ros.h>
 #include <geometry_msgs/Point.h>
+#include <ros/ros.h>
+#include <spellbook/geometry/nurb/NURB.h>
 #include <visualization_msgs/Marker.h>
-#include <rcta/common/geometry/nurb/NURB.h>
 
 class SplineVisualizer
 {

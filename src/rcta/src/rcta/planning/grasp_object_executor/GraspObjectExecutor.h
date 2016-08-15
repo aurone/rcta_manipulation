@@ -1,9 +1,12 @@
 #ifndef ObjectPickupExecutor_h
 #define ObjectPickupExecutor_h
 
+// standard includes
 #include <cstdint>
 #include <memory>
 #include <string>
+
+// system includes
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
@@ -13,12 +16,14 @@
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
 #include <spellbook/costmap_extruder/CostmapExtruder.h>
+#include <spellbook/geometry/nurb/NURB.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
 #include <rcta_msgs/GraspObjectCommandAction.h>
+
+// project includes
 #include <rcta/MoveArmCommandAction.h>
 #include <rcta/ViservoCommandAction.h>
-#include <rcta/common/geometry/nurb/NURB.h>
 #include <rcta/common/hdt_description/RobotModel.h>
 
 namespace GraspObjectExecutionStatus

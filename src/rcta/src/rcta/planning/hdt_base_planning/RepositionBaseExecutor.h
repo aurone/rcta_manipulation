@@ -1,31 +1,32 @@
 #ifndef RepositionBaseExecutor_h
 #define RepositionBaseExecutor_h
 
-
-#include <ros/ros.h>
+// standard includes
 #include <signal.h>
-#include <visualization_msgs/Marker.h>
-#include <tf/transform_datatypes.h>
-#include <stdlib.h>
 #include <sstream>
-#include <Eigen/Dense>
+#include <stdlib.h>
 
+// system includes
+#include <Eigen/Dense>
+#include <actionlib/client/simple_action_client.h>
+#include <actionlib/server/simple_action_server.h>
+#include <rcta_msgs/RepositionBaseCommandAction.h>
+#include <rcta_viz/hdt_viz.h>
+#include <ros/ros.h>
+#include <spellbook/geometry/nurb/NURB.h>
+#include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
+#include <visualization_msgs/Marker.h>
 
-#include <rcta_msgs/RepositionBaseCommandAction.h>
-#include <actionlib/server/simple_action_server.h>
-#include <actionlib/client/simple_action_client.h>
-#include <rcta/common/geometry/nurb/NURB.h>
-#include <tf/transform_listener.h>
+// project includes
 #include <rcta/common/hdt_description/RobotModel.h>
 #include <rcta/MoveArmCommandAction.h>
 
 //xytheta collision checking!
 #include "xytheta_collision_checker.h"
 
-//visualizations
-#include <rcta_viz/hdt_viz.h>
 
 namespace RepositionBaseCandidate
 {
@@ -192,7 +193,7 @@ private:
 	double wrapAngle(double ang);
 	bool computeRobPose(double objx, double objy, double objY,  double robx0, double roby0, double robY0,  std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 	bool bComputedRobPose_;
-	
+
 
 	ros::NodeHandle nh_;
 	nav_msgs::OccupancyGrid map_;
