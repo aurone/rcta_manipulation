@@ -17,5 +17,5 @@
                   -x $(arg start_x) -y $(arg start_y) -z $(arg start_z)
                   -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
 
-    <include file="$(find rcta)/launch/roman_control.launch"/>
+    <include file="$(find rcta)/launch/control/roman_control.launch"/>
 </launch>
