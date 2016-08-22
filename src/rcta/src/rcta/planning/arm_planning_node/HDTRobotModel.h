@@ -39,6 +39,11 @@ public:
     double velLimit(int jidx) const override;
     double accLimit(int jidx) const override;
 
+    /// \namem Reimplemented Public Functions from Extension
+    ///@{
+    virtual sbpl::manip::Extension* getExtension(size_t class_code) override;
+    ///@}
+
     bool checkJointLimits(
         const std::vector<double>& angles,
         bool verbose = false) override;

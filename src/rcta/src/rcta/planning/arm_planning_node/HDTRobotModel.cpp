@@ -75,6 +75,19 @@ double HDTRobotModel::accLimit(int jidx) const
     return 0.0;
 }
 
+sbpl::manip::Extension* HDTRobotModel::getExtension(size_t class_code)
+{
+    if (class_code == sbpl::manip::GetClassCode<sbpl::manip::RobotModel>() ||
+        class_code == sbpl::manip::GetClassCode<sbpl::manip::ForwardKinematicsInterface>() ||
+        class_code == sbpl::manip::GetClassCode<sbpl::manip::InverseKinematicsInterface>())
+    {
+        return this;
+    }
+    else {
+        return nullptr;
+    }
+}
+
 bool HDTRobotModel::checkJointLimits(
     const std::vector<double>& angles,
     bool verbose)

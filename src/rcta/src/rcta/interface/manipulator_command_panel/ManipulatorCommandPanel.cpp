@@ -12,8 +12,7 @@
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/TransformStamped.h>
-#include <sbpl_geometry_utils/interpolation.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <sbpl_geometry_utils/geometry.h>
 #include <sensor_msgs/JointState.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/msg_utils/msg_utils.h>

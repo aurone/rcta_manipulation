@@ -12,7 +12,7 @@
 #include <leatherman/utils.h>
 #include <leatherman/print.h>
 #include <octomap_msgs/conversions.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <sbpl_geometry_utils/geometry.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/utils.h>
