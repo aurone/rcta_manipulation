@@ -16,6 +16,18 @@
         <arg name="load_robot_description" value="true"/>
     </include>
 
+    <param name="collision_detector" value="collision_detection/CollisionPluginSBPL"/>
+    <rosparam command="load" file="$(find rcta)/config/common/roman/collision_model.yaml"/>
+    <rosparam param="world_collision_model">
+        size_x: 3.0
+        size_y: 3.0
+        size_z: 2.0
+        origin_x: -1.0
+        origin_y: -2.0
+        origin_z: 0.0
+        res_m: 0.02
+    </rosparam>
+
     <!-- Planning Functionality -->
     <include ns="move_group" file="$(find rcta)/config/moveit/roman/planning_pipeline.launch.xml">
         <arg name="pipeline" value="sbpl"/>

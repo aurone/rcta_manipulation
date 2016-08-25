@@ -1,0 +1,100 @@
+robot_collision_model:
+  voxels_models:
+    - link_name: talon
+    - link_name: torso_link0
+    - link_name: chest
+
+    # links with trivial or no geometry (stated here for reference)
+    - link_name: base_footprint
+    - link_name: base_link
+    - link_name: track_left
+    - link_name: track_right
+
+  spheres_models:
+    - link_name: limb_left_link0
+      spheres:
+        - { name: ll0s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link1
+      spheres:
+        - { name: ll1s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link2
+      spheres:
+        - { name: ll2s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link3
+      spheres:
+        - { name: ll3s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link4
+      spheres:
+        - { name: ll4s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link5
+      spheres:
+        - { name: ll5s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link6
+      spheres:
+        - { name: ll6s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_left_link7
+      spheres:
+        - { name: ll7s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+#    - link_name: limb_right_link0
+#      spheres:
+#        - { name: lr0s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+    - link_name: limb_right_link1
+      spheres:
+        - { name: lr1s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
+        - { name: lr1s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.06 }
+    - link_name: limb_right_link2
+      spheres:
+        - { name: lr2s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.06 }
+        - { name: lr2s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr2s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr2s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr2s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr2s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.06 }
+    - link_name: limb_right_link3
+      spheres:
+        - { name: lr3s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
+        - { name: lr3s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.06 }
+    - link_name: limb_right_link4
+      spheres:
+        - { name: lr4s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.06 }
+        - { name: lr4s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr4s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr4s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr4s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr4s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.06 }
+    - link_name: limb_right_link5
+      spheres:
+        - { name: lr5s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
+        - { name: lr5s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.06 }
+    - link_name: limb_right_link6
+      spheres:
+        - { name: lr6s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.06 }
+        - { name: lr6s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr6s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr6s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr6s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr6s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.06 }
+    - link_name: limb_right_link7
+      spheres:
+        - { name: lr7s0, x: 0.09, y: 0.0, z: 0.0, radius: 0.10 }
+  collision_groups:
+    - name: left_arm
+      links:
+        - name: limb_left_link0
+        - name: limb_left_link1
+        - name: limb_left_link2
+        - name: limb_left_link3
+        - name: limb_left_link4
+        - name: limb_left_link5
+        - name: limb_left_link6
+        - name: limb_left_link7
+    - name: right_arm
+      links:
+        - name: limb_right_link0
+        - name: limb_right_link1
+        - name: limb_right_link2
+        - name: limb_right_link3
+        - name: limb_right_link4
+        - name: limb_right_link5
+        - name: limb_right_link6
+        - name: limb_right_link7
