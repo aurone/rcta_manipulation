@@ -3,6 +3,7 @@ src/*
 !src/andalite_description
 !src/roman_model
 !src/roman_client_ros_utils
+!src/rcta
 devel/*
 build/*
 install/*
