@@ -143,7 +143,7 @@ private:
     FollowJointTrajectoryActionServer::Feedback m_feedback;
     FollowJointTrajectoryActionServer::Result m_result;
 
-    roman_client_ros_utils::RomanState m_state;
+    roman_client_ros_utils::RomanState::ConstPtr m_state;
 
     std::map<std::string, int> m_joint_name_to_spec_index;
 
