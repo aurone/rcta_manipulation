@@ -7,3 +7,4 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_LIBRARIES})
+add_dependencies(localization_simulator ${${PROJECT_NAME}_EXPORTED_TARGETS})
