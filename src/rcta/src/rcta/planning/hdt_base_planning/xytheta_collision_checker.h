@@ -18,10 +18,10 @@ class XYThetaCollisionChecker
 public:
 
     XYThetaCollisionChecker(
-            const std::vector<sbpl_2Dpt_t> &footprint_polygon,
-            int obs_thresh,
-            int num_heading_disc=16);
-    
+        const std::vector<sbpl_2Dpt_t> &footprint_polygon,
+        int obs_thresh,
+        int num_heading_disc = 16);
+
     ~XYThetaCollisionChecker();
 
     void UpdateOccupancyGrid(nav_msgs::OccupancyGrid new_occ_grid);
@@ -41,14 +41,17 @@ private:
     int num_heading_disc_;
     int obs_thresh_;
 
-    std::vector< std::vector<sbpl_2Dcell_t> > precomputed_footprint_cells; //indexed by discrete heading value
+    std::vector<std::vector<sbpl_2Dcell_t> > precomputed_footprint_cells; //indexed by discrete heading value
     bool footprints_initialized_;
 
     bool reinit();
 
     bool PreComputeFootprints();
 
-    bool CalculateFootprintForPose(EnvNAVXYTHETALAT3Dpt_t pose, std::vector<sbpl_2Dcell_t> &footprint_cells, const std::vector<sbpl_2Dpt_t>& FootprintPolygon);
+    bool CalculateFootprintForPose(
+        EnvNAVXYTHETALAT3Dpt_t pose,
+        std::vector<sbpl_2Dcell_t> &footprint_cells,
+        const std::vector<sbpl_2Dpt_t>& FootprintPolygon);
 
     bool IsValidCell(int x, int y);
     double getCellColllisionProbability(int x, int y);
