@@ -1,11 +1,11 @@
 add_executable(
-    hdt_base_planning_node
+    reposition_planner_node
     hdt_base_planning.cpp
     RepositionBaseExecutor.cpp
     xytheta_collision_checker.cpp)
 
 target_link_libraries(
-    hdt_base_planning_node
+    reposition_planner_node
     ${actionlib_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
@@ -22,5 +22,5 @@ target_link_libraries(
     robotiq_common)
 
 add_dependencies(
-    hdt_base_planning_node
+    reposition_planner_node
     ${PROJECT_NAME}_generate_messages_cpp)

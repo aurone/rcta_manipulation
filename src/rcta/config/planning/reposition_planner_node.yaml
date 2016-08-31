@@ -1,0 +1,2 @@
+max_grasp_candidates: 100
+manipulator_group_name: right_arm

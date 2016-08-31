@@ -1,8 +1,8 @@
 <launch>
-    <node name="reposition_base_command" pkg="hdt" type="hdt_base_planning_node" output="screen"> 
-    <!--node name="reposition_base_command" pkg="hdt" type="hdt_base_planning_node" output="log" launch-prefix="gdb ex - -args" -->
-        <rosparam command="load" file="$(find rcta)/config/gas_canister_v2.yaml"/>
-        <rosparam command="load" file="$(find rcta)/config/grasp_object_executor.yaml"/>
-		<param name="max_grasp_candidates" value="100"/>
+    <include file="$(find rcta)/launch/moveit/roman/planning_context.launch"/>
+    <node name="reposition_planner_node" pkg="rcta" type="reposition_planner_node" output="screen">
+        <rosparam command="load" file="$(find rcta)/config/planning/gas_canister_v2.yaml"/>
+        <rosparam command="load" file="$(find rcta)/config/planning/grasp_object_executor.yaml"/>
+        <rosparam command="load" file="$(find rcta)/config/planning/reposition_planner_node.yaml"/>
 	</node>
 </launch>

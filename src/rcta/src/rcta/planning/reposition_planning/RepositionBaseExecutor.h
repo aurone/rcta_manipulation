@@ -12,6 +12,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
 #include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_state/robot_state.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
@@ -108,17 +109,15 @@ private:
     moveit::core::JointModelGroup* manipulator_group_;
     std::string manipulator_group_name_;
 
+    moveit::core::RobotStatePtr robot_state_;
+
     std::string robot_frame_;
-    std::string kinematics_frame_;
     std::string camera_view_frame_;
 
     //visualizations
-//    HDTViz viz;
 
     //xytheta collision checking
     std::unique_ptr<XYThetaCollisionChecker> cc_;
-
-    Eigen::Affine3d T_robot_to_kinematics;
 
     std::vector<AttachedMarker> attached_markers_;
 
@@ -184,9 +183,14 @@ private:
         const Eigen::Affine3d& robot_to_object,
         int num_candidates) const;
 
-    void filter_grasp_candidates(
+    void filterGraspCandidates(
         std::vector<GraspCandidate>& candidates,
-        const Eigen::Affine3d& T_kinematics_robot,
+        const Eigen::Affine3d& T_camera_robot,
+        double marker_incident_angle_threshold_rad) const;
+
+    void filterGraspCandidatesIK(std::vector<GraspCandidate>& candidates) const;
+    void filterGraspCandidatesVisibility(
+        std::vector<GraspCandidate>& candidates,
         const Eigen::Affine3d& T_camera_robot,
         double marker_incident_angle_threshold_rad) const;
 
@@ -195,42 +199,17 @@ private:
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
         const rcta::MoveArmCommandResult::ConstPtr& result);
-    void visualize_grasp_candidates(
+    void visualizeGraspCandidates(
         const std::vector<GraspCandidate>& grasps,
         Eigen::Affine3d T_robot_to_map,
         std::string ns) const;
 
     template <typename ActionType>
-    bool wait_for_action_server(
+    bool waitForActionServer(
         std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& action_client,
         const std::string& action_name,
         const ros::Duration& poll_duration,
-        const ros::Duration& timeout)
-    {
-        ROS_INFO("Waiting for action server '%s'", action_name.c_str());
-        if (!action_client) {
-            ROS_WARN("Action client is null");
-            return false;
-        }
-        ros::Time start = ros::Time::now();
-        while (timeout == ros::Duration(0) || ros::Time::now() < start + timeout) {
-            ros::spinOnce();
-            if (!action_client->isServerConnected()) {
-                action_client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
-                if (!action_client) {
-                    ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
-                    return false;
-                }
-            }
-            if (action_client->isServerConnected()) {
-                return true;
-            }
-            poll_duration.sleep();
-            ROS_INFO("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(),
-                    action_name.c_str());
-        }
-        return false;
-    }
+        const ros::Duration& timeout);
 
     bool computeRobPose(
         const Eigen::Affine3d& robot_pose,
@@ -240,12 +219,12 @@ private:
     void goal_callback();
     void preempt_callback();
 
-    uint8_t execution_status_to_feedback_status(RepositionBaseExecutionStatus::Status status);
+    uint8_t execution_status_to_feedback_status(
+        RepositionBaseExecutionStatus::Status status);
 
-    int checkIK(const geometry_msgs::PoseStamped& gas_can_pose, const geometry_msgs::PoseStamped& candidate_base_pose);
-    int checkPLAN(
-        const geometry_msgs::PoseStamped& gas_can_pose,
-        const geometry_msgs::PoseStamped& candidate_base_pose);
+    int checkIK(
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& object_pose);
     bool computeRobPoseExhaustive(
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose,

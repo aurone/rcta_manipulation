@@ -36,17 +36,14 @@ double sign(double val)
 }
 
 RepositionBaseExecutor::RepositionBaseExecutor() :
-//    viz(),
     nh_(),
     ph_("~"),
     robot_model_(),
     manipulator_group_(nullptr),
     manipulator_group_name_(),
     robot_frame_(),
-    kinematics_frame_(),
     camera_view_frame_(),
     cc_(),
-    T_robot_to_kinematics(Eigen::Affine3d::Identity()),
     attached_markers_(),
     gas_can_mesh_path_(),
     gas_can_scale_(),
@@ -94,7 +91,6 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
 bool RepositionBaseExecutor::initialize()
 {
     robot_frame_ = "base_footprint";
-    kinematics_frame_ = "arm_mount_panel_dummy";
     camera_view_frame_ = "camera_rgb_optical_frame";
 
     robot_model_loader::RobotModelLoader rml;
@@ -103,6 +99,8 @@ bool RepositionBaseExecutor::initialize()
         ROS_ERROR("Failed to load robot model");
         return false;
     }
+
+    robot_state_.reset(new moveit::core::RobotState(robot_model_));
 
     if (!msg_utils::download_param(ph_, "manipulator_group_name", manipulator_group_name_)) {
         return false;
@@ -149,20 +147,6 @@ bool RepositionBaseExecutor::initialize()
     ROS_INFO("Action server started");
 
     ros::spinOnce();
-
-    ROS_INFO("Looking up static transform from /base_footprint to kinematics frame (arm_mount_panel_dummy)");
-    tf::StampedTransform tf_robot_to_kinematics_transform;
-    try {
-        ROS_INFO("Waiting for transform!");
-        listener_.waitForTransform(robot_frame_, kinematics_frame_, ros::Time(0), ros::Duration(10.0));
-        listener_.lookupTransform(robot_frame_, kinematics_frame_, ros::Time(0), tf_robot_to_kinematics_transform);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_WARN("Failed to lookup transform from %s to %s frame! (%s)", robot_frame_.c_str(), kinematics_frame_.c_str(), ex.what());
-        return false;
-    }
-
-    msg_utils::convert(tf_robot_to_kinematics_transform, T_robot_to_kinematics);
 
     if (!download_marker_params()) {
         ROS_WARN("Failed to download marker params");
@@ -1736,25 +1720,10 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 // 					}
 
         // check for inverse kinematics and arm planning (if object is in reachable range and within angle of view)
-        for (int i = 0; i < nDist; i++)
-            for (int j = 0; j < nAng; j++)
-                for (int k = 0; k < nYaw; k++)
+        for (int i = 0; i < nDist; i++) {
+            for (int j = 0; j < nAng; j++) {
+                for (int k = 0; k < nYaw; k++) {
                     if (bTotMax[i][j][k] == true) {
-// 						geometry_msgs::PoseStamped gas_can_pose;
-// 						gas_can_pose.header.frame_id = "/abs_nwu";
-// 						gas_can_pose.header.seq = 0;
-// 						gas_can_pose.header.stamp = ros::Time::now();
-//
-// 						gas_can_pose.pose.position.x = objx;
-// 						gas_can_pose.pose.position.y = objy;
-// 						gas_can_pose.pose.position.z = 0.0;
-//
-// 						tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY+M_PI/2.0);
-// 						gas_can_pose.pose.orientation.x = objq[0];
-// 						gas_can_pose.pose.orientation.y = objq[1];
-// 						gas_can_pose.pose.orientation.z = objq[2];
-// 						gas_can_pose.pose.orientation.w = objq[3];
-
                         geometry_msgs::PoseStamped candidate_base_pose;
                         candidate_base_pose.header.frame_id = "/abs_nwu";
                         candidate_base_pose.header.seq = 0;
@@ -1773,9 +1742,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                         candidate_base_pose.pose.orientation.z = robqf[2];
                         candidate_base_pose.pose.orientation.w = robqf[3];
 
-// 						int retIKPLAN = checkIK(gas_can_pose, candidate_base_pose);	// -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
-                        int retIKPLAN = checkIK(current_goal_->gas_can_in_map, candidate_base_pose); // -4,-3,-2: inverse kinematics failed, -1,0: arm planning failed, +1: possible to grasp
-                        //std::cerr << "retIKPLAN: " << retIKPLAN << std::endl;
+                        int retIKPLAN = checkIK(robot_pose, object_pose);
                         if (retIKPLAN != 1) {
                             //checkIK failed!
                             // /top_shelf pose
@@ -1796,6 +1763,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                             //checkIK success!
                         }
                     }
+                }
+            }
+        }
     }
 
     // 4) total probability
@@ -2148,22 +2118,6 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
             int i = m->i;
             int j = m->j;
             int k = m->k;
-            /*
-             geometry_msgs::PoseStamped gas_can_pose;
-             gas_can_pose.header.frame_id = "/abs_nwu";
-             gas_can_pose.header.seq = 0;
-             gas_can_pose.header.stamp = ros::Time::now();
-
-             gas_can_pose.pose.position.x = objx;
-             gas_can_pose.pose.position.y = objy;
-             gas_can_pose.pose.position.z = 0.0;
-
-             tf::Quaternion objq = tf::createQuaternionFromRPY(0.0,0.0,objY+M_PI/2.0);
-             gas_can_pose.pose.orientation.x = objq[0];
-             gas_can_pose.pose.orientation.y = objq[1];
-             gas_can_pose.pose.orientation.z = objq[2];
-             gas_can_pose.pose.orientation.w = objq[3];
-             */
             geometry_msgs::PoseStamped candidate_base_pose;
             candidate_base_pose.header.frame_id = "/abs_nwu";
             candidate_base_pose.header.seq = 0;
@@ -2193,7 +2147,6 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                 cntCheckPLAN++;
             }
         }
-// 		printf("Number of rejection: %d/%d\n",cntCheckPLANreject,cntCheckPLANMax);
         printf("Number of rejection until finding %d feasible candidates: %d\n", cntCheckPLANMax, cntCheckPLANreject);
 
         // 6-2) generate final desired robot poses with maximum pTot
@@ -2277,78 +2230,104 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
     return true;
 }
 
-////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////
-
-void RepositionBaseExecutor::filter_grasp_candidates(
+/// \brief Filter grasp candidates by kinematics and visibility
+void RepositionBaseExecutor::filterGraspCandidates(
     std::vector<GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_kinematics_robot,
+    const Eigen::Affine3d& T_camera_robot,
+    double marker_incident_angle_threshold_rad) const
+{
+    filterGraspCandidatesIK(candidates);
+    filterGraspCandidatesVisibility(candidates, T_camera_robot, marker_incident_angle_threshold_rad);
+}
+
+void RepositionBaseExecutor::filterGraspCandidatesIK(
+    std::vector<GraspCandidate>& candidates) const
+{
+    std::vector<GraspCandidate> filtered_candidates;
+    filtered_candidates.reserve(candidates.size());
+
+    int num_not_reachable = 0;
+    for (const GraspCandidate& grasp_candidate : candidates) {
+        // check for an ik solution to this grasp pose
+        moveit::core::RobotState robot_state(robot_model_);
+        robot_state.setToDefaultValues();
+        bool check_ik = robot_state.setFromIK(manipulator_group_, grasp_candidate.grasp_candidate_transform);
+        std::vector<double> sol;
+        if (check_ik) {
+            robot_state.copyJointGroupPositions(manipulator_group_, sol);
+        }
+
+        if (!check_ik) {
+            ++num_not_reachable;
+        }
+
+        if (check_ik) {
+            GraspCandidate reachable_grasp_candidate(
+                    grasp_candidate.grasp_candidate_transform,
+                    grasp_candidate.T_object_grasp,
+                    grasp_candidate.u);
+            filtered_candidates.push_back(reachable_grasp_candidate);
+
+            ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
+            ROS_INFO("IK sol: %s", to_string(sol).c_str());
+        }
+    }
+
+    ROS_INFO("%d of %zd grasps not reachable", num_not_reachable, candidates.size());
+    std::swap(filtered_candidates, candidates);
+}
+
+void RepositionBaseExecutor::filterGraspCandidatesVisibility(
+    std::vector<GraspCandidate>& candidates,
     const Eigen::Affine3d& T_camera_robot,
     double marker_incident_angle_threshold_rad) const
 {
     std::vector<GraspCandidate> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
-    int num_not_reachable = 0;
     int num_not_visible = 0;
-    int i = 0;
     for (const GraspCandidate& grasp_candidate : candidates) {
-        //ROS_INFO("Checking Grasp Candidate %d", i++);
-
-        // check for an ik solution to this grasp pose
-        Eigen::Affine3d T_kinematics_grasp = T_kinematics_robot * grasp_candidate.grasp_candidate_transform;
-
-        moveit::core::RobotState robot_state(robot_model_);
-        robot_state.setToDefaultValues();
-        bool check_ik = robot_state.setFromIK(manipulator_group_, T_kinematics_grasp);
-        std::vector<double> sol;
-        if (check_ik) {
-            robot_state.copyJointGroupPositions(manipulator_group_, sol);
-        }
-
         // check for visibility of the ar marker to this grasp pose
         Eigen::Affine3d T_camera_marker = // assume link == wrist
-                T_camera_robot * grasp_candidate.grasp_candidate_transform * attached_markers_[0].link_to_marker;
+                T_camera_robot *
+                grasp_candidate.grasp_candidate_transform *
+                attached_markers_[0].link_to_marker;
 
-        //ROS_INFO("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
-        Eigen::Vector3d camera_view_axis(0.0, 0.0, -1.0); // negated
+        ROS_DEBUG("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
+        Eigen::Vector3d camera_view_axis = -Eigen::Vector3d::UnitZ();
         Eigen::Vector3d marker_plane_normal;
         marker_plane_normal.x() = T_camera_marker(0, 2);
         marker_plane_normal.y() = T_camera_marker(1, 2);
         marker_plane_normal.z() = T_camera_marker(2, 2);
 
-        //ROS_INFO("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
+        ROS_DEBUG("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
 
         double dp = marker_plane_normal.dot(camera_view_axis);
-        //ROS_INFO("  Marker Normal * Camera View Axis: %0.3f", dp);
+        ROS_DEBUG("  Marker Normal * Camera View Axis: %0.3f", dp);
 
-        double angle = acos(dp); // the optimal situation is when the camera is facing the marker directly
-        //ROS_INFO("  Angle: %0.3f", angle);
+        // the optimal situation is when the camera is facing the marker
+        // directly and this angle is 0
+        double angle = acos(dp);
+        ROS_DEBUG("  Angle: %0.3f", angle);
 
         bool check_visibility = angle < marker_incident_angle_threshold_rad;
 
-        if (!check_ik) {
-            ++num_not_reachable;
-        }
         if (!check_visibility) {
             ++num_not_visible;
         }
 
-        // camera -> robot * robot -> wrist * wrist -> marker = camera -> marker
-        if (check_ik && check_visibility) {
-            GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.T_object_grasp,
+        if (check_visibility) {
+            GraspCandidate reachable_grasp_candidate(
+                    grasp_candidate.grasp_candidate_transform,
+                    grasp_candidate.T_object_grasp,
                     grasp_candidate.u);
             filtered_candidates.push_back(reachable_grasp_candidate);
 
-            ROS_INFO("Grasp pose ori: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
-            ROS_INFO("Grasp pose in kinematics: %s", to_string(T_kinematics_grasp).c_str());
-            ROS_INFO("IK sol: %s", to_string(sol).c_str());
+            ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
         }
     }
 
-    ROS_INFO("%d of %zd grasps not reachable", num_not_reachable, candidates.size());
     ROS_INFO("%d of %zd grasps not visible", num_not_visible, candidates.size());
-
     std::swap(filtered_candidates, candidates);
 }
 
@@ -2362,29 +2341,20 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose)
 {
-    Eigen::Affine3d robot_to_object = robot_pose.inverse() * object_pose;
+    Eigen::Affine3d T_robot_object = robot_pose.inverse() * object_pose;
 
     // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
     int max_num_candidates = 100;
-    std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(robot_to_object, max_num_candidates);
+    std::vector<GraspCandidate> grasp_candidates =
+            sample_grasp_candidates(T_robot_object, max_num_candidates);
     ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
 
-    visualize_grasp_candidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN");
+    visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN");
 
-    // mount -> wrist = mount -> robot * robot -> wrist
-
-    tf::StampedTransform tf_transform;
-    tf::StampedTransform T_robot_camera_tf;
-    listener_.lookupTransform(robot_frame_, kinematics_frame_, ros::Time(0), tf_transform);
-    listener_.lookupTransform(robot_frame_, camera_view_frame_, ros::Time(0), T_robot_camera_tf);
-
-    Eigen::Affine3d robot_to_kinematics;
-    Eigen::Affine3d robot_to_camera;
-    msg_utils::convert(tf_transform, robot_to_kinematics);
-    msg_utils::convert(T_robot_camera_tf, robot_to_camera);
+    Eigen::Affine3d T_robot_camera = robot_state_->getGlobalLinkTransform(camera_view_frame_);
 
     // filter unreachable grasp candidates that we know we can't grasp
-    filter_grasp_candidates(grasp_candidates, robot_to_kinematics.inverse(), robot_to_camera.inverse(), sbpl::utils::ToRadians(45.0));
+    filterGraspCandidates(grasp_candidates, T_robot_camera.inverse(), sbpl::utils::ToRadians(45.0));
 
     ROS_INFO("Produced %zd reachable grasp poses", grasp_candidates.size());
 
@@ -2393,7 +2363,7 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
         return grasp_candidates;
     }
 
-    visualize_grasp_candidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN_filtered");
+    visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN_filtered");
 
     const double min_u = 0.0;
     const double max_u = 1.0;
@@ -2523,7 +2493,7 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 
     // wait for move arm action to come up
     ROS_WARN("wait for action '%s' to come up", move_arm_command_action_name_.c_str());
-    if (!wait_for_action_server(move_arm_command_client_, move_arm_command_action_name_, ros::Duration(0.1), ros::Duration(5.0))) {
+    if (!waitForActionServer(move_arm_command_client_, move_arm_command_action_name_, ros::Duration(0.1), ros::Duration(5.0))) {
         ROS_WARN("failed to connect to '%s' action server", move_arm_command_action_name_.c_str());
         return 3;
     }
@@ -2552,76 +2522,12 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 }
 
 int RepositionBaseExecutor::checkIK(
-    const geometry_msgs::PoseStamped& gas_can_pose,
-    const geometry_msgs::PoseStamped& candidate_base_pose)
+    const Eigen::Affine3d& robot_pose,
+    const Eigen::Affine3d& object_pose)
 {
     ROS_INFO("checkIK!");
-    if (!generated_grasps_) {
-        Eigen::Affine3d base_link_in_map;
-        Eigen::Affine3d gas_can_in_map;
-        tf::poseMsgToEigen(gas_can_pose.pose, gas_can_in_map);
-        tf::poseMsgToEigen(candidate_base_pose.pose, base_link_in_map);
-        Eigen::Affine3d base_link_to_gas_canister = base_link_in_map.inverse() * gas_can_in_map;
-
-        // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
-        int max_num_candidates = 100;
-        std::vector<GraspCandidate> grasp_candidates = sample_grasp_candidates(base_link_to_gas_canister,
-                max_num_candidates);
-        ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
-
-        // mount -> wrist = mount -> robot * robot -> wrist
-        visualize_grasp_candidates(grasp_candidates, base_link_in_map, "grasp_candidates_checkIK");
-
-        tf::StampedTransform tf_transform;
-        tf::StampedTransform T_robot_camera_tf;
-        try {
-            listener_.lookupTransform(robot_frame_, kinematics_frame_, ros::Time(0), tf_transform);
-            listener_.lookupTransform(robot_frame_, camera_view_frame_, ros::Time(0), T_robot_camera_tf);
-        }
-        catch (const tf::TransformException& ex) {
-            ROS_WARN("failed to lookup transform '%s' -> '%s'; unable to determine reachability", robot_frame_.c_str(), kinematics_frame_.c_str());
-            return -4;
-        }
-
-        Eigen::Affine3d robot_to_kinematics;
-        Eigen::Affine3d robot_to_camera;
-        msg_utils::convert(tf_transform, robot_to_kinematics);
-        msg_utils::convert(T_robot_camera_tf, robot_to_camera);
-
-        // filter unreachable grasp candidates that we know we can't grasp
-        std::swap(grasp_candidates, grasp_candidates);
-        filter_grasp_candidates(grasp_candidates, robot_to_kinematics.inverse(), robot_to_camera.inverse(),
-                sbpl::utils::ToRadians(45.0));
-
-        ROS_INFO("Produced %zd reachable grasp poses", grasp_candidates.size());
-
-        if (grasp_candidates.empty()) {
-            ROS_WARN("No reachable grasp candidates available");
-            return -3;
-        }
-
-        visualize_grasp_candidates(grasp_candidates, base_link_in_map, "grasp_candidates_checkIK_filtered");
-
-        const double min_u = 0.0;
-        const double max_u = 1.0;
-
-        // 3. sort grasp candidates by desirability (note: more desirable grasps are at the end of the vector)
-        std::sort(grasp_candidates.begin(), grasp_candidates.end(),
-                [&](const GraspCandidate& a, const GraspCandidate& b) -> bool
-                {
-                    double mid_u = 0.5 * (min_u + max_u);
-                    return fabs(a.u - mid_u) < fabs(b.u - mid_u);
-                });
-
-        // limit the number of grasp attempts by the configured amount
-        grasp_candidates.resize(max_grasp_candidates_);
-
-        ROS_INFO("Attempting %zd grasps", grasp_candidates.size());
-
-        generated_grasps_ = true;
-    }
-
-    return 1;	// success
+    auto candidates = generateFilteredGraspCandidates(robot_pose, object_pose);
+    return !candidates.empty();
 }
 
 int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
@@ -2634,7 +2540,13 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
     return checkFeasibleMoveToPregraspTrajectory(T_world_robot, T_world_object);
 }
 
-std::vector<RepositionBaseExecutor::GraspCandidate> RepositionBaseExecutor::sample_grasp_candidates(
+/// \brief Sample a set of candidate grasp poses
+///
+/// Grasp candidates are defined as pregrasp poses for the "wrist" of the robot.
+/// The pregrasp is offset from the grasp pose by the configured fixed offset.
+/// The resulting pregrasp samples are specified in the robot frame.
+std::vector<RepositionBaseExecutor::GraspCandidate>
+RepositionBaseExecutor::sample_grasp_candidates(
     const Eigen::Affine3d& robot_to_object,
     int num_candidates) const
 {
@@ -2666,28 +2578,38 @@ std::vector<RepositionBaseExecutor::GraspCandidate> RepositionBaseExecutor::samp
         Eigen::Vector3d object_pos_robot_frame(robot_to_object.translation());
 
         Eigen::Vector3d sample_spline_point = (*grasp_spline_)(u);
-        ROS_DEBUG("    Sample Spline Point [canister frame]: %s", to_string(sample_spline_point).c_str());
         Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
+
+        ROS_DEBUG("    Sample Spline Point [canister frame]: %s", to_string(sample_spline_point).c_str());
         ROS_DEBUG("    Sample Spline Deriv [canister frame]: %s", to_string(sample_spline_deriv).c_str());
 
-        Eigen::Affine3d mark_to_menglong(Eigen::Affine3d::Identity());
-        Eigen::Vector3d sample_spline_point_robot_frame = robot_to_object * mark_to_menglong
-                * Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * sample_spline_point;
-        ROS_DEBUG("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
+        Eigen::Vector3d sample_spline_point_robot_frame =
+                robot_to_object *
+                Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) *
+                sample_spline_point;
 
-        Eigen::Vector3d sample_spline_deriv_robot_frame = robot_to_object.rotation() * sample_spline_deriv.normalized();
+        Eigen::Vector3d sample_spline_deriv_robot_frame =
+                robot_to_object.rotation() *
+                sample_spline_deriv.normalized();
+
+        ROS_DEBUG("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
         ROS_DEBUG("    Sample Spline Deriv [robot frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
 
         // compute the normal to the grasp spline that most points "up" in the robot frame
         Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
-        Eigen::Vector3d up_grasp_dir = up_bias
-                - up_bias.dot(sample_spline_deriv_robot_frame) * sample_spline_deriv_robot_frame;
+        Eigen::Vector3d up_grasp_dir =
+                up_bias -
+                        up_bias.dot(sample_spline_deriv_robot_frame) *
+                        sample_spline_deriv_robot_frame;
         up_grasp_dir.normalize();
         up_grasp_dir *= -1.0;
 
+        // compute the normal to the grasp spline that most points "down" in the robot frame
         Eigen::Vector3d down_bias(-Eigen::Vector3d::UnitZ());
-        Eigen::Vector3d down_grasp_dir = down_bias
-                - down_bias.dot(sample_spline_deriv_robot_frame) * sample_spline_deriv_robot_frame;
+        Eigen::Vector3d down_grasp_dir =
+                down_bias -
+                        down_bias.dot(sample_spline_deriv_robot_frame) *
+                        sample_spline_deriv_robot_frame;
         down_grasp_dir.normalize();
         down_grasp_dir *= -1.0;
 
@@ -2719,12 +2641,18 @@ std::vector<RepositionBaseExecutor::GraspCandidate> RepositionBaseExecutor::samp
         grasp_rotation_matrix(2, 2) = grasp_candidate_dir_z.z();
 
         // robot_frame -> candidate tool frame pose
-        Eigen::Affine3d grasp_candidate_rotation = Eigen::Translation3d(sample_spline_point_robot_frame)
-                * grasp_rotation_matrix;
+        Eigen::Affine3d grasp_candidate_rotation =
+                Eigen::Translation3d(sample_spline_point_robot_frame) *
+                grasp_rotation_matrix;
 
-        // robot -> grasp candidate (desired tool) * tool -> wrist * wrist (grasp) -> pregrasp = robot -> wrist
-        Eigen::Affine3d candidate_wrist_transform = grasp_candidate_rotation * wrist_to_tool_.inverse()
-                * grasp_to_pregrasp_;
+        // robot -> grasp candidate (desired tool) *
+        // tool -> wrist *
+        // wrist (grasp) -> pregrasp =
+        // robot -> wrist
+        Eigen::Affine3d candidate_wrist_transform =
+                grasp_candidate_rotation *
+                wrist_to_tool_.inverse() *
+                grasp_to_pregrasp_;
 
         ROS_DEBUG("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
 
@@ -2732,13 +2660,17 @@ std::vector<RepositionBaseExecutor::GraspCandidate> RepositionBaseExecutor::samp
                 GraspCandidate(candidate_wrist_transform, robot_to_object.inverse() * candidate_wrist_transform, u));
     }
 
+    // add each grasps flipped variant
     std::size_t original_size = grasp_candidates.size();
     for (int i = 0; i < original_size; ++i) {
         const GraspCandidate& grasp = grasp_candidates[i];
-        Eigen::Affine3d flipped_candidate_transform = grasp.grasp_candidate_transform
-                * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
+        Eigen::Affine3d flipped_candidate_transform =
+                grasp.grasp_candidate_transform *
+                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
         grasp_candidates.push_back(
-                GraspCandidate(flipped_candidate_transform, robot_to_object.inverse() * flipped_candidate_transform,
+                GraspCandidate(
+                        flipped_candidate_transform,
+                        robot_to_object.inverse() * flipped_candidate_transform,
                         grasp.u));
     }
     return grasp_candidates;
@@ -2753,7 +2685,7 @@ void RepositionBaseExecutor::move_arm_command_result_cb(
     pending_move_arm_command_ = false;
 }
 
-void RepositionBaseExecutor::visualize_grasp_candidates(
+void RepositionBaseExecutor::visualizeGraspCandidates(
     const std::vector<GraspCandidate>& grasps,
     Eigen::Affine3d T_robot_to_map,
     std::string ns) const
@@ -2817,6 +2749,38 @@ void RepositionBaseExecutor::visualize_grasp_candidates(
 
     ROS_INFO("Visualizing %zd triad markers", all_triad_markers.markers.size());
     marker_arr_pub_.publish(all_triad_markers);
+}
+
+template <typename ActionType>
+bool RepositionBaseExecutor::waitForActionServer(
+    std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& action_client,
+    const std::string& action_name,
+    const ros::Duration& poll_duration,
+    const ros::Duration& timeout)
+{
+    ROS_INFO("Waiting for action server '%s'", action_name.c_str());
+    if (!action_client) {
+        ROS_WARN("Action client is null");
+        return false;
+    }
+    ros::Time start = ros::Time::now();
+    while (timeout == ros::Duration(0) || ros::Time::now() < start + timeout) {
+        ros::spinOnce();
+        if (!action_client->isServerConnected()) {
+            action_client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
+            if (!action_client) {
+                ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
+                return false;
+            }
+        }
+        if (action_client->isServerConnected()) {
+            return true;
+        }
+        poll_duration.sleep();
+        ROS_INFO("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(),
+                action_name.c_str());
+    }
+    return false;
 }
 
 bool RepositionBaseExecutor::download_marker_params()
