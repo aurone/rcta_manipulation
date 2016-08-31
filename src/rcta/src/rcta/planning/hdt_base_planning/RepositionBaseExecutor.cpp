@@ -2789,14 +2789,15 @@ void RepositionBaseExecutor::visualize_grasp_candidates(
             marker.id = id++;
             Eigen::Affine3d marker_transform;
             tf::poseMsgToEigen(marker.pose, marker_transform);
-            Eigen::Affine3d new_marker_transform = T_robot_to_map * candidate.grasp_candidate_transform
-                    * marker_transform;
+            Eigen::Affine3d new_marker_transform =
+                    T_robot_to_map *
+                    candidate.grasp_candidate_transform *
+                    marker_transform;
             tf::poseEigenToMsg(new_marker_transform, marker.pose);
         }
 
         // add triad markers for this grasp to the total marker set
-        all_triad_markers.markers.insert(all_triad_markers.markers.end(), triad_markers.markers.begin(),
-                triad_markers.markers.end());
+        all_triad_markers.markers.insert(all_triad_markers.markers.end(), triad_markers.markers.begin(), triad_markers.markers.end());
 
         // publish the triad for this grasp by itself to a separate namespace, but keep the same id scheme so that older grasps are not overwritten
         single_triad_markers.markers = triad_markers.markers;
