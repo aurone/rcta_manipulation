@@ -19,8 +19,8 @@
             <visual>
                 <origin xyz="0.593 0 0" rpy="1.57080 1.57080 0"/>
                 <geometry>
-                    <box size="0.1 0.1 0.1"/>
-<!--                    <mesh filename="package://roman_model/meshes/roman_torso_scaled.stl" scale="1 1 1"/> -->
+                    <!-- <box size="0.1 0.1 0.1"/> -->
+                   <mesh filename="package://roman_model/meshes/roman_torso.stl" scale="1 1 1"/>
                 </geometry>
                 <material name="grey">
                     <color rgba="0.8 0.8 0.8 1"/>
