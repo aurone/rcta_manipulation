@@ -2343,17 +2343,15 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
 {
     Eigen::Affine3d T_robot_object = robot_pose.inverse() * object_pose;
 
-    // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
     int max_num_candidates = 100;
     std::vector<GraspCandidate> grasp_candidates =
-            sample_grasp_candidates(T_robot_object, max_num_candidates);
+            sampleGraspCandidates(T_robot_object, max_num_candidates);
     ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
 
     visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN");
 
     Eigen::Affine3d T_robot_camera = robot_state_->getGlobalLinkTransform(camera_view_frame_);
 
-    // filter unreachable grasp candidates that we know we can't grasp
     filterGraspCandidates(grasp_candidates, T_robot_camera.inverse(), sbpl::utils::ToRadians(45.0));
 
     ROS_INFO("Produced %zd reachable grasp poses", grasp_candidates.size());
@@ -2365,10 +2363,11 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
 
     visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN_filtered");
 
+    // grasp poses in the middle of the handle are more desirable; sort them
+    // that way
     const double min_u = 0.0;
     const double max_u = 1.0;
 
-    // 3. sort grasp candidates by desirability
     std::sort(grasp_candidates.begin(), grasp_candidates.end(),
             [&](const GraspCandidate& a, const GraspCandidate& b) -> bool
             {
@@ -2546,7 +2545,7 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 /// The pregrasp is offset from the grasp pose by the configured fixed offset.
 /// The resulting pregrasp samples are specified in the robot frame.
 std::vector<RepositionBaseExecutor::GraspCandidate>
-RepositionBaseExecutor::sample_grasp_candidates(
+RepositionBaseExecutor::sampleGraspCandidates(
     const Eigen::Affine3d& robot_to_object,
     int num_candidates) const
 {
@@ -2595,7 +2594,8 @@ RepositionBaseExecutor::sample_grasp_candidates(
         ROS_DEBUG("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
         ROS_DEBUG("    Sample Spline Deriv [robot frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
 
-        // compute the normal to the grasp spline that most points "up" in the robot frame
+        // compute the normal to the grasp spline that most points "up" in the
+        // robot frame
         Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
         Eigen::Vector3d up_grasp_dir =
                 up_bias -
@@ -2604,7 +2604,8 @@ RepositionBaseExecutor::sample_grasp_candidates(
         up_grasp_dir.normalize();
         up_grasp_dir *= -1.0;
 
-        // compute the normal to the grasp spline that most points "down" in the robot frame
+        // compute the normal to the grasp spline that most points "down" in the
+        // robot frame
         Eigen::Vector3d down_bias(-Eigen::Vector3d::UnitZ());
         Eigen::Vector3d down_grasp_dir =
                 down_bias -
@@ -2794,30 +2795,27 @@ bool RepositionBaseExecutor::download_marker_params()
 
     AttachedMarker attached_marker;
 
-    bool success = msg_utils::download_param(ph_, "tracked_marker_id", attached_marker.marker_id)
-            && msg_utils::download_param(ph_, "tracked_marker_attached_link", attached_marker.attached_link)
-            && msg_utils::download_param(ph_, "marker_to_link_x", marker_to_link_x)
-            && msg_utils::download_param(ph_, "marker_to_link_y", marker_to_link_y)
-            && msg_utils::download_param(ph_, "marker_to_link_z", marker_to_link_z)
-            && msg_utils::download_param(ph_, "marker_to_link_roll_deg", marker_to_link_roll_degs)
-            && msg_utils::download_param(ph_, "marker_to_link_pitch_deg", marker_to_link_pitch_degs)
-            && msg_utils::download_param(ph_, "marker_to_link_yaw_deg", marker_to_link_yaw_degs);
+    bool success =
+            msg_utils::download_param(ph_, "tracked_marker_id", attached_marker.marker_id) &&
+            msg_utils::download_param(ph_, "tracked_marker_attached_link", attached_marker.attached_link) &&
+            msg_utils::download_param(ph_, "marker_to_link_x", marker_to_link_x) &&
+            msg_utils::download_param(ph_, "marker_to_link_y", marker_to_link_y) &&
+            msg_utils::download_param(ph_, "marker_to_link_z", marker_to_link_z) &&
+            msg_utils::download_param(ph_, "marker_to_link_roll_deg", marker_to_link_roll_degs) &&
+            msg_utils::download_param(ph_, "marker_to_link_pitch_deg", marker_to_link_pitch_degs) &&
+            msg_utils::download_param(ph_, "marker_to_link_yaw_deg", marker_to_link_yaw_degs);
+    if (!success) {
+        ROS_WARN("Failed to download marker params");
+        return false;
+    }
 
     attached_marker.link_to_marker =
             Eigen::Affine3d(
-                    Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z)
-                            * Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs),
-                                    Eigen::Vector3d::UnitZ())
-                            * Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs),
-                                    Eigen::Vector3d::UnitY())
-                            * Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs),
-                                    Eigen::Vector3d::UnitX())).inverse();
+                    Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
+                    Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+                    Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+                    Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
     attached_markers_.push_back(std::move(attached_marker));
-
-    if (!success) {
-        ROS_WARN("Failed to download marker params");
-    }
-
-    return success;
+    return true;
 }

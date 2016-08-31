@@ -109,6 +109,7 @@ private:
     moveit::core::JointModelGroup* manipulator_group_;
     std::string manipulator_group_name_;
 
+    // TODO: monitor state
     moveit::core::RobotStatePtr robot_state_;
 
     std::string robot_frame_;
@@ -179,7 +180,7 @@ private:
     std::vector<GraspCandidate> generateFilteredGraspCandidates(
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose);
-    std::vector<GraspCandidate> sample_grasp_candidates(
+    std::vector<GraspCandidate> sampleGraspCandidates(
         const Eigen::Affine3d& robot_to_object,
         int num_candidates) const;
 
