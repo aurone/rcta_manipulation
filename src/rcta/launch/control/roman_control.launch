@@ -1,14 +1,52 @@
 <launch>
-    <rosparam command="load" file="$(find rcta)/config/control/roman_control.yaml"/>
+    <arg name="live" default="true"/>
+    <arg name="fake" default="false"/>
+    <arg name="ns" default="false"/>
 
-    <node name="controller_spawner" pkg="controller_manager" type="spawner"
-            args="
-                    joint_state_controller
-                    left_limb_joint_trajectory_controller
-                    right_limb_joint_trajectory_controller
-                    torso_joint1_controller"/>
+    <!-- start pose for the robot in gazebo -->
+    <arg name="start_x" default="-3.55"/>
+    <arg name="start_y" default="-3.5"/>
+    <arg name="start_z" default="1.2"/>
+    <arg name="start_R" default="0.0"/>
+    <arg name="start_P" default="0.0"/>
+    <arg name="start_Y" default="3.1415"/>
 
+    <include file="$(find roman_model)/robots/upload_rcta_roman.launch">
+        <arg name="ns" value="$(arg ns)"/>
+    </include>
+
+    <group if="$(arg live)">
+        <node name="roman_joint_trajectory_controller" pkg="rcta" type="roman_joint_trajectory_controller"/>
+        <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+            <rosparam param="source_list">[/roman_joint_states]</rosparam>
+        </node>
+    </group>
+    <group unless="$(arg live)">
+        <group if="$(arg fake)">
+            <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+                <param name="use_gui" value="false"/>
+                <rosparam param="source_list">[/move_group/fake_controller_joint_states]</rosparam>
+            </node>
+        </group>
+        <group unless="$(arg fake)">
+            <!-- spawn the robot in gazebo -->
+            <node name="spawn_roman" pkg="gazebo_ros" type="spawn_model"
+                    args="-param robot_description -urdf -model rcta_roman
+                        -x $(arg start_x) -y $(arg start_y) -z $(arg start_z)
+                        -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
+
+            <!-- spawn simulated controllers -->
+            <rosparam command="load" file="$(find rcta)/config/control/roman_control.yaml"/>
+            <node name="controller_spawner" pkg="controller_manager" type="spawner"
+                    args="joint_state_controller
+                            left_limb_joint_trajectory_controller
+                            right_limb_joint_trajectory_controller
+                            torso_joint1_controller"/>
+        </group>
+    </group>
+
+    <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/>
+
+    <!-- all configurations need a robot state publisher -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
-
-    <node name="virtual_joint_broadcaster_0" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/>
 </launch>
