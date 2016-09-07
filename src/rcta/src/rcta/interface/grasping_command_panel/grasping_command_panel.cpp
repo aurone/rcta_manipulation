@@ -69,8 +69,8 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     candidate_base_poses_()
 {
     setup_gui();
-    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
-    occupancy_grid_sub_ = nh_.subscribe("fixed_costmap_sim", 1, &GraspingCommandPanel::occupancy_grid_callback, this);
+    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
+    occupancy_grid_sub_ = nh_.subscribe("map", 1, &GraspingCommandPanel::occupancy_grid_callback, this);
 }
 
 GraspingCommandPanel::~GraspingCommandPanel()
