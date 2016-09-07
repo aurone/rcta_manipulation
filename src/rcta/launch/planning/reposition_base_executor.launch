@@ -1,6 +1,7 @@
 <launch>
     <include file="$(find rcta)/launch/moveit/roman/planning_context.launch"/>
     <node name="reposition_planner_node" pkg="rcta" type="reposition_planner_node" output="screen">
+        <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/gas_canister_v2.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/grasp_object_executor.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/reposition_planner_node.yaml"/>
