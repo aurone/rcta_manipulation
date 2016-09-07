@@ -17,6 +17,7 @@
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
+#include <spellbook/grid/grid.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <urdf_model/model.h>
@@ -66,6 +67,13 @@ std::string to_string(Status status);
 
 } // namespace RepositionBaseExecutionStatus
 
+struct Pose2D
+{
+    double x;
+    double y;
+    double yaw;
+};
+
 class RepositionBaseExecutor
 {
 public:
@@ -107,6 +115,7 @@ private:
     ros::NodeHandle ph_;
 
     ros::Publisher viz_pub_;
+    ros::Publisher debug_map_pub_;
 
     tf::TransformListener listener_;
 
@@ -222,6 +231,20 @@ private:
         const std::string& action_name,
         const ros::Duration& poll_duration,
         const ros::Duration& timeout);
+
+    void computeGraspProbabilities(
+        const au::grid<3, Pose2D>& rob,
+        double distMin,
+        double distStep,
+        const Pose2D& obj,
+        double pTotThr,
+        au::grid<3, double>& pGrasp,
+        au::grid<3, bool>& bTotMax);
+
+    void projectProbabilityMap(
+        const au::grid<3, Pose2D>& rob,
+        const au::grid<3, double>& map,
+        nav_msgs::OccupancyGrid& grid);
 
     bool computeRobPose(
         const Eigen::Affine3d& robot_pose,
