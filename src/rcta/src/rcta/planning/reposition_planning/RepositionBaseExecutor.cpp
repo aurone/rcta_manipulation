@@ -7,8 +7,6 @@
 #include <angles/angles.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <leatherman/utils.h>
-#include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit/robot_state/robot_state.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -41,10 +39,12 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     nh_(),
     ph_("~"),
     action_name_("reposition_base_command"),
+    viz_pub_(),
+    listener_(),
     as_(),
     robot_model_(),
-    manipulator_group_(nullptr),
-    manipulator_group_name_(),
+    manip_group_(nullptr),
+    manip_name_(),
     camera_view_frame_(),
     cc_(),
     attached_markers_(),
@@ -59,37 +59,20 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     move_arm_command_action_name_(),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     move_arm_command_result_(),
-    listener_(),
-    viz_pub_(),
     map_(),
     current_goal_(),
     status_(RepositionBaseExecutionStatus::INVALID),
     last_status_(RepositionBaseExecutionStatus::INVALID)
 {
-    // hard-coded robot perimeter here
-    int obs_thresh = 50;
-    int num_heading_disc = (int)(360.0 / 5.0); //5 degree discretization
-    std::vector<sbpl_2Dpt_t> footprint_polygon;
-    footprint_polygon.resize(4);
-    double robot_halfwidth = 0.40;
-    double robot_halflength = 0.60;
-    footprint_polygon[0].x = -robot_halflength;
-    footprint_polygon[0].y = -robot_halfwidth;
-    footprint_polygon[1].x = robot_halflength;
-    footprint_polygon[1].y = -robot_halfwidth;
-    footprint_polygon[2].x = robot_halflength;
-    footprint_polygon[2].y = robot_halfwidth;
-    footprint_polygon[3].x = -robot_halflength;
-    footprint_polygon[3].y = robot_halfwidth;
-    cc_.reset(new XYThetaCollisionChecker(footprint_polygon, obs_thresh, num_heading_disc));
 }
 
 bool RepositionBaseExecutor::initialize()
 {
+    robot_frame_ = "base_footprint";
     camera_view_frame_ = "camera_rgb_optical_frame";
 
-    robot_model_loader::RobotModelLoader rml;
-    robot_model_ = rml.getModel();
+    rml_.reset(new robot_model_loader::RobotModelLoader);
+    robot_model_ = rml_->getModel();
     if (!robot_model_) {
         ROS_ERROR("Failed to load robot model");
         return false;
@@ -97,12 +80,12 @@ bool RepositionBaseExecutor::initialize()
 
     robot_state_.reset(new moveit::core::RobotState(robot_model_));
 
-    if (!msg_utils::download_param(ph_, "manipulator_group_name", manipulator_group_name_)) {
+    if (!msg_utils::download_param(ph_, "manipulator_group_name", manip_name_)) {
         return false;
     }
 
-    if (!robot_model_->hasJointModelGroup(manipulator_group_name_)) {
-        ROS_ERROR("robot '%s' has no group named '%s'", robot_model_->getName().c_str(), manipulator_group_name_.c_str());
+    if (!robot_model_->hasJointModelGroup(manip_name_)) {
+        ROS_ERROR("robot '%s' has no group named '%s'", robot_model_->getName().c_str(), manip_name_.c_str());
         return false;
     }
 
@@ -118,7 +101,7 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-    viz_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
+    viz_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 5);
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
@@ -141,12 +124,30 @@ bool RepositionBaseExecutor::initialize()
     as_->start();
     ROS_INFO("Action server started");
 
-    ros::spinOnce();
-
     if (!download_marker_params()) {
         ROS_WARN("Failed to download marker params");
         return false;
     }
+
+    std::vector<geometry_msgs::Point> footprint;
+    if (!msg_utils::download_param(ph_, "footprint", footprint)) {
+        return false;
+    }
+
+    // hard-coded robot perimeter here
+    int obs_thresh = 50;
+    int num_heading_disc = (int)(360.0 / 5.0); //5 degree discretization
+
+    std::vector<sbpl_2Dpt_t> footprint_polygon;
+    footprint_polygon.resize(footprint.size());
+    ROS_INFO("Footprint:");
+    for (size_t i = 0; i < footprint.size(); ++i) {
+        ROS_INFO("  (%0.3f, %0.3f)", footprint[i].x, footprint[i].y);
+        footprint_polygon[i].x = footprint[i].x;
+        footprint_polygon[i].y = footprint[i].y;
+    }
+
+    cc_.reset(new XYThetaCollisionChecker(footprint_polygon, obs_thresh, num_heading_disc));
 
     return true;
 }
@@ -309,22 +310,32 @@ void RepositionBaseExecutor::goal_callback()
     current_goal_ = as_->acceptNewGoal();
     ROS_INFO("    Goal ID: %u", current_goal_->id);
     ROS_INFO("    Retry Count: %d", current_goal_->retry_count);
-    ROS_INFO("    Gas Can Pose [map]: %s", to_string(current_goal_->gas_can_in_map.pose).c_str());
-    ROS_INFO("    Base Link Pose [map]: %s", to_string(current_goal_->base_link_in_map.pose).c_str());
-    ROS_INFO("    Occupancy Grid Seq: %d", current_goal_->map.header.seq);
-    ROS_INFO("    Occupancy Grid Stamp: %d", current_goal_->map.header.stamp.sec);
-    ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
+    ROS_INFO("    Gas Can Pose: %s", to_string(current_goal_->gas_can_in_map).c_str());
+    ROS_INFO("    Base Link Pose: %s", to_string(current_goal_->base_link_in_map).c_str());
+    ROS_INFO("    Map Header: %s", to_string(current_goal_->map.header).c_str());
 
-    robot_pose_world_frame_.header.stamp = ros::Time(0);
-    robot_pose_world_frame_.header.frame_id = "base_footprint"; // TODO: robot model frame here?
-    robot_pose_world_frame_.pose = geometry_msgs::IdentityPose();
-    try {
-        listener_.transformPose("abs_nwu", robot_pose_world_frame_, robot_pose_world_frame_);
-        ROS_INFO("Robot Pose [abs_nwu]: %s", to_string(robot_pose_world_frame_.pose).c_str());
+    // NOTE: There was some fishy business going on here transforming the
+    // incoming pose to a pose specified in another frame, presumably for
+    // compatibility. Removing for now, but keep this in mind...it shouldn't
+    // be necessary, strictly speaking
+//    const std::string world_frame = "abs_nwu";
+
+    const std::string& map_frame = current_goal_->map.header.frame_id;
+    if (current_goal_->base_link_in_map.header.frame_id != map_frame) {
+        try {
+            listener_.transformPose(
+                    map_frame,
+                    current_goal_->base_link_in_map,
+                    robot_pose_world_frame_);
+        }
+        catch (const tf::TransformException& ex) {
+            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", current_goal_->base_link_in_map.header.frame_id.c_str(), map_frame.c_str(), ex.what());
+            as_->setAborted();
+            return;
+        }
     }
-    catch (const tf::TransformException& ex) {
-        ROS_ERROR("Failed to transform from 'base_footprint' to 'abs_nwu'");
-        as_->setAborted();
+    else {
+        robot_pose_world_frame_ = current_goal_->base_link_in_map;
     }
 
     // update collision checker if valid map
@@ -2195,10 +2206,10 @@ void RepositionBaseExecutor::filterGraspCandidatesIK(
         // check for an ik solution to this grasp pose
         moveit::core::RobotState robot_state(robot_model_);
         robot_state.setToDefaultValues();
-        bool check_ik = robot_state.setFromIK(manipulator_group_, grasp_candidate.grasp_candidate_transform);
+        bool check_ik = robot_state.setFromIK(manip_group_, grasp_candidate.grasp_candidate_transform);
         std::vector<double> sol;
         if (check_ik) {
-            robot_state.copyJointGroupPositions(manipulator_group_, sol);
+            robot_state.copyJointGroupPositions(manip_group_, sol);
         }
 
         if (!check_ik) {

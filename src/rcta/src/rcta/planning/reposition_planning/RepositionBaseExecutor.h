@@ -12,6 +12,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
 #include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
@@ -105,39 +106,42 @@ private:
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
+    ros::Publisher viz_pub_;
+
+    tf::TransformListener listener_;
+
     std::string action_name_;
     typedef actionlib::SimpleActionServer<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
     std::unique_ptr<RepositionBaseCommandActionServer> as_;
 
-    ros::Publisher viz_pub_;
-
+    robot_model_loader::RobotModelLoaderPtr rml_;
     moveit::core::RobotModelPtr robot_model_;
-    moveit::core::JointModelGroup* manipulator_group_;
-    std::string manipulator_group_name_;
+    moveit::core::JointModelGroup* manip_group_;
+    std::string manip_name_;
 
-    // TODO: monitor state
+    // TODO: monitor state to get the transform between the camera and the wrist
     moveit::core::RobotStatePtr robot_state_;
 
+    std::string robot_frame_;
     std::string camera_view_frame_;
 
-    //visualizations
-
-    // xytheta collision checking
+    /// \name Planar Collision Constraints
+    ///@{
     std::unique_ptr<XYThetaCollisionChecker> cc_;
+    ///@}
 
     /// \name Visibility Constraints
-    /// @{
+    ///@{
     std::vector<AttachedMarker> attached_markers_;
-    /// @}
+    ///@}
 
-    // pretend that these aren't required by the grasp planner...
+    /// \name Grasping
+    ///@{
     // the hand-generated grasping spline is done in model coordinates
     // and requires at least the scale to be brought into world coordinates
     std::string gas_can_mesh_path_;
     double gas_can_scale_;
 
-    /// \name Grasping
-    ///@{
     int max_grasp_candidates_;
     double pregrasp_to_grasp_offset_m_;
     Eigen::Affine3d wrist_to_tool_;
@@ -153,8 +157,6 @@ private:
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
     rcta::MoveArmCommandResult::ConstPtr move_arm_command_result_;
     ///@}
-
-    tf::TransformListener listener_;
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
 
