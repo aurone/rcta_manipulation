@@ -1,0 +1,7 @@
+<library path="lib/libviservo_command_panel_plugin">
+    <class name="rcta_plugins/ViservoCommandPanel" type="rcta::ViservoCommandPanel" base_class_type="rviz::Panel">
+        <description>
+            A panel widget for commanding grippers through a simple interface
+        </description>
+    </class>
+</library>

@@ -33,8 +33,6 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     nh_(),
     move_arm_command_client_(),
     pending_move_arm_command_(false),
-    viservo_command_client_(),
-    pending_viservo_command_(false),
     grasp_object_command_client_(),
     pending_grasp_object_command_(false),
     reposition_base_command_client_(),
@@ -43,8 +41,6 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     pending_teleport_andalite_command_(false),
     teleport_hdt_command_client_(),
     pending_teleport_hdt_command_(false),
-    gripper_command_client_(),
-    pending_gripper_command_(false),
     robot_description_line_edit_(nullptr),
     refresh_robot_desc_button_(nullptr),
     global_frame_line_edit_(nullptr),
@@ -55,26 +51,12 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     teleport_base_command_z_box_(nullptr),
     teleport_base_command_yaw_box_(nullptr),
     send_teleport_andalite_command_button_(nullptr),
-    send_teleport_hdt_command_button_(nullptr),
-    octomap_checkbox_(nullptr),
-    octomap_topic_line_edit_(nullptr),
-    copy_current_state_button_(nullptr),
-    cycle_ik_solutions_button_(nullptr),
-    send_move_arm_command_button_(nullptr),
-    send_joint_goal_button_(nullptr),
-    j1_spinbox_(nullptr),
-    j2_spinbox_(nullptr),
-    j3_spinbox_(nullptr),
-    j4_spinbox_(nullptr),
-    j5_spinbox_(nullptr),
-    j6_spinbox_(nullptr),
-    j7_spinbox_(nullptr),
-    send_viservo_command_button_(nullptr),
     send_grasp_object_command_button_(nullptr),
     send_reposition_base_command_button_(nullptr),
     world_to_robot_(Eigen::Affine3d::Identity()),
     world_to_object_(Eigen::Affine3d::Identity()),
     robot_model_(),
+    manip_name_("right_arm"),
     rm_loader_(),
     rm_(),
     rs_(),
@@ -84,7 +66,6 @@ ManipulatorCommandPanel::ManipulatorCommandPanel(QWidget *parent) :
     last_joint_state_(),
     tip_link_(),
     base_link_(),
-    mount_frame_to_manipulator_frame_(Eigen::Affine3d::Identity()),
     listener_(),
     robot_description_(),
     global_frame_(),
@@ -304,293 +285,6 @@ void ManipulatorCommandPanel::send_teleport_andalite_command()
     pending_teleport_andalite_command_ = true;
 }
 
-void ManipulatorCommandPanel::send_teleport_hdt_command()
-{
-    if (!reconnect_client(teleport_hdt_command_client_, "teleport_hdt_command")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Teleport HDT Command (server is not connected)"));
-        return;
-    }
-
-    rcta::TeleportHDTCommandGoal teleport_hdt_goal;
-    teleport_hdt_goal.joint_state.header.seq = 0;
-    teleport_hdt_goal.joint_state.header.stamp = ros::Time(0);
-    teleport_hdt_goal.joint_state.header.frame_id = "";
-    teleport_hdt_goal.joint_state.name = robot_model_->joint_names();
-    teleport_hdt_goal.joint_state.position = get_phantom_joint_angles();
-
-    auto result_cb = boost::bind(&ManipulatorCommandPanel::teleport_hdt_command_result_cb, this, _1, _2);
-    teleport_hdt_command_client_->sendGoal(teleport_hdt_goal, result_cb);
-    pending_teleport_hdt_command_ = true;
-}
-
-void ManipulatorCommandPanel::send_open_gripper_command()
-{
-    if (!reconnect_client(gripper_command_client_, "gripper_controller/gripper_command_action")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected)"));
-        return;
-    }
-
-    control_msgs::GripperCommandGoal gripper_command_goal;
-    gripper_command_goal.command.position = GripperModel().maximum_width();
-    gripper_command_goal.command.max_effort = GripperModel().maximum_force();
-
-    auto result_cb = boost::bind(&ManipulatorCommandPanel::gripper_command_result_cb, this, _1, _2);
-    gripper_command_client_->sendGoal(gripper_command_goal, result_cb);
-    pending_gripper_command_ = true;
-}
-
-void ManipulatorCommandPanel::send_close_gripper_command()
-{
-    if (!reconnect_client(gripper_command_client_, "gripper_controller/gripper_command_action")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Gripper Command (server is not connected)"));
-        return;
-    }
-
-    control_msgs::GripperCommandGoal gripper_command_goal;
-    gripper_command_goal.command.position = GripperModel().minimum_width();
-    gripper_command_goal.command.max_effort = GripperModel().maximum_force();
-
-    auto result_cb = boost::bind(&ManipulatorCommandPanel::gripper_command_result_cb, this, _1, _2);
-    gripper_command_client_->sendGoal(gripper_command_goal, result_cb);
-    pending_gripper_command_ = true;
-}
-
-void ManipulatorCommandPanel::check_send_octomap(int)
-{
-    ROS_INFO("Send Octomap: %s", ::boolstr(octomap_checkbox_->isChecked()));
-}
-
-void ManipulatorCommandPanel::subscribe_to_octomap()
-{
-    const std::string octomap_topic = octomap_topic_line_edit_->text().toStdString();
-    last_octomap_msg_.reset();
-    if (octomap_topic.empty()) {
-        ROS_INFO("Shutting down octomap subscriber");
-        octomap_sub_.shutdown();
-    }
-    else {
-        ROS_INFO("Subscribing to octomap topic '%s'", octomap_topic.c_str());
-        octomap_sub_ = nh_.subscribe<octomap_msgs::Octomap>(octomap_topic, 1, &ManipulatorCommandPanel::octomap_callback, this);
-    }
-}
-
-void ManipulatorCommandPanel::copy_current_state()
-{
-    std::vector<double> curr_joint_angles = get_current_joint_angles();
-    if (!set_phantom_joint_angles(curr_joint_angles)) {
-        QMessageBox::warning(this, tr("Copy Current State"), tr("Failed to copy current state to phantom state"));
-        return;
-    }
-
-    update_manipulator_marker_pose();
-    update_spinboxes();
-    publish_phantom_robot_visualizations();
-}
-
-void ManipulatorCommandPanel::cycle_ik_solutions()
-{
-   Eigen::Affine3d new_eef_pose;
-   new_eef_pose = rs_->getGlobalLinkTransform(tip_link_);
-
-   // manipulator -> eef = manipulator -> base * base -> root * root -> eef
-   new_eef_pose = mount_frame_to_manipulator_frame_.inverse() * rs_->getFrameTransform(base_link_).inverse() * new_eef_pose;
-
-   // get the current joint configuration to use as a seed for picking a nearby ik solution
-   std::vector<double> curr_joint_angles(7);
-   curr_joint_angles[0] = rs_->getVariablePosition("arm_1_shoulder_twist");
-   curr_joint_angles[1] = rs_->getVariablePosition("arm_2_shoulder_lift");
-   curr_joint_angles[2] = rs_->getVariablePosition("arm_3_elbow_twist");
-   curr_joint_angles[3] = rs_->getVariablePosition("arm_4_elbow_lift");
-   curr_joint_angles[4] = rs_->getVariablePosition("arm_5_wrist_twist");
-   curr_joint_angles[5] = rs_->getVariablePosition("arm_6_wrist_lift");
-   curr_joint_angles[6] = rs_->getVariablePosition("arm_7_gripper_lift");
-
-   const double ik_search_res = sbpl::utils::ToRadians(1.0);
-
-   std::vector<std::vector<double>> ik_solutions;
-   SimpleIKSolutionGenerator solgen = robot_model_->compute_all_ik_solutions(new_eef_pose, curr_joint_angles);
-
-   std::vector<double> iksol;
-   while (solgen(iksol)) {
-        ik_solutions.push_back(std::move(iksol));
-   }
-
-   std::sort(ik_solutions.begin(), ik_solutions.end(), [&curr_joint_angles](const std::vector<double>& j1, const std::vector<double>& j2)
-   {
-       return ComputeJointStateL2NormSqrd(j1, curr_joint_angles) < ComputeJointStateL2NormSqrd(j2, curr_joint_angles);
-   });
-
-   if (ik_solutions.size() > 1) {
-       ROS_INFO("BAM, %zd solutions", ik_solutions.size());
-       std::vector<std::vector<double>>::const_iterator next = ++ik_solutions.cbegin();
-       if (!set_phantom_joint_angles(*next)) {
-           QMessageBox::warning(this, tr("Cycle IK Solutions"), tr("Failed to set phantom state from ik solution"));
-           return;
-       }
-       rs_->updateLinkTransforms();
-       publish_phantom_robot_visualizations();
-   }
-   else {
-       ROS_WARN("Not enough IK solutions to cycle");
-   }
-}
-
-void ManipulatorCommandPanel::send_move_arm_command()
-{
-    if (!reconnect_client(move_arm_command_client_, "move_arm_command")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
-        return;
-    }
-
-    rcta::MoveArmCommandGoal move_arm_goal;
-
-    move_arm_goal.type = rcta::MoveArmCommandGoal::EndEffectorGoal;
-
-    // mounting frame -> eef = mounting_frame -> root * root -> eef
-    const Eigen::Affine3d& root_to_mount_frame = rs_->getFrameTransform(base_link_);
-    tf::poseEigenToMsg(
-            root_to_mount_frame.inverse() *
-                    rs_->getGlobalLinkTransform("arm_7_gripper_lift_link"),
-            move_arm_goal.goal_pose);
-
-    // manipulator -> eef = manipulator -> mount * mount -> root * root -> end effector
-    Eigen::Affine3d manipulator_frame_to_eef_frame =
-            mount_frame_to_manipulator_frame_.inverse() *
-            root_to_mount_frame.inverse() *
-                    rs_->getGlobalLinkTransform("arm_7_gripper_lift_link");
-
-    geometry_msgs::Pose eef_in_manipulator_frame;
-    tf::poseEigenToMsg(manipulator_frame_to_eef_frame, eef_in_manipulator_frame);
-    ROS_INFO("eef in manipulator frame: %s", to_string(manipulator_frame_to_eef_frame).c_str());
-
-    move_arm_goal.execute_path = true;
-
-    if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
-        move_arm_goal.octomap = *last_octomap_msg_;
-    }
-
-    auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
-    move_arm_command_client_->sendGoal(move_arm_goal, result_callback);
-
-    pending_move_arm_command_ = true;
-    update_gui();
-}
-
-void ManipulatorCommandPanel::send_joint_goal()
-{
-    if (!reconnect_client(move_arm_command_client_, "move_arm_command")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Move Arm Command (server is not connected)"));
-        return;
-    }
-
-    rcta::MoveArmCommandGoal move_arm_goal;
-    move_arm_goal.type = rcta::MoveArmCommandGoal::JointGoal;
-
-    move_arm_goal.goal_joint_state.header.stamp = ros::Time::now();
-    move_arm_goal.goal_joint_state.name = robot_model_->joint_names();
-    move_arm_goal.goal_joint_state.position.reserve(7);
-    for (const std::string& joint_name : robot_model_->joint_names()) {
-        move_arm_goal.goal_joint_state.position.push_back(rs_->getVariablePosition(joint_name));
-    }
-
-    move_arm_goal.execute_path = true;
-
-    if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
-        move_arm_goal.octomap = *last_octomap_msg_;
-    }
-
-    auto result_callback = boost::bind(&ManipulatorCommandPanel::move_arm_command_result_cb, this, _1, _2);
-    move_arm_command_client_->sendGoal(move_arm_goal, result_callback);
-
-    pending_move_arm_command_ = true;
-    update_gui();
-}
-
-void ManipulatorCommandPanel::update_j1_position(double value)
-{
-    update_joint_position(0, value);
-}
-
-void ManipulatorCommandPanel::update_j2_position(double value)
-{
-    update_joint_position(1, value);
-}
-
-void ManipulatorCommandPanel::update_j3_position(double value)
-{
-    update_joint_position(2, value);
-}
-
-void ManipulatorCommandPanel::update_j4_position(double value)
-{
-    update_joint_position(3, value);
-}
-
-void ManipulatorCommandPanel::update_j5_position(double value)
-{
-    update_joint_position(4, value);
-}
-
-void ManipulatorCommandPanel::update_j6_position(double value)
-{
-    update_joint_position(5, value);
-}
-
-void ManipulatorCommandPanel::update_j7_position(double value)
-{
-    update_joint_position(6, value);
-}
-
-void ManipulatorCommandPanel::send_viservo_command()
-{
-    if (!reconnect_client(viservo_command_client_, "viservo_command")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Viservo Command (server is not connected)"));
-        return;
-    }
-
-    const std::string camera_link_name = "camera_rgb_frame";
-    const std::string wrist_link_name = "arm_7_gripper_lift_link";
-
-    if (/*!rs_->hasLinkState(camera_link_name) ||*/ !rs_->getLinkModel(wrist_link_name)) {
-        ROS_ERROR("Robot State does not contain transforms for camera or wrist links");
-        return;
-    }
-
-    geometry_msgs::PoseStamped identity_pose_camera_frame;
-    identity_pose_camera_frame.header.frame_id = camera_link_name;
-    identity_pose_camera_frame.header.stamp = ros::Time(0);
-    identity_pose_camera_frame.header.seq = 0;
-    identity_pose_camera_frame.pose.position.x = identity_pose_camera_frame.pose.position.y = identity_pose_camera_frame.pose.position.z = 0.0;
-    identity_pose_camera_frame.pose.orientation.x = identity_pose_camera_frame.pose.orientation.y = identity_pose_camera_frame.pose.orientation.z = 0.0;
-    identity_pose_camera_frame.pose.orientation.w = 1.0;
-    geometry_msgs::PoseStamped root_to_camera_pose;
-    try {
-        listener_.transformPose(rs_->getRobotModel()->getRootLinkName(), identity_pose_camera_frame, root_to_camera_pose);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_ERROR("Failed to find fixed transform between '%s' and %s'", camera_link_name.c_str(), wrist_link_name.c_str());
-        return;
-    }
-
-    Eigen::Affine3d root_to_camera;
-    tf::poseMsgToEigen(root_to_camera_pose.pose, root_to_camera);
-
-    ROS_INFO("Root to camera: %s", to_string(root_to_camera).c_str());
-
-    // construct the goal wrist pose in the camera frame; the goal pose should be the same pose as whatever pose we think we're currently at.
-//    const Eigen::Affine3d& root_to_camera = rs_->getLinkState(camera_link_name)->getGlobalLinkTransform();
-    const Eigen::Affine3d& root_to_wrist = rs_->getGlobalLinkTransform(wrist_link_name);
-    Eigen::Affine3d camera_to_wrist = root_to_camera.inverse() * root_to_wrist;
-
-    rcta::ViservoCommandGoal viservo_goal;
-    tf::poseEigenToMsg(camera_to_wrist, viservo_goal.goal_pose);
-    auto result_callback = boost::bind(&ManipulatorCommandPanel::viservo_command_result_cb, this, _1, _2);
-    viservo_command_client_->sendGoal(viservo_goal, result_callback);
-
-    pending_viservo_command_ = true;
-    update_gui();
-}
-
 void ManipulatorCommandPanel::send_grasp_object_command()
 {
     if (!reconnect_client(grasp_object_command_client_, "grasp_object_command")) {
@@ -622,10 +316,6 @@ void ManipulatorCommandPanel::send_grasp_object_command()
 
     grasp_object_goal.gas_can_in_map.header.frame_id = interactive_marker_frame();
     tf::poseEigenToMsg(object_transform(), grasp_object_goal.gas_can_in_map.pose);
-
-    if (last_octomap_msg_ && octomap_checkbox_->isChecked()) {
-        grasp_object_goal.octomap = *last_octomap_msg_;
-    }
 
     auto result_callback = boost::bind(&ManipulatorCommandPanel::grasp_object_command_result_cb, this, _1, _2);
     grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
@@ -730,71 +420,6 @@ void ManipulatorCommandPanel::setup_gui()
         base_commands_layout->addWidget(send_teleport_andalite_command_button_);
     base_commands_group->setLayout(base_commands_layout);
 
-    // arm commands
-    QGroupBox* arm_commands_group = new QGroupBox(tr("Arm Commands"));
-        QVBoxLayout* arm_commands_layout = new QVBoxLayout;
-            QHBoxLayout* octomap_settings_layout = new QHBoxLayout;
-                octomap_checkbox_ = new QCheckBox(tr("Send Octomap"));
-                octomap_checkbox_->setChecked(false);
-                QLabel* octomap_topic_label = new QLabel(tr("Octomap Topic:"));
-                octomap_topic_line_edit_ = new QLineEdit;
-            octomap_settings_layout->addWidget(octomap_checkbox_);
-            octomap_settings_layout->addWidget(octomap_topic_label);
-            octomap_settings_layout->addWidget(octomap_topic_line_edit_);
-            copy_current_state_button_ = new QPushButton(tr("Copy Arm State"));
-            cycle_ik_solutions_button_ = new QPushButton(tr("Cycle IK Solution"));
-            QGridLayout* joint_state_spinbox_layout = new QGridLayout;
-                QLabel* j1_label = new QLabel(tr("J1"));
-                j1_spinbox_ = new QDoubleSpinBox;
-                QLabel* j2_label = new QLabel(tr("J2"));
-                j2_spinbox_ = new QDoubleSpinBox;
-                QLabel* j3_label = new QLabel(tr("J3"));
-                j3_spinbox_ = new QDoubleSpinBox;
-                QLabel* j4_label = new QLabel(tr("J4"));
-                j4_spinbox_ = new QDoubleSpinBox;
-                QLabel* j5_label = new QLabel(tr("J5"));
-                j5_spinbox_ = new QDoubleSpinBox;
-                QLabel* j6_label = new QLabel(tr("J6"));
-                j6_spinbox_ = new QDoubleSpinBox;
-                QLabel* j7_label = new QLabel(tr("J7"));
-                j7_spinbox_ = new QDoubleSpinBox;
-            joint_state_spinbox_layout->addWidget(j1_label, 0, 0);
-            joint_state_spinbox_layout->addWidget(j1_spinbox_, 0, 1);
-            joint_state_spinbox_layout->addWidget(j2_label, 0, 2);
-            joint_state_spinbox_layout->addWidget(j2_spinbox_, 0, 3);
-            joint_state_spinbox_layout->addWidget(j3_label, 0, 4);
-            joint_state_spinbox_layout->addWidget(j3_spinbox_, 0, 5);
-            joint_state_spinbox_layout->addWidget(j4_label, 0, 6);
-            joint_state_spinbox_layout->addWidget(j4_spinbox_, 0, 7);
-            joint_state_spinbox_layout->addWidget(j5_label, 1, 0);
-            joint_state_spinbox_layout->addWidget(j5_spinbox_, 1, 1);
-            joint_state_spinbox_layout->addWidget(j6_label, 1, 2);
-            joint_state_spinbox_layout->addWidget(j6_spinbox_, 1, 3);
-            joint_state_spinbox_layout->addWidget(j7_label, 1, 4);
-            joint_state_spinbox_layout->addWidget(j7_spinbox_, 1, 5);
-            send_move_arm_command_button_ = new QPushButton(tr("Move Arm to End Effector Pose"));
-            send_joint_goal_button_ = new QPushButton(tr("Move Arm to Joint State"));
-            send_teleport_hdt_command_button_ = new QPushButton(tr("Teleport HDT"));
-            send_viservo_command_button_ = new QPushButton(tr("Visual Servo"));
-        arm_commands_layout->addLayout(octomap_settings_layout);
-        arm_commands_layout->addWidget(copy_current_state_button_);
-        arm_commands_layout->addWidget(cycle_ik_solutions_button_);
-        arm_commands_layout->addLayout(joint_state_spinbox_layout);
-        arm_commands_layout->addWidget(send_move_arm_command_button_);
-        arm_commands_layout->addWidget(send_joint_goal_button_);
-        arm_commands_layout->addWidget(send_teleport_hdt_command_button_);
-        arm_commands_layout->addWidget(send_viservo_command_button_);
-    arm_commands_group->setLayout(arm_commands_layout);
-
-    // gripper commands
-    QGroupBox* gripper_commands_group = new QGroupBox(tr("Gripper Commands"));
-        QVBoxLayout* gripper_commands_layout = new QVBoxLayout;
-            send_open_gripper_command_button_ = new QPushButton(tr("Open Gripper"));
-            send_close_gripper_command_button_ = new QPushButton(tr("Close Gripper"));
-        gripper_commands_layout->addWidget(send_open_gripper_command_button_);
-        gripper_commands_layout->addWidget(send_close_gripper_command_button_);
-    gripper_commands_group->setLayout(gripper_commands_layout);
-
     // object interaction commands
     QGroupBox* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
         QVBoxLayout* object_interaction_commands_layout = new QVBoxLayout;
@@ -813,8 +438,6 @@ void ManipulatorCommandPanel::setup_gui()
 
     main_layout->addWidget(general_settings_group);
     main_layout->addWidget(base_commands_group);
-    main_layout->addWidget(arm_commands_group);
-    main_layout->addWidget(gripper_commands_group);
     main_layout->addWidget(object_interaction_commands_group);
     setLayout(main_layout);
 
@@ -830,27 +453,6 @@ void ManipulatorCommandPanel::setup_gui()
     connect(teleport_base_command_z_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_z(double)));
     connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
     connect(send_teleport_andalite_command_button_, SIGNAL(clicked()), this, SLOT(send_teleport_andalite_command()));
-
-    // arm commands
-    connect(octomap_checkbox_, SIGNAL(stateChanged(int)), this, SLOT(check_send_octomap(int)));
-    connect(octomap_topic_line_edit_, SIGNAL(editingFinished()), this, SLOT(subscribe_to_octomap()));
-    connect(copy_current_state_button_, SIGNAL(clicked()), this, SLOT(copy_current_state()));
-    connect(cycle_ik_solutions_button_, SIGNAL(clicked()), this, SLOT(cycle_ik_solutions()));
-    connect(send_move_arm_command_button_, SIGNAL(clicked()), this, SLOT(send_move_arm_command()));
-    connect(send_joint_goal_button_, SIGNAL(clicked()), this, SLOT(send_joint_goal()));
-    connect(send_teleport_hdt_command_button_, SIGNAL(clicked()), this, SLOT(send_teleport_hdt_command()));
-    connect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
-    connect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
-    connect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
-    connect(j4_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j4_position(double)));
-    connect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
-    connect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
-    connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
-    connect(send_viservo_command_button_, SIGNAL(clicked()), this, SLOT(send_viservo_command()));
-
-    // gripper commands
-    connect(send_open_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_open_gripper_command()));
-    connect(send_close_gripper_command_button_, SIGNAL(clicked()), this, SLOT(send_close_gripper_command()));
 
     // object interaction commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
@@ -1020,37 +622,36 @@ void ManipulatorCommandPanel::do_process_feedback(
 
     ROS_DEBUG("Marker is in frame %s", feedback->header.frame_id.c_str());
 
-    ROS_DEBUG("Manipulator -> Base: %s", to_string(mount_frame_to_manipulator_frame_.inverse()).c_str());
     ROS_DEBUG("Base -> Robot: %s", to_string(rs_->getFrameTransform(base_link_).inverse()).c_str());
     ROS_DEBUG("Robot -> World: %s", to_string(world_to_robot_.inverse()).c_str());
     ROS_DEBUG("World -> End Effector: %s", to_string(new_eef_pose).c_str());
 
-    // manipulator -> eef =
-    //     manipulator -> mount * mount -> root * root -> global * global -> eef
-    new_eef_pose =
-            mount_frame_to_manipulator_frame_.inverse() *
-            rs_->getFrameTransform(base_link_).inverse() *
-            robot_transform().inverse() *
-            new_eef_pose;
+    // (robot -> eef) = (root -> global) * (global -> eef)
+    new_eef_pose = robot_transform().inverse() * new_eef_pose;
 
-    ROS_DEBUG("Manipulator -> EndEffector: %s", to_string(new_eef_pose).c_str());
+    ROS_DEBUG("Robot -> End Effector: %s", to_string(new_eef_pose).c_str());
 
-    // get the current joint configuration to use as a seed for picking a nearby ik solution
-    std::vector<double> curr_joint_angles = get_phantom_joint_angles();
-    const double ik_search_res = sbpl::utils::ToRadians(1.0);
-    std::vector<double> iksol;
-
-    // run ik to the pose of the marker
-    if (robot_model_->search_nearest_ik(new_eef_pose, curr_joint_angles, iksol, ik_search_res)) {
-        if (!set_phantom_joint_angles(iksol)) {
-            QMessageBox::warning(this, tr("Interactive Marker Feedback"), tr("Failed to set phantom state from interactive marker-driven IK"));
-            return;
+    const auto* jmg = rm_->getJointModelGroup(manip_name_);
+    if (jmg) {
+        rs_->setFromIK(jmg, new_eef_pose);
+        std::vector<double> solution;
+        rs_->copyJointGroupPositions(jmg, solution);
+        if (!set_phantom_joint_angles(solution)) {
+            QMessageBox::warning(
+                    this,
+                    tr("Interactive Marker Feedback"),
+                    tr("Failed to set phantom state from interactive marker-driven IK"));
         }
+    }
+    else {
+        QMessageBox::warning(
+                this,
+                tr("Interactive Marker Feedback"),
+                tr("No joint model group %1 found in Robot Model").arg(QString::fromStdString(manip_name_)));
     }
 
     // update the position of the marker (in case of ik failure and for synchronization)
     update_manipulator_marker_pose();
-    update_spinboxes();
     publish_phantom_robot_visualizations();
 }
 
@@ -1118,7 +719,8 @@ std::string ManipulatorCommandPanel::get_tip_link(const robot_model::JointModelG
     }
 }
 
-std::string ManipulatorCommandPanel::get_base_link(const robot_model::JointModelGroup& joint_model_group) const
+std::string ManipulatorCommandPanel::get_base_link(
+    const robot_model::JointModelGroup& joint_model_group) const
 {
     const std::vector<const robot_model::JointModel*>& joint_roots = joint_model_group.getJointRoots();
     if (joint_roots.size() == 1) {
@@ -1207,14 +809,6 @@ bool ManipulatorCommandPanel::get_joint_value(
     return false;
 }
 
-void ManipulatorCommandPanel::update_joint_position(int joint_index, double joint_position)
-{
-    double joint_val = sbpl::utils::ToRadians(joint_position);
-    rs_->setVariablePosition(robot_model_->joint_names()[joint_index], joint_val);
-    update_manipulator_marker_pose();
-    publish_phantom_robot_visualizations();
-}
-
 void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg)
 {
     if (!initialized()) {
@@ -1248,17 +842,15 @@ void ManipulatorCommandPanel::joint_states_callback(const sensor_msgs::JointStat
     }
 }
 
-void ManipulatorCommandPanel::octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg)
-{
-    last_octomap_msg_ = msg;
-}
-
-void ManipulatorCommandPanel::occupancy_grid_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+void ManipulatorCommandPanel::occupancy_grid_callback(
+    const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
 	last_occupancy_grid_msg_ = msg;
 }
 
-bool ManipulatorCommandPanel::reinit(const std::string& robot_description, std::string& why)
+bool ManipulatorCommandPanel::reinit(
+    const std::string& robot_description,
+    std::string& why)
 {
     if (!reinit_robot_models(robot_description, why)) {
         return false;
@@ -1268,22 +860,13 @@ bool ManipulatorCommandPanel::reinit(const std::string& robot_description, std::
         return false;
     }
 
-    // TODO: The following must be done after the interactive marker server has
-    // been reinitialized, which is what identifies the base and tip links. It
-    // probably makes more sense for this step to be done when the robot is
-    // reinitialized
-
-    // compute the transform to the frame that kinematics is done in, which is required for sending arm goals
-    const Eigen::Affine3d& root_to_manipulator_frame = rs_->getFrameTransform("arm_1_shoulder_twist_link");
-    const Eigen::Affine3d& root_to_base_frame = rs_->getFrameTransform(base_link_);
-    mount_frame_to_manipulator_frame_ = root_to_base_frame.inverse() * root_to_manipulator_frame;
-    ROS_INFO("Mount Frame -> Manipulator Frame: %s", to_string(mount_frame_to_manipulator_frame_).c_str());
-
     publish_phantom_robot_visualizations();
     return true;
 }
 
-bool ManipulatorCommandPanel::reinit_robot_models(const std::string& robot_description, std::string& why)
+bool ManipulatorCommandPanel::reinit_robot_models(
+    const std::string& robot_description,
+    std::string& why)
 {
     if (!nh_.hasParam(robot_description) || !nh_.hasParam(robot_description + "_semantic")) {
         std::stringstream ss;
@@ -1346,31 +929,6 @@ bool ManipulatorCommandPanel::reinit_robot_models(const std::string& robot_descr
     rs_->setToDefaultValues();
 //    rs_->setRootTransform(Eigen::Affine3d::Identity()); // TODO: equivalent
     rs_->updateLinkTransforms();
-
-    // update gui parameters to reflect robot
-    j1_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[0]));
-    j2_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[1]));
-    j3_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[2]));
-    j4_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[3]));
-    j5_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[4]));
-    j6_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[5]));
-    j7_spinbox_->setMinimum(sbpl::utils::ToDegrees(robot_model_->min_limits()[6]));
-
-    j1_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[0]));
-    j2_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[1]));
-    j3_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[2]));
-    j4_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[3]));
-    j5_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[4]));
-    j6_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[5]));
-    j7_spinbox_->setMaximum(sbpl::utils::ToDegrees(robot_model_->max_limits()[6]));
-
-    j1_spinbox_->setSingleStep(1.0);
-    j2_spinbox_->setSingleStep(1.0);
-    j3_spinbox_->setSingleStep(1.0);
-    j4_spinbox_->setSingleStep(1.0);
-    j5_spinbox_->setSingleStep(1.0);
-    j6_spinbox_->setSingleStep(1.0);
-    j7_spinbox_->setSingleStep(1.0);
 
     return true;
 }
@@ -1524,25 +1082,6 @@ void ManipulatorCommandPanel::move_arm_command_result_cb(
     update_gui();
 }
 
-void ManipulatorCommandPanel::viservo_command_active_cb()
-{
-
-}
-
-void ManipulatorCommandPanel::viservo_command_feedback_cb(const rcta::ViservoCommandFeedback::ConstPtr& feedback)
-{
-
-}
-
-void ManipulatorCommandPanel::viservo_command_result_cb(
-    const actionlib::SimpleClientGoalState& state,
-    const rcta::ViservoCommandResult::ConstPtr& result)
-{
-    ROS_INFO("Received Result from Viservo Command Action");
-    pending_viservo_command_ = false;
-    update_gui();
-}
-
 void ManipulatorCommandPanel::grasp_object_command_active_cb()
 {
 
@@ -1633,24 +1172,6 @@ void ManipulatorCommandPanel::teleport_hdt_command_result_cb(
     pending_teleport_hdt_command_ = false;
 }
 
-void ManipulatorCommandPanel::gripper_command_active_cb()
-{
-
-}
-
-void ManipulatorCommandPanel::gripper_command_feedback_cb(
-    const control_msgs::GripperCommandFeedback::ConstPtr& feedback)
-{
-
-}
-
-void ManipulatorCommandPanel::gripper_command_result_cb(
-    const actionlib::SimpleClientGoalState& state,
-    const control_msgs::GripperCommandResult::ConstPtr& result)
-{
-    pending_gripper_command_ = false;
-}
-
 bool ManipulatorCommandPanel::gatherRobotMarkers(
     const robot_state::RobotState& robot_state,
     const std::vector<std::string>& link_names,
@@ -1738,34 +1259,6 @@ bool ManipulatorCommandPanel::gatherRobotMarkers(
     return true;
 }
 
-void ManipulatorCommandPanel::update_spinboxes()
-{
-    // note: temporarily disable this guys so that spinboxes can be updated in
-    // response to interactive marker changes without publishing a fuckton of
-    // display markers from triggering one slot for each joint
-    disconnect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
-    disconnect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
-    disconnect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
-    disconnect(j4_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j4_position(double)));
-    disconnect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
-    disconnect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
-    disconnect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
-    j1_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[0])));
-    j2_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[1])));
-    j3_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[2])));
-    j4_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[3])));
-    j5_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[4])));
-    j6_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[5])));
-    j7_spinbox_->setValue(sbpl::utils::ToDegrees(rs_->getVariablePosition(robot_model_->joint_names()[6])));
-    connect(j1_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j1_position(double)));
-    connect(j2_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j2_position(double)));
-    connect(j3_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j3_position(double)));
-    connect(j4_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j4_position(double)));
-    connect(j5_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j5_position(double)));
-    connect(j6_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j6_position(double)));
-    connect(j7_spinbox_, SIGNAL(valueChanged(double)), this, SLOT(update_j7_position(double)));
-}
-
 void ManipulatorCommandPanel::update_base_pose_spinboxes()
 {
     disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
@@ -1784,19 +1277,16 @@ void ManipulatorCommandPanel::update_base_pose_spinboxes()
 void ManipulatorCommandPanel::update_gui()
 {
     ROS_INFO("    Pending Move Arm Command: %s", pending_move_arm_command_ ? "TRUE" : "FALSE");
-    ROS_INFO("    Pending Viservo Command: %s", pending_viservo_command_ ? "TRUE": "FALSE");
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Teleport Andalite Command: %s", pending_teleport_andalite_command_ ? "TRUE" : "FALSE");
 
     bool pending_motion_command =
         pending_move_arm_command_          ||
-        pending_viservo_command_           ||
         pending_grasp_object_command_      ||
         pending_reposition_base_command_   ||
         pending_teleport_andalite_command_ ||
-        pending_teleport_hdt_command_      ||
-        pending_gripper_command_;
+        pending_teleport_hdt_command_;
 
     pending_motion_command = false;
 
@@ -1808,20 +1298,6 @@ void ManipulatorCommandPanel::update_gui()
     teleport_base_command_z_box_->setEnabled(global_frame_active() && initialized());
     teleport_base_command_yaw_box_->setEnabled(global_frame_active() && initialized());
     send_teleport_andalite_command_button_->setEnabled(global_frame_active() && initialized() && !pending_motion_command);
-
-    copy_current_state_button_->setEnabled(initialized());
-    cycle_ik_solutions_button_->setEnabled(initialized());
-    send_move_arm_command_button_->setEnabled(initialized() && !pending_motion_command);
-    send_joint_goal_button_->setEnabled(initialized() && !pending_motion_command);
-    send_teleport_hdt_command_button_->setEnabled(initialized() && !pending_motion_command);
-    j1_spinbox_->setEnabled(initialized());
-    j2_spinbox_->setEnabled(initialized());
-    j3_spinbox_->setEnabled(initialized());
-    j4_spinbox_->setEnabled(initialized());
-    j5_spinbox_->setEnabled(initialized());
-    j6_spinbox_->setEnabled(initialized());
-    j7_spinbox_->setEnabled(initialized());
-    send_viservo_command_button_->setEnabled(initialized() && !pending_motion_command);
 
     send_grasp_object_command_button_->setEnabled(initialized() && !pending_motion_command);
     send_reposition_base_command_button_->setEnabled(global_frame_active() && initialized() && !pending_motion_command);

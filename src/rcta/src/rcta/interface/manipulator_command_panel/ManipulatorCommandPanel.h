@@ -30,7 +30,6 @@
 // project includes
 #include <hdt_description/RobotModel.h>
 #include <rcta/MoveArmCommandAction.h>
-#include <rcta/ViservoCommandAction.h>
 #include <rcta/TeleportAndaliteCommandAction.h>
 #include <rcta/TeleportHDTCommandAction.h>
 
@@ -63,23 +62,6 @@ public Q_SLOTS:
     void update_base_pose_candidate(int index);
     void send_teleport_andalite_command();
     void send_teleport_hdt_command();
-    void send_open_gripper_command();
-    void send_close_gripper_command();
-
-    void check_send_octomap(int);
-    void subscribe_to_octomap();
-    void copy_current_state();
-    void cycle_ik_solutions();
-    void send_move_arm_command();
-    void send_joint_goal();
-    void update_j1_position(double value);
-    void update_j2_position(double value);
-    void update_j3_position(double value);
-    void update_j4_position(double value);
-    void update_j5_position(double value);
-    void update_j6_position(double value);
-    void update_j7_position(double value);
-    void send_viservo_command();
 
     void send_grasp_object_command();
     void send_reposition_base_command();
@@ -93,10 +75,6 @@ private:
     typedef actionlib::SimpleActionClient<rcta::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
     bool pending_move_arm_command_;
-
-    typedef actionlib::SimpleActionClient<rcta::ViservoCommandAction> ViservoCommandActionClient;
-    std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
-    bool pending_viservo_command_;
 
     typedef actionlib::SimpleActionClient<rcta_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
@@ -113,10 +91,6 @@ private:
     typedef actionlib::SimpleActionClient<rcta::TeleportHDTCommandAction> TeleportHDTCommandActionClient;
     std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
     bool pending_teleport_hdt_command_;
-
-    typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
-    std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
-    bool pending_gripper_command_;
 
     /// @}
 
@@ -138,25 +112,7 @@ private:
     QPushButton* send_teleport_andalite_command_button_;
 
     // Arm Command Widgets
-    QCheckBox* octomap_checkbox_;
-    QLineEdit* octomap_topic_line_edit_;
-    QPushButton* copy_current_state_button_;
-    QPushButton* cycle_ik_solutions_button_;
-    QPushButton* send_move_arm_command_button_;
-    QPushButton* send_joint_goal_button_;
     QPushButton* send_teleport_hdt_command_button_;
-    QDoubleSpinBox* j1_spinbox_;
-    QDoubleSpinBox* j2_spinbox_;
-    QDoubleSpinBox* j3_spinbox_;
-    QDoubleSpinBox* j4_spinbox_;
-    QDoubleSpinBox* j5_spinbox_;
-    QDoubleSpinBox* j6_spinbox_;
-    QDoubleSpinBox* j7_spinbox_;
-    QPushButton* send_viservo_command_button_;
-
-    // Gripper Command Widgets
-    QPushButton* send_open_gripper_command_button_;
-    QPushButton* send_close_gripper_command_button_;
 
     // Object Interaction Command Widgets
     QPushButton* send_grasp_object_command_button_;
@@ -170,6 +126,9 @@ private:
     Eigen::Affine3d world_to_object_;
 
     hdt::RobotModelPtr robot_model_;
+
+    // joint group (as defined in the srdf) corresponding to the arm
+    std::string manip_name_;
 
     robot_model_loader::RobotModelLoaderPtr rm_loader_;
     robot_model::RobotModelPtr rm_;
@@ -267,12 +226,6 @@ private:
             const actionlib::SimpleClientGoalState& state,
             const rcta::MoveArmCommandResult::ConstPtr& result);
 
-    void viservo_command_active_cb();
-    void viservo_command_feedback_cb(const rcta::ViservoCommandFeedback::ConstPtr& feedback);
-    void viservo_command_result_cb(
-            const actionlib::SimpleClientGoalState& state,
-            const rcta::ViservoCommandResult::ConstPtr& result);
-
     void grasp_object_command_active_cb();
     void grasp_object_command_feeback_cb(const rcta_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
     void grasp_object_command_result_cb(
@@ -297,11 +250,6 @@ private:
             const actionlib::SimpleClientGoalState& state,
             const rcta::TeleportHDTCommandResult::ConstPtr& result);
 
-    void gripper_command_active_cb();
-    void gripper_command_feedback_cb(const control_msgs::GripperCommandFeedback::ConstPtr& feedback);
-    void gripper_command_result_cb(
-            const actionlib::SimpleClientGoalState& state,
-            const control_msgs::GripperCommandResult::ConstPtr& result);
 
     bool gatherRobotMarkers(
             const robot_state::RobotState& robot_state,
