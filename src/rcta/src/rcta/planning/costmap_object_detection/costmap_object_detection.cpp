@@ -8,8 +8,7 @@
 #include <spellbook/random/gaussian.h>
 #include <leatherman/print.h>
 #include <nav_msgs/OccupancyGrid.h>
-
-// project headers
+#include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 
 bool within_bounds(const nav_msgs::OccupancyGrid& grid, int x, int y)

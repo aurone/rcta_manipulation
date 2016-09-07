@@ -10,9 +10,10 @@
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
-#include <spellbook/utils/RunUponDestruction.h>
 #include <spellbook/stringifier/stringifier.h>
+#include <spellbook/utils/RunUponDestruction.h>
 #include <tf_conversions/tf_eigen.h>
 
 namespace RepositionBaseExecutionStatus {

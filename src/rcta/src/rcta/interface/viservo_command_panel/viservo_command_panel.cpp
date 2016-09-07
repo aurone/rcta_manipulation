@@ -4,6 +4,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
+#include <spellbook/geometry_msgs/geometry_msgs.h>
 
 // project includes
 #include <rcta/common/comms/actionlib.h>

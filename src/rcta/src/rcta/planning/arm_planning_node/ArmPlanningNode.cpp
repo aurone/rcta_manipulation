@@ -13,7 +13,9 @@
 #include <leatherman/print.h>
 #include <octomap_msgs/conversions.h>
 #include <sbpl_geometry_utils/geometry.h>
+#include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/std_msgs/std_msgs.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/utils.h>
 #include <tf/LinearMath/Quaternion.h>
