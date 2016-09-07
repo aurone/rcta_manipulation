@@ -105,6 +105,12 @@ private:
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
+    std::string action_name_;
+    typedef actionlib::SimpleActionServer<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+    std::unique_ptr<RepositionBaseCommandActionServer> as_;
+
+    ros::Publisher viz_pub_;
+
     moveit::core::RobotModelPtr robot_model_;
     moveit::core::JointModelGroup* manipulator_group_;
     std::string manipulator_group_name_;
@@ -112,15 +118,17 @@ private:
     // TODO: monitor state
     moveit::core::RobotStatePtr robot_state_;
 
-    std::string robot_frame_;
     std::string camera_view_frame_;
 
     //visualizations
 
-    //xytheta collision checking
+    // xytheta collision checking
     std::unique_ptr<XYThetaCollisionChecker> cc_;
 
+    /// \name Visibility Constraints
+    /// @{
     std::vector<AttachedMarker> attached_markers_;
+    /// @}
 
     // pretend that these aren't required by the grasp planner...
     // the hand-generated grasping spline is done in model coordinates
@@ -137,33 +145,34 @@ private:
     std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
     ///@}
 
-    bool generated_grasps_;
-    bool pending_move_arm_command_;
-    bool sent_move_arm_goal_;
+    /// \name Arm Planning Constraints
+    /// @{
     typedef actionlib::SimpleActionClient<rcta::MoveArmCommandAction> MoveArmCommandActionClient;
     std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
     std::string move_arm_command_action_name_;
-    rcta::MoveArmCommandGoal last_move_arm_pregrasp_goal_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
     rcta::MoveArmCommandResult::ConstPtr move_arm_command_result_;
+    ///@}
+
     tf::TransformListener listener_;
-    ros::Publisher marker_arr_pub_;
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
 
-    bool bComputedRobPose_;
     nav_msgs::OccupancyGrid map_;
-    std::string action_name_;
-    typedef actionlib::SimpleActionServer<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
-    std::unique_ptr<RepositionBaseCommandActionServer> as_;
     rcta_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
     RepositionBaseExecutionStatus::Status status_;
     RepositionBaseExecutionStatus::Status last_status_;
 
     bool downloadGraspingParameters(ros::NodeHandle& nh);
 
-    void computeRobotPlanarPose(const Eigen::Affine3d& robot_pose, Eigen::Affine2d& planar_pose) const;
-    void computeObjectPlanarPose(const Eigen::Affine3d& object_pose, Eigen::Affine2d& planar_pose) const;
+    Eigen::Affine3d poseFrom2D(double x, double y, double yaw) const;
+
+    void computeRobotPlanarPose(
+        const Eigen::Affine3d& robot_pose,
+        Eigen::Affine2d& planar_pose) const;
+    void computeObjectPlanarPose(
+        const Eigen::Affine3d& object_pose,
+        Eigen::Affine2d& planar_pose) const;
 
     bool tryFeasibleArmCheck(
         const Eigen::Affine3d& robot_pose,
@@ -230,6 +239,12 @@ private:
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose,
         std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
+
+    void visualizeRobot(
+        const Eigen::Affine3d& pose,
+        int hue,
+        const std::string& ns,
+        int& id);
 };
 
 #endif

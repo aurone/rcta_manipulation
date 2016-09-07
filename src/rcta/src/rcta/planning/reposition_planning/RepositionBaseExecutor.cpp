@@ -6,6 +6,7 @@
 // systemm includes
 #include <angles/angles.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <leatherman/utils.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
 #include <sbpl_geometry_utils/utils.h>
@@ -38,10 +39,11 @@ double sign(double val)
 RepositionBaseExecutor::RepositionBaseExecutor() :
     nh_(),
     ph_("~"),
+    action_name_("reposition_base_command"),
+    as_(),
     robot_model_(),
     manipulator_group_(nullptr),
     manipulator_group_name_(),
-    robot_frame_(),
     camera_view_frame_(),
     cc_(),
     attached_markers_(),
@@ -49,23 +51,16 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     gas_can_scale_(),
     max_grasp_candidates_(0),
     pregrasp_to_grasp_offset_m_(0.0),
-    generated_grasps_(false),
-    pending_move_arm_command_(false),
-    sent_move_arm_goal_(false),
     wrist_to_tool_(Eigen::Affine3d::Identity()),
     grasp_to_pregrasp_(Eigen::Affine3d::Identity()),
     grasp_spline_(),
     move_arm_command_client_(),
     move_arm_command_action_name_(),
-    last_move_arm_pregrasp_goal_(),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     move_arm_command_result_(),
     listener_(),
-    marker_arr_pub_(),
-    bComputedRobPose_(true),
+    viz_pub_(),
     map_(),
-    action_name_("reposition_base_command"),
-    as_(),
     current_goal_(),
     status_(RepositionBaseExecutionStatus::INVALID),
     last_status_(RepositionBaseExecutionStatus::INVALID)
@@ -90,7 +85,6 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
 
 bool RepositionBaseExecutor::initialize()
 {
-    robot_frame_ = "base_footprint";
     camera_view_frame_ = "camera_rgb_optical_frame";
 
     robot_model_loader::RobotModelLoader rml;
@@ -123,7 +117,7 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-    marker_arr_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
+    viz_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
@@ -264,7 +258,8 @@ int RepositionBaseExecutor::run()
                 int err = checkFeasibleMoveToPregraspTrajectory(robot_pose, object_pose);
                 ROS_DEBUG("arm plan result: %d", err);
                 if (err) {
-//                    viz.visualizeRobotBase(pos, 0, "base_checkIKPLAN_fail", v_id);
+                    int v_id = 0;
+                    visualizeRobot(robot_pose, 0, "base_checkIKPLAN_fail", v_id);
                 } else {
                     // you can grasp it now!
                     rcta_msgs::RepositionBaseCommandResult result;
@@ -320,7 +315,7 @@ void RepositionBaseExecutor::goal_callback()
     ROS_INFO("    Occupancy Grid Frame ID: %s", current_goal_->map.header.frame_id.c_str());
 
     robot_pose_world_frame_.header.stamp = ros::Time(0);
-    robot_pose_world_frame_.header.frame_id = "base_footprint";
+    robot_pose_world_frame_.header.frame_id = "base_footprint"; // TODO: robot model frame here?
     robot_pose_world_frame_.pose = geometry_msgs::IdentityPose();
     try {
         listener_.transformPose("abs_nwu", robot_pose_world_frame_, robot_pose_world_frame_);
@@ -339,12 +334,6 @@ void RepositionBaseExecutor::goal_callback()
     else {
         ROS_WARN("No valid map received with goal!");
     }
-
-    bComputedRobPose_ = false;
-
-    generated_grasps_ = false;
-    sent_move_arm_goal_ = false;
-    pending_move_arm_command_ = false;
 }
 
 void RepositionBaseExecutor::preempt_callback()
@@ -635,11 +624,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                                 // /base_link pose
                                                 robxf += cos(robYf) * baseOffsetx;
                                                 robyf += sin(robYf) * baseOffsetx;
-                                                std::vector<double> pos(3, 0);
-                                                pos[0] = robxf;
-                                                pos[1] = robyf;
-                                                pos[2] = robYf;
-//                                                viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                                                visualizeRobot(
+                                                        poseFrom2D(robxf, robyf, robYf),
+                                                        0,
+                                                        "base_candidates_collision",
+                                                        base_collision_viz_id);
                                             }
                                             else if (distObs < armLength)
                                                 pObs[i][j][k] = std::min(pObs[i][j][k],
@@ -678,16 +667,18 @@ bool RepositionBaseExecutor::computeRobPose(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
+                                visualizeRobot(
+                                        poseFrom2D(robxf, robyf, robYf),
+                                        0,
+                                        "base_candidates_fp_collision",
+                                        base_collision_viz_id);
                             }
                             else {
-
-                                if (bodyi >= patchSize2 && bodyi < width - patchSize2 && bodyj >= patchSize2
-                                        && bodyj < height - patchSize2) {
+                                if (bodyi >= patchSize2 &&
+                                    bodyi < width - patchSize2 &&
+                                    bodyj >= patchSize2 &&
+                                    bodyj < height - patchSize2)
+                                {
                                     bool bCollided = false;
                                     for (int ii = -patchSize2; ii <= patchSize2 && !bCollided; ii++)
                                         for (int jj = -patchSize2; jj <= patchSize2 && !bCollided; jj++)
@@ -704,11 +695,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                                     // /base_link pose
                                                     robxf += cos(robYf) * baseOffsetx;
                                                     robyf += sin(robYf) * baseOffsetx;
-                                                    std::vector<double> pos(3, 0);
-                                                    pos[0] = robxf;
-                                                    pos[1] = robyf;
-                                                    pos[2] = robYf;
-//                                                    viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                                                    visualizeRobot(
+                                                            poseFrom2D(robxf, robyf, robYf),
+                                                            0,
+                                                            "base_candidates_collision",
+                                                            base_collision_viz_id);
                                                 }
                                                 else if (distObs < bodyLength)
                                                     pObs[i][j][k] *= std::min(pObs[i][j][k],
@@ -750,7 +741,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                 pos[0] = robxf;
                                 pos[1] = robyf;
                                 pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
+                                visualizeRobot(
+                                        poseFrom2D(robxf, robyf, robYf),
+                                        0,
+                                        "base_candidates_fp_collision",
+                                        base_collision_viz_id);
                             }
                             else {
 
@@ -773,11 +768,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                                     // /base_link pose
                                                     robxf += cos(robYf) * baseOffsetx;
                                                     robyf += sin(robYf) * baseOffsetx;
-                                                    std::vector<double> pos(3, 0);
-                                                    pos[0] = robxf;
-                                                    pos[1] = robyf;
-                                                    pos[2] = robYf;
-//                                                    viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                                                    visualizeRobot(
+                                                            poseFrom2D(robxf, robyf, robYf),
+                                                            0,
+                                                            "base_candidates_collision",
+                                                            base_collision_viz_id);
                                                 }
                                                 else if (distObs < bodyLength)
                                                     pObs[i][j][k] *= std::min(pObs[i][j][k],
@@ -863,11 +858,11 @@ bool RepositionBaseExecutor::computeRobPose(
                         // /base_link pose
                         robxf += cos(robYf) * baseOffsetx;
                         robyf += sin(robYf) * baseOffsetx;
-                        std::vector<double> pos(3, 0);
-                        pos[0] = robxf;
-                        pos[1] = robyf;
-                        pos[2] = robYf;
-//                        viz.visualizeRobotBase(pos, 0, "base_candidates_validity_reject", base_validityreject_viz_id);
+                        visualizeRobot(
+                                poseFrom2D(robxf, robyf, robYf),
+                                0,
+                                "base_candidates_validity_reject",
+                                base_validityreject_viz_id);
                     }
 
         ROS_INFO("    cntTotMax: %d", cntTotMax);
@@ -932,11 +927,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                visualizeRobot(
+                                        poseFrom2D(robxf, robyf, robYf),
+                                        0,
+                                        "base_candidates_prob_reject",
+                                        base_probreject_viz_id);
                             }
                         }
                     }
@@ -956,11 +951,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                visualizeRobot(
+                                        poseFrom2D(robxf, robyf, robYf),
+                                        0,
+                                        "base_candidates_prob_reject",
+                                        base_probreject_viz_id);
                                 cntTotMax--;
                             }
                         }
@@ -1001,7 +996,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                     pos[0] = robxf;
                                     pos[1] = robyf;
                                     pos[2] = robYf;
-//                                    viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                    visualizeRobot(
+                                            poseFrom2D(robxf, robyf, robYf),
+                                            0,
+                                            "base_candidates_prob_reject",
+                                            base_probreject_viz_id);
                                 }
                             }
 
@@ -1021,11 +1020,11 @@ bool RepositionBaseExecutor::computeRobPose(
                                         // /base_link pose
                                         robxf += cos(robYf) * baseOffsetx;
                                         robyf += sin(robYf) * baseOffsetx;
-                                        std::vector<double> pos(3, 0);
-                                        pos[0] = robxf;
-                                        pos[1] = robyf;
-                                        pos[2] = robYf;
-//                                        viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                        visualizeRobot(
+                                                poseFrom2D(robxf, robyf, robYf),
+                                                0,
+                                                "base_candidates_prob_reject",
+                                                base_probreject_viz_id);
                                         cntTotMax--;
                                     }
                                 }
@@ -1073,11 +1072,11 @@ bool RepositionBaseExecutor::computeRobPose(
                         candidate_base_pose.pose.orientation.w = robqf[3];
                         candidate_base_poses.push_back(candidate_base_pose);
 
-                        std::vector<double> pos(3, 0);
-                        pos[0] = robxf;
-                        pos[1] = robyf;
-                        pos[2] = robYf;
-//                        viz.visualizeRobotBase(pos, 120, "base_valid_candidates", base_candidates_viz_id);
+                        visualizeRobot(
+                                poseFrom2D(robxf, robyf, robYf),
+                                120,
+                                "base_valid_candidates",
+                                base_candidates_viz_id);
                     }
     }	// if (bSortMetric==1 || bSortMetric==2)
 
@@ -1154,7 +1153,7 @@ bool RepositionBaseExecutor::computeRobPose(
         ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0, roby0, angles::normalize_angle(robY0)*180/M_PI);
 
         int cntTotThr = 0;	// number of candidate poses with pTot higher than threshold
-        for (std::vector<RepositionBaseCandidate::candidate>::iterator m = cands.begin(); m != cands.end(); ++m)
+        for (std::vector<RepositionBaseCandidate::candidate>::iterator m = cands.begin(); m != cands.end(); ++m) {
             if (m->pTot >= pTotThr) {
                 int i = m->i;
                 int j = m->j;
@@ -1167,9 +1166,7 @@ bool RepositionBaseExecutor::computeRobPose(
                 // /base_link pose
                 robxf += cos(robYf) * baseOffsetx;
                 robyf += sin(robYf) * baseOffsetx;
-// 				ROS_INFO("    Robot Pose (desired):  %f %f %f", robxf,robyf,angles::normalize_angle(robYf)*180/M_PI);
-                ROS_INFO("    Robot Pose (desired):  %f %f %f  (i:%d j:%d k:%d)    pTot: %f", robxf, robyf,
-                        angles::normalize_angle(robYf)*180/M_PI, i, j, k, m->pTot);
+                ROS_INFO("    Robot Pose (desired):  %f %f %f  (i:%d j:%d k:%d)    pTot: %f", robxf, robyf, angles::normalize_angle(robYf)*180/M_PI, i, j, k, m->pTot);
 
                 geometry_msgs::PoseStamped candidate_base_pose;
                 candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1187,14 +1184,15 @@ bool RepositionBaseExecutor::computeRobPose(
                 candidate_base_pose.pose.orientation.w = robqf[3];
                 candidate_base_poses.push_back(candidate_base_pose);
 
-                std::vector<double> pos(3, 0);
-                pos[0] = robxf;
-                pos[1] = robyf;
-                pos[2] = robYf;
-//                viz.visualizeRobotBase(pos, (m->pTot * 240) - 120, "base_probable_candidates", base_probcandidates_viz_id);
+                visualizeRobot(
+                        poseFrom2D(robxf, robyf, robYf),
+                        (m->pTot * 240) - 120,
+                        "base_probable_candidates",
+                        base_probcandidates_viz_id);
 
                 cntTotThr++;
             }
+        }
         if (cntTotThr == 0) {
             robxf = robx0;
             robyf = roby0;
@@ -1445,11 +1443,11 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                             // /base_link pose
                             robxf += cos(robYf) * baseOffsetx;
                             robyf += sin(robYf) * baseOffsetx;
-                            std::vector<double> pos(3, 0);
-                            pos[0] = robxf;
-                            pos[1] = robyf;
-                            pos[2] = robYf;
-//                            viz.visualizeRobotBase(pos, 0, "base_candidates_seen", base_seen_viz_id);
+                            visualizeRobot(
+                                    poseFrom2D(robxf, robyf, robYf),
+                                    0,
+                                    "base_candidates_seen",
+                                    base_seen_viz_id);
                             // higher probability around diffY==bestAngYaw
 // 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
 // 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
@@ -1533,11 +1531,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                                 // /base_link pose
                                                 robxf += cos(robYf) * baseOffsetx;
                                                 robyf += sin(robYf) * baseOffsetx;
-                                                std::vector<double> pos(3, 0);
-                                                pos[0] = robxf;
-                                                pos[1] = robyf;
-                                                pos[2] = robYf;
-//                                                viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                                                visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_collision", base_collision_viz_id);
                                             }
                                             else if (distObs < armLength)
                                                 pObs[i][j][k] = std::min(pObs[i][j][k],
@@ -1575,11 +1569,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
+                                visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_fp_collision", base_collision_viz_id);
                             }
                             else {
 
@@ -1602,11 +1592,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                                     // /base_link pose
                                                     robxf += cos(robYf) * baseOffsetx;
                                                     robyf += sin(robYf) * baseOffsetx;
-                                                    std::vector<double> pos(3, 0);
-                                                    pos[0] = robxf;
-                                                    pos[1] = robyf;
-                                                    pos[2] = robYf;
-//                                                    viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                                                    visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_collision", base_collision_viz_id);
                                                 }
                                                 else if (distObs < bodyLength)
                                                     pObs[i][j][k] *= std::min(pObs[i][j][k],
@@ -1644,11 +1630,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_fp_collision", base_collision_viz_id);
+                                visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_fp_collision", base_collision_viz_id);
                             }
                             else {
 
@@ -1671,11 +1653,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                                     // /base_link pose
                                                     robxf += cos(robYf) * baseOffsetx;
                                                     robyf += sin(robYf) * baseOffsetx;
-                                                    std::vector<double> pos(3, 0);
-                                                    pos[0] = robxf;
-                                                    pos[1] = robyf;
-                                                    pos[2] = robYf;
-//                                                    viz.visualizeRobotBase(pos, 0, "base_candidates_collision", base_collision_viz_id);
+                                                    visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_collision", base_collision_viz_id);
                                                 }
                                                 else if (distObs < bodyLength)
                                                     pObs[i][j][k] *= std::min(pObs[i][j][k],
@@ -1752,11 +1730,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                             // /base_link pose
                             robxf += cos(robYf) * baseOffsetx;
                             robyf += sin(robYf) * baseOffsetx;
-                            std::vector<double> pos(3, 0);
-                            pos[0] = robxf;
-                            pos[1] = robyf;
-                            pos[2] = robYf;
-//                            viz.visualizeRobotBase(pos, 0, "base_candidates_failed_ik", base_failedik_viz_id);
+                            visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_failed_ik", base_failedik_viz_id);
                             bTotMax[i][j][k] = false;
                         }
                         else {
@@ -1809,11 +1783,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                         // /base_link pose
                         robxf += cos(robYf) * baseOffsetx;
                         robyf += sin(robYf) * baseOffsetx;
-                        std::vector<double> pos(3, 0);
-                        pos[0] = robxf;
-                        pos[1] = robyf;
-                        pos[2] = robYf;
-//                        viz.visualizeRobotBase(pos, 0, "base_candidates_validity_reject", base_validityreject_viz_id);
+                        visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_validity_reject", base_validityreject_viz_id);
                     }
 
         ROS_INFO("    cntTotMax: %d", cntTotMax);
@@ -1878,11 +1848,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_prob_reject", base_probreject_viz_id);
                             }
                         }
                     }
@@ -1902,11 +1868,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
-                                std::vector<double> pos(3, 0);
-                                pos[0] = robxf;
-                                pos[1] = robyf;
-                                pos[2] = robYf;
-//                                viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_prob_reject", base_probreject_viz_id);
                                 cntTotMax--;
                             }
                         }
@@ -1943,11 +1905,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                         // /base_link pose
                                         robxf += cos(robYf) * baseOffsetx;
                                         robyf += sin(robYf) * baseOffsetx;
-                                        std::vector<double> pos(3, 0);
-                                        pos[0] = robxf;
-                                        pos[1] = robyf;
-                                        pos[2] = robYf;
-//                                        viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                        visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_prob_reject", base_probreject_viz_id);
                                     }
                                 }
                             }
@@ -1968,11 +1926,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                         // /base_link pose
                                         robxf += cos(robYf) * baseOffsetx;
                                         robyf += sin(robYf) * baseOffsetx;
-                                        std::vector<double> pos(3, 0);
-                                        pos[0] = robxf;
-                                        pos[1] = robyf;
-                                        pos[2] = robYf;
-//                                        viz.visualizeRobotBase(pos, 0, "base_candidates_prob_reject", base_probreject_viz_id);
+                                        visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_prob_reject", base_probreject_viz_id);
                                         cntTotMax--;
                                     }
                                 }
@@ -2019,11 +1973,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                         candidate_base_pose.pose.orientation.z = robqf[2];
                         candidate_base_pose.pose.orientation.w = robqf[3];
                         candidate_base_poses.push_back(candidate_base_pose);
-                        std::vector<double> pos(3, 0);
-                        pos[0] = robxf;
-                        pos[1] = robyf;
-                        pos[2] = robYf;
-//                        viz.visualizeRobotBase(pos, 120, "base_candidates", base_candidates_viz_id);
+                        visualizeRobot(poseFrom2D(robxf, robyf, robYf), 120, "base_candidates", base_candidates_viz_id);
                     }
     }	// if (bSortMetric==1 || bSortMetric==2)
 
@@ -2051,11 +2001,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                         // /base_link pose
                         robxf += cos(robYf) * baseOffsetx;
                         robyf += sin(robYf) * baseOffsetx;
-                        std::vector<double> pos(3, 0);
-                        pos[0] = robxf;
-                        pos[1] = robyf;
-                        pos[2] = robYf;
-//                        viz.visualizeRobotBase(pos, 0, "base_candidates_validity_reject", base_validityreject_viz_id);
+                        visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_validity_reject", base_validityreject_viz_id);
                     }
 
         ROS_INFO("Reposition Base Command Result:");
@@ -2188,11 +2134,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                 candidate_base_pose.pose.orientation.w = robqf[3];
                 candidate_base_poses.push_back(candidate_base_pose);
 
-                std::vector<double> pos(3, 0);
-                pos[0] = robxf;
-                pos[1] = robyf;
-                pos[2] = robYf;
-//                viz.visualizeRobotBase(pos, (m->pTot * 240) - 120, "base_probable_candidates", base_candidates_viz_id);
+                visualizeRobot(poseFrom2D(robxf, robyf, robYf), (m->pTot * 240) - 120, "base_probable_candidates", base_candidates_viz_id);
 
                 cntTotThr++;
             }
@@ -2240,6 +2182,7 @@ void RepositionBaseExecutor::filterGraspCandidates(
     filterGraspCandidatesVisibility(candidates, T_camera_robot, marker_incident_angle_threshold_rad);
 }
 
+/// \brief Filter grasp candidates by kinematic feasibility (inverse kinematics)
 void RepositionBaseExecutor::filterGraspCandidatesIK(
     std::vector<GraspCandidate>& candidates) const
 {
@@ -2277,6 +2220,12 @@ void RepositionBaseExecutor::filterGraspCandidatesIK(
     std::swap(filtered_candidates, candidates);
 }
 
+/// \brief Filter grasp candidates by fiducial visibility.
+///
+/// Fiducial visibility defined by the angle of incidence between the viewer
+/// and the fiducial frame (assumed z normal).
+///
+/// \param[in,out] candidates Grasp candidates in the robot frame
 void RepositionBaseExecutor::filterGraspCandidatesVisibility(
     std::vector<GraspCandidate>& candidates,
     const Eigen::Affine3d& T_camera_robot,
@@ -2380,6 +2329,13 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
 
     ROS_INFO("Attempting %zd grasps", grasp_candidates.size());
     return grasp_candidates;
+}
+
+Eigen::Affine3d RepositionBaseExecutor::poseFrom2D(
+    double x, double y, double yaw) const
+{
+    return Eigen::Translation3d(x, y, 0.0) *
+            Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ());
 }
 
 void RepositionBaseExecutor::computeRobotPlanarPose(
@@ -2504,10 +2460,11 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
         const GraspCandidate& grasp = grasp_candidates[gidx];
 
-        last_move_arm_pregrasp_goal_.type = rcta::MoveArmCommandGoal::EndEffectorGoal;
-        tf::poseEigenToMsg(grasp.grasp_candidate_transform, last_move_arm_pregrasp_goal_.goal_pose);
+        rcta::MoveArmCommandGoal pregrasp_goal;
+        pregrasp_goal.type = rcta::MoveArmCommandGoal::EndEffectorGoal;
+        tf::poseEigenToMsg(grasp.grasp_candidate_transform, pregrasp_goal.goal_pose);
         auto result_cb = boost::bind(&RepositionBaseExecutor::move_arm_command_result_cb, this, _1, _2);
-        move_arm_command_client_->sendGoal(last_move_arm_pregrasp_goal_, result_cb);
+        move_arm_command_client_->sendGoal(pregrasp_goal, result_cb);
 
         const ros::Duration move_arm_command_timeout(30.0);
         move_arm_command_client_->waitForResult(move_arm_command_timeout);
@@ -2683,7 +2640,6 @@ void RepositionBaseExecutor::move_arm_command_result_cb(
 {
     move_arm_command_goal_state_ = state;
     move_arm_command_result_ = result;
-    pending_move_arm_command_ = false;
 }
 
 void RepositionBaseExecutor::visualizeGraspCandidates(
@@ -2699,7 +2655,6 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
     // create triad markers to be reused for each grasp candidate
     visualization_msgs::MarkerArray triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
     for (visualization_msgs::Marker& marker : triad_markers.markers) {
-//         marker.header.frame_id = current_goal_->gas_can_in_base_link.header.frame_id;
         marker.header.frame_id = "/abs_nwu";
         marker.ns = ns;
     }
@@ -2739,7 +2694,7 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
         for (visualization_msgs::Marker& marker : single_triad_markers.markers) {
             marker.ns = "solo_candidate_grasp";
         }
-        marker_arr_pub_.publish(single_triad_markers);
+        viz_pub_.publish(single_triad_markers);
         single_triad_markers.markers.clear();
 
         // restore marker transforms to their original frame
@@ -2749,7 +2704,7 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
     }
 
     ROS_INFO("Visualizing %zd triad markers", all_triad_markers.markers.size());
-    marker_arr_pub_.publish(all_triad_markers);
+    viz_pub_.publish(all_triad_markers);
 }
 
 template <typename ActionType>
@@ -2818,4 +2773,23 @@ bool RepositionBaseExecutor::download_marker_params()
 
     attached_markers_.push_back(std::move(attached_marker));
     return true;
+}
+
+void RepositionBaseExecutor::visualizeRobot(
+    const Eigen::Affine3d& pose,
+    int hue,
+    const std::string& ns,
+    int& id)
+{
+    const moveit::core::JointModel* root_joint = robot_model_->getRootJoint();
+    robot_state_->setJointPositions(root_joint, pose);
+    visualization_msgs::MarkerArray ma;
+    const auto& link_names = robot_model_->getLinkModelNames();
+    std_msgs::ColorRGBA color;
+    leatherman::msgHSVToRGB((double)hue, 1.0, 1.0, color);
+    robot_state_->getRobotMarkers(ma, link_names, color, ns, ros::Duration(0), false);
+    for (auto& marker : ma.markers) {
+        marker.id = id++;
+    }
+    viz_pub_.publish(ma);
 }

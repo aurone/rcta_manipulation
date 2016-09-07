@@ -7,6 +7,7 @@ add_executable(
 target_link_libraries(
     reposition_planner_node
     ${actionlib_LIBRARIES}
+    ${leatherman_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
