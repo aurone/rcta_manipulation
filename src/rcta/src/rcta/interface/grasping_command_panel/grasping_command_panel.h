@@ -119,6 +119,7 @@ private:
 
     Eigen::Affine3d T_world_object_;
 
+    robot_model_loader::RobotModelLoaderPtr rml_;
     robot_model::RobotModelPtr robot_model_;
     robot_state::RobotStatePtr robot_state_;
 
@@ -150,6 +151,8 @@ private:
         const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback);
 
     void publish_phantom_robot_visualizations();
+    void publish_base_pose_candidate_visualization(
+        const geometry_msgs::PoseStamped& candidate_pose);
 
     std::vector<visualization_msgs::InteractiveMarkerControl> create_sixdof_controls() const;
 

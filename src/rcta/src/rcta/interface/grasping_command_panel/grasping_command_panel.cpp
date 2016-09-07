@@ -247,11 +247,7 @@ void GraspingCommandPanel::update_base_pose_candidate(int index)
     if (index > 0) {
         base_candidate_idx_ = index - 1;
         assert(base_candidate_idx_ >= 0 && base_candidate_idx_ < candidate_base_poses_.size());
-
-        tf::poseMsgToEigen(candidate_base_poses_[base_candidate_idx_].pose, T_world_robot_);
-
-        update_base_pose_spinboxes();
-        publish_phantom_robot_visualizations();
+        publish_base_pose_candidate_visualization(candidate_base_poses_[base_candidate_idx_]);
     }
 }
 
@@ -315,8 +311,18 @@ void GraspingCommandPanel::send_grasp_object_command()
 
 void GraspingCommandPanel::send_reposition_base_command()
 {
-    if (!ReconnectActionClient(reposition_base_command_client_, "reposition_base_command")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Reposition Base Command (server is not connected)"));
+    if (!ReconnectActionClient(
+            reposition_base_command_client_, "reposition_base_command"))
+    {
+        QMessageBox::warning(
+                this,
+                tr("Command Failure"),
+                tr("Unable to send Reposition Base Command (server is not connected)"));
+        return;
+    }
+
+    if (!occupancy_grid_) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("No map data received"));
         return;
     }
 
@@ -332,11 +338,7 @@ void GraspingCommandPanel::send_reposition_base_command()
     tf::poseEigenToMsg(T_world_robot_, reposition_base_goal.base_link_in_map.pose);
     reposition_base_goal.base_link_in_map.header.frame_id = global_frame_;
 
-    // TODO: occupancy grid
-    if (occupancy_grid_) {
-    	ROS_INFO("Sending occupancy grid to sung");
-    	reposition_base_goal.map = *occupancy_grid_;
-    }
+	reposition_base_goal.map = *occupancy_grid_;
 
     auto result_callback = boost::bind(&GraspingCommandPanel::reposition_base_command_result_cb, this, _1, _2);
     reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
@@ -585,6 +587,40 @@ void GraspingCommandPanel::publish_phantom_robot_visualizations()
     robot_markers_pub_.publish(marker_array);
 }
 
+void GraspingCommandPanel::publish_base_pose_candidate_visualization(
+    const geometry_msgs::PoseStamped& candidate_pose)
+{
+    if (!initialized()) {
+        return;
+    }
+
+    robot_state_->update();
+
+    const std::vector<std::string>& link_names = robot_model_->getLinkModelNames();
+    std_msgs::ColorRGBA color = std_msgs::CreateColorRGBA(0.44, 0.94, 0.44, 1.0);
+    std::string ns = "base_pose_candidate";
+    ros::Duration d(0);
+
+    visualization_msgs::MarkerArray marker_array;
+    gatherRobotMarkers(*robot_state_, link_names, color, ns, d, marker_array);
+
+    Eigen::Affine3d T_world_candidate;
+    tf::poseMsgToEigen(candidate_pose.pose, T_world_candidate);
+
+    // transform all markers from the robot frame into the global frame
+    for (visualization_msgs::Marker& marker : marker_array.markers) {
+        Eigen::Affine3d root_to_marker;
+        tf::poseMsgToEigen(marker.pose, root_to_marker);
+        // world -> marker = world -> robot * robot -> marker
+        Eigen::Affine3d world_to_marker = T_world_candidate * root_to_marker;
+        tf::poseEigenToMsg(world_to_marker, marker.pose);
+        marker.header.frame_id = global_frame_;
+        marker.header.stamp = ros::Time(0);
+    }
+
+    robot_markers_pub_.publish(marker_array);
+}
+
 std::vector<visualization_msgs::InteractiveMarkerControl>
 GraspingCommandPanel::create_sixdof_controls() const
 {
@@ -687,9 +723,9 @@ bool GraspingCommandPanel::reinit_robot_models(
         return false;
     }
 
-    robot_model_loader::RobotModelLoader rml(robot_description, true);
+    rml_.reset(new robot_model_loader::RobotModelLoader(robot_description, true));
 
-    robot_model::RobotModelPtr robot_model = rml.getModel();
+    robot_model::RobotModelPtr robot_model = rml_->getModel();
     if (!robot_model) {
         why = "Robot Model Loader was unable to construct Robot Model";
         return false;
