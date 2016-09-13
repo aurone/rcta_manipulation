@@ -111,11 +111,27 @@ private:
         Eigen::Affine3d link_to_marker;
     };
 
+    struct SearchSpaceParams
+    {
+        int nDist;
+        double distMin;
+        double distStep;
+
+        int nAng;
+        double angMin;
+        double angStep;
+
+        int nYaw;
+        double yawMin;
+        double yawStep;
+    };
+
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
     ros::Publisher viz_pub_;
-    ros::Publisher debug_map_pub_;
+    ros::Publisher pgrasp_map_pub_;
+    ros::Publisher pobs_map_pub_;
 
     tf::TransformListener listener_;
 
@@ -133,6 +149,8 @@ private:
 
     std::string robot_frame_;
     std::string camera_view_frame_;
+
+    Eigen::Translation2d T_mount_robot_;
 
     /// \name Planar Collision Constraints
     ///@{
@@ -169,21 +187,35 @@ private:
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
 
-    nav_msgs::OccupancyGrid map_;
     rcta_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
     RepositionBaseExecutionStatus::Status status_;
     RepositionBaseExecutionStatus::Status last_status_;
 
     bool downloadGraspingParameters(ros::NodeHandle& nh);
 
+    /// \name 2D and 3D Pose Type Conversions
+    ///@{
     Eigen::Affine3d poseFrom2D(double x, double y, double yaw) const;
+
+    Pose2D poseEigen3ToSimple(const Eigen::Affine3d& pose) const;
+    Pose2D poseEigen2ToSimple(const Eigen::Affine2d& in) const;
+
+    Eigen::Affine2d poseSimpleToEigen2(const Pose2D& pose) const;
+    Eigen::Affine2d poseEigen3ToEigen2(const Eigen::Affine3d& pose) const;
+
+    Eigen::Affine3d poseSimpleToEigen3(
+        const Pose2D& in,
+        double z = 0.0, double R = 0.0, double P = 0.0) const;
+
+    Eigen::Affine3d poseEigen2ToEigen3(
+        const Eigen::Affine2d& in,
+        double z = 0.0, double R = 0.0, double P = 0.0) const;
+    ///@}
 
     void computeRobotPlanarPose(
         const Eigen::Affine3d& robot_pose,
         Eigen::Affine2d& planar_pose) const;
-    void computeObjectPlanarPose(
-        const Eigen::Affine3d& object_pose,
-        Eigen::Affine2d& planar_pose) const;
+    Pose2D poseEigen3ToSimpleGascan(const Eigen::Affine3d& object_pose) const;
 
     bool tryFeasibleArmCheck(
         const Eigen::Affine3d& robot_pose,
@@ -225,30 +257,31 @@ private:
         Eigen::Affine3d T_robot_to_map,
         std::string ns) const;
 
-    template <typename ActionType>
-    bool waitForActionServer(
-        std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& action_client,
-        const std::string& action_name,
-        const ros::Duration& poll_duration,
-        const ros::Duration& timeout);
-
     void computeGraspProbabilities(
+        const SearchSpaceParams& ss,
         const au::grid<3, Pose2D>& rob,
-        double distMin,
-        double distStep,
         const Pose2D& obj,
         double pTotThr,
         au::grid<3, double>& pGrasp,
         au::grid<3, bool>& bTotMax);
 
     void projectProbabilityMap(
-        const au::grid<3, Pose2D>& rob,
-        const au::grid<3, double>& map,
+        const nav_msgs::OccupancyGrid& map,
+        const SearchSpaceParams& ss,
+        const Pose2D& obj_pose,
+        const au::grid<3, double>& prob,
+        const au::grid<3, bool>& valid,
         nav_msgs::OccupancyGrid& grid);
 
+    void generateCandidatePoseSamples(
+        const Pose2D& obj_pose,
+        const SearchSpaceParams& params,
+        au::grid<3, Pose2D>& g) const;
+
     bool computeRobPose(
-        const Eigen::Affine3d& robot_pose,
-        const Eigen::Affine3d& object_pose,
+        const nav_msgs::OccupancyGrid& map,
+        const Pose2D& robot_pose,
+        const Pose2D& object_pose,
         std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
     void goal_callback();
@@ -261,9 +294,24 @@ private:
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose);
     bool computeRobPoseExhaustive(
+        const nav_msgs::OccupancyGrid& map,
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose,
         std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
+
+    void visualizeRobot(
+        double x,
+        double y,
+        double yaw,
+        int hue,
+        const std::string& ns,
+        int& id);
+
+    void visualizeRobot(
+        const Eigen::Affine2d& pose,
+        int hue,
+        const std::string& ns,
+        int& id);
 
     void visualizeRobot(
         const Eigen::Affine3d& pose,
