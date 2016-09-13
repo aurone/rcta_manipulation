@@ -338,7 +338,7 @@ void GraspingCommandPanel::send_reposition_base_command()
     tf::poseEigenToMsg(T_world_robot_, reposition_base_goal.base_link_in_map.pose);
     reposition_base_goal.base_link_in_map.header.frame_id = global_frame_;
 
-	reposition_base_goal.map = *occupancy_grid_;
+    reposition_base_goal.map = *occupancy_grid_;
 
     auto result_callback = boost::bind(&GraspingCommandPanel::reposition_base_command_result_cb, this, _1, _2);
     reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
@@ -681,7 +681,7 @@ GraspingCommandPanel::create_sixdof_controls() const
 void GraspingCommandPanel::occupancy_grid_callback(
     const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
-	occupancy_grid_ = msg;
+    occupancy_grid_ = msg;
 }
 
 bool GraspingCommandPanel::reinit(
