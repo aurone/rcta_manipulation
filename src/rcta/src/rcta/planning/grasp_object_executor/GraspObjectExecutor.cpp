@@ -1496,13 +1496,13 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
     double circle_y,
     double circle_radius) const
 {
-    Eigen::Vector2d mean(circle_x, circle_y);
-    Eigen::Matrix2d covariance(Eigen::Matrix2d::Zero());
+    au::vector2d mean = { circle_x, circle_y };
+    au::matrix2d covariance(au::matrix2d::zeros());
     covariance(0, 0) = 0.1;
     covariance(1, 1) = 0.1;
-    Gaussian2 gauss(mean, covariance);
+    au::gaussian_distribution<2> gauss(mean, covariance);
 
-    ROS_INFO("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (%0.3f, %0.3f)", mean.x(), mean.y(), covariance(0, 0), covariance(1, 1));
+    ROS_INFO("Setting up gaussian with mean (%0.3f, %0.3f) and covariance (%0.3f, %0.3f)", mean[0], mean[1], covariance(0, 0), covariance(1, 1));
 
     ROS_INFO("Evaluating circle at (%0.3f, %0.3f) with radius %0.3f from costmap", circle_x, circle_y, circle_radius);
     Eigen::Vector2d circle_center(circle_x, circle_y);
@@ -1541,7 +1541,7 @@ double GraspObjectExecutor::calc_prob_successful_grasp(
             // calculate the probability modulus for this cell
             int xrow = grid_x - min_grid(0);
             int ycol = grid_y - min_grid(1);
-            mask(xrow, ycol) = gauss(wp);
+            mask(xrow, ycol) = gauss({ wp.x(), wp.y() });
             sum += mask(xrow, ycol);
 
         }
