@@ -246,16 +246,14 @@ bool XYThetaCollisionChecker::updateDistanceMap(
     for (size_t x = 0; x < grid.info.width; ++x) {
         if (occupied(x, 0)) {
             G(x, 0) = 0;
-        }
-        else {
+        } else {
             G(x, 0) = inf;
         }
 
         for (size_t y = 1; y < grid.info.height; ++y) {
             if (occupied(x, y)) {
                 G(x, y) = 0;
-            }
-            else {
+            } else {
                 G(x, y) = G(x, y - 1) + 1;
             }
         }
@@ -284,8 +282,7 @@ bool XYThetaCollisionChecker::updateDistanceMap(
             if (q < 0) {
                 q = 0;
                 s(0) = u;
-            }
-            else {
+            } else {
                 auto sep = [&](int i, int u) {
                     return (u*u - i*i + g(u)*g(u) - g(i)*g(i)) / (2 * (u - i));
                 };
@@ -335,7 +332,7 @@ bool XYThetaCollisionChecker::precomputeFootprints(double res)
     footprint_cells.resize(m_num_heading_disc);
     for (int h = 0; h < m_num_heading_disc; h++) {
         pose.theta = DiscTheta2Cont(h, m_num_heading_disc);
-        ROS_INFO("Pre-computing footprint for heading %d/%d", h, m_num_heading_disc);
+        ROS_DEBUG("Pre-computing footprint for heading %d/%d", h, m_num_heading_disc);
         if (!calculateFootprintForPose(pose, footprint_cells[h], m_footprint_polygon, res)) {
             ROS_WARN("Failed to pre-compute footprint polygon for heading %d", h);
             return false;
@@ -452,7 +449,7 @@ bool XYThetaCollisionChecker::calculateFootprintForPose(
         }
     }
 
-    ROS_INFO("Footprint size: %zd cells", footprint_cells.size());
+    ROS_DEBUG("Footprint size: %zd cells", footprint_cells.size());
     return true;
 }
 
