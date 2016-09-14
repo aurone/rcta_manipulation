@@ -91,6 +91,12 @@ bool RepositionBaseExecutor::initialize()
         ROS_ERROR("robot '%s' has no group named '%s'", robot_model_->getName().c_str(), manip_name_.c_str());
         return false;
     }
+    manip_group_ = robot_model_->getJointModelGroup(manip_name_);
+    const auto& tip_frames = manip_group_->getSolverInstance()->getTipFrames();
+    ROS_INFO("'%s' group tip frames:", manip_name_.c_str());
+    for (const auto& tip_frame : tip_frames) {
+        ROS_INFO("  %s", tip_frame.c_str());
+    }
 
     if (!msg_utils::download_param(ph_, "gas_canister_mesh", gas_can_mesh_path_) ||
         !msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_))
