@@ -585,12 +585,7 @@ bool RepositionBaseExecutor::computeRobPose(
     std::vector<RepositionBaseCandidate::candidate> cands;
     extractValidCandidatesSorted(ss, bTotMax, pTot, cands);
 
-    // 6-2) generate final desired robot poses with maximum pTot
-    ROS_INFO("Reposition Base Command Result:");
-    ROS_INFO("    Object Pose (initial): %f %f %f", object_pose.x, object_pose.y, angles::normalize_angle(object_pose.yaw)*180/M_PI);
-    ROS_INFO("    Robot Pose (intial):   %f %f %f", robot_pose.x, robot_pose.y, angles::normalize_angle(robot_pose.yaw)*180/M_PI);
-
-    int cntTotThr = 0; // number of candidate poses with pTot higher than threshold
+    // finally, gather all pose candidates with valid probabilities
     for (size_t cidx = 0; cidx < cands.size(); ++cidx) {
         const auto& cand = cands[cidx];
         if (cand.pTot >= pTotThr) {
@@ -618,7 +613,6 @@ bool RepositionBaseExecutor::computeRobPose(
             candidate_base_poses.push_back(candidate_pose);
 
             visualizeRobot(T_world_robot, (cand.pTot * 240) - 120, "base_probable_candidates", base_probcandidates_viz_id);
-            cntTotThr++;
         }
     }
 
@@ -679,12 +673,10 @@ void RepositionBaseExecutor::computeGraspProbabilities(
     double bestDist = 0.70;
 
     // pGrasp: quadratic function (1 at bestDist, (1 - scalepGraspDist)^2 at borders)
-//    double scalepGraspDist = 0.1;
-    double scalepGraspDist = 0.05;
+    double scalepGraspDist = 0.05; // 0.1
 
     // pGrasp: quadratic function (1 at bestAngYaw, (1 - scalepGraspAngYaw)^2 at borders)
-//    double scalepGraspAngYaw = 0.1;
-    double scalepGraspAngYaw = 0.05;
+    double scalepGraspAngYaw = 0.05; // 0.1
 
     ///////////////////////
     // END CONFIGURATION //
@@ -824,27 +816,30 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
                     if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
                         // EXCLUDE CANDIDATES WE HAVE ALREADY SEEN
                         bTotMax(i, j, k) = false;
-                        // /top_shelf pose
                         Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
                         Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
                         visualizeRobot(T_world_robot, 0, "base_candidates_seen", base_seen_viz_id);
                         // higher probability around diffY==bestAngYaw
-// 							pGrasp(i, j, k) = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-// 							pGrasp(i, j, k) = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+                        // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+//                        pGrasp(i, j, k) = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );
+//                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
 
                         // higher probability around diffY==bestAngYaw and diffDist==bestDist
-// 							pGrasp(i, j, k) = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(ss.distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+                        // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+//                        pGrasp(i, j, k) = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(ss.distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0));
+//                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
                     }
                 }
-// 					pGrasp(i, j, k) = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
-// 												* std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0)
-// 												* std::pow( (diffDistMax-fabs(ss.distMin+ss.distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
-// 										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-// 					pGrasp(i, j, k) = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
+                // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+//                pGrasp(i, j, k) = std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0) *
+//                        std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) *
+//                        std::pow( (diffDistMax-fabs(ss.distMin+ss.distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0);
+//                pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
+//                pGrasp(i, j, k) = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
 
                 // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
                 pGrasp(i, j, k) =
-                        std::max(std::min(diffAng - 5.0 / 180.0 * M_PI, 0.0) / diffAngMax + 1.0, 0.0) * // ^1
+                        std::max(std::min(diffAng - angles::from_degrees(5.0), 0.0) / diffAngMax + 1.0, 0.0) * // ^1
                         sqrd((diffYMax - std::min(fabs(angles::normalize_angle(diffY - bestAngYaw)), fabs(angles::normalize_angle(diffY - M_PI - bestAngYaw))) * scalepGraspAngYaw) / (diffYMax)) *
                         sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist) / (diffDistMax));
                 pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
