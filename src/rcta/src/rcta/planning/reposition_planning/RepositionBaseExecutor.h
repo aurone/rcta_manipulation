@@ -14,6 +14,7 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
@@ -132,6 +133,7 @@ private:
     ros::Publisher viz_pub_;
     ros::Publisher pgrasp_map_pub_;
     ros::Publisher pobs_map_pub_;
+    ros::Publisher pgrasp_exhaustive_map_pub_;
 
     tf::TransformListener listener_;
 
@@ -145,9 +147,9 @@ private:
     std::string manip_name_;
 
     // TODO: monitor state to get the transform between the camera and the wrist
+    planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
     moveit::core::RobotStatePtr robot_state_;
 
-    std::string robot_frame_;
     std::string camera_view_frame_;
 
     Eigen::Translation2d T_mount_robot_;
@@ -155,6 +157,14 @@ private:
     /// \name Planar Collision Constraints
     ///@{
     std::unique_ptr<XYThetaCollisionChecker> cc_;
+
+    double m_arm_offset_x;
+    double m_arm_offset_y;
+    double m_arm_length;
+    double m_arm_length_core;
+
+    double m_body_length;
+    double m_body_length_core;
     ///@}
 
     /// \name Visibility Constraints
@@ -192,6 +202,11 @@ private:
     RepositionBaseExecutionStatus::Status last_status_;
 
     bool downloadGraspingParameters(ros::NodeHandle& nh);
+
+    const moveit::core::RobotState& currentRobotState() const;
+
+    void processSceneUpdate(
+        planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType type);
 
     /// \name 2D and 3D Pose Type Conversions
     ///@{
@@ -233,15 +248,18 @@ private:
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose);
     std::vector<GraspCandidate> sampleGraspCandidates(
-        const Eigen::Affine3d& robot_to_object,
+        const Eigen::Affine3d& T_grasp_object,
         int num_candidates) const;
 
     void filterGraspCandidates(
         std::vector<GraspCandidate>& candidates,
+        const Eigen::Affine3d& T_grasp_robot,
         const Eigen::Affine3d& T_camera_robot,
         double marker_incident_angle_threshold_rad) const;
 
-    void filterGraspCandidatesIK(std::vector<GraspCandidate>& candidates) const;
+    void filterGraspCandidatesIK(
+        std::vector<GraspCandidate>& candidates,
+        const Eigen::Affine3d& T_grasp_robot) const;
     void filterGraspCandidatesVisibility(
         std::vector<GraspCandidate>& candidates,
         const Eigen::Affine3d& T_camera_robot,
@@ -254,8 +272,12 @@ private:
         const rcta::MoveArmCommandResult::ConstPtr& result);
     void visualizeGraspCandidates(
         const std::vector<GraspCandidate>& grasps,
-        Eigen::Affine3d T_robot_to_map,
-        std::string ns) const;
+        const Eigen::Affine3d& T_world_grasp,
+        const std::string& ns) const;
+
+    void visualizeGraspCandidates(
+        const std::vector<GraspCandidate>& grasp,
+        const std::string& ns) const;
 
     void computeGraspProbabilities(
         const SearchSpaceParams& ss,
@@ -264,6 +286,37 @@ private:
         double pTotThr,
         au::grid<3, double>& pGrasp,
         au::grid<3, bool>& bTotMax);
+
+    void computeExhaustiveGraspProbabilities(
+        const SearchSpaceParams& ss,
+        const au::grid<3, Pose2D>& rob,
+        const Pose2D& obj,
+        double pTotThr,
+        au::grid<3, double>& pGrasp,
+        au::grid<3, bool>& bTotMax);
+
+    void pruneCollisionStates(
+        const SearchSpaceParams& ss,
+        const au::grid<3, Pose2D>& rob,
+        au::grid<3, bool>& bTotMax);
+
+    void computeArmCollisionProbabilities(
+        const SearchSpaceParams& ss,
+        const au::grid<3, Pose2D>& rob,
+        au::grid<3, double>& pObs,
+        au::grid<3, bool>& bTotMax);
+
+    void computeBaseCollisionProbabilities(
+        const SearchSpaceParams& ss,
+        const au::grid<3, Pose2D>& rob,
+        au::grid<3, double>& pObs,
+        au::grid<3, bool>& bTotMax);
+
+    bool multiplyProbabilities(
+        const au::grid<3, double>& p1,
+        const au::grid<3, double>& p2,
+        const au::grid<3, bool>& b,
+        au::grid<3, double>& p);
 
     void projectProbabilityMap(
         const nav_msgs::OccupancyGrid& map,

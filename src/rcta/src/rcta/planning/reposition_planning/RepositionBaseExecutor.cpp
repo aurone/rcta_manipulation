@@ -71,7 +71,6 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
 
 bool RepositionBaseExecutor::initialize()
 {
-    robot_frame_ = "base_footprint";
     camera_view_frame_ = "camera_rgb_optical_frame";
 
     rml_.reset(new robot_model_loader::RobotModelLoader);
@@ -81,7 +80,17 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-    robot_state_.reset(new moveit::core::RobotState(robot_model_));
+    if (!robot_model_->hasLinkModel(camera_view_frame_)) {
+        ROS_ERROR("No link '%s' found in robot model", camera_view_frame_.c_str());
+        return false;
+    }
+
+    auto transformer = boost::shared_ptr<tf::Transformer>(new tf::TransformListener);
+    m_scene_monitor.reset(new planning_scene_monitor::PlanningSceneMonitor(
+            rml_, transformer));
+    auto update_fn = boost::bind(&RepositionBaseExecutor::processSceneUpdate, this, _1);
+    m_scene_monitor->addUpdateCallback(update_fn);
+    m_scene_monitor->startStateMonitor();
 
     if (!msg_utils::download_param(ph_, "manipulator_group_name", manip_name_)) {
         return false;
@@ -113,6 +122,7 @@ bool RepositionBaseExecutor::initialize()
     viz_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 100);
     pgrasp_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_map", 1);
     pobs_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
+    pgrasp_exhaustive_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
 
     move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
@@ -159,6 +169,21 @@ bool RepositionBaseExecutor::initialize()
     }
 
     cc_.reset(new XYThetaCollisionChecker(footprint_polygon, obs_thresh, num_heading_disc));
+
+    m_arm_offset_x = 0.3;
+    m_arm_offset_y = -0.5;   // -1.1,  0.0
+
+    // workspace radius about the center of arm
+    m_arm_length = 0.5; // 1.5
+
+    // core workspace radius about the center of arm (pObs = 0.0)
+    m_arm_length_core = 0.3; // 0.6
+
+    // support polygon radius about the center of body
+    m_body_length = 0.5; // 0.8
+
+    // core support polygon radius about the center of body (pObs = 0.0)
+    m_body_length_core = 0.335; // 0.65
 
     double baseOffsetx = -0.49 + 0.148975;  // -0.49, -0.5, -0.3, 0.0
     T_mount_robot_ = Eigen::Translation2d(baseOffsetx, 0.0);
@@ -226,6 +251,25 @@ bool RepositionBaseExecutor::downloadGraspingParameters(ros::NodeHandle& nh)
     grasp_to_pregrasp_ = Eigen::Translation3d(-pregrasp_to_grasp_offset_m_, 0, 0);
 
     return true;
+}
+
+const moveit::core::RobotState& RepositionBaseExecutor::currentRobotState() const
+{
+    assert(m_scene_monitor && m_scene_monitor->getPlanningScene());
+    return m_scene_monitor->getPlanningScene()->getCurrentState();
+}
+
+void RepositionBaseExecutor::processSceneUpdate(
+    planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType type)
+{
+    switch (type) {
+    case planning_scene_monitor::PlanningSceneMonitor::UPDATE_STATE: {
+
+    }   break;
+    case planning_scene_monitor::PlanningSceneMonitor::UPDATE_TRANSFORMS: {
+
+    }   break;
+    }
 }
 
 int RepositionBaseExecutor::run()
@@ -425,8 +469,6 @@ bool RepositionBaseExecutor::computeRobPose(
     // visualizations
     int base_candidates_viz_id = 0;
     int base_probcandidates_viz_id = 0;
-    int base_collision_viz_id = 0;
-    int base_footprint_viz_id = 0;
     int base_probreject_viz_id = 0;
     int base_validityreject_viz_id = 0;
     int base_failedik_viz_id = 0;
@@ -451,32 +493,7 @@ bool RepositionBaseExecutor::computeRobPose(
     ss.yawStep = angles::from_degrees(5.0);     // 5.0
 
     bool bCheckGrasp = true;
-
     bool bCheckObs = true;
-
-    // 2) arm position offset for computing pObs
-
-    // center of arm (for normal grasping motion)
-    double armOffsetx = 0.3;
-    double armOffsety = -0.5;   // -1.1,  0.0
-
-    // workspace radius about the center of arm
-    double armLength = 0.5; // 1.5
-
-    // core workspace radius about the center of arm (pObs = 0.0)
-    double armLengthCore = 0.3; // 0.6
-
-    // center of front body (except arm)
-    double bodyOffsetx1 = -0.49 + 0.148975 + 0.27;
-
-    // center of rear body (except arm)
-    double bodyOffsetx2 = -0.49 + 0.148975 - 0.27;
-
-    // support polygon radius about the center of body
-    double bodyLength = 0.5; // 0.8
-
-    // core support polygon radius about the center of body (pObs = 0.0)
-    double bodyLengthCore = 0.335; // 0.65
 
     // threshold for classifying clear and occupied regions
     int mapObsThr = 1;
@@ -562,30 +579,7 @@ bool RepositionBaseExecutor::computeRobPose(
 
     if (bCheckObs) {
         // filter out poses where the robot is definitely in collision
-        for (int i = 0; i < ss.nDist; ++i) {
-        for (int j = 0; j < ss.nAng; ++j) {
-        for (int k = 0; k < ss.nYaw; ++k) {
-            if (!bTotMax(i, j, k)) {
-                continue;
-            }
-            Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
-            Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
-
-            Pose2D rp = poseEigen2ToSimple(T_world_robot);
-
-            if (!cc_->isValidState(rp.x, rp.y, rp.yaw)) {
-                // equivalent to pObs[i][j][k] = 0;
-                bTotMax(i, j, k) = false;
-                auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
-                for (auto& m : fp_markers.markers) {
-                    m.ns = "footprint_polygon_collisions";
-                    m.id = base_footprint_viz_id++;
-                }
-                viz_pub_.publish(fp_markers);
-            }
-        }
-        }
-        }
+        pruneCollisionStates(ss, rob, bTotMax);
 
         const bool publish_pobs_map = true;
         if (publish_pobs_map) {
@@ -594,84 +588,14 @@ bool RepositionBaseExecutor::computeRobPose(
             pobs_map_pub_.publish(prob_grid);
         }
 
-        // filter out poses that are definitely in collision with the arm
-        // (minimum workspace radius constraint) and update collision
-        // probabilities of collision if within the maximum workspace radius
-        for (int i = 0; i < ss.nDist; i++) {
-        for (int j = 0; j < ss.nAng; j++) {
-        for (int k = 0; k < ss.nYaw; k++) {
-            if (!bTotMax(i, j, k)) {
-                continue;
-            }
-            Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
-            Eigen::Affine2d T_mount_arm(
-                    Eigen::Translation2d(armOffsetx, armOffsety));
-            Eigen::Affine2d T_world_arm = T_world_mount * T_mount_arm;
-            const double armx = T_world_arm.translation()[0];
-            const double army = T_world_arm.translation()[1];
-
-            double distObs = cc_->getCellObstacleDistance(armx, army);
-            if (distObs < armLengthCore) {
-                bTotMax(i, j, k) = false;
-                Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j ,k));
-                Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
-                visualizeRobot(T_world_robot, 0, "candidate_arm_collisions", base_collision_viz_id);
-            } else if (distObs < armLength) {
-                double p = sqrd((distObs - armLengthCore) / (armLength - armLengthCore));
-                pObs(i, j, k) = std::min(pObs(i, j, k), p);
-            }
-        }
-        }
-        }
-
-        // filter out poses that are definitely in collision with the base and
-        // update probabilities of collision if within some threshold
-        for (int i = 0; i < ss.nDist; i++) {
-        for (int j = 0; j < ss.nAng; j++) {
-        for (int k = 0; k < ss.nYaw; k++) {
-            if (!bTotMax(i, j, k)) {
-                continue;
-            }
-            Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
-            Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
-
-            double bodyx = T_world_robot.translation()[0];
-            double bodyy = T_world_robot.translation()[1];
-
-            double distObs = cc_->getCellObstacleDistance(bodyx, bodyy);
-            if (distObs < bodyLengthCore) {
-                bTotMax(i, j, k) = false;
-                visualizeRobot(T_world_robot, 0, "candidate_body_collisions", base_collision_viz_id);
-            } else if (distObs < bodyLength) {
-                // pObs: quadratic function (1 at outer borders, 0 at
-                // inner borders) lowest value among the patch
-                // cells for current i,j,k
-                double p = sqrd((distObs - bodyLengthCore) / (bodyLength - bodyLengthCore));
-                pObs(i, j, k) *= std::min(pObs(i, j, k), p);
-            }
-        }
-        }
-        }
+        computeArmCollisionProbabilities(ss, rob, pObs, bTotMax);
+        computeBaseCollisionProbabilities(ss, rob, pObs, bTotMax);
     }
 
     // 3) TODO: robot arm workspace limit should be included here!
 
-    // 4) total probability
-
-    au::grid<3, double> pTot(ss.nDist, ss.nAng, ss.nYaw);
-    pTot.assign(0.0);
-    for (int i = 0; i < ss.nDist; i++) {
-        for (int j = 0; j < ss.nAng; j++) {
-            for (int k = 0; k < ss.nYaw; k++) {
-                if (bTotMax(i, j, k)) {
-                    pTot(i, j, k) = pGrasp(i, j, k) * pObs(i, j, k);
-                }
-                else {
-                    pTot(i, j, k) = 0.0;
-                }
-            }
-        }
-    }
+    au::grid<3, double> pTot;
+    multiplyProbabilities(pGrasp, pObs, bTotMax, pTot);
 
     // 5) select maximum probability with min distance from robot
     // HEURISTICALLY, minimum difference in angular coordinate wrt object, then farthest from the origin of object
@@ -723,7 +647,7 @@ bool RepositionBaseExecutor::computeRobPose(
             // (we can select poses with pTot higher than a THRESHOLD)
             // a) sorting by difference of angular coordinates for current and desired poses
             // ASSUME? backward driving is allowed for husky
-            // HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
+            // HEURISTIC: minimize angle difference between robot orientation (rob(i, j, k).yawot motion direction (angO2Rcur)
             double angO2Rcur = atan2(robot_pose.y - object_pose.y, robot_pose.x - object_pose.x);	// current angular coordinate from object to robot
             double angO2Rdes, angO2Rerr, angO2RerrMin = M_PI;
             cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
@@ -1014,10 +938,6 @@ void RepositionBaseExecutor::computeGraspProbabilities(
     au::grid<3, double>& pGrasp,
     au::grid<3, bool>& bTotMax)
 {
-    int nDist = rob.size(0);
-    int nAng = rob.size(1);
-    int nYaw = rob.size(2);
-
     ///////////////////
     // CONFIGURATION //
     ///////////////////
@@ -1030,7 +950,7 @@ void RepositionBaseExecutor::computeGraspProbabilities(
 
     // partition radial samples into zones for distance-dependent allowable
     // heading differences between the robot and the object
-    int secDist[2] = { 1 * nDist / 3, 2 * nDist / 3 };
+    int secDist[2] = { 1 * ss.nDist / 3, 2 * ss.nDist / 3 };
 
     // distance-dependent allowable heading offset range
     double secAngYaw[2];
@@ -1053,7 +973,7 @@ void RepositionBaseExecutor::computeGraspProbabilities(
     // END CONFIGURATION //
     ///////////////////////
 
-    for (int i = 0; i < nDist; i++) {
+    for (int i = 0; i < ss.nDist; i++) {
         // c) set acceptable object orientation range
         if (i < secDist[0]) {
             secAngYaw[0] = angles::from_degrees(45.0);  // 15,  15
@@ -1069,8 +989,8 @@ void RepositionBaseExecutor::computeGraspProbabilities(
             bestAngYaw   = angles::from_degrees(60.0);  // 50, 15
         }
 
-        for (int j = 0; j < nAng; ++j) {
-            for (int k = 0; k < nYaw; ++k) {
+        for (int j = 0; j < ss.nAng; ++j) {
+            for (int k = 0; k < ss.nYaw; ++k) {
                 // angular coordinate of a vector from robot position to object
                 // position (not orientation)
                 double rob2obj = atan2(obj.y - rob(i, j, k).y, obj.x - rob(i, j, k).x);
@@ -1093,7 +1013,7 @@ void RepositionBaseExecutor::computeGraspProbabilities(
                     // desirable distance configuration
                     const double diffDistMax = std::max(
                             fabs(ss.distMin - bestDist),
-                            fabs(ss.distMin + ss.distStep * (nDist - 1) - bestDist));
+                            fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
 
                     // filter out all candidate poses where the difference in
                     // heading between the robot and the object lies outside the
@@ -1122,6 +1042,233 @@ void RepositionBaseExecutor::computeGraspProbabilities(
             }
         }
     }
+}
+
+void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
+    const SearchSpaceParams& ss,
+    const au::grid<3, Pose2D>& rob,
+    const Pose2D& obj,
+    double pTotThr,
+    au::grid<3, double>& pGrasp,
+    au::grid<3, bool>& bTotMax)
+{
+    int base_seen_viz_id = 0;
+
+    int secDist[2] = { ss.nDist / 3, 2 * ss.nDist / 3 };
+    double secAngYaw[2];
+    double bestAngYaw;
+    double bestDist = 0.60;
+
+//    double secSide[2] = { angles::from_degrees(0.0), angles::from_degrees(45.0) };
+//    double secSide[2] = { angles::from_degrees(0.0), angles::from_degrees(20.0) };
+    double secSide[2] = { angles::from_degrees(-5.0), angles::from_degrees(40.0) };
+
+    // pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
+    double scalepGraspDist = 0.05; // 0.1
+
+    // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
+    double scalepGraspAngYaw = 0.3; // 0.05, 0.1
+
+    // heuristic probability of successful grasping
+    // a) position: the object should be within left-hand side of the robot and 45 deg angle of view
+    // exception: exclude poses at close distance, include ones in right-hand side at far distance
+    // b) orientation: the object handle should be directed to the right of the robot
+    // c) exception: allow more deviation at close distance, reject most of deviations at far distance
+
+    for (int i = 0; i < ss.nDist; i++) {
+        // c) set acceptable object orientation range
+        if (i < secDist[0]) {
+            secAngYaw[0] = angles::from_degrees(45.0); // 15
+            secAngYaw[1] = angles::from_degrees(130.0); // 90, 100
+            bestAngYaw = angles::from_degrees(-90.0); // -60, 65, 60
+        } else if (i < secDist[1]) {
+            secAngYaw[0] = angles::from_degrees(45.0); // 15
+            secAngYaw[1] = angles::from_degrees(130.0); // 90
+            bestAngYaw = angles::from_degrees(-90.0); // -60, 60, 45
+        } else { // if (i >= secDist[1])
+            secAngYaw[0] = angles::from_degrees(45.0); // 15
+            secAngYaw[1] = angles::from_degrees(130.0); // 90, 60, 30
+            bestAngYaw = angles::from_degrees(-90.0); // -60, -120, 50, 15
+        }
+
+        for (int j = 0; j < ss.nAng; j++) {
+            for (int k = 0; k < ss.nYaw; k++) {
+                // object position (not orientation)
+                double rob2obj = atan2(obj.y - rob(i, j, k).y, obj.x - rob(i, j, k).x);
+                double diffAng = angles::normalize_angle(rob2obj - rob(i, j, k).yaw);
+                double diffAngMax = fabs(ss.yawMin - secSide[0]);
+                // b) object handle orientation to the right of the robot
+                double diffY = angles::normalize_angle(obj.yaw - rob(i, j, k).yaw);
+                double diffYMax = M_PI / 2.0;
+                double diffDistMax = std::max(fabs(ss.distMin - bestDist),
+                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
+                // left-hand side and angle of view
+                if (diffAng >= secSide[0] && diffAng < secSide[1]) {
+                    if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
+                        // EXCLUDE CANDIDATES WE HAVE ALREADY SEEN
+                        bTotMax(i, j, k) = false;
+                        // /top_shelf pose
+                        Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+                        Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+                        visualizeRobot(T_world_robot, 0, "base_candidates_seen", base_seen_viz_id);
+                        // higher probability around diffY==bestAngYaw
+// 							pGrasp(i, j, k) = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+// 							pGrasp(i, j, k) = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+
+                        // higher probability around diffY==bestAngYaw and diffDist==bestDist
+// 							pGrasp(i, j, k) = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(ss.distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+                    }
+                }
+// 					pGrasp(i, j, k) = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
+// 												* std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0)
+// 												* std::pow( (diffDistMax-fabs(ss.distMin+ss.distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
+// 										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+// 					pGrasp(i, j, k) = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
+
+                // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
+                pGrasp(i, j, k) =
+                        std::max(std::min(diffAng - 5.0 / 180.0 * M_PI, 0.0) / diffAngMax + 1.0, 0.0) * // ^1
+                        sqrd((diffYMax - std::min(fabs(angles::normalize_angle(diffY - bestAngYaw)), fabs(angles::normalize_angle(diffY - M_PI - bestAngYaw))) * scalepGraspAngYaw) / (diffYMax)) *
+                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist) / (diffDistMax));
+                pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
+            }
+        }
+    }
+}
+
+void RepositionBaseExecutor::pruneCollisionStates(
+    const SearchSpaceParams& ss,
+    const au::grid<3, Pose2D>& rob,
+    au::grid<3, bool>& bTotMax)
+{
+    int base_footprint_viz_id = 0;
+    for (int i = 0; i < ss.nDist; ++i) {
+    for (int j = 0; j < ss.nAng; ++j) {
+    for (int k = 0; k < ss.nYaw; ++k) {
+        if (!bTotMax(i, j, k)) {
+            continue;
+        }
+        Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+        Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+
+        Pose2D rp = poseEigen2ToSimple(T_world_robot);
+
+        if (!cc_->isValidState(rp.x, rp.y, rp.yaw)) {
+            // equivalent to pObs[i][j][k] = 0;
+            bTotMax(i, j, k) = false;
+            auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
+            for (auto& m : fp_markers.markers) {
+                m.ns = "footprint_polygon_collisions";
+                m.id = base_footprint_viz_id++;
+            }
+            viz_pub_.publish(fp_markers);
+        }
+    }
+    }
+    }
+}
+
+void RepositionBaseExecutor::computeArmCollisionProbabilities(
+    const SearchSpaceParams& ss,
+    const au::grid<3, Pose2D>& rob,
+    au::grid<3, double>& pObs,
+    au::grid<3, bool>& bTotMax)
+{
+    int arm_collision_viz_id = 0;
+    // filter out poses that are definitely in collision with the arm
+    // (minimum workspace radius constraint) and update collision
+    // probabilities of collision if within the maximum workspace radius
+    for (int i = 0; i < ss.nDist; i++) {
+    for (int j = 0; j < ss.nAng; j++) {
+    for (int k = 0; k < ss.nYaw; k++) {
+        if (!bTotMax(i, j, k)) {
+            continue;
+        }
+        Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+        Eigen::Affine2d T_mount_arm(
+                Eigen::Translation2d(m_arm_offset_x, m_arm_offset_y));
+        Eigen::Affine2d T_world_arm = T_world_mount * T_mount_arm;
+        const double armx = T_world_arm.translation()[0];
+        const double army = T_world_arm.translation()[1];
+
+        double distObs = cc_->getCellObstacleDistance(armx, army);
+        if (distObs < m_arm_length_core) {
+            bTotMax(i, j, k) = false;
+            Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j ,k));
+            Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+            visualizeRobot(T_world_robot, 0, "candidate_arm_collisions", arm_collision_viz_id);
+        } else if (distObs < m_arm_length) {
+            double p = sqrd((distObs - m_arm_length_core) / (m_arm_length - m_arm_length_core));
+            pObs(i, j, k) = std::min(pObs(i, j, k), p);
+        }
+    }
+    }
+    }
+}
+
+void RepositionBaseExecutor::computeBaseCollisionProbabilities(
+    const SearchSpaceParams& ss,
+    const au::grid<3, Pose2D>& rob,
+    au::grid<3, double>& pObs,
+    au::grid<3, bool>& bTotMax)
+{
+    int base_collision_viz_id = 0;
+    // filter out poses that are definitely in collision with the base and
+    // update probabilities of collision if within some threshold
+    for (int i = 0; i < ss.nDist; i++) {
+    for (int j = 0; j < ss.nAng; j++) {
+    for (int k = 0; k < ss.nYaw; k++) {
+        if (!bTotMax(i, j, k)) {
+            continue;
+        }
+        Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+        Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+
+        double bodyx = T_world_robot.translation()[0];
+        double bodyy = T_world_robot.translation()[1];
+
+        double distObs = cc_->getCellObstacleDistance(bodyx, bodyy);
+        if (distObs < m_body_length_core) {
+            bTotMax(i, j, k) = false;
+            visualizeRobot(T_world_robot, 0, "candidate_body_collisions", base_collision_viz_id);
+        } else if (distObs < m_body_length) {
+            // pObs: quadratic function (1 at outer borders, 0 at
+            // inner borders) lowest value among the patch
+            // cells for current i,j,k
+            double p = sqrd((distObs - m_body_length_core) / (m_body_length - m_body_length_core));
+            pObs(i, j, k) *= std::min(pObs(i, j, k), p);
+        }
+    }
+    }
+    }
+}
+
+bool RepositionBaseExecutor::multiplyProbabilities(
+    const au::grid<3, double>& p1,
+    const au::grid<3, double>& p2,
+    const au::grid<3, bool>& b,
+    au::grid<3, double>& p)
+{
+    if (p1.size(0) != p2.size(0) ||
+        p1.size(1) != p2.size(1) ||
+        p1.size(2) != p2.size(2))
+    {
+        return false;
+    }
+
+    p.resize(p1.size(0), p1.size(1), p1.size(2));
+    p.assign(0.0);
+    for (int i = 0; i < p1.size(0); i++) {
+        for (int j = 0; j < p1.size(1); j++) {
+            for (int k = 0; k < p1.size(2); k++) {
+                if (b(i, j, k)) {
+                    p(i, j, k) = p1(i, j, k) * p2(i, j, k);
+                }
+            }
+        }
+    }
+
+    return true;
 }
 
 /// \brief Construct an occupancy grid for visualizing probabilities.
@@ -1213,32 +1360,25 @@ void RepositionBaseExecutor::generateCandidatePoseSamples(
 
 bool RepositionBaseExecutor::computeRobPoseExhaustive(
     const nav_msgs::OccupancyGrid& map,
-    const Eigen::Affine3d& robot_pose,
-    const Eigen::Affine3d& object_pose,
+    const Eigen::Affine3d& rp3,
+    const Eigen::Affine3d& op3,
     std::vector<geometry_msgs::PoseStamped>& candidate_base_poses)
 {
-    return false;
+    ROS_INFO("computeRobPoseExhaustive");
 
-    double objx, objy, objY, robx0, roby0, robY0;
-    Eigen::Affine2d robot_pose_planar;
-    computeRobotPlanarPose(robot_pose, robot_pose_planar);
-    Pose2D object_pose_planar = poseEigen3ToSimpleGascan(object_pose);
-    robx0 = robot_pose_planar.translation()[0];
-    roby0 = robot_pose_planar.translation()[1];
-    robY0 = Eigen::Rotation2Dd(0.0).fromRotationMatrix(robot_pose_planar.rotation()).angle();
-    objx = object_pose_planar.x;
-    objy = object_pose_planar.y;
-    objY = object_pose_planar.yaw;
+    Pose2D robot_pose = poseEigen3ToSimple(rp3);
+    Pose2D object_pose = poseEigen3ToSimpleGascan(op3);
 
-    //visualizations
+    ROS_INFO("robot pose: (%0.3f, %0.3f, %0.3f)", robot_pose.x, robot_pose.y, angles::to_degrees(robot_pose.yaw));
+    ROS_INFO("object pose: (%0.3f, %0.3f, %0.3f)", object_pose.x, object_pose.y, angles::to_degrees(object_pose.yaw));
+
+    // visualizations
     int base_candidates_viz_id = 0;
     int base_probcandidates_viz_id = 0;
     int base_collision_viz_id = 0;
     int base_probreject_viz_id = 0;
     int base_validityreject_viz_id = 0;
     int base_failedik_viz_id = 0;
-    int base_seen_viz_id = 0;
-//    viz.setReferenceFrame("/abs_nwu");
 
     // policy for robot pose selection
     // 0) set search space
@@ -1249,22 +1389,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
     // 5) candidate sorting by some metrics
     // 6) generate final candidate base poses
 
-    // PARAMETER SETTING
-
-    // 1) flag for pGrasp operation
-    bool bCheckGrasp = true;
-// 	bool bCheckGrasp = false;
-
-    // 2) flag for pObs operation
-    bool bCheckObs = true;		// TODO: sometimes map data is corrupted and NO candidate_base_pose can be found!
-// 	bool bCheckObs = false;
-
-    // 3) flag for pWork operation
-// 	bool bCheckWork = true;
-    bool bCheckWork = false;
-
-    // 5) flag for candidate sorting
-    int bSortMetric = 3;		// 1: angle, 2: angle, position, 3: pTot threshold (default)
+    ///////////////////////
+    // PARAMETER SETTING //
+    ///////////////////////
 
     SearchSpaceParams ss;
 
@@ -1282,214 +1409,87 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
     ss.yawMin = angles::from_degrees(-20.0);    // -10
     ss.yawStep = angles::from_degrees(5.0);     // 5
 
-    // 1) grasp achievable zone 	// TODO: tune these parameters
-    int secDist[] = { (int)(ss.nDist / 3), (int)(ss.nDist * 2 / 3) };	// divide zone by distance (for acceptable object orientation setting)
-    double secAngYaw[2];// accept object orientations between these two values 	// seperately defined for different regions by secDist (values within the detail code of 1))
-    double bestAngYaw;// best object orientation to get highest pGrasp probability (set as the mean value of secAngYaw[0~1] currently)
-    double bestDist = 0.60;	// best object distance to get highest pGrasp probability (set as the nominal value from experiment)
-//	double secSide[2] = {0.0, M_PI/4.0};    		// divide left and right-hand side  // [rad]
-    double secSide[2] = { -05.0 / 180.0 * M_PI, 40.0 / 180.0 * M_PI };		// divide left and right-hand side  // [rad]
-// 	double secSide[2] = {0.0, 20.0/180.0*M_PI};		// divide left and right-hand side  // [rad]
-// 	double scalepGraspAngYaw = 0.1;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
-// 	double scalepGraspDist = 0.1;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
-// 	double scalepGraspAngYaw = 0.05;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
-    double scalepGraspAngYaw = 0.3;	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
-    double scalepGraspDist = 0.05;	// pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
+    bool bCheckGrasp = true;
+    bool bCheckObs = true;
+    bool bCheckWork = false;
 
-    // 2) arm position offset for computing pObs
-// 	double armOffsety = -0.0;
-// 	double armOffsety = -0.5;
-// 	double armOffsety = -1.1;	// center of arm (when straightend)
-// 	double armLength = 1.5;		// workspace radius about the center of arm
-// 	double armLengthCore = 0.6;	// core workspace radius about the center of arm (pObs = 0.0)
-    double armOffsetx = 0.3;	// center of arm (for normal grasping motion)
-    double armOffsety = -0.5;	// center of arm (for normal grasping motion)
-    double armLength = 0.5;		// workspace radius about the center of arm
-    double armLengthCore = 0.3;	// core workspace radius about the center of arm (pObs = 0.0)
-// 	double bodyOffsetx = -0.49+0.148975;	// center of body (except arm)
-// 	double bodyLength = 0.8;	// support polygon radius about the center of body
-// 	double bodyLengthCore = 0.65;	// core support polygon radius about the center of body (pObs = 0.0)
-    double bodyOffsetx1 = -0.49 + 0.148975 + 0.27;	// center of front body (except arm)
-    double bodyOffsetx2 = -0.49 + 0.148975 - 0.27;	// center of rear body (except arm)
-    double bodyLength = 0.5;	// support polygon radius about the center of body
-    double bodyLengthCore = 0.335;	// core support polygon radius about the center of body (pObs = 0.0)
-    int mapObsThr = 1;			// threshold for classifying clear and occupied regions
+    // threshold for classifying clear and occupied regions
+    int mapObsThr = 1;
 
-    // 5) candidate selection criterion
-    double scaleDiffYglob = 0.05;// multiply a quadratic function to pTot (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
-// 	double pTotThr = 0.5;		// pTot threshold for bSortMetric==3
-    double pTotThr = 0.0;		// pTot threshold for bSortMetric==3
+    // multiply a quadratic function to pTot (1 at diffYglob==0,
+    // (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
+    double scaleDiffYglob = 0.05;
+
+    // pTot threshold for bSortMetric==3
+    double pTotThr = 0.0; // 0.5
 
     // 6) /base_link offset from /top_shelf for final robot pose return
-// 	double baseOffsetx = -0.0;
-// 	double baseOffsetx = -0.3;
-// 	double baseOffsetx = -0.5;
-    double baseOffsetx = -0.49 + 0.148975;	// /base_link to /base_link_front_bumper_part to /top_shelf
-//	double baseOffsetx = -0.49;				// /base_link to /base_link_front_bumper_part (in new Hokuyo setting) 	// same as in computeRobPose()
+    // /base_link to /base_link_front_bumper_part to /top_shelf
+    // /base_link to /base_link_front_bumper_part (in new Hokuyo setting)
+    double baseOffsetx = -0.49 + 0.148975; // -0.49, -0.5, -0.3, 0.0
 
-////////////////////////////////////////////////////////////////////////////////////
+    // 1: angle, 2: angle, position, 3: pTot threshold (default)
+    int bSortMetric = 3;
+
+    ///////////////////////////
+    // END PARAMETER SETTING //
+    ///////////////////////////
 
     // 0) set search space (r,th,Y)
     // (r,th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
     // (Y): orientation about z-axis
 
-    double pTot[ss.nDist][ss.nAng][ss.nYaw];
-    double pGrasp[ss.nDist][ss.nAng][ss.nYaw];
-    double pObs[ss.nDist][ss.nAng][ss.nYaw];
-    bool bTotMax[ss.nDist][ss.nAng][ss.nYaw];
-    for (int i = 0; i < ss.nDist; i++) {
-        for (int j = 0; j < ss.nAng; j++) {
-            for (int k = 0; k < ss.nYaw; k++) {
-                pTot[i][j][k] = 0.0;
-                pGrasp[i][j][k] = 1.0;
-                pObs[i][j][k] = 1.0;
-                bTotMax[i][j][k] = true;	// used when 1) check candidate validity before IK (process 1~4)
-                                            //			 2) select the one with maximum pTot (process 5~6)
-            }
-        }
-    }
+    au::grid<3, bool> bTotMax(ss.nDist, ss.nAng, ss.nYaw);
+
+    au::grid<3, double> pGrasp(ss.nDist, ss.nAng, ss.nYaw);
+    au::grid<3, double> pObs(ss.nDist, ss.nAng, ss.nYaw);
+
+    bTotMax.assign(true);
+    pGrasp.assign(1.0);
+    pObs.assign(1.0);
 
     double robz0 = 0.0, robP0 = 0.0, robR0 = 0.0;
-    double robxf = robx0, robyf = roby0, robzf = robz0, robYf = robY0, robPf = robP0, robRf = robR0; // final (computed) robot pose
+    double robxf = robot_pose.x, robyf = robot_pose.y, robzf = robz0, robYf = robot_pose.yaw, robPf = robP0, robRf = robR0; // final (computed) robot pose
 
-    double robx[ss.nDist][ss.nAng][ss.nYaw], roby[ss.nDist][ss.nAng][ss.nYaw], robY[ss.nDist][ss.nAng][ss.nYaw];	// candidate robot poses
-    for (int i = 0; i < ss.nDist; i++) {
-        for (int j = 0; j < ss.nAng; j++) {
-            for (int k = 0; k < ss.nYaw; k++) {
-                robx[i][j][k] = objx + cos(objY + ss.angMin + ss.angStep * j) * (ss.distMin + ss.distStep * i);
-                roby[i][j][k] = objy + sin(objY + ss.angMin + ss.angStep * j) * (ss.distMin + ss.distStep * i);
-                // angular coordinate of x-axis (frontal direction) of the robot with respect to global frame
-                robY[i][j][k] = objY + (ss.angMin + ss.angStep * j) - M_PI - (ss.yawMin + ss.yawStep * k);
-            }
-        }
-    }
+    au::grid<3, Pose2D> rob;
+    generateCandidatePoseSamples(object_pose, ss, rob);
 
     // 1) probability of successful grasping
 
     if (bCheckGrasp) {
-        // heuristic probability of successful grasping
-        // a) position: the object should be within left-hand side of the robot and 45 deg angle of view
-        // exception: exclude poses at close distance, include ones in right-hand side at far distance
-        // b) orientation: the object handle should be directed to the right of the robot
-        // c) exception: allow more deviation at close distance, reject most of deviations at far distance
+        computeExhaustiveGraspProbabilities(ss, rob, object_pose, pTotThr, pGrasp, bTotMax);
 
-        for (int i = 0; i < ss.nDist; i++) {
-            // c) set acceptable object orientation range
-            if (i < secDist[0]) {
-// 				secAngYaw[0] = 15.0/180.0*M_PI;
-// 				secAngYaw[1] = 100.0/180.0*M_PI;
-                secAngYaw[0] = 45.0 / 180.0 * M_PI;
-// 				secAngYaw[1] = 90.0/180.0*M_PI;
-                secAngYaw[1] = 130.0 / 180.0 * M_PI;
-// 				bestAngYaw   = 60.0/180.0*M_PI;
-// 				bestAngYaw   = 65.0/180.0*M_PI;
-// 				bestAngYaw   = -60.0/180.0*M_PI;
-                bestAngYaw = -90.0 / 180.0 * M_PI;
-            }
-            else if (i < secDist[1]) {
-// 				secAngYaw[0] = 15.0/180.0*M_PI;
-// 				secAngYaw[1] = 90.0/180.0*M_PI;
-                secAngYaw[0] = 45.0 / 180.0 * M_PI;
-// 				secAngYaw[1] = 90.0/180.0*M_PI;
-                secAngYaw[1] = 130.0 / 180.0 * M_PI;
-// 				bestAngYaw   = 45.0/180.0*M_PI;
-// 				bestAngYaw   = 60.0/180.0*M_PI;
-                bestAngYaw = -90.0 / 180.0 * M_PI;
-// 				bestAngYaw   = -60.0/180.0*M_PI;
-            }
-            else // if (i >= secDist[1])
-            {
-// 				secAngYaw[0] = 15.0/180.0*M_PI;
-// // 				secAngYaw[1] = 30.0/180.0*M_PI;
-// 				secAngYaw[1] = 60.0/180.0*M_PI;
-                secAngYaw[0] = 45.0 / 180.0 * M_PI;
-// 				secAngYaw[1] = 90.0/180.0*M_PI;
-                secAngYaw[1] = 130.0 / 180.0 * M_PI;
-// 				bestAngYaw   = 15.0/180.0*M_PI;
-// 				bestAngYaw   = 50.0/180.0*M_PI;
-// 				bestAngYaw   = -120.0/180.0*M_PI;
-                bestAngYaw = -90.0 / 180.0 * M_PI;
-// 				bestAngYaw   = -60.0/180.0*M_PI;
-            }
-
-            for (int j = 0; j < ss.nAng; j++) {
-                for (int k = 0; k < ss.nYaw; k++) {
-                    // a) object position at left-hand side to the robot
-                    double rob2obj = atan2(objy - roby[i][j][k], objx - robx[i][j][k]);	// angular coordinate of a vector from robot position to object position (not orientation)
-                    double diffAng = angles::normalize_angle(rob2obj - robY[i][j][k]);
-                    double diffAngMax = fabs(ss.yawMin - secSide[0]);
-                    // b) object handle orientation to the right of the robot
-// 						double diffY = angles::normalize_angle( objY-robY[i][j][k] );
-// 						double diffYMax = std::max( fabs(secAngYaw[0]-bestAngYaw), fabs(secAngYaw[1]-bestAngYaw) );
-// 						double diffYMax = M_PI/1.0;
-                    double diffY = angles::normalize_angle(objY - robY[i][j][k]);
-                    double diffYMax = M_PI / 2.0;
-                    double diffDistMax = std::max(fabs(ss.distMin - bestDist),
-                            fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
-                    if (diffAng >= secSide[0] && diffAng < secSide[1])    // left-hand side and angle of view
-                            {
-                        if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
-                            // EXCLUDE CANDIDATES WE HAVE ALREADY SEEN
-                            bTotMax[i][j][k] = false; // using bTotMax instead of pGrasp to explicitly represent candidate validity (before expensive IK test)
-                            // /top_shelf pose
-                            double robxf = robx[i][j][k];
-                            double robyf = roby[i][j][k];
-                            double robYf = robY[i][j][k];
-                            // /base_link pose
-                            robxf += cos(robYf) * baseOffsetx;
-                            robyf += sin(robYf) * baseOffsetx;
-                            visualizeRobot(
-                                    poseFrom2D(robxf, robyf, robYf),
-                                    0,
-                                    "base_candidates_seen",
-                                    base_seen_viz_id);
-                            // higher probability around diffY==bestAngYaw
-// 							pGrasp[i][j][k] = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-// 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 ), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-
-                            // higher probability around diffY==bestAngYaw and diffDist==bestDist
-// 							pGrasp[i][j][k] = std::max( std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(ss.distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0), pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-                        }
-                    }
-// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
-// 												* std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0)
-// 												* std::pow( (diffDistMax-fabs(ss.distMin+ss.distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0)
-// 										, pTotThr);	// pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-// 					pGrasp[i][j][k] = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
-                    pGrasp[i][j][k] = std::max(
-                            std::pow(std::max(std::min(diffAng - 5.0 / 180.0 * M_PI, 0.0) / diffAngMax + 1.0, 0.0), 1.0)
-                                    * std::pow(
-                                            (diffYMax
-                                                    - std::min(fabs(angles::normalize_angle(diffY - bestAngYaw)),
-                                                            fabs(angles::normalize_angle(diffY - M_PI - bestAngYaw)))
-                                                            * scalepGraspAngYaw) / (diffYMax), 2.0)
-                                    * std::pow(
-                                            (diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist)
-                                                    / (diffDistMax), 2.0), pTotThr); // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-                }
-            }
+        const bool publish_pgrasp_map = true;
+        if (publish_pgrasp_map) {
+            nav_msgs::OccupancyGrid prob_grid;
+            projectProbabilityMap(map, ss, object_pose, pGrasp, bTotMax, prob_grid);
+            pgrasp_exhaustive_map_pub_.publish(prob_grid);
         }
     }
 
-    // 2) probability not to collide with obstacles
-    // depends on distance to obstacles considering the position offset wrt orientation
+    if (bCheckObs) {
+        pruneCollisionStates(ss, rob, bTotMax);
+        computeArmCollisionProbabilities(ss, rob, pObs, bTotMax);
+        computeBaseCollisionProbabilities(ss, rob, pObs, bTotMax);
+    }
 
     // 3) robot arm workspace limit should be included here!
 
     if (bCheckWork) {
-        // check for inverse kinematics and arm planning (if object is in reachable range and within angle of view)
+        // check for inverse kinematics and arm planning (if object is in
+        // reachable range and within angle of view)
         for (int i = 0; i < ss.nDist; i++) {
             for (int j = 0; j < ss.nAng; j++) {
                 for (int k = 0; k < ss.nYaw; k++) {
-                    if (bTotMax[i][j][k] == true) {
+                    if (bTotMax(i, j, k)) {
                         geometry_msgs::PoseStamped candidate_base_pose;
                         candidate_base_pose.header.frame_id = "/abs_nwu";
                         candidate_base_pose.header.seq = 0;
                         candidate_base_pose.header.stamp = ros::Time::now();
 
-                        double robY_base = robY[i][j][k];
-                        double robx_base = robx[i][j][k] + cos(robY_base) * baseOffsetx;
-                        double roby_base = roby[i][j][k] + sin(robY_base) * baseOffsetx;
+                        double robY_base = rob(i, j, k).yaw;
+                        double robx_base = rob(i, j, k).x + cos(robY_base) * baseOffsetx;
+                        double roby_base = rob(i, j, k).y + sin(robY_base) * baseOffsetx;
                         candidate_base_pose.pose.position.x = robx_base;
                         candidate_base_pose.pose.position.y = roby_base;
                         candidate_base_pose.pose.position.z = 0.0;
@@ -1500,18 +1500,18 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                         candidate_base_pose.pose.orientation.z = robqf[2];
                         candidate_base_pose.pose.orientation.w = robqf[3];
 
-                        int retIKPLAN = checkIK(robot_pose, object_pose);
+                        int retIKPLAN = checkIK(rp3, op3);
                         if (retIKPLAN != 1) {
                             //checkIK failed!
                             // /top_shelf pose
-                            double robxf = robx[i][j][k];
-                            double robyf = roby[i][j][k];
-                            double robYf = robY[i][j][k];
+                            double robxf = rob(i, j, k).x;
+                            double robyf = rob(i, j, k).y;
+                            double robYf = rob(i, j, k).yaw;
                             // /base_link pose
                             robxf += cos(robYf) * baseOffsetx;
                             robyf += sin(robYf) * baseOffsetx;
                             visualizeRobot(poseFrom2D(robxf, robyf, robYf), 0, "base_candidates_failed_ik", base_failedik_viz_id);
-                            bTotMax[i][j][k] = false;
+                            bTotMax(i, j, k) = false;
                         } else {
                             //checkIK success!
                         }
@@ -1521,31 +1521,19 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         }
     }
 
-    // 4) total probability
-
-    for (int i = 0; i < ss.nDist; i++) {
-        for (int j = 0; j < ss.nAng; j++) {
-            for (int k = 0; k < ss.nYaw; k++) {
-                if (bTotMax[i][j][k] == true) {
-                    pTot[i][j][k] = pGrasp[i][j][k] * pObs[i][j][k];
-                }
-                else {
-                    pTot[i][j][k] = 0.0;
-                }
-            }
-        }
-    }
+    au::grid<3, double> pTot;
+    multiplyProbabilities(pGrasp, pObs, bTotMax, pTot);
 
     // 5) select maximum probability with min distance from robot
     // HEURISTICALLY, minimum difference in angular coordinate wrt object, then farthest from the origin of object
     if (bSortMetric == 1 || bSortMetric == 2) {
-        double pTotMax = 1E-10;		// to opt out the poses with pTot[i][j][k]==0
+        double pTotMax = 1E-10;		// to opt out the poses with pTot(i, j, k)==0
 
         for (int i = 0; i < ss.nDist; i++) {
             for (int j = 0; j < ss.nAng; j++) {
                 for (int k = 0; k < ss.nYaw; k++) {
-                    if (pTot[i][j][k] > pTotMax) {
-                        pTotMax = pTot[i][j][k];
+                    if (pTot(i, j, k) > pTotMax) {
+                        pTotMax = pTot(i, j, k);
                     }
                 }
             }
@@ -1555,18 +1543,18 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         for (int i = 0; i < ss.nDist; i++)
             for (int j = 0; j < ss.nAng; j++)
                 for (int k = 0; k < ss.nYaw; k++)
-                    if (pTot[i][j][k] == pTotMax) {
-                        bTotMax[i][j][k] = true;
+                    if (pTot(i, j, k) == pTotMax) {
+                        bTotMax(i, j, k) = true;
                         iMax = i;
                         jMax = j;
                         kMax = k;
                         cntTotMax++;
                     } else {
-                        bTotMax[i][j][k] = false;
+                        bTotMax(i, j, k) = false;
                         // /top_shelf pose
-                        double robxf = robx[i][j][k];
-                        double robyf = roby[i][j][k];
-                        double robYf = robY[i][j][k];
+                        double robxf = rob(i, j, k).x;
+                        double robyf = rob(i, j, k).y;
+                        double robYf = rob(i, j, k).yaw;
                         // /base_link pose
                         robxf += cos(robYf) * baseOffsetx;
                         robyf += sin(robYf) * baseOffsetx;
@@ -1578,9 +1566,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         if (cntTotMax == 0) {
             // TODO: check why the previous candidate_base_poses remain in RViz panel
             // just set to initial robot poase
-            robxf = robx0;
-            robyf = roby0;
-            robYf = robY0;
+            robxf = robot_pose.x;
+            robyf = robot_pose.y;
+            robYf = robot_pose.yaw;
             robxf += cos(robYf) * baseOffsetx;
             robyf += sin(robYf) * baseOffsetx;
 
@@ -1608,15 +1596,15 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                 {
             // a) sorting by difference of angular coordinates for current and desired poses
             // ASSUME? backward driving is allowed for husky
-            // HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
-            double angO2Rcur = atan2(roby0 - objy, robx0 - objx);	// current angular coordinate from object to robot
+            // HEURISTIC: minimize angle difference between robot orientation (rob(i, j, k).yawot motion direction (angO2Rcur)
+            double angO2Rcur = atan2(robot_pose.y - object_pose.y, robot_pose.x - object_pose.x);	// current angular coordinate from object to robot
             double angO2Rdes, angO2Rerr, angO2RerrMin = M_PI;
             cntTotMax = 0;		// reinitialization for angular coordinate heuristic sorting
             for (int i = 0; i < ss.nDist; i++)
                 for (int j = 0; j < ss.nAng; j++)
                     for (int k = 0; k < ss.nYaw; k++) {
-                        if (bTotMax[i][j][k] == true) {
-                            angO2Rdes = objY + ss.angMin + ss.angStep * j;// desired angular coordinate from object to robot
+                        if (bTotMax(i, j, k) == true) {
+                            angO2Rdes = object_pose.yaw + ss.angMin + ss.angStep * j;// desired angular coordinate from object to robot
                             angO2Rerr = angles::normalize_angle(angO2Rdes - angO2Rcur);
 
                             if (fabs(angO2Rerr) <= angO2RerrMin) {
@@ -1627,11 +1615,11 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                 cntTotMax++;
                             }
                             else {
-                                bTotMax[i][j][k] = false;
+                                bTotMax(i, j, k) = false;
                                 // /top_shelf pose
-                                double robxf = robx[i][j][k];
-                                double robyf = roby[i][j][k];
-                                double robYf = robY[i][j][k];
+                                double robxf = rob(i, j, k).x;
+                                double robyf = rob(i, j, k).y;
+                                double robYf = rob(i, j, k).yaw;
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
@@ -1639,19 +1627,19 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                             }
                         }
                     }
-            // update bTotMax[i][j][k]
+            // update bTotMax(i, j, k)
             for (int i = 0; i < ss.nDist; i++)
                 for (int j = 0; j < ss.nAng; j++)
                     for (int k = 0; k < ss.nYaw; k++)
-                        if (bTotMax[i][j][k] == true) {
-                            angO2Rdes = objY + ss.angMin + ss.angStep * j;
+                        if (bTotMax(i, j, k) == true) {
+                            angO2Rdes = object_pose.yaw + ss.angMin + ss.angStep * j;
                             angO2Rerr = angles::normalize_angle(angO2Rdes - angO2Rcur);
                             if (fabs(angO2Rerr) != angO2RerrMin) {
-                                bTotMax[i][j][k] = false;
+                                bTotMax(i, j, k) = false;
                                 // /top_shelf pose
-                                double robxf = robx[i][j][k];
-                                double robyf = roby[i][j][k];
-                                double robYf = robY[i][j][k];
+                                double robxf = rob(i, j, k).x;
+                                double robyf = rob(i, j, k).y;
+                                double robYf = rob(i, j, k).yaw;
                                 // /base_link pose
                                 robxf += cos(robYf) * baseOffsetx;
                                 robyf += sin(robYf) * baseOffsetx;
@@ -1670,9 +1658,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                     for (int i = 0; i < ss.nDist; i++)
                         for (int j = 0; j < ss.nAng; j++)
                             for (int k = 0; k < ss.nYaw; k++) {
-                                if (bTotMax[i][j][k] == true) {
-                                    xysqerr = std::pow(robx[i][j][k] - robx0, 2.0)
-                                            + std::pow(roby[i][j][k] - roby0, 2.0);
+                                if (bTotMax(i, j, k) == true) {
+                                    xysqerr = std::pow(rob(i, j, k).x - robot_pose.x, 2.0)
+                                            + std::pow(rob(i, j, k).y - robot_pose.y, 2.0);
 
                                     if (xysqerr <= xysqerrMin) {
                                         xysqerrMin = xysqerr;
@@ -1682,11 +1670,11 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                         cntTotMax++;
                                     }
                                     else {
-                                        bTotMax[i][j][k] = false;
+                                        bTotMax(i, j, k) = false;
                                         // /top_shelf pose
-                                        double robxf = robx[i][j][k];
-                                        double robyf = roby[i][j][k];
-                                        double robYf = robY[i][j][k];
+                                        double robxf = rob(i, j, k).x;
+                                        double robyf = rob(i, j, k).y;
+                                        double robYf = rob(i, j, k).yaw;
                                         // /base_link pose
                                         robxf += cos(robYf) * baseOffsetx;
                                         robyf += sin(robYf) * baseOffsetx;
@@ -1695,19 +1683,19 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                                 }
                             }
 
-                    // OPTIONAL: update bTotMax[i][j][k]
+                    // OPTIONAL: update bTotMax(i, j, k)
                     for (int i = 0; i < ss.nDist; i++)
                         for (int j = 0; j < ss.nAng; j++)
                             for (int k = 0; k < ss.nYaw; k++)
-                                if (bTotMax[i][j][k] == true) {
-                                    xysqerr = std::pow(robx[i][j][k] - robx0, 2.0)
-                                            + std::pow(roby[i][j][k] - roby0, 2.0);
+                                if (bTotMax(i, j, k) == true) {
+                                    xysqerr = std::pow(rob(i, j, k).x - robot_pose.x, 2.0)
+                                            + std::pow(rob(i, j, k).y - robot_pose.y, 2.0);
                                     if (xysqerr != xysqerrMin) {
-                                        bTotMax[i][j][k] = false;
+                                        bTotMax(i, j, k) = false;
                                         // /top_shelf pose
-                                        double robxf = robx[i][j][k];
-                                        double robyf = roby[i][j][k];
-                                        double robYf = robY[i][j][k];
+                                        double robxf = rob(i, j, k).x;
+                                        double robyf = rob(i, j, k).y;
+                                        double robYf = rob(i, j, k).yaw;
                                         // /base_link pose
                                         robxf += cos(robYf) * baseOffsetx;
                                         robyf += sin(robYf) * baseOffsetx;
@@ -1725,19 +1713,19 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 
         // 6-1) generate final desired robot poses with maximum pTot
         ROS_INFO("Reposition Base Command Result:");
-        ROS_INFO("    Object Pose (initial): %f %f %f", objx, objy, angles::normalize_angle(objY)*180/M_PI);
-        ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0, roby0, angles::normalize_angle(robY0)*180/M_PI);
+        ROS_INFO("    Object Pose (initial): %f %f %f", object_pose.x, object_pose.y, angles::normalize_angle(object_pose.yaw)*180/M_PI);
+        ROS_INFO("    Robot Pose (intial):   %f %f %f", robot_pose.x, robot_pose.y, angles::normalize_angle(robot_pose.yaw)*180/M_PI);
         // index order regarding to sorting priority
         // 	for (int i=0; i<ss.nDist; i++)
         for (int i = ss.nDist - 1; i >= 0; i--)
             for (int j = 0; j < ss.nAng; j++)
                 // 			for (int k=0; k<ss.nYaw; k++)
                 for (int k = ss.nYaw - 1; k >= 0; k--)
-                    if (bTotMax[i][j][k] == true) {
+                    if (bTotMax(i, j, k)) {
                         // /top_shelf pose
-                        robxf = robx[i][j][k];
-                        robyf = roby[i][j][k];
-                        robYf = robY[i][j][k];
+                        robxf = rob(i, j, k).x;
+                        robyf = rob(i, j, k).y;
+                        robYf = rob(i, j, k).yaw;
                         // /base_link pose
                         robxf += cos(robYf) * baseOffsetx;
                         robyf += sin(robYf) * baseOffsetx;
@@ -1761,28 +1749,27 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                         visualizeRobot(poseFrom2D(robxf, robyf, robYf), 120, "base_candidates", base_candidates_viz_id);
                     }
     }	// if (bSortMetric==1 || bSortMetric==2)
-
     else if (bSortMetric == 3) {
         // candidate prefernece by difference of angular coordinates for current and desired poses
-        // HEURISTIC: minimize angle difference between robot orientation (robY) and robot motion direction (angO2Rcur)
-        double rob2objY = atan2(objy - roby0, objx - robx0);  // angular coordinate of displacement from robot to object
+        // HEURISTIC: minimize angle difference between robot orientation (rob(i, j, k).yawot motion direction (angO2Rcur)
+        double rob2objY = atan2(object_pose.y - robot_pose.y, object_pose.x - robot_pose.x);  // angular coordinate of displacement from robot to object
         double diffYglob;
         int cntTotMax = 0;
         for (int i = 0; i < ss.nDist; i++)
             for (int j = 0; j < ss.nAng; j++)
                 for (int k = 0; k < ss.nYaw; k++)
-                    if (bTotMax[i][j][k] == true) {
-                        diffYglob = angles::normalize_angle(robY[i][j][k] - rob2objY);
-// 						pTot[i][j][k] *= std::pow(1 - (scaleDiffYglob * fabs(diffYglob)/M_PI), 2.0);	// quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
-                        pTot[i][j][k] *= std::max(std::pow(1 - (scaleDiffYglob * fabs(diffYglob) / M_PI), 2.0),
+                    if (bTotMax(i, j, k)) {
+                        diffYglob = angles::normalize_angle(rob(i, j, k).yaw - rob2objY);
+// 						pTot(i, j, k) *= std::pow(1 - (scaleDiffYglob * fabs(diffYglob)/M_PI), 2.0);	// quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
+                        pTot(i, j, k) *= std::max(std::pow(1 - (scaleDiffYglob * fabs(diffYglob) / M_PI), 2.0),
                                 pTotThr); // quadratic function (1 at diffYglob==0, (1-wDiffYglob)^2 at diffYglob==M_PI)
                         cntTotMax++;
                     }
                     else {
                         // /top_shelf pose
-                        double robxf = robx[i][j][k];
-                        double robyf = roby[i][j][k];
-                        double robYf = robY[i][j][k];
+                        double robxf = rob(i, j, k).x;
+                        double robyf = rob(i, j, k).y;
+                        double robYf = rob(i, j, k).yaw;
                         // /base_link pose
                         robxf += cos(robYf) * baseOffsetx;
                         robyf += sin(robYf) * baseOffsetx;
@@ -1796,9 +1783,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         if (cntTotMax == 0) {
             // TODO: check why the previous candidate_base_poses remain in RViz panel
             // just set to initial robot poase
-            robxf = robx0;
-            robyf = roby0;
-            robYf = robY0;
+            robxf = robot_pose.x;
+            robyf = robot_pose.y;
+            robYf = robot_pose.yaw;
 
             geometry_msgs::PoseStamped candidate_base_pose;
             candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1826,11 +1813,11 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         for (int j = 0; j < ss.nAng; j++) {
             for (int i = ss.nDist - 1; i >= 0; i--) {
                 for (int k = ss.nYaw - 1; k >= 0; k--) {
-                    if (bTotMax[i][j][k] == true) {
+                    if (bTotMax(i, j, k)) {
                         cand.i = i;
                         cand.j = j;
                         cand.k = k;
-                        cand.pTot = pTot[i][j][k];
+                        cand.pTot = pTot(i, j, k);
                         cands.push_back(cand);
                     }
                 }
@@ -1854,9 +1841,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
             candidate_base_pose.header.seq = 0;
             candidate_base_pose.header.stamp = ros::Time::now();
 
-            double robY_base = robY[i][j][k];
-            double robx_base = robx[i][j][k] + cos(robY_base) * baseOffsetx;
-            double roby_base = roby[i][j][k] + sin(robY_base) * baseOffsetx;
+            double robY_base = rob(i, j, k).yaw;
+            double robx_base = rob(i, j, k).x + cos(robY_base) * baseOffsetx;
+            double roby_base = rob(i, j, k).y + sin(robY_base) * baseOffsetx;
             candidate_base_pose.pose.position.x = robx_base;
             candidate_base_pose.pose.position.y = roby_base;
             candidate_base_pose.pose.position.z = 0.0;
@@ -1882,8 +1869,8 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 
         // 6-2) generate final desired robot poses with maximum pTot
 // 		ROS_INFO("Reposition Base Command Result:");
-        ROS_INFO("    Object Pose (initial): %f %f %f", objx, objy, angles::normalize_angle(objY)*180/M_PI);
-        ROS_INFO("    Robot Pose (intial):   %f %f %f", robx0, roby0, angles::normalize_angle(robY0)*180/M_PI);
+        ROS_INFO("    Object Pose (initial): %f %f %f", object_pose.x, object_pose.y, angles::normalize_angle(object_pose.yaw)*180/M_PI);
+        ROS_INFO("    Robot Pose (intial):   %f %f %f", robot_pose.x, robot_pose.y, angles::normalize_angle(robot_pose.yaw)*180/M_PI);
 
         int cntTotThr = 0;	// number of candidate poses with pTot higher than threshold
         for (std::vector<RepositionBaseCandidate::candidate>::iterator m = cands.begin(); m != cands.end(); ++m)
@@ -1893,9 +1880,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                 int k = m->k;
 
                 // /top_shelf pose
-                robxf = robx[i][j][k];
-                robyf = roby[i][j][k];
-                robYf = robY[i][j][k];
+                robxf = rob(i, j, k).x;
+                robyf = rob(i, j, k).y;
+                robYf = rob(i, j, k).yaw;
                 // /base_link pose
                 robxf += cos(robYf) * baseOffsetx;
                 robyf += sin(robYf) * baseOffsetx;
@@ -1924,9 +1911,9 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                 cntTotThr++;
             }
         if (cntTotThr == 0) {
-            robxf = robx0;
-            robyf = roby0;
-            robYf = robY0;
+            robxf = robot_pose.x;
+            robyf = robot_pose.y;
+            robYf = robot_pose.yaw;
 
             geometry_msgs::PoseStamped candidate_base_pose;
             candidate_base_pose.header.frame_id = "/abs_nwu";
@@ -1958,36 +1945,40 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 /// \brief Filter grasp candidates by kinematics and visibility
 void RepositionBaseExecutor::filterGraspCandidates(
     std::vector<GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_camera_robot,
+    const Eigen::Affine3d& T_grasp_robot,
+    const Eigen::Affine3d& T_grasp_camera,
     double marker_incident_angle_threshold_rad) const
 {
-    filterGraspCandidatesIK(candidates);
-    filterGraspCandidatesVisibility(candidates, T_camera_robot, marker_incident_angle_threshold_rad);
+    ROS_INFO("Filter %zu grasp candidates", candidates.size());
+    // run this first since this is significantly less expensive than IK
+    filterGraspCandidatesVisibility(candidates, T_grasp_camera, marker_incident_angle_threshold_rad);
+    filterGraspCandidatesIK(candidates, T_grasp_robot);
 }
 
 /// \brief Filter grasp candidates by kinematic feasibility (inverse kinematics)
 void RepositionBaseExecutor::filterGraspCandidatesIK(
-    std::vector<GraspCandidate>& candidates) const
+    std::vector<GraspCandidate>& candidates,
+    const Eigen::Affine3d& T_grasp_robot) const
 {
+    ROS_INFO("Filter %zu grasp candidate via IK", candidates.size());
     std::vector<GraspCandidate> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
     int num_not_reachable = 0;
     for (const GraspCandidate& grasp_candidate : candidates) {
-        // check for an ik solution to this grasp pose
         moveit::core::RobotState robot_state(robot_model_);
         robot_state.setToDefaultValues();
-        bool check_ik = robot_state.setFromIK(manip_group_, grasp_candidate.grasp_candidate_transform);
+        // place the robot in the grasp frame
+        const moveit::core::JointModel* root_joint = robot_model_->getRootJoint();
+        robot_state.setJointPositions(root_joint, T_grasp_robot);
+        robot_state.update();
+
+        ROS_INFO("test grasp candidate %s for ik solution", to_string(grasp_candidate.grasp_candidate_transform).c_str());
+
+        // check for an ik solution to this grasp pose
         std::vector<double> sol;
-        if (check_ik) {
+        if (robot_state.setFromIK(manip_group_, grasp_candidate.grasp_candidate_transform)) {
             robot_state.copyJointGroupPositions(manip_group_, sol);
-        }
-
-        if (!check_ik) {
-            ++num_not_reachable;
-        }
-
-        if (check_ik) {
             GraspCandidate reachable_grasp_candidate(
                     grasp_candidate.grasp_candidate_transform,
                     grasp_candidate.T_object_grasp,
@@ -1996,11 +1987,13 @@ void RepositionBaseExecutor::filterGraspCandidatesIK(
 
             ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
             ROS_INFO("IK sol: %s", to_string(sol).c_str());
+        } else {
+            ++num_not_reachable;
         }
     }
 
     ROS_INFO("%d of %zd grasps not reachable", num_not_reachable, candidates.size());
-    std::swap(filtered_candidates, candidates);
+    candidates = std::move(filtered_candidates);
 }
 
 /// \brief Filter grasp candidates by fiducial visibility.
@@ -2011,19 +2004,38 @@ void RepositionBaseExecutor::filterGraspCandidatesIK(
 /// \param[in,out] candidates Grasp candidates in the robot frame
 void RepositionBaseExecutor::filterGraspCandidatesVisibility(
     std::vector<GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_camera_robot,
+    const Eigen::Affine3d& T_grasp_camera,
     double marker_incident_angle_threshold_rad) const
 {
+    ROS_INFO("Filter %zu candidates via visibility", candidates.size());
     std::vector<GraspCandidate> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
     int num_not_visible = 0;
     for (const GraspCandidate& grasp_candidate : candidates) {
         // check for visibility of the ar marker to this grasp pose
-        Eigen::Affine3d T_camera_marker = // assume link == wrist
-                T_camera_robot *
+        Eigen::Affine3d T_camera_marker =
+                T_grasp_camera.inverse() *
                 grasp_candidate.grasp_candidate_transform *
                 attached_markers_[0].link_to_marker;
+
+        const bool publish_marker_frames = false;
+        if (publish_markers) {
+            auto triads = msg_utils::create_triad_marker_arr(geometry_msgs::CreateVector3(0.1, 0.01, 0.01));
+            for (auto& m : triads.markers) {
+                // transform to the world frame
+                Eigen::Affine3d T_triad_marker;
+                tf::poseMsgToEigen(m.pose, T_triad_marker);
+                // NOTE: assumption here that the grasp frame is the world
+                // frame; this wasn't always the case so be careful here if you
+                // don't want to pass the frame down to this call
+                Eigen::Affine3d T_camera_triad = T_grasp_camera * T_camera_marker * T_triad_marker;
+                tf::poseEigenToMsg(T_camera_triad, m.pose);
+                m.header.frame_id = current_goal_->map.header.frame_id; //camera_view_frame_;
+                m.ns = "marker";
+            }
+            viz_pub_.publish(triads);
+        }
 
         ROS_DEBUG("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
         Eigen::Vector3d camera_view_axis = -Eigen::Vector3d::UnitZ();
@@ -2073,30 +2085,33 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose)
 {
-    Eigen::Affine3d T_robot_object = robot_pose.inverse() * object_pose;
-
+    // generate grasps in the world frame
     int max_num_candidates = 100;
     std::vector<GraspCandidate> grasp_candidates =
-            sampleGraspCandidates(T_robot_object, max_num_candidates);
+            sampleGraspCandidates(object_pose, max_num_candidates);
+
     ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
 
-    visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN");
+    visualizeGraspCandidates(grasp_candidates, "grasp_candidates_checkIKPLAN");
 
-    Eigen::Affine3d T_robot_camera = robot_state_->getGlobalLinkTransform(camera_view_frame_);
+    moveit::core::RobotState robot_state = currentRobotState();
+    robot_state.setJointPositions(robot_model_->getRootJoint(), robot_pose);
+    robot_state.update();
+    Eigen::Affine3d camera_pose =
+            robot_state.getGlobalLinkTransform(camera_view_frame_);
 
-    filterGraspCandidates(grasp_candidates, T_robot_camera.inverse(), sbpl::utils::ToRadians(45.0));
+    ROS_INFO("robot -> camera: %s", to_string(camera_pose).c_str());
+
+    filterGraspCandidates(
+        grasp_candidates,
+        robot_pose,
+        camera_pose,
+        sbpl::utils::ToRadians(45.0));
 
     ROS_INFO("Produced %zd reachable grasp poses", grasp_candidates.size());
 
-    if (grasp_candidates.empty()) {
-        ROS_WARN("No reachable grasp candidates available");
-        return grasp_candidates;
-    }
-
-    visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN_filtered");
-
-    // grasp poses in the middle of the handle are more desirable; sort them
-    // that way
+    // sort grasp poses so that grasps in the middle of the spline are at the
+    // front of the list
     const double min_u = 0.0;
     const double max_u = 1.0;
 
@@ -2107,10 +2122,17 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
                 return fabs(a.u - mid_u) < fabs(b.u - mid_u);
             });
 
-    // limit the number of grasp attempts by the configured amount
-    grasp_candidates.resize(max_grasp_candidates_);
+    // limit grasps to the configured amount
+    if (grasp_candidates.size() > max_grasp_candidates_) {
+        grasp_candidates.resize(max_grasp_candidates_);
+    }
 
-    ROS_INFO("Attempting %zd grasps", grasp_candidates.size());
+    visualizeGraspCandidates(grasp_candidates, robot_pose, "grasp_candidates_checkIKPLAN_filtered");
+
+    if (grasp_candidates.empty()) {
+        ROS_WARN("No reachable grasp candidates available");
+    }
+
     return grasp_candidates;
 }
 
@@ -2342,21 +2364,67 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 /// \brief Sample a set of candidate grasp poses
 ///
 /// Grasp candidates are defined as pregrasp poses for the "wrist" of the robot.
-/// The pregrasp is offset from the grasp pose by the configured fixed offset.
-/// The resulting pregrasp samples are specified in the robot frame.
+/// The original grasp candidate is computed as follows
+///
+/// * A spline is specified, in the object frame, that defines possible poses to
+///   place the tool frame of a gripper to successfully grasp the object
+///
+/// * Points are sampled along the spline, as well as the derivative of the
+///   spline at that point.
+///
+/// * A direction for the grasp is chosen, orthogonal to the derivative at the
+///   grasp point. The exact grasp direction is the direction that minimizes the
+///   distance to the +z axis in the <grasp frame>
+///
+/// * The tool frame is chosen such that the +x axis is in line with the grasp
+///   direction, the +y direction follows the spline derivative, and the +z is
+///   chosen so as to create a right-hand coordinate system
+///
+/// * The wrist (grasp) frame is determined via a fixed offset from the tool
+///   frame
+///
+/// * The pregrasp frame is determined via a fixed offset from the grasp frame
 std::vector<RepositionBaseExecutor::GraspCandidate>
 RepositionBaseExecutor::sampleGraspCandidates(
-    const Eigen::Affine3d& robot_to_object,
+    const Eigen::Affine3d& T_grasp_object,
     int num_candidates) const
 {
     const double min_u = 0.0;
     const double max_u = 1.0;
 
+//    auto ipow = [](int b, int e)
+//    {
+//        if (e == 0) {
+//            return 1;
+//        } else if (e % 2 == 0) {
+//            int r = ipow(b, e >> 1);
+//            return r * r;
+//        } else {
+//            return b * ipow(b, e - 1);
+//        }
+//    };
+//
+//    int l = 0;
+//    int sample_count = ipow(2, l) + 1;
+//    int sidx = 0;
+//    auto next_u = [&]()
+//    {
+//        if (sidx == sample_count) {
+//            ++l;
+//            sample_count = ipow(2, l) + 1;
+//            sidx = 0;
+//            while (l > 0 && sidx % 2 == 0 && sidx != sample_count) {
+//                ++sidx;
+//            }
+//        }
+//    };
+
     std::vector<GraspCandidate> grasp_candidates;
     grasp_candidates.reserve(num_candidates);
     for (int i = 0; i < num_candidates; ++i) {
         ROS_DEBUG("Candidate Pregrasp %3d", i);
-        // sample uniformly the position and derivative of the gas canister grasp spline
+        // sample uniformly the position and derivative of the gas canister
+        // grasp spline
         double u = (max_u - min_u) * i / (num_candidates - 1);
 
         int knot_num = -1;
@@ -2369,30 +2437,29 @@ RepositionBaseExecutor::sampleGraspCandidates(
             }
         }
 
-        if (knot_num < grasp_spline_->degree() || knot_num >= grasp_spline_->knots().size() - grasp_spline_->degree()) {
+        if (knot_num < grasp_spline_->degree() ||
+            knot_num >= grasp_spline_->knots().size() - grasp_spline_->degree())
+        {
             ROS_DEBUG("Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
             continue;
         }
 
-        Eigen::Vector3d object_pos_robot_frame(robot_to_object.translation());
+        Eigen::Vector3d object_pos_robot_frame(T_grasp_object.translation());
 
-        Eigen::Vector3d sample_spline_point = (*grasp_spline_)(u);
+        Eigen::Vector3d sample_spline_point = Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * (*grasp_spline_)(u);
         Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
 
-        ROS_DEBUG("    Sample Spline Point [canister frame]: %s", to_string(sample_spline_point).c_str());
-        ROS_DEBUG("    Sample Spline Deriv [canister frame]: %s", to_string(sample_spline_deriv).c_str());
+        ROS_DEBUG("    Sample Spline Point [object frame]: %s", to_string(sample_spline_point).c_str());
+        ROS_DEBUG("    Sample Spline Deriv [object frame]: %s", to_string(sample_spline_deriv).c_str());
 
         Eigen::Vector3d sample_spline_point_robot_frame =
-                robot_to_object *
-                Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) *
-                sample_spline_point;
+                T_grasp_object * sample_spline_point;
 
         Eigen::Vector3d sample_spline_deriv_robot_frame =
-                robot_to_object.rotation() *
-                sample_spline_deriv.normalized();
+                T_grasp_object.rotation() * sample_spline_deriv.normalized();
 
-        ROS_DEBUG("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
-        ROS_DEBUG("    Sample Spline Deriv [robot frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
+        ROS_DEBUG("    Sample Spline Point [target frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
+        ROS_DEBUG("    Sample Spline Deriv [target frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
 
         // compute the normal to the grasp spline that most points "up" in the
         // robot frame
@@ -2415,10 +2482,11 @@ RepositionBaseExecutor::sampleGraspCandidates(
         down_grasp_dir *= -1.0;
 
         Eigen::Vector3d grasp_dir;
-        if (up_grasp_dir.dot(sample_spline_point_robot_frame - object_pos_robot_frame) < 0) {
+        Eigen::Vector3d object_to_sample =
+                sample_spline_point_robot_frame - object_pos_robot_frame;
+        if (up_grasp_dir.dot(object_to_sample) < 0) {
             grasp_dir = up_grasp_dir;
-        }
-        else {
+        } else {
             ROS_DEBUG("Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
             continue;
 //            grasp_dir = down_grasp_dir;
@@ -2458,22 +2526,19 @@ RepositionBaseExecutor::sampleGraspCandidates(
         ROS_DEBUG("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
 
         grasp_candidates.push_back(
-                GraspCandidate(candidate_wrist_transform, robot_to_object.inverse() * candidate_wrist_transform, u));
-    }
+                GraspCandidate(candidate_wrist_transform, T_grasp_object.inverse() * candidate_wrist_transform, u));
 
-    // add each grasps flipped variant
-    std::size_t original_size = grasp_candidates.size();
-    for (int i = 0; i < original_size; ++i) {
-        const GraspCandidate& grasp = grasp_candidates[i];
+        const GraspCandidate& added = grasp_candidates.back();
         Eigen::Affine3d flipped_candidate_transform =
-                grasp.grasp_candidate_transform *
+                added.grasp_candidate_transform *
                 Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
         grasp_candidates.push_back(
                 GraspCandidate(
                         flipped_candidate_transform,
-                        robot_to_object.inverse() * flipped_candidate_transform,
-                        grasp.u));
+                        T_grasp_object.inverse() * flipped_candidate_transform,
+                        added.u));
     }
+
     return grasp_candidates;
 }
 
@@ -2487,24 +2552,29 @@ void RepositionBaseExecutor::move_arm_command_result_cb(
 
 void RepositionBaseExecutor::visualizeGraspCandidates(
     const std::vector<GraspCandidate>& grasps,
-    Eigen::Affine3d T_robot_to_map,
-    std::string ns) const
+    const Eigen::Affine3d& T_world_robot,
+    const std::string& ns) const
 {
-    ROS_INFO("Visualizing %zd grasps", grasps.size());
-    geometry_msgs::Vector3 triad_scale = geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
-
-    visualization_msgs::MarkerArray all_triad_markers;
+    ROS_INFO("Visualizing %zd grasp candidates", grasps.size());
+    geometry_msgs::Vector3 triad_scale =
+            geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
 
     // create triad markers to be reused for each grasp candidate
-    visualization_msgs::MarkerArray triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
+    auto triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
+    std::string marker_frame;
+    if (current_goal_) {
+        marker_frame = current_goal_->map.header.frame_id;
+    }
+
     for (visualization_msgs::Marker& marker : triad_markers.markers) {
-        marker.header.frame_id = "/abs_nwu";
+        marker.header.frame_id = marker_frame;
         marker.ns = ns;
     }
 
-    visualization_msgs::MarkerArray single_triad_markers;
+    visualization_msgs::MarkerArray all_markers;
+    all_markers.markers.resize(grasps.size() * triad_markers.markers.size());
 
-    // save the original marker transforms
+    // save the relative transform of each marker in the triad's frame
     std::vector<Eigen::Affine3d> marker_transforms;
     marker_transforms.reserve(triad_markers.markers.size());
     for (const auto& marker : triad_markers.markers) {
@@ -2513,41 +2583,35 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
         marker_transforms.push_back(marker_transform);
     }
 
+    // transform each marker into the world frame
     int id = 0;
-    for (const GraspCandidate& candidate : grasps) {
-        // transform triad markers to the candidate grasp transform
-        for (visualization_msgs::Marker& marker : triad_markers.markers) {
-            marker.id = id++;
-            Eigen::Affine3d marker_transform;
-            tf::poseMsgToEigen(marker.pose, marker_transform);
-            Eigen::Affine3d new_marker_transform =
-                    T_robot_to_map *
+    for (size_t gidx = 0; gidx < grasps.size(); ++gidx) {
+        const GraspCandidate& candidate = grasps[gidx];
+        for (size_t midx = 0; midx < triad_markers.markers.size(); ++midx) {
+            size_t idx = triad_markers.markers.size() * gidx + midx;
+
+            // make a copy of the marker copy transformed into the world frame
+            visualization_msgs::Marker m = triad_markers.markers[midx];
+            Eigen::Affine3d T_world_marker =
+                    T_world_robot *
                     candidate.grasp_candidate_transform *
-                    marker_transform;
-            tf::poseEigenToMsg(new_marker_transform, marker.pose);
-        }
+                    marker_transforms[midx];
+            tf::poseEigenToMsg(T_world_marker, m.pose);
 
-        // add triad markers for this grasp to the total marker set
-        all_triad_markers.markers.insert(all_triad_markers.markers.end(), triad_markers.markers.begin(), triad_markers.markers.end());
-
-        // publish the triad for this grasp by itself to a separate namespace, but keep the same id scheme so that older grasps are not overwritten
-        single_triad_markers.markers = triad_markers.markers;
-        assert(single_triad_markers.markers.size() == 4);
-        ROS_INFO("Publishing marker for grasp %d", single_triad_markers.markers.front().id >> 2); // each marker set should have 3 markers for the axes and 1 marker for the origin
-        for (visualization_msgs::Marker& marker : single_triad_markers.markers) {
-            marker.ns = "solo_candidate_grasp";
-        }
-        viz_pub_.publish(single_triad_markers);
-        single_triad_markers.markers.clear();
-
-        // restore marker transforms to their original frame
-        for (std::size_t i = 0; i < triad_markers.markers.size(); ++i) {
-            tf::poseEigenToMsg(marker_transforms[i], triad_markers.markers[i].pose);
+            m.id = idx;
+            all_markers.markers[idx] = std::move(m);
         }
     }
 
-    ROS_INFO("Visualizing %zd triad markers", all_triad_markers.markers.size());
-    viz_pub_.publish(all_triad_markers);
+    ROS_DEBUG("Visualizing %zd triad markers", all_markers.markers.size());
+    viz_pub_.publish(all_markers);
+}
+
+void RepositionBaseExecutor::visualizeGraspCandidates(
+    const std::vector<GraspCandidate>& grasps,
+    const std::string& ns) const
+{
+    return visualizeGraspCandidates(grasps, Eigen::Affine3d::Identity(), ns);
 }
 
 bool RepositionBaseExecutor::download_marker_params()
@@ -2611,13 +2675,15 @@ void RepositionBaseExecutor::visualizeRobot(
     const std::string& ns,
     int& id)
 {
+    moveit::core::RobotState robot_state = currentRobotState();
     const moveit::core::JointModel* root_joint = robot_model_->getRootJoint();
-    robot_state_->setJointPositions(root_joint, pose);
+    robot_state.setJointPositions(root_joint, pose);
+    robot_state.update();
     visualization_msgs::MarkerArray ma;
     const std::vector<std::string>& link_names = { "talon", "torso_link0" }; //robot_model_->getLinkModelNames();
     std_msgs::ColorRGBA color;
     leatherman::msgHSVToRGB((double)hue, 1.0, 1.0, color);
-    robot_state_->getRobotMarkers(ma, link_names, color, ns, ros::Duration(0), false);
+    robot_state.getRobotMarkers(ma, link_names, color, ns, ros::Duration(0), false);
     for (auto& marker : ma.markers) {
         marker.id = id++;
     }
