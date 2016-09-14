@@ -75,6 +75,22 @@ struct Pose2D
     double yaw;
 };
 
+/// \brief Describes the space of discrete poses with respect to another pose
+struct SearchSpaceParams
+{
+    int nDist;          ///< Number of radial samples
+    double distMin;     ///< Minimum radius away from pivot position
+    double distStep;    ///< Discretization of radial samples
+
+    int nAng;           ///< Number of angular samples wrt the pivot position
+    double angMin;      ///< Minimum angle offset from pivot pose
+    double angStep;     ///< Discretization of angular samples
+
+    int nYaw;           ///< Number of relative heading samples wrt the pivot heading
+    double yawMin;      ///< Minimum relative heading offset from pivot heading
+    double yawStep;     ///< Discretization of yaw samples
+};
+
 class RepositionBaseExecutor
 {
 public:
@@ -110,21 +126,6 @@ private:
         int marker_id;
         std::string attached_link;
         Eigen::Affine3d link_to_marker;
-    };
-
-    struct SearchSpaceParams
-    {
-        int nDist;
-        double distMin;
-        double distStep;
-
-        int nAng;
-        double angMin;
-        double angStep;
-
-        int nYaw;
-        double yawMin;
-        double yawStep;
     };
 
     ros::NodeHandle nh_;
@@ -201,14 +202,21 @@ private:
     RepositionBaseExecutionStatus::Status status_;
     RepositionBaseExecutionStatus::Status last_status_;
 
+    /// \name Initialization
+    ///@{
     bool downloadGraspingParameters(ros::NodeHandle& nh);
+    bool downloadMarkerParameters();
+    ///@}
 
+    /// \name State Monitoring
+    ///@{
     const moveit::core::RobotState& currentRobotState() const;
 
     void processSceneUpdate(
         planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType type);
+    ///@}
 
-    /// \name 2D and 3D Pose Type Conversions
+    /// \name 2D and 3D Pose Type Conversions (and some Frame Policies)
     ///@{
     Eigen::Affine3d poseFrom2D(double x, double y, double yaw) const;
 
@@ -225,28 +233,16 @@ private:
     Eigen::Affine3d poseEigen2ToEigen3(
         const Eigen::Affine2d& in,
         double z = 0.0, double R = 0.0, double P = 0.0) const;
+
+    Pose2D poseEigen3ToSimpleGascan(const Eigen::Affine3d& object_pose) const;
     ///@}
 
-    void computeRobotPlanarPose(
-        const Eigen::Affine3d& robot_pose,
-        Eigen::Affine2d& planar_pose) const;
-    Pose2D poseEigen3ToSimpleGascan(const Eigen::Affine3d& object_pose) const;
-
-    bool tryFeasibleArmCheck(
-        const Eigen::Affine3d& robot_pose,
-        const Eigen::Affine3d& object_pose) const;
-
-    int checkFeasibleMoveToPregraspTrajectory(
-        const Eigen::Affine3d& robot_pose,
-        const Eigen::Affine3d& object_pose);
-
-    int checkFeasibleMoveToPregraspTrajectory(
-        const geometry_msgs::PoseStamped& robot_pose,
-        const geometry_msgs::PoseStamped& object_pose);
-
+    /// \name Grasp Candidate Selection
+    ///@{
     std::vector<GraspCandidate> generateFilteredGraspCandidates(
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose);
+
     std::vector<GraspCandidate> sampleGraspCandidates(
         const Eigen::Affine3d& T_grasp_object,
         int num_candidates) const;
@@ -260,26 +256,37 @@ private:
     void filterGraspCandidatesIK(
         std::vector<GraspCandidate>& candidates,
         const Eigen::Affine3d& T_grasp_robot) const;
+
     void filterGraspCandidatesVisibility(
         std::vector<GraspCandidate>& candidates,
         const Eigen::Affine3d& T_camera_robot,
         double marker_incident_angle_threshold_rad) const;
+    ///@}
 
-    bool download_marker_params();
+    /// \name Reposition Search Policies
+    ///@{
+    bool tryFeasibleArmCheck(
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& object_pose) const;
 
-    void move_arm_command_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const rcta::MoveArmCommandResult::ConstPtr& result);
-    void visualizeGraspCandidates(
-        const std::vector<GraspCandidate>& grasps,
-        const Eigen::Affine3d& T_world_grasp,
-        const std::string& ns) const;
+    bool computeRobPose(
+        const nav_msgs::OccupancyGrid& map,
+        const Pose2D& robot_pose,
+        const Pose2D& object_pose,
+        std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
-    void visualizeGraspCandidates(
-        const std::vector<GraspCandidate>& grasp,
-        const std::string& ns) const;
+    bool computeRobPoseExhaustive(
+        const nav_msgs::OccupancyGrid& map,
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& object_pose,
+        std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
 
-    void computeGraspProbabilities(
+    void generateCandidatePoseSamples(
+        const Pose2D& obj_pose,
+        const SearchSpaceParams& params,
+        au::grid<3, Pose2D>& g) const;
+
+    void computeExhaustiveGraspProbabilities(
         const SearchSpaceParams& ss,
         const au::grid<3, Pose2D>& rob,
         const Pose2D& obj,
@@ -287,7 +294,7 @@ private:
         au::grid<3, double>& pGrasp,
         au::grid<3, bool>& bTotMax);
 
-    void computeExhaustiveGraspProbabilities(
+    void computeGraspProbabilities(
         const SearchSpaceParams& ss,
         const au::grid<3, Pose2D>& rob,
         const Pose2D& obj,
@@ -318,6 +325,33 @@ private:
         const au::grid<3, bool>& b,
         au::grid<3, double>& p);
 
+    int checkIK(
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& object_pose);
+
+    int checkFeasibleMoveToPregraspTrajectory(
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& object_pose);
+
+    void scaleByHeadingDifference(
+        const SearchSpaceParams& ss,
+        const au::grid<3, Pose2D>& rob,
+        const au::grid<3, bool>& bTotMax,
+        const Pose2D& object_pose,
+        const Pose2D& robot_pose,
+        double scale,
+        double pTotThr,
+        au::grid<3, double>& pTot);
+
+    void extractValidCandidatesSorted(
+        const SearchSpaceParams& ss,
+        const au::grid<3, bool>& bTotMax,
+        const au::grid<3, double>& pTot,
+        std::vector<RepositionBaseCandidate::candidate>& cands);
+    ///@}
+
+    ///\name Debug Visualization
+    ///@{
     void projectProbabilityMap(
         const nav_msgs::OccupancyGrid& map,
         const SearchSpaceParams& ss,
@@ -326,31 +360,21 @@ private:
         const au::grid<3, bool>& valid,
         nav_msgs::OccupancyGrid& grid);
 
-    void generateCandidatePoseSamples(
-        const Pose2D& obj_pose,
-        const SearchSpaceParams& params,
-        au::grid<3, Pose2D>& g) const;
+    void visualizeBaseCandidates(
+        const au::grid<3, Pose2D>& cands,
+        const std::string& ns,
+        int radius_throttle = 1,
+        int angle_throttle = 1,
+        int yaw_throttle = 1) const;
 
-    bool computeRobPose(
-        const nav_msgs::OccupancyGrid& map,
-        const Pose2D& robot_pose,
-        const Pose2D& object_pose,
-        std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
+    void visualizeGraspCandidates(
+        const std::vector<GraspCandidate>& grasps,
+        const Eigen::Affine3d& T_world_grasp,
+        const std::string& ns) const;
 
-    void goal_callback();
-    void preempt_callback();
-
-    uint8_t execution_status_to_feedback_status(
-        RepositionBaseExecutionStatus::Status status);
-
-    int checkIK(
-        const Eigen::Affine3d& robot_pose,
-        const Eigen::Affine3d& object_pose);
-    bool computeRobPoseExhaustive(
-        const nav_msgs::OccupancyGrid& map,
-        const Eigen::Affine3d& robot_pose,
-        const Eigen::Affine3d& object_pose,
-        std::vector<geometry_msgs::PoseStamped>& candidate_base_poses);
+    void visualizeGraspCandidates(
+        const std::vector<GraspCandidate>& grasp,
+        const std::string& ns) const;
 
     void visualizeRobot(
         double x,
@@ -358,19 +382,33 @@ private:
         double yaw,
         int hue,
         const std::string& ns,
-        int& id);
+        int& id) const;
 
     void visualizeRobot(
         const Eigen::Affine2d& pose,
         int hue,
         const std::string& ns,
-        int& id);
+        int& id) const;
 
     void visualizeRobot(
         const Eigen::Affine3d& pose,
         int hue,
         const std::string& ns,
-        int& id);
+        int& id) const;
+    ///@}
+
+    void goal_callback();
+    void preempt_callback();
+
+    uint8_t execution_status_to_feedback_status(
+        RepositionBaseExecutionStatus::Status status);
+
+    void move_arm_command_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const rcta::MoveArmCommandResult::ConstPtr& result);
+
+    void aMetricIDontHaveTimeToMaintain();
+    void anotherMetricIDontHaveTimeToMaintain();
 };
 
 #endif
