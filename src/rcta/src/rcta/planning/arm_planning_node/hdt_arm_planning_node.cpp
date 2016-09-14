@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "hdt_arm_planning_node");
 
-    hdt::ArmPlanningNode node;
+    rcta::ArmPlanningNode node;
 
     if (!node.init()) {
         return FAILED_TO_INITIALIZE_NODE;
