@@ -4,8 +4,7 @@
         one fixed transform for the base of the asus:
             ${name}_mount_joint
         one revolute joint for the asus neck:
-            ${name}_tilt one fixed transform to
-        the canonical frame of the camera
+            ${name}_tilt one fixed transform to the canonical frame of the camera
             ${name}_frame_joint
         multiple fixed transforms for convenient sensor frames:
             ${name}_depth_frame_joint
