@@ -6,7 +6,7 @@
     <!-- start pose for the robot in gazebo -->
     <arg name="start_x" default="-3.55"/>
     <arg name="start_y" default="-3.5"/>
-    <arg name="start_z" default="1.2"/>
+    <arg name="start_z" default="0.0"/>
     <arg name="start_R" default="0.0"/>
     <arg name="start_P" default="0.0"/>
     <arg name="start_Y" default="3.1415"/>
