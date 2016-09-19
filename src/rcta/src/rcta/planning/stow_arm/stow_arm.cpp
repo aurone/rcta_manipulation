@@ -13,7 +13,7 @@
 #include <spellbook/utils/utils.h>
 
 // project includes
-#include <rcta/MoveArmCommandAction.h>
+#include <rcta/MoveArmAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
 
 struct StowPosition
@@ -24,7 +24,7 @@ struct StowPosition
 
 bool cb_success = false;
 std::vector<StowPosition> stow_positions_;
-actionlib::SimpleActionClient<rcta::MoveArmCommandAction> *client_;
+actionlib::SimpleActionClient<rcta::MoveArmAction> *client_;
 hdt::RobotModelPtr robot_model;
 
 ros::Publisher pub;
@@ -52,7 +52,7 @@ bool extract_xml_value(
 
 void result_callback(
 	const actionlib::SimpleClientGoalState& state,
-	const rcta::MoveArmCommandResult::ConstPtr& result)
+	const rcta::MoveArmResult::ConstPtr& result)
 {
 	if(result->success){
 		ROS_INFO("Arm stowed!");
@@ -69,8 +69,8 @@ bool try_stow_arm(){
 		return false;
 	}
 
-	rcta::MoveArmCommandGoal move_arm_stow_goal;
-	move_arm_stow_goal.type = rcta::MoveArmCommandGoal::JointGoal;
+	rcta::MoveArmGoal move_arm_stow_goal;
+	move_arm_stow_goal.type = rcta::MoveArmGoal::JointGoal;
 	move_arm_stow_goal.goal_joint_state.name = robot_model->joint_names();
 	move_arm_stow_goal.octomap; // meh?
     	//include the attached object in the goal
@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
 	}
 
 	const std::string move_arm_command_action_name = "move_arm_command";
-	actionlib::SimpleActionClient<rcta::MoveArmCommandAction> client(move_arm_command_action_name, true);
+	actionlib::SimpleActionClient<rcta::MoveArmAction> client(move_arm_command_action_name, true);
 	client_ = &client;
 
 	pub = nh.advertise<std_msgs::String>("/hdt/stow_arm_response", 5);

@@ -249,7 +249,7 @@ bool GraspObjectExecutor::initialize()
     marker_arr_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 5);
     filtered_costmap_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
 
-    move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
+    move_arm_command_client_.reset(new MoveArmActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
         ROS_ERROR("Failed to instantiate Move Arm Command Client");
         return false;
@@ -446,7 +446,7 @@ int GraspObjectExecutor::run()
                 const GraspCandidate& next_best_grasp = reachable_grasp_candidates_.back();
 
                 // 4. send a move arm goal for the best grasp
-                last_move_arm_pregrasp_goal_.type = rcta::MoveArmCommandGoal::EndEffectorGoal;
+                last_move_arm_pregrasp_goal_.type = rcta::MoveArmGoal::EndEffectorGoal;
                 tf::poseEigenToMsg(next_best_grasp.grasp_candidate_transform, last_move_arm_pregrasp_goal_.goal_pose);
 
                 last_move_arm_pregrasp_goal_.octomap = use_extrusion_octomap_ ?
@@ -829,7 +829,7 @@ int GraspObjectExecutor::run()
 
                 const StowPosition& next_stow_position = stow_positions_[next_stow_position_to_attempt_++];
 
-                last_move_arm_stow_goal_.type = rcta::MoveArmCommandGoal::JointGoal;
+                last_move_arm_stow_goal_.type = rcta::MoveArmGoal::JointGoal;
                 last_move_arm_stow_goal_.goal_joint_state.name = robot_model_->joint_names();
                 last_move_arm_stow_goal_.goal_joint_state.position = next_stow_position.joint_positions;
 
@@ -1066,14 +1066,14 @@ void GraspObjectExecutor::move_arm_command_active_cb()
 
 }
 
-void GraspObjectExecutor::move_arm_command_feedback_cb(const rcta::MoveArmCommandFeedback::ConstPtr& feedback)
+void GraspObjectExecutor::move_arm_command_feedback_cb(const rcta::MoveArmFeedback::ConstPtr& feedback)
 {
 
 }
 
 void GraspObjectExecutor::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::MoveArmCommandResult::ConstPtr& result)
+    const rcta::MoveArmResult::ConstPtr& result)
 {
     move_arm_command_goal_state_ = state;
     move_arm_command_result_ = result;

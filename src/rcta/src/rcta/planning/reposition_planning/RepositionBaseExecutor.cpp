@@ -124,7 +124,7 @@ bool RepositionBaseExecutor::initialize()
     pobs_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
     pgrasp_exhaustive_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
 
-    move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
+    move_arm_command_client_.reset(new MoveArmActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
         ROS_ERROR("Failed to instantiate Move Arm Command Client");
         return false;
@@ -1718,8 +1718,8 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
         const GraspCandidate& grasp = grasp_candidates[gidx];
 
-        rcta::MoveArmCommandGoal pregrasp_goal;
-        pregrasp_goal.type = rcta::MoveArmCommandGoal::EndEffectorGoal;
+        rcta::MoveArmGoal pregrasp_goal;
+        pregrasp_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
         tf::poseEigenToMsg(grasp.grasp_candidate_transform, pregrasp_goal.goal_pose);
         auto result_cb = boost::bind(&RepositionBaseExecutor::move_arm_command_result_cb, this, _1, _2);
         move_arm_command_client_->sendGoal(pregrasp_goal, result_cb);
@@ -1984,7 +1984,7 @@ RepositionBaseExecutor::sampleGraspCandidates(
 
 void RepositionBaseExecutor::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::MoveArmCommandResult::ConstPtr& result)
+    const rcta::MoveArmResult::ConstPtr& result)
 {
     move_arm_command_goal_state_ = state;
     move_arm_command_result_ = result;

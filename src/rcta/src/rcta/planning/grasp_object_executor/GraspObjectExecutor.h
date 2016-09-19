@@ -22,7 +22,7 @@
 #include <rcta_msgs/GraspObjectCommandAction.h>
 
 // project includes
-#include <rcta/MoveArmCommandAction.h>
+#include <rcta/MoveArmAction.h>
 #include <rcta/ViservoCommandAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
 
@@ -130,16 +130,16 @@ private:
     typedef actionlib::SimpleActionServer<rcta_msgs::GraspObjectCommandAction> GraspObjectCommandActionServer;
     std::unique_ptr<GraspObjectCommandActionServer> as_;
 
-    typedef actionlib::SimpleActionClient<rcta::MoveArmCommandAction> MoveArmCommandActionClient;
+    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
     std::string move_arm_command_action_name_;
-    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
+    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
     bool sent_move_arm_goal_;
     bool pending_move_arm_command_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
-    rcta::MoveArmCommandResult::ConstPtr move_arm_command_result_;
+    rcta::MoveArmResult::ConstPtr move_arm_command_result_;
 
-    rcta::MoveArmCommandGoal last_move_arm_pregrasp_goal_;
-    rcta::MoveArmCommandGoal last_move_arm_stow_goal_;
+    rcta::MoveArmGoal last_move_arm_pregrasp_goal_;
+    rcta::MoveArmGoal last_move_arm_stow_goal_;
     GraspCandidate last_successful_grasp_;
 
     typedef actionlib::SimpleActionClient<rcta::ViservoCommandAction> ViservoCommandActionClient;
@@ -197,10 +197,10 @@ private:
     void preempt_callback();
 
     void move_arm_command_active_cb();
-    void move_arm_command_feedback_cb(const rcta::MoveArmCommandFeedback::ConstPtr& feedback);
+    void move_arm_command_feedback_cb(const rcta::MoveArmFeedback::ConstPtr& feedback);
     void move_arm_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta::MoveArmCommandResult::ConstPtr& result);
+            const rcta::MoveArmResult::ConstPtr& result);
 
     void viservo_command_active_cb();
     void viservo_command_feedback_cb(const rcta::ViservoCommandFeedback::ConstPtr& feedback);

@@ -27,7 +27,7 @@
 
 // project includes
 #include <rcta/common/hdt_description/RobotModel.h>
-#include <rcta/MoveArmCommandAction.h>
+#include <rcta/MoveArmAction.h>
 
 //xytheta collision checking!
 #include "xytheta_collision_checker.h"
@@ -189,11 +189,11 @@ private:
 
     /// \name Arm Planning Constraints
     /// @{
-    typedef actionlib::SimpleActionClient<rcta::MoveArmCommandAction> MoveArmCommandActionClient;
-    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
+    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
+    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
     std::string move_arm_command_action_name_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
-    rcta::MoveArmCommandResult::ConstPtr move_arm_command_result_;
+    rcta::MoveArmResult::ConstPtr move_arm_command_result_;
     ///@}
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
@@ -405,7 +405,7 @@ private:
 
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
-        const rcta::MoveArmCommandResult::ConstPtr& result);
+        const rcta::MoveArmResult::ConstPtr& result);
 
     void aMetricIDontHaveTimeToMaintain();
     void anotherMetricIDontHaveTimeToMaintain();

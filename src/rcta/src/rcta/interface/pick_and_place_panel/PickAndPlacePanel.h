@@ -29,7 +29,7 @@
 
 // project includes
 #include <rcta/ObjectDetectionAction.h>
-#include <rcta/MoveArmCommandAction.h>
+#include <rcta/MoveArmAction.h>
 
 // module includes
 #include "SimpleInteractiveMarkerServer.h"
@@ -118,8 +118,8 @@ private:
 
     std::shared_ptr<GraspMarkerSelection> selection_;
 
-    typedef actionlib::SimpleActionClient<rcta::MoveArmCommandAction> MoveArmCommandActionClient;
-    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
+    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
+    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
     bool pending_move_arm_command_;
 
     typedef actionlib::SimpleActionClient<rcta::ObjectDetectionAction> ObjectDetectionActionClient;
@@ -172,10 +172,10 @@ private:
         const GripperCommandResult::ConstPtr& result);
 
     void move_arm_command_active_cb();
-    void move_arm_command_feedback_cb(const rcta::MoveArmCommandFeedback::ConstPtr& feedback);
+    void move_arm_command_feedback_cb(const rcta::MoveArmFeedback::ConstPtr& feedback);
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
-        const rcta::MoveArmCommandResult::ConstPtr& result);
+        const rcta::MoveArmResult::ConstPtr& result);
 
     tf::Transform geomsgs_pose_to_tf_transform(const geometry_msgs::Pose& pose) const;
     geometry_msgs::Pose tf_transform_to_geomsgs_pose(const tf::Transform& transform) const;

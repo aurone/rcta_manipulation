@@ -31,24 +31,24 @@ int ArmPlanningNode::run()
     return 0;
 }
 
-void ArmPlanningNode::move_arm(const rcta::MoveArmCommandGoal::ConstPtr& request)
+void ArmPlanningNode::move_arm(const rcta::MoveArmGoal::ConstPtr& request)
 {
     geometry_msgs::PoseStamped wrist_goal_planning_frame;
 
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
-    if (request->type == rcta::MoveArmCommandGoal::JointGoal) {
+    if (request->type == rcta::MoveArmGoal::JointGoal) {
         ROS_INFO("Received a joint goal");
         moveit_msgs::RobotState goal_state;
         success = plan_to_joint_goal(goal_state, *request, result_traj);
     }
-    else if (request->type == rcta::MoveArmCommandGoal::EndEffectorGoal) {
+    else if (request->type == rcta::MoveArmGoal::EndEffectorGoal) {
         ROS_INFO("Received an end effector goal");
         success = plan_to_eef_goal(wrist_goal_planning_frame, result_traj);
     }
 
     if (!success) {
-        rcta::MoveArmCommandResult result;
+        rcta::MoveArmResult result;
         result.success = false;
         result.trajectory;
         m_move_arm_command_server->setAborted(result, "Failed to plan path");
@@ -58,7 +58,7 @@ void ArmPlanningNode::move_arm(const rcta::MoveArmCommandGoal::ConstPtr& request
     if (request->execute_path) {
     }
 
-    rcta::MoveArmCommandResult result;
+    rcta::MoveArmResult result;
     result.success = true;
     result.trajectory = result_traj;
     m_move_arm_command_server->setSucceeded(result);
@@ -73,7 +73,7 @@ bool ArmPlanningNode::plan_to_eef_goal(
 
 bool ArmPlanningNode::plan_to_joint_goal(
     const moveit_msgs::RobotState& start,
-    const rcta::MoveArmCommandGoal& goal,
+    const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
     return false;

@@ -72,7 +72,7 @@ PickAndPlacePanel::PickAndPlacePanel(QWidget* parent) :
         ROS_ERROR("Failed to instantiate Grasp Marker Selection");
     }
 
-    move_arm_command_client_.reset(new MoveArmCommandActionClient("move_arm_command"));
+    move_arm_command_client_.reset(new MoveArmActionClient("move_arm_command"));
     if (!move_arm_command_client_) {
         ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
     }
@@ -296,7 +296,7 @@ void PickAndPlacePanel::move_arm_to_marker_pose(const std::string& marker_name, 
         tf::poseEigenToMsg(goal_wrist_transform_flipped, goal_wrist_pose_mount_frame.pose);
     }
 
-    rcta::MoveArmCommandGoal goal;
+    rcta::MoveArmGoal goal;
     goal.goal_pose = goal_wrist_pose_mount_frame.pose;
     move_arm_command_client_->sendGoal(goal, boost::bind(&PickAndPlacePanel::move_arm_command_result_cb, this, _1, _2));
     pending_move_arm_command_ = true;
@@ -578,14 +578,14 @@ void PickAndPlacePanel::move_arm_command_active_cb()
 
 }
 
-void PickAndPlacePanel::move_arm_command_feedback_cb(const rcta::MoveArmCommandFeedback::ConstPtr& feedback)
+void PickAndPlacePanel::move_arm_command_feedback_cb(const rcta::MoveArmFeedback::ConstPtr& feedback)
 {
 
 }
 
 void PickAndPlacePanel::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::MoveArmCommandResult::ConstPtr& result)
+    const rcta::MoveArmResult::ConstPtr& result)
 {
     pending_move_arm_command_ = false;
     update_gui();

@@ -14,7 +14,7 @@
 #include <trajectory_msgs/JointTrajectory.h>
 
 // project includes
-#include <rcta/MoveArmCommandAction.h>
+#include <rcta/MoveArmAction.h>
 
 namespace rcta {
 
@@ -38,10 +38,10 @@ private:
     ros::NodeHandle m_nh;
     ros::NodeHandle m_ph;
 
-    typedef actionlib::SimpleActionServer<rcta::MoveArmCommandAction> MoveArmActionServer;
+    typedef actionlib::SimpleActionServer<rcta::MoveArmAction> MoveArmActionServer;
     std::unique_ptr<MoveArmActionServer> m_move_arm_command_server;
 
-    void move_arm(const rcta::MoveArmCommandGoal::ConstPtr& goal);
+    void move_arm(const rcta::MoveArmGoal::ConstPtr& goal);
 
     bool plan_to_eef_goal(
             const geometry_msgs::PoseStamped& goal_pose,
@@ -49,7 +49,7 @@ private:
 
     bool plan_to_joint_goal(
             const moveit_msgs::RobotState& start,
-            const rcta::MoveArmCommandGoal& goal,
+            const rcta::MoveArmGoal& goal,
             trajectory_msgs::JointTrajectory& traj);
 };
 

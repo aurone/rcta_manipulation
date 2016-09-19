@@ -86,7 +86,7 @@ add_action_files(
     DIRECTORY action
     FILES
         ObjectDetection.action
-        MoveArmCommand.action
+        MoveArm.action
         TeleportAndaliteCommand.action
         TeleportHDTCommand.action
         ViservoCommand.action)
