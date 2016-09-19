@@ -21,12 +21,9 @@ target_link_libraries(
     ${sbpl_collision_checking_LIBRARIES}
     ${sbpl_kdl_robot_model_LIBRARIES})
 
-add_executable(
-    hdt_arm_planning_node
-    hdt_arm_planning_node.cpp
-    ArmPlanningNode.cpp)
+add_executable(move_arm_node move_arm_node.cpp MoveArmNode.cpp)
 target_link_libraries(
-    hdt_arm_planning_node
+    move_arm_node
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${leatherman_LIBRARIES}
@@ -44,7 +41,7 @@ target_link_libraries(
     hdt_robot_model)
 
 install(
-    TARGETS hdt_arm_planning hdt_arm_planning_node
+    TARGETS hdt_arm_planning move_arm_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})

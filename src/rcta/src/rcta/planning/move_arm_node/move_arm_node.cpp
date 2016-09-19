@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include "ArmPlanningNode.h"
+#include "MoveArmNode.h"
 
 enum MainResult
 {
@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "hdt_arm_planning_node");
 
-    rcta::ArmPlanningNode node;
+    rcta::MoveArmNode node;
 
     if (!node.init()) {
         return FAILED_TO_INITIALIZE_NODE;

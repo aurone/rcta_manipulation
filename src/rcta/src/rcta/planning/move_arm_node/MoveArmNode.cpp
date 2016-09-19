@@ -1,18 +1,19 @@
-#include "ArmPlanningNode.h"
+#include "MoveArmNode.h"
 
 namespace rcta {
 
-ArmPlanningNode::ArmPlanningNode() :
+MoveArmNode::MoveArmNode() :
     m_nh(),
     m_ph("~"),
     m_move_arm_command_server()
 {
 }
 
-bool ArmPlanningNode::init()
+bool MoveArmNode::init()
 {
-    auto move_command_callback = boost::bind(&ArmPlanningNode::move_arm, this, _1);
-    m_move_arm_command_server.reset(new MoveArmActionServer("move_arm_command", move_command_callback, false));
+    auto move_command_callback = boost::bind(&MoveArmNode::move_arm, this, _1);
+    m_move_arm_command_server.reset(
+            new MoveArmActionServer("move_arm_command", move_command_callback, false));
     if (!m_move_arm_command_server) {
         ROS_ERROR("Failed to instantiate Move Arm Action Server");
         return false;
@@ -23,7 +24,7 @@ bool ArmPlanningNode::init()
     return true;
 }
 
-int ArmPlanningNode::run()
+int MoveArmNode::run()
 {
     ROS_INFO("Spinning...");
     ros::spin();
@@ -31,7 +32,7 @@ int ArmPlanningNode::run()
     return 0;
 }
 
-void ArmPlanningNode::move_arm(const rcta::MoveArmGoal::ConstPtr& request)
+void MoveArmNode::move_arm(const rcta::MoveArmGoal::ConstPtr& request)
 {
     geometry_msgs::PoseStamped wrist_goal_planning_frame;
 
@@ -64,14 +65,14 @@ void ArmPlanningNode::move_arm(const rcta::MoveArmGoal::ConstPtr& request)
     m_move_arm_command_server->setSucceeded(result);
 }
 
-bool ArmPlanningNode::plan_to_eef_goal(
+bool MoveArmNode::plan_to_eef_goal(
     const geometry_msgs::PoseStamped& goal_pose,
     trajectory_msgs::JointTrajectory& traj)
 {
     return false;
 }
 
-bool ArmPlanningNode::plan_to_joint_goal(
+bool MoveArmNode::plan_to_joint_goal(
     const moveit_msgs::RobotState& start,
     const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)

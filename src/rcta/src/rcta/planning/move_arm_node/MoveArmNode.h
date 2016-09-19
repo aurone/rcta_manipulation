@@ -1,5 +1,5 @@
-#ifndef hdt_ArmPlanningNode_h
-#define hdt_ArmPlanningNode_h
+#ifndef rcta_move_arm_node_h
+#define rcta_move_arm_node_h
 
 // standard includes
 #include <memory>
@@ -23,11 +23,11 @@ namespace rcta {
 /// The ROS node maintains the state of the robot and the world to plan and
 /// and execute paths that avoid obstacles in the environment and self
 /// collisions with the robot itself.
-class ArmPlanningNode
+class MoveArmNode
 {
 public:
 
-    ArmPlanningNode();
+    MoveArmNode();
 
     bool init();
 
