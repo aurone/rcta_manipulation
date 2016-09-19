@@ -12,6 +12,9 @@ target_link_libraries(
     ${eigen_conversions_LIBRARIES}
     ${rviz_LIBRARIES}
     ${tf_LIBRARIES})
+add_dependencies(
+    viservo_command_panel_plugin
+    ${${PROJECT_NAME}_EXPORTED_TARGETS})
 install(
     TARGETS viservo_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
