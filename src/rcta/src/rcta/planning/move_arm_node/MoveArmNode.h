@@ -6,9 +6,11 @@
 #include <string>
 
 // system includes
+#include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <moveit_msgs/Constraints.h>
+#include <moveit_msgs/MoveGroupAction.h>
 #include <moveit_msgs/RobotState.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
@@ -39,18 +41,47 @@ private:
     ros::NodeHandle m_ph;
 
     typedef actionlib::SimpleActionServer<rcta::MoveArmAction> MoveArmActionServer;
-    std::unique_ptr<MoveArmActionServer> m_move_arm_command_server;
+    std::string m_server_name;
+    std::unique_ptr<MoveArmActionServer> m_move_arm_server;
 
-    void move_arm(const rcta::MoveArmGoal::ConstPtr& goal);
+    typedef actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction> MoveGroupActionClient;
+    std::unique_ptr<MoveGroupActionClient> m_move_group_client;
 
-    bool plan_to_eef_goal(
-            const geometry_msgs::PoseStamped& goal_pose,
-            trajectory_msgs::JointTrajectory& traj);
+    std::string m_tip_link;
+    double m_pos_tolerance;
+    double m_rot_tolerance;
+    double m_joint_tolerance;
 
-    bool plan_to_joint_goal(
-            const moveit_msgs::RobotState& start,
-            const rcta::MoveArmGoal& goal,
-            trajectory_msgs::JointTrajectory& traj);
+    moveit_msgs::MoveGroupGoal m_goal;
+    moveit_msgs::MoveGroupResult m_result;
+
+    void moveArm(const rcta::MoveArmGoal::ConstPtr& goal);
+
+    bool sendMoveGroupPoseGoal(
+        const moveit_msgs::PlanningOptions& ops,
+        const geometry_msgs::PoseStamped& goal_pose);
+
+    bool planToGoalEE(
+        const geometry_msgs::PoseStamped& goal_pose,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool planToGoalJoints(
+        const moveit_msgs::RobotState& start,
+        const rcta::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool moveToGoalEE(
+        const geometry_msgs::PoseStamped& goal_pose,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool moveToGoalJoints(
+        const moveit_msgs::RobotState& start,
+        const rcta::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    void moveGroupResultCallback(
+        const actionlib::SimpleClientGoalState& state,
+        const moveit_msgs::MoveGroupResult::ConstPtr& result);
 };
 
 } // namespace rcta
