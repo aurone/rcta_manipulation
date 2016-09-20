@@ -10,7 +10,8 @@ MoveArmNode::MoveArmNode() :
     m_nh(),
     m_ph("~"),
     m_server_name("move_arm"),
-    m_move_arm_server()
+    m_move_arm_server(),
+    m_spinner(2)
 {
 }
 
@@ -43,6 +44,10 @@ bool MoveArmNode::init()
     geometry_msgs::Vector3 workspace_max;
 
     m_ph.param("allowed_planning_time", allowed_planning_time, 10.0);
+    if (!m_ph.getParam("planner_id", planner_id)) {
+        ROS_ERROR("Failed to retrieve 'planner_id' from the param server");
+        return false;
+    }
 
     if (!m_ph.getParam("group_name", group_name)) {
         ROS_ERROR("Failed to retrieve 'group_name' from the param server");
@@ -109,7 +114,8 @@ int MoveArmNode::run()
 {
     ROS_INFO("Spinning...");
     m_move_arm_server->start();
-    ros::spin();
+    m_spinner.start();
+    ros::waitForShutdown();
     ROS_INFO("Done spinning");
     return 0;
 }
@@ -127,7 +133,7 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
     trajectory_msgs::JointTrajectory result_traj;
     const bool execute = request->execute_path;
 
-    if (request->type == rcta::MoveArmGoal::JointGoal && execute) {
+    if (request->type == rcta::MoveArmGoal::JointGoal) {
         if (execute) {
             moveit_msgs::RobotState goal_state;
             success = moveToGoalJoints(goal_state, *request, result_traj);
@@ -135,7 +141,7 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
             moveit_msgs::RobotState goal_state;
             success = planToGoalJoints(goal_state, *request, result_traj);
         }
-    } else if (request->type == rcta::MoveArmGoal::EndEffectorGoal && execute) {
+    } else if (request->type == rcta::MoveArmGoal::EndEffectorGoal) {
         if (execute) {
             success = moveToGoalEE(tip_goal, result_traj);
         } else {
@@ -143,6 +149,9 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
         }
     } else {
         ROS_ERROR("Unrecognized goal type");
+        rcta::MoveArmResult result;
+        result.success = false;
+        m_move_arm_server->setAborted(result, "Unrecognized goal type");
     }
 
     if (success) {
@@ -227,6 +236,7 @@ void MoveArmNode::moveGroupResultCallback(
     const moveit_msgs::MoveGroupResult::ConstPtr& result)
 {
     if (result) {
+        ROS_INFO("receive result from move_group");
         m_result = *result;
     }
 }

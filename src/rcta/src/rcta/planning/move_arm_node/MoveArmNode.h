@@ -55,6 +55,8 @@ private:
     moveit_msgs::MoveGroupGoal m_goal;
     moveit_msgs::MoveGroupResult m_result;
 
+    ros::AsyncSpinner m_spinner;
+
     void moveArm(const rcta::MoveArmGoal::ConstPtr& goal);
 
     bool sendMoveGroupPoseGoal(
