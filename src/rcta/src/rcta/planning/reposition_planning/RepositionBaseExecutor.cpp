@@ -60,7 +60,7 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     grasp_to_pregrasp_(Eigen::Affine3d::Identity()),
     grasp_spline_(),
     move_arm_command_client_(),
-    move_arm_command_action_name_(),
+    move_arm_command_action_name_("move_arm"),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     move_arm_command_result_(),
     current_goal_(),
@@ -362,7 +362,8 @@ int RepositionBaseExecutor::run()
             } else {
                 rcta_msgs::RepositionBaseCommandResult result;
                 result.result = rcta_msgs::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
-                result.candidate_base_poses = candidate_base_poses;	// this pose is same with the initial base pose
+                // this pose is same with the initial base pose
+                result.candidate_base_poses = candidate_base_poses;
                 as_->setSucceeded(result);
                 status_ = RepositionBaseExecutionStatus::IDLE;
             }
@@ -1494,7 +1495,7 @@ RepositionBaseExecutor::generateFilteredGraspCandidates(
     const Eigen::Affine3d& object_pose)
 {
     // generate grasps in the world frame
-    int max_num_candidates = 100;
+    int max_num_candidates = max_grasp_candidates_; //100;
     std::vector<GraspCandidate> grasp_candidates =
             sampleGraspCandidates(object_pose, max_num_candidates);
 
@@ -1724,10 +1725,21 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
         auto result_cb = boost::bind(&RepositionBaseExecutor::move_arm_command_result_cb, this, _1, _2);
         move_arm_command_client_->sendGoal(pregrasp_goal, result_cb);
 
-        const ros::Duration move_arm_command_timeout(30.0);
-        move_arm_command_client_->waitForResult(move_arm_command_timeout);
+        int count = 0;
+        while (!move_arm_command_client_->waitForResult(ros::Duration(0.5)) &&
+                count < 60)
+        {
+            ros::spinOnce();
+            ++count;
+        }
+        bool finished = count < 60; //move_arm_command_client_->waitForResult();
+        if (!finished) {
+            ROS_WARN("timeout waiting for move arm action server to finish");
+        }
 
-        if (move_arm_command_client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+        if (finished && move_arm_command_client_->getState() ==
+                actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
             return 0;
         }
     }
