@@ -850,7 +850,7 @@ void GraspingCommandPanel::reposition_base_command_result_cb(
     ROS_INFO("Received Result from Reposition Base Command Action");
     pending_reposition_base_command_ = false;
 
-    if (result->result == rcta_msgs::RepositionBaseCommandResult::SUCCESS) {
+    if (result && result->result == rcta_msgs::RepositionBaseCommandResult::SUCCESS) {
         candidate_base_poses_ = result->candidate_base_poses;
         ROS_INFO("Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
     }
