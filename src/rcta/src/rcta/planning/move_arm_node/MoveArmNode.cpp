@@ -122,30 +122,21 @@ int MoveArmNode::run()
 
 void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
 {
-    geometry_msgs::PoseStamped tip_goal;
-
-    // TODO: get this from the configured planning frame in moveit
-    tip_goal.header.frame_id = "map";
-
-    tip_goal.pose = request->goal_pose;
-
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
     const bool execute = request->execute_path;
 
     if (request->type == rcta::MoveArmGoal::JointGoal) {
         if (execute) {
-            moveit_msgs::RobotState goal_state;
-            success = moveToGoalJoints(goal_state, *request, result_traj);
+            success = moveToGoalJoints(*request, result_traj);
         } else {
-            moveit_msgs::RobotState goal_state;
-            success = planToGoalJoints(goal_state, *request, result_traj);
+            success = planToGoalJoints(*request, result_traj);
         }
     } else if (request->type == rcta::MoveArmGoal::EndEffectorGoal) {
         if (execute) {
-            success = moveToGoalEE(tip_goal, result_traj);
+            success = moveToGoalEE(*request, result_traj);
         } else {
-            success = planToGoalEE(tip_goal, result_traj);
+            success = planToGoalEE(*request, result_traj);
         }
     } else {
         ROS_ERROR("Unrecognized goal type");
@@ -176,14 +167,22 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
 /// \return true if the goal was sent to the server; false otherwise
 bool MoveArmNode::sendMoveGroupPoseGoal(
     const moveit_msgs::PlanningOptions& ops,
-    const geometry_msgs::PoseStamped& goal_pose)
+    const rcta::MoveArmGoal& goal)
 {
     if (!m_move_group_client->isServerConnected()) {
         ROS_ERROR("server is not connected");
         return false;
     }
 
+    geometry_msgs::PoseStamped tip_goal;
+
+    // TODO: get this from the configured planning frame in moveit
+    tip_goal.header.frame_id = "map";
+    tip_goal.pose = goal.goal_pose;
+
     moveit_msgs::MotionPlanRequest& req = m_goal.request;
+
+    req.start_state = goal.start_state;
 
     req.goal_constraints.clear();
 
@@ -193,20 +192,20 @@ bool MoveArmNode::sendMoveGroupPoseGoal(
 
     // one position constraint
     moveit_msgs::PositionConstraint goal_pos_constraint;
-    goal_pos_constraint.header.frame_id = goal_pose.header.frame_id;
+    goal_pos_constraint.header.frame_id = tip_goal.header.frame_id;
     goal_pos_constraint.link_name = m_tip_link;
     goal_pos_constraint.target_point_offset = geometry_msgs::CreateVector3(0.0, 0.0, 0.0);
     shape_msgs::SolidPrimitive tolerance_volume;
     tolerance_volume.type = shape_msgs::SolidPrimitive::SPHERE;
     tolerance_volume.dimensions = { m_pos_tolerance };
     goal_pos_constraint.constraint_region.primitives.push_back(tolerance_volume);
-    goal_pos_constraint.constraint_region.primitive_poses.push_back(goal_pose.pose);
+    goal_pos_constraint.constraint_region.primitive_poses.push_back(tip_goal.pose);
     goal_pos_constraint.weight = 1.0;
 
     // one orientation constraint
     moveit_msgs::OrientationConstraint goal_rot_constraint;
-    goal_rot_constraint.header.frame_id = goal_pose.header.frame_id;
-    goal_rot_constraint.orientation = goal_pose.pose.orientation;
+    goal_rot_constraint.header.frame_id = tip_goal.header.frame_id;
+    goal_rot_constraint.orientation = tip_goal.pose.orientation;
     goal_rot_constraint.link_name = m_tip_link;
     goal_rot_constraint.absolute_x_axis_tolerance = m_rot_tolerance;
     goal_rot_constraint.absolute_y_axis_tolerance = m_rot_tolerance;
@@ -242,12 +241,15 @@ void MoveArmNode::moveGroupResultCallback(
 }
 
 bool MoveArmNode::planToGoalEE(
-    const geometry_msgs::PoseStamped& goal_pose,
+    const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
+    assert(!goal.execute_path && goal.type == rcta::MoveArmGoal::EndEffectorGoal);
+
     ROS_INFO("plan to goal pose");
+
     moveit_msgs::PlanningOptions ops;
-    ops.planning_scene_diff.robot_state.is_diff = true;
+    ops.planning_scene_diff.robot_state = goal.start_state;
     ops.look_around = false;
     ops.look_around_attempts = 0;
     ops.max_safe_execution_cost = 1.0;
@@ -255,7 +257,7 @@ bool MoveArmNode::planToGoalEE(
     ops.replan = false;
     ops.replan_attempts = 0;
     ops.replan_delay = 0.0;
-    if (!sendMoveGroupPoseGoal(ops, goal_pose)) {
+    if (!sendMoveGroupPoseGoal(ops, goal)) {
         return false;
     }
 
@@ -268,7 +270,6 @@ bool MoveArmNode::planToGoalEE(
 }
 
 bool MoveArmNode::planToGoalJoints(
-    const moveit_msgs::RobotState& start,
     const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
@@ -277,12 +278,14 @@ bool MoveArmNode::planToGoalJoints(
 }
 
 bool MoveArmNode::moveToGoalEE(
-    const geometry_msgs::PoseStamped& goal_pose,
+    const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
+    assert(goal.execute_path && goal.type == rcta::MoveArmGoal::EndEffectorGoal);
     ROS_INFO("move to goal pose");
+
     moveit_msgs::PlanningOptions ops;
-    ops.planning_scene_diff.robot_state.is_diff = true;
+    ops.planning_scene_diff.robot_state.is_diff = false;
     ops.look_around = false;
     ops.look_around_attempts = 0;
     ops.max_safe_execution_cost = 1.0;
@@ -290,7 +293,7 @@ bool MoveArmNode::moveToGoalEE(
     ops.replan = false;
     ops.replan_attempts = 0;
     ops.replan_delay = 0.0;
-    if (!sendMoveGroupPoseGoal(ops, goal_pose)) {
+    if (!sendMoveGroupPoseGoal(ops, goal)) {
         return false;
     }
 
@@ -300,11 +303,9 @@ bool MoveArmNode::moveToGoalEE(
         // TODO: slerp trajectory
         return true;
     }
-    return false;
 }
 
 bool MoveArmNode::moveToGoalJoints(
-    const moveit_msgs::RobotState& start,
     const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {

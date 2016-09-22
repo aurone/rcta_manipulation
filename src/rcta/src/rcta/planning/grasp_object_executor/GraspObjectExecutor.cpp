@@ -452,7 +452,6 @@ int GraspObjectExecutor::run()
                 last_move_arm_pregrasp_goal_.octomap = use_extrusion_octomap_ ?
                         *current_octomap_ : current_goal_->octomap;
 
-                last_move_arm_pregrasp_goal_.has_attached_object = false;
                 last_move_arm_pregrasp_goal_.execute_path = true;
 
                 auto result_cb = boost::bind(&GraspObjectExecutor::move_arm_command_result_cb, this, _1, _2);
@@ -837,8 +836,9 @@ int GraspObjectExecutor::run()
                         *current_octomap_ : current_goal_->octomap;
 
                 //include the attached object in the goal
-                last_move_arm_stow_goal_.has_attached_object = true;
-                moveit_msgs::AttachedCollisionObject &attached_object = last_move_arm_stow_goal_.attached_object;
+                // TODO: include the attached object here
+
+                moveit_msgs::AttachedCollisionObject attached_object;// = last_move_arm_stow_goal_.attached_object;
                 attached_object.link_name = "arm_7_gripper_lift_link";
                 attached_object.object.id = "gas_can";
                 attached_object.object.primitives.resize(2);

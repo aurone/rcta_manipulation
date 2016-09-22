@@ -61,23 +61,21 @@ private:
 
     bool sendMoveGroupPoseGoal(
         const moveit_msgs::PlanningOptions& ops,
-        const geometry_msgs::PoseStamped& goal_pose);
+        const rcta::MoveArmGoal& goal);
 
     bool planToGoalEE(
-        const geometry_msgs::PoseStamped& goal_pose,
+        const rcta::MoveArmGoal& goal,
         trajectory_msgs::JointTrajectory& traj);
 
     bool planToGoalJoints(
-        const moveit_msgs::RobotState& start,
         const rcta::MoveArmGoal& goal,
         trajectory_msgs::JointTrajectory& traj);
 
     bool moveToGoalEE(
-        const geometry_msgs::PoseStamped& goal_pose,
+        const rcta::MoveArmGoal& goal,
         trajectory_msgs::JointTrajectory& traj);
 
     bool moveToGoalJoints(
-        const moveit_msgs::RobotState& start,
         const rcta::MoveArmGoal& goal,
         trajectory_msgs::JointTrajectory& traj);
 
