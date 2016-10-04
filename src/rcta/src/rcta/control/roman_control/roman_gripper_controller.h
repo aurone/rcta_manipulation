@@ -38,6 +38,14 @@ private:
 
     roman_client_ros_utils::RomanState::ConstPtr m_state;
 
+    std::deque<double> m_speed_history;
+
+    enum Hand
+    {
+        Right = 0,
+        Left
+    } m_hand;
+
     void goalCallback();
     void preemptCallback();
 

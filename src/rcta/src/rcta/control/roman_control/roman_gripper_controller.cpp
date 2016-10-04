@@ -32,6 +32,8 @@ RomanGripperController::RomanGripperController() :
 
     m_server.registerGoalCallback(boost::bind(&RomanGripperController::goalCallback, this));
     m_server.registerPreemptCallback(boost::bind(&RomanGripperController::preemptCallback, this));
+
+    m_hand = Hand::Right;
 }
 
 RomanGripperController::~RomanGripperController()
@@ -53,14 +55,27 @@ void RomanGripperController::goalCallback()
 {
     ROS_INFO("Received gripper command goal");
     m_goal = m_server.acceptNewGoal();
-    if (m_server.isPreemptRequested()) {
+    if (!m_state) {
+        ROS_ERROR("No roman state received");
+        m_server.setAborted();
+    }
 
+    if (m_server.isPreemptRequested()) {
+        ROS_INFO("Preempt requested");
+        m_server.setPreempted();
+        return;
     }
 
     roman_client_ros_utils::RobotiqSimpleCmd cmd;
+
     cmd.utime = ros::Time::now().toNSec() / 1e3;
     cmd.mode = roman_client_ros_utils::RobotiqSimpleCmd::MODE_BASIC;
-    cmd.mech = roman_client_ros_utils::RobotiqSimpleCmd::MECH_RIGHT;
+    if (m_hand == Hand::Right) {
+        cmd.mech = roman_client_ros_utils::RobotiqSimpleCmd::MECH_RIGHT;
+    } else {
+        cmd.mech = roman_client_ros_utils::RobotiqSimpleCmd::MECH_LEFT;
+    }
+
     if (m_goal->command.position == GripperModel().maximum_width()) {
         cmd.close = false;
         m_hand_open_pub.publish(cmd);
@@ -91,6 +106,7 @@ void RomanGripperController::goalCallback()
 
 void RomanGripperController::preemptCallback()
 {
+    ROS_INFO("Preempt current goal");
 }
 
 void RomanGripperController::romanStateCallback(
