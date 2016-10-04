@@ -24,7 +24,6 @@
     <depend>eigen_conversions</depend>
     <depend>geometric_shapes</depend>
     <depend>geometry_msgs</depend>
-    <depend>hdt_msgs</depend>
     <depend>interactive_markers</depend>
     <depend>leatherman</depend>
     <depend>libblas-dev</depend>
@@ -46,6 +45,7 @@
     <depend>octomap_msgs</depend>
     <depend>pkg-config</depend>
     <depend>pluginlib</depend>
+    <depend>rcta_msgs</depend>
     <depend>roman_client_ros_utils</depend>
     <depend>rosbag</depend>
     <depend>roscpp</depend>
