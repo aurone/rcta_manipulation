@@ -9,7 +9,8 @@ add_library(
 target_link_libraries(
     gripper_command_panel_plugin
     ${QT_LIBRARIES}
-    ${actionlib_LIBRARIES})
+    ${actionlib_LIBRARIES}
+    robotiq_common)
 install(
     TARGETS gripper_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
