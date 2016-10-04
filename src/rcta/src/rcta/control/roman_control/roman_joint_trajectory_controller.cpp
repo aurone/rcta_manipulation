@@ -136,6 +136,10 @@ void RomanJointTrajectoryController::goalCallback()
     ROS_INFO("This is probably where i would publish the spec");
     m_goal = m_server.acceptNewGoal();
 
+    // TODO: there's a possibility we might have to check here for whether a
+    // preempt has been requested between the time the callback was serviced
+    // and the goal was accepted (though this should be a very rare race condition)
+
     for (auto& s : m_goal->trajectory.joint_names) {
         ROS_INFO("%s", s.c_str());
     }
