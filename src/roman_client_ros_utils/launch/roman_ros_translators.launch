@@ -1,4 +1,0 @@
-<launch>
-	<node name="roman_client_jpl2ros" pkg="roman_client_ros_utils" type="roman_client_jpl2ros" />
-	<node name="roman_client_ros2jpl" pkg="roman_client_ros_utils" type="roman_client_ros2jpl" />
-</launch>
