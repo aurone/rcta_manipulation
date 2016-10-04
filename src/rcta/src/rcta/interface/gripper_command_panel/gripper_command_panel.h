@@ -14,6 +14,9 @@
 
 namespace rcta {
 
+// TODO: emit configChanged() when line edit changes (maybe changes to something
+// valid)...a valid response returned from one of action server requests?
+
 class GripperCommandPanel : public rviz::Panel
 {
     Q_OBJECT
@@ -21,6 +24,9 @@ class GripperCommandPanel : public rviz::Panel
 public:
 
     GripperCommandPanel(QWidget* parent = 0);
+
+    virtual void load(const rviz::Config& config);
+    virtual void save(rviz::Config config) const;
 
 public Q_SLOTS:
 
@@ -37,6 +43,7 @@ private:
     bool pending_gripper_command_;
 
     // Gripper Command Widgets
+    QLineEdit* action_name_line_edit_;
     QPushButton* send_open_gripper_command_button_;
     QPushButton* send_close_gripper_command_button_;
 
