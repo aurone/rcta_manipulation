@@ -24,4 +24,4 @@ target_link_libraries(
 
 add_dependencies(
     reposition_planner_node
-    ${PROJECT_NAME}_generate_messages_cpp)
+    ${PROJECT_NAME}_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
