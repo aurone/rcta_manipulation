@@ -36,8 +36,19 @@ class HDTViz : public PVizGeneric
 
     void visualizeRobots(std::vector<std::vector<double> > &arm_pos, double hue, std::string ns, int &id, int throttle, bool use_embedded_materials = false);
 
-    void visualizeRobotBase(BodyPose &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials = false);
-    void visualizeRobotBase(std::vector<double> &base_pos, double hue, std::string ns, int &id, bool use_embedded_materials=false);
+    void visualizeRobotBase(
+        BodyPose &base_pos,
+        double hue,
+        std::string ns,
+        int &id,
+        bool use_embedded_materials = false);
+
+    void visualizeRobotBase(
+        std::vector<double> &base_pos,
+        double hue,
+        std::string ns,
+        int &id,
+        bool use_embedded_materials=false);
 
     void visualizeRobotWithTitle(std::vector<double> &arm_pos, BodyPose &base_pos, double hue, std::string ns, int &id, std::string title);
 

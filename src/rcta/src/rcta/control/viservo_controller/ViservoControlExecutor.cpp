@@ -9,6 +9,7 @@
 #include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/RunUponDestruction.h>

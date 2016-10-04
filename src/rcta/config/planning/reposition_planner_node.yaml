@@ -1,0 +1,7 @@
+max_grasp_candidates: 50
+manipulator_group_name: right_arm
+footprint:
+  - { x: -0.6, y: -0.4 }
+  - { x:  0.6, y: -0.4 }
+  - { x:  0.6, y:  0.4 }
+  - { x: -0.6, y:  0.4 }

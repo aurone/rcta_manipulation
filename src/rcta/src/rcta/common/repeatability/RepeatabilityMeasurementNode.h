@@ -17,7 +17,7 @@
 #include <tf/transform_listener.h>
 
 // project includes
-#include <rcta/MoveArmCommandAction.h>
+#include <rcta/MoveArmAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
 
 inline std::string to_string(const std::tuple<int, int, int, int, int, int>& coord)
@@ -169,8 +169,8 @@ private:
     ar_track_alvar_msgs::AlvarMarkers::ConstPtr last_markers_msg_;
     sensor_msgs::JointState::ConstPtr last_joint_state_msg_;
 
-    typedef actionlib::SimpleActionClient<rcta::MoveArmCommandAction> MoveArmCommandActionClient;
-    std::unique_ptr<MoveArmCommandActionClient> move_arm_command_client_;
+    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
+    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
     std::string move_arm_command_action_name_;
     bool pending_command_;
 
@@ -220,7 +220,7 @@ private:
 
     void move_arm_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta::MoveArmCommandResult::ConstPtr& result);
+            const rcta::MoveArmResult::ConstPtr& result);
 
     void publish_triad(const Eigen::Affine3d& mount_to_eef);
 

@@ -1,0 +1,7 @@
+<library path="lib/libgrasping_command_panel_plugin">
+    <class name="rcta_plugins/GraspingCommandPanel" type="rcta::GraspingCommandPanel" base_class_type="rviz::Panel">
+           <description>
+               A panel widget for sending out grasping pipeline commands
+           </description>
+     </class>
+</library>

@@ -10,6 +10,7 @@
 // system includes
 #include <eigen_conversions/eigen_msg.h>
 #include <sbpl_geometry_utils/utils.h>
+#include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -511,7 +512,7 @@ bool RepeatabilityMeasurementNode::download_egress_positions()
 bool RepeatabilityMeasurementNode::connect_to_move_arm_client()
 {
     move_arm_command_action_name_ = "move_arm_command";
-    move_arm_command_client_.reset(new MoveArmCommandActionClient(move_arm_command_action_name_, false));
+    move_arm_command_client_.reset(new MoveArmActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
         ROS_ERROR("Failed to instantiate Move Arm Command Action Client");
         return false;
@@ -639,9 +640,9 @@ bool RepeatabilityMeasurementNode::move_to_position(const hdt::JointState& posit
     std::vector<double> joint_vector =
             { position.a0, position.a1, position.a2, position.a3, position.a4, position.a5, position.a6 };
 
-    rcta::MoveArmCommandGoal goal;
+    rcta::MoveArmGoal goal;
 
-    goal.type = rcta::MoveArmCommandGoal::JointGoal;
+    goal.type = rcta::MoveArmGoal::JointGoal;
     goal.goal_joint_state.header.stamp = ros::Time::now();
     goal.goal_joint_state.header.frame_id = "";
     goal.goal_joint_state.header.seq = 0;
@@ -752,7 +753,7 @@ bool RepeatabilityMeasurementNode::track_eef_pose(const ros::Duration& listen_du
 
 void RepeatabilityMeasurementNode::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::MoveArmCommandResult::ConstPtr& result)
+    const rcta::MoveArmResult::ConstPtr& result)
 {
     AU_DEBUG("Received a Move Arm Command Result!");
     pending_command_ = false;

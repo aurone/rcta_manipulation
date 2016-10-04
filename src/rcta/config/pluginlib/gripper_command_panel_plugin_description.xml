@@ -1,0 +1,7 @@
+<library path="lib/libgripper_command_panel_plugin">
+    <class name="rcta_plugins/GripperCommandPanel" type="rcta::GripperCommandPanel" base_class_type="rviz::Panel">
+        <description>
+            A panel widget for commanding grippers through a simple interface
+        </description>
+    </class>
+</library>

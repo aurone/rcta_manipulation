@@ -1,11 +1,11 @@
-qt4_wrap_cpp(HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES ManipulatorCommandPanel.h)
+qt4_wrap_cpp(HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES grasping_command_panel.h)
 
 add_library(
-    hdt_command_plugins
+    grasping_command_panel_plugin
     ${HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES}
-    ManipulatorCommandPanel.cpp)
+    grasping_command_panel.cpp)
 target_link_libraries(
-    hdt_command_plugins
+    grasping_command_panel_plugin
     ${QT_LIBRARIES}
     ${actionlib_LIBRARIES}
     ${geometric_shapes_LIBRARIES}
@@ -22,7 +22,7 @@ target_link_libraries(
     qwt)
 
 install(
-    TARGETS hdt_command_plugins
+    TARGETS grasping_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
 

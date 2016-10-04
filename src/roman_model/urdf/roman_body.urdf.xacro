@@ -2,6 +2,7 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
     <xacro:include filename="$(find roman_model)/gazebo/roman_body.gazebo.xacro"/>
     <xacro:include filename="$(find roman_model)/control/roman_body.transmission.xacro"/>
+    <xacro:include filename="$(find hector_sensors_description)/urdf/asus_camera.urdf.xacro"/>
 
     <xacro:macro name="roman_body" params="name parent *origin namespace">
         <joint name="torso_joint0" type="fixed">
@@ -19,8 +20,8 @@
             <visual>
                 <origin xyz="0.593 0 0" rpy="1.57080 1.57080 0"/>
                 <geometry>
-                    <box size="0.1 0.1 0.1"/>
-<!--                    <mesh filename="package://roman_model/meshes/roman_torso_scaled.stl" scale="1 1 1"/> -->
+                    <!-- <box size="0.1 0.1 0.1"/> -->
+                   <mesh filename="package://roman_model/meshes/roman_torso.stl" scale="1 1 1"/>
                 </geometry>
                 <material name="grey">
                     <color rgba="0.8 0.8 0.8 1"/>
@@ -66,6 +67,10 @@
                 </geometry>
             </collision>
         </link>
+
+        <xacro:asus_camera name="camera" parent="chest">
+            <origin xyz="0.05 -0.075 0" rpy="${-M_PI/2} 0.0 -2.09"/>
+        </xacro:asus_camera>
 
         <xacro:roman_body_gazebo name="${name}" namespace="${namespace}"/>
         <xacro:roman_body_transmission name="${name}" namespace="${namespace}"/>

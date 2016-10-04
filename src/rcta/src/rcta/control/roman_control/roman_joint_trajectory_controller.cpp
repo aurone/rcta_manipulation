@@ -1,17 +1,23 @@
+#define BUILD_LIVE_JPL 0
+
 // system includes
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
+#if BUILD_LIVE_JPL
 #include <robot/robot_pub_types.h>
 #include <plan/plan_types.h>
 #include <plan/plan_utils.h>
+#endif
 #include <roman_client_ros_utils/RomanSpec.h>
 #include <roman_client_ros_utils/RomanSpecReply.h>
 #include <roman_client_ros_utils/RomanState.h>
 #include <ros/ros.h>
 
+
 // project includes
 #include "roman_joint_trajectory_controller.h"
 
+#if BUILD_LIVE_JPL
 // translate roman_spec_t to RomanSpec
 void translate_jplspec_to_rosspec(roman_spec_t& spec, roman_client_ros_utils::RomanSpec& spec_rosmsg)
 {
@@ -69,6 +75,7 @@ void spec_update_times(roman_client_ros_utils::RomanSpec& spec_rosmsg)
   plan_utils_update_times_roman(&spec, max_vel, accel);// updates utime according to a joint level trapezoidal profiling scheme
   translate_jplspec_to_rosspec(spec, spec_rosmsg);
 }
+#endif
 
 class RomanJointTrajectoryController
 {
@@ -169,6 +176,7 @@ private:
             return;
         }
 
+#if BUILD_LIVE_JPL
         roman_client_ros_utils::RomanSpec path_msg;
         path_msg.utime = ros::Time::now().toNSec() / 1e3;
         path_msg.num_mechanisms = ROBOT_NUM_MECHS;
@@ -199,6 +207,7 @@ private:
 //        ROS_INFO_STREAM(path_msg);
         spec_update_times(path_msg);
         m_roman_spec_pub.publish(path_msg);
+#endif
     }
 
     void preemptCallback()

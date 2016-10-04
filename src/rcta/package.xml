@@ -62,14 +62,18 @@
     <depend>urdf</depend>
     <depend>visualization_msgs</depend>
 
+    <exec_depend>hector_mapping</exec_depend>
+
     <export>
         <gazebo_ros gazebo_media_path="${prefix}/models"/>
         <gazebo_ros gazebo_model_path="${prefix}/models"/>
         <rviz plugin="${prefix}/config/pluginlib/plugin_description.xml"/>
-        <rviz plugin="${prefix}/config/pluginlib/hdt_command_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/pluginlib/grasping_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/config/pluginlib/controller_status_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/config/pluginlib/pick_and_place_plugin_description.xml"/>
         <rviz plugin="${prefix}/config/pluginlib/temperature_status_plugin_description.xml"/>
         <rviz plugin="${prefix}/config/pluginlib/move_group_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/pluginlib/gripper_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/config/pluginlib/viservo_command_panel_plugin_description.xml"/>
     </export>
 </package>

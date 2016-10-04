@@ -1,0 +1,30 @@
+<launch>
+    <arg name="sim" default="false"/>
+    <arg name="fake" default="false"/>
+
+    <include file="$(find rcta)/launch/moveit/roman/roman_move_group.launch">
+        <arg name="sim" value="$(arg sim)"/>
+        <arg name="fake" value="$(arg fake)"/>
+    </include>
+
+    <node name="move_arm_node" pkg="rcta" type="move_arm_node" output="screen">
+        <param name="allowed_planning_time" value="10.0"/>
+        <param name="planner_id" value="ARA*"/>
+        <param name="group_name" value="right_arm"/>
+        <param name="pos_tolerance" value="0.05"/>
+        <param name="rot_tolerance" value="5.0"/>
+        <param name="joint_tolerance" value="5.0"/>
+        <param name="tip_link" value="limb_right_link7"/>
+        <param name="workspace_frame" value="base_footprint"/>
+        <rosparam param="workspace_min">
+            x: -0.5
+            y: -1.5
+            z: 0.0
+        </rosparam>
+        <rosparam param="workspace_max">
+            x: 1.5
+            y: 0.5
+            z: 2.0
+        </rosparam>
+    </node>
+</launch>

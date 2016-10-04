@@ -4,6 +4,8 @@
 #include <sbpl/utils/utils.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <spellbook/geometry_msgs/geometry_msgs.h>
+#include <spellbook/std_msgs/std_msgs.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/utils.h>
 

@@ -1,0 +1,25 @@
+source ~/.screenrc
+
+screen -t core
+stuff "roscore^M"
+
+screen -t rviz
+stuff "rosrun rviz rviz"
+
+screen -t sim
+stuff "roslaunch rcta quantico_simulation.launch"
+
+screen -t gaze
+stuff "rosrun gazebo_ros gzclient"
+
+screen -t robot
+stuff "roslaunch rcta roman_control.launch live:=false --screen"
+
+screen -t pose
+stuff "roslaunch rcta roman_pose.launch live:=false --screen"
+
+screen -t repo
+stuff "roslaunch rcta reposition_base_executor.launch --screen"
+
+screen -t move
+stuff "roslaunch rcta roman_move_group.launch --screen"
