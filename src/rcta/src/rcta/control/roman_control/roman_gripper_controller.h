@@ -3,6 +3,7 @@
 
 // system includes
 #include <actionlib/server/simple_action_server.h>
+#include <boost/circular_buffer.hpp>
 #include <control_msgs/GripperCommandAction.h>
 #include <roman_client_ros_utils/RomanState.h>
 #include <ros/ros.h>
@@ -36,9 +37,11 @@ private:
     GripperCommandActionServer::Feedback m_feedback;
     GripperCommandActionServer::Result m_result;
 
-    roman_client_ros_utils::RomanState::ConstPtr m_state;
+    typedef roman_client_ros_utils::RomanState RomanState;
 
-    std::deque<double> m_speed_history;
+    double m_expected_state_rate;   ///< Expected publish rate of RomanState
+    double m_state_history_length;  ///< Length, in seconds, of states to keep
+    boost::circular_buffer<RomanState::ConstPtr> m_state_hist;
 
     enum Hand
     {
@@ -49,8 +52,7 @@ private:
     void goalCallback();
     void preemptCallback();
 
-    void romanStateCallback(
-        const roman_client_ros_utils::RomanState::ConstPtr& msg);
+    void romanStateCallback(const RomanState::ConstPtr& msg);
 };
 
 #endif
