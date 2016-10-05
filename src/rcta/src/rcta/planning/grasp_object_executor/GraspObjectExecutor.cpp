@@ -80,6 +80,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     nh_(),
     ph_("~"),
     costmap_sub_(),
+    m_viz(),
     last_occupancy_grid_(),
     current_occupancy_grid_(),
     wait_for_after_grasp_grid_(false),
@@ -117,85 +118,32 @@ GraspObjectExecutor::GraspObjectExecutor() :
     current_goal_(),
     status_(GraspObjectExecutionStatus::INVALID),
     last_status_(GraspObjectExecutionStatus::INVALID),
-    grasp_spline_(),
-    gas_can_scale_(),
-    wrist_to_tool_(),
-    pregrasp_to_grasp_offset_m_(0.0),
     listener_()
 {
+    sbpl::viz::set_visualizer(&m_viz);
+}
+
+GraspObjectExecutor::~GraspObjectExecutor()
+{
+    if (sbpl::viz::visualizer() == &m_viz) {
+        sbpl::viz::unset_visualizer();
+    }
 }
 
 bool GraspObjectExecutor::initialize()
 {
-    ////////////////////////////////////////////////////////////////////////////////
-    // load robot models
-    ////////////////////////////////////////////////////////////////////////////////
-
-    std::string urdf_string;
-    if (!nh_.getParam("robot_description", urdf_string)) {
-        ROS_ERROR("Failed to retrieve 'robot_description' from the param server");
+    m_rml.reset(new robot_model_loader::RobotModelLoader);
+    m_robot_model = m_rml->getModel();
+    if (!m_robot_model) {
+        ROS_ERROR("Failed to load Robot Model");
         return false;
     }
 
-    robot_model_ = hdt::RobotModel::LoadFromURDF(urdf_string, true); // enable safety limits to conservatively filter grasp locations
-    if (!robot_model_) {
-        ROS_ERROR("Failed to load Robot Model from the URDF");
+    ros::NodeHandle grasp_nh(ph_, "grasping");
+    if (!m_grasp_planner.init(grasp_nh)) {
+        ROS_ERROR("Failed to initialize Grasp Planner");
         return false;
     }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // download grasping parameters
-    ////////////////////////////////////////////////////////////////////////////////
-
-    if (!msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_)) {
-        ROS_ERROR("Failed to download gas canister parameters");
-        return false;
-    }
-
-    std::vector<geometry_msgs::Point> control_points;
-    int degree;
-    if (!msg_utils::download_param(ph_, "degree", degree) ||
-        !msg_utils::download_param(ph_, "control_points", control_points))
-    {
-        ROS_ERROR("Failed to retrieve grasp spline parameters");
-        return false;
-    }
-
-    std::vector<Eigen::Vector3d> grasp_spline_control_points(control_points.size());
-    for (std::size_t i = 0; i < control_points.size(); ++i) {
-        const geometry_msgs::Point& p = control_points[i];
-        grasp_spline_control_points[i] = Eigen::Vector3d(p.x, p.y, p.z);
-    }
-
-    grasp_spline_.reset(new Nurb<Eigen::Vector3d>(grasp_spline_control_points, degree));
-    if (!grasp_spline_) {
-        ROS_ERROR("Failed to instantiate Nurb");
-        return false;
-    }
-
-    ROS_INFO("Control Points:");
-    for (const Eigen::Vector3d& control_vertex : grasp_spline_->control_points()) {
-        ROS_INFO("    %s", to_string(control_vertex).c_str());
-    }
-
-    ROS_INFO("Knot Vector: %s", to_string(grasp_spline_->knots()).c_str());
-    ROS_INFO("Degree: %s", std::to_string(grasp_spline_->degree()).c_str());
-
-    geometry_msgs::Pose tool_pose_wrist_frame;
-    if (!msg_utils::download_param(ph_, "wrist_to_tool_transform", tool_pose_wrist_frame)) {
-        ROS_ERROR("Failed to retrieve 'wrist_to_tool_transform' from the param server");
-        return false;
-    }
-
-    tf::poseMsgToEigen(tool_pose_wrist_frame, wrist_to_tool_);
-    ROS_INFO("Wrist-to-Tool Transform: %s", to_string(wrist_to_tool_).c_str());
-
-    if (!msg_utils::download_param(ph_, "pregrasp_to_grasp_offset_m", pregrasp_to_grasp_offset_m_)) {
-        ROS_ERROR("Failed to retrieve 'pregrasp_to_grasp_offset_m' from the param server");
-        return false;
-    }
-
-    grasp_to_pregrasp_ = Eigen::Translation3d(-pregrasp_to_grasp_offset_m_, 0, 0);
 
     // read in stow positions
     if (!msg_utils::download_param(ph_, "stow_positions", stow_positions_)) {
@@ -234,10 +182,6 @@ bool GraspObjectExecutor::initialize()
     if (!download_marker_params()) {
         return false; // errors printed within
     }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // set up comms
-    ////////////////////////////////////////////////////////////////////////////////
 
     // subscribers
     costmap_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("costmap", 1, &GraspObjectExecutor::occupancy_grid_cb, this);
@@ -346,11 +290,15 @@ int GraspObjectExecutor::run()
 
             // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
             int max_num_candidates = 100;
-            std::vector<GraspCandidate> grasp_candidates =
-                    sample_grasp_candidates(base_link_to_gas_canister, max_num_candidates);
+            std::vector<rcta::GraspCandidate> grasp_candidates;
+            if (!m_grasp_planner.sampleGrasps(
+                    base_link_to_gas_canister, max_num_candidates, grasp_candidates))
+            {
+                // TODO: hmm
+            }
             ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
 
-            visualize_grasp_candidates(grasp_candidates);
+            SV_SHOW_INFO(getGraspCandidatesVisualization(grasp_candidates, "candidate_grasp"));
 
             // mount -> wrist = mount -> robot * robot -> wrist
 
@@ -381,7 +329,7 @@ int GraspObjectExecutor::run()
 
             // filter unreachable grasp candidates that we know we can't grasp
             std::swap(grasp_candidates, reachable_grasp_candidates_);
-            filter_grasp_candidates(
+            filterGraspCandidates(
                     reachable_grasp_candidates_,
                     robot_to_kinematics.inverse(),
                     robot_to_camera.inverse(),
@@ -398,7 +346,7 @@ int GraspObjectExecutor::run()
                 break;
             }
 
-            rank_grasp_candidates(reachable_grasp_candidates_, 0.5); // rank grasp attempts by 'graspability'
+            rcta::RankGrasps(reachable_grasp_candidates_); // rank grasp attempts by 'graspability'
             cull_grasp_candidates(reachable_grasp_candidates_, max_grasp_candidates_); // limit the number of grasp attempts by the configured amount
 
             ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
@@ -441,7 +389,7 @@ int GraspObjectExecutor::run()
                     break;
                 }
 
-                const GraspCandidate& next_best_grasp = reachable_grasp_candidates_.back();
+                const rcta::GraspCandidate& next_best_grasp = reachable_grasp_candidates_.back();
 
                 // 4. send a move arm goal for the best grasp
                 last_move_arm_pregrasp_goal_.type = rcta::MoveArmGoal::EndEffectorGoal;
@@ -648,7 +596,7 @@ int GraspObjectExecutor::run()
                 Eigen::Affine3d viservo_grasp_goal_transform;
                 tf::poseMsgToEigen(last_viservo_pregrasp_goal_.goal_pose, viservo_grasp_goal_transform);
                 // camera -> pregrasp * pregrasp -> grasp = camera -> grasp
-                viservo_grasp_goal_transform = viservo_grasp_goal_transform * grasp_to_pregrasp_.inverse();
+                viservo_grasp_goal_transform = viservo_grasp_goal_transform * m_grasp_planner.graspToPregrasp().inverse();
 
                 last_viservo_grasp_goal_.goal_id = current_goal_->id;
                 tf::poseEigenToMsg(viservo_grasp_goal_transform, last_viservo_grasp_goal_.goal_pose);
@@ -1146,197 +1094,28 @@ uint8_t GraspObjectExecutor::execution_status_to_feedback_status(GraspObjectExec
     }
 }
 
-std::vector<GraspObjectExecutor::GraspCandidate>
-GraspObjectExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const
-{
-    const double min_u = 0.0;
-    const double max_u = 1.0;
-
-    std::vector<GraspCandidate> grasp_candidates;
-    grasp_candidates.reserve(num_candidates);
-    for (int i = 0; i < num_candidates; ++i) {
-        ROS_INFO("Candidate Pregrasp %3d", i);
-        // sample uniformly the position and derivative of the gas canister grasp spline
-        double u = (max_u - min_u) * i / (num_candidates - 1);
-
-        int knot_num = -1;
-        for (int j = 0; j < grasp_spline_->knots().size() - 1; ++j) {
-            double curr_knot = grasp_spline_->knot(j);
-            double next_knot = grasp_spline_->knot(j + 1);
-            if (u >= curr_knot && u < next_knot) {
-                knot_num = j;
-                break;
-            }
-        }
-
-        if (knot_num < grasp_spline_->degree() ||
-            knot_num >= grasp_spline_->knots().size() - grasp_spline_->degree())
-        {
-            ROS_INFO("Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
-            continue;
-        }
-
-        Eigen::Vector3d object_pos_robot_frame(robot_to_object.translation());
-
-        Eigen::Vector3d sample_spline_point = (*grasp_spline_)(u);
-        ROS_INFO("    Sample Spline Point [canister frame]: %s", to_string(sample_spline_point).c_str());
-        Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
-        ROS_INFO("    Sample Spline Deriv [canister frame]: %s", to_string(sample_spline_deriv).c_str());
-
-        Eigen::Affine3d mark_to_menglong(Eigen::Affine3d::Identity());
-        Eigen::Vector3d sample_spline_point_robot_frame =
-                robot_to_object * // Affine3d
-                mark_to_menglong * // Affine3d
-                Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * // Scaling
-                sample_spline_point; // Vector3d
-        ROS_INFO("    Sample Spline Point [robot frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
-
-        Eigen::Vector3d sample_spline_deriv_robot_frame =
-                robot_to_object.rotation() * sample_spline_deriv.normalized();
-        ROS_INFO("    Sample Spline Deriv [robot frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
-
-        // compute the normal to the grasp spline that most points "up" in the robot frame
-        Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
-        Eigen::Vector3d up_grasp_dir =
-            up_bias - up_bias.dot(sample_spline_deriv_robot_frame) * sample_spline_deriv_robot_frame;
-        up_grasp_dir.normalize();
-        up_grasp_dir *= -1.0;
-
-        Eigen::Vector3d down_bias(-Eigen::Vector3d::UnitZ());
-        Eigen::Vector3d down_grasp_dir =
-            down_bias - down_bias.dot(sample_spline_deriv_robot_frame) * sample_spline_deriv_robot_frame;
-        down_grasp_dir.normalize();
-        down_grasp_dir *= -1.0;
-
-        Eigen::Vector3d grasp_dir;
-        if (up_grasp_dir.dot(sample_spline_point_robot_frame - object_pos_robot_frame) < 0) {
-            grasp_dir = up_grasp_dir;
-        }
-        else {
-            ROS_INFO("Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
-            continue;
-//            grasp_dir = down_grasp_dir;
-        }
-
-        ROS_INFO("    Grasp Direction [robot frame]: %s", to_string(grasp_dir).c_str());
-
-        Eigen::Vector3d grasp_candidate_dir_x = grasp_dir;
-        Eigen::Vector3d grasp_candidate_dir_y = sample_spline_deriv_robot_frame;
-        Eigen::Vector3d grasp_candidate_dir_z = grasp_dir.cross(sample_spline_deriv_robot_frame);
-
-        Eigen::Matrix3d grasp_rotation_matrix;
-        grasp_rotation_matrix(0, 0) = grasp_candidate_dir_x.x();
-        grasp_rotation_matrix(1, 0) = grasp_candidate_dir_x.y();
-        grasp_rotation_matrix(2, 0) = grasp_candidate_dir_x.z();
-        grasp_rotation_matrix(0, 1) = grasp_candidate_dir_y.x();
-        grasp_rotation_matrix(1, 1) = grasp_candidate_dir_y.y();
-        grasp_rotation_matrix(2, 1) = grasp_candidate_dir_y.z();
-        grasp_rotation_matrix(0, 2) = grasp_candidate_dir_z.x();
-        grasp_rotation_matrix(1, 2) = grasp_candidate_dir_z.y();
-        grasp_rotation_matrix(2, 2) = grasp_candidate_dir_z.z();
-
-        // robot_frame -> candidate tool frame pose
-        Eigen::Affine3d grasp_candidate_rotation =
-                Eigen::Translation3d(sample_spline_point_robot_frame) * grasp_rotation_matrix;
-
-        // robot -> grasp candidate (desired tool) * tool -> wrist * wrist (grasp) -> pregrasp = robot -> wrist
-        Eigen::Affine3d candidate_wrist_transform = grasp_candidate_rotation * wrist_to_tool_.inverse() * grasp_to_pregrasp_;
-
-        ROS_INFO("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
-
-        grasp_candidates.push_back(GraspCandidate(candidate_wrist_transform, robot_to_object.inverse() * candidate_wrist_transform, u));
-    }
-
-    std::size_t original_size = grasp_candidates.size();
-    for (int i = 0; i < original_size; ++i) {
-        const GraspCandidate& grasp = grasp_candidates[i];
-        Eigen::Affine3d flipped_candidate_transform =
-                grasp.pose * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
-        grasp_candidates.push_back(
-                GraspCandidate(flipped_candidate_transform, robot_to_object.inverse() * flipped_candidate_transform, grasp.u));
-    }
-
-    return grasp_candidates;
-}
-
-void GraspObjectExecutor::filter_grasp_candidates(
-    std::vector<GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_kinematics_robot,
-    const Eigen::Affine3d& T_camera_robot,
+void GraspObjectExecutor::filterGraspCandidates(
+    std::vector<rcta::GraspCandidate>& candidates,
+    const Eigen::Affine3d& T_kinematics_robot,  // keep these names to indicate improper usage
+    const Eigen::Affine3d& T_camera_robot,      // keep these names to indicate improper usage
     double marker_incident_angle_threshold_rad) const
 {
-    std::vector<GraspCandidate> filtered_candidates;
-    filtered_candidates.reserve(candidates.size());
+    const Eigen::Affine3d& camera_pose = T_camera_robot;
 
-    int num_not_reachable = 0;
-    int num_not_visible = 0;
-    int i = 0;
-    for (const GraspCandidate& grasp_candidate : candidates) {
-        ROS_INFO("Checking Grasp Candidate %d", i++);
-
-        // check for an ik solution to this grasp pose
-        Eigen::Affine3d T_kinematics_grasp =
-                T_kinematics_robot * grasp_candidate.pose;
-
-        std::vector<double> fake_seed(robot_model_->joint_names().size(), 0.0);
-        std::vector<double> sol;
-        bool check_ik = robot_model_->search_nearest_ik(T_kinematics_grasp, fake_seed, sol, sbpl::utils::ToRadians(1.0));
-
-        // check for visibility of the ar marker to this grasp pose
-        Eigen::Affine3d T_camera_marker = // assume link == wrist
-            T_camera_robot * grasp_candidate.pose * attached_markers_[0].link_to_marker;
-
-        ROS_INFO("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
-        Eigen::Vector3d camera_view_axis(0.0, 0.0, -1.0); // negated
-        Eigen::Vector3d marker_plane_normal;
-        marker_plane_normal.x() = T_camera_marker(0, 2);
-        marker_plane_normal.y() = T_camera_marker(1, 2);
-        marker_plane_normal.z() = T_camera_marker(2, 2);
-
-        ROS_INFO("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
-
-        double dp = marker_plane_normal.dot(camera_view_axis);
-        ROS_INFO("  Marker Normal * Camera View Axis: %0.3f", dp);
-
-        double angle = acos(dp); // the optimal situation is when the camera is facing the marker directly
-        ROS_INFO("  Angle: %0.3f", angle);
-
-        bool check_visibility = angle < marker_incident_angle_threshold_rad;
-
-        if (!check_ik) {
-        	++num_not_reachable;
-        }
-        if (!check_visibility) {
-        	++num_not_visible;
-        }
-
-        // camera -> robot * robot -> wrist * wrist -> marker = camera -> marker
-        if (check_ik && check_visibility) {
-            GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.pose_in_object, grasp_candidate.u);
-            filtered_candidates.push_back(reachable_grasp_candidate);
-        }
+    EigenSTL::vector_Affine3d marker_poses;
+    marker_poses.reserve(attached_markers_.size());
+    for (const auto& marker : attached_markers_) {
+        marker_poses.push_back(marker.link_to_marker);
     }
 
-    ROS_INFO("%d of %zd grasps not reachable", num_not_reachable, candidates.size());
-    ROS_INFO("%d of %zd grasps not visible", num_not_visible, candidates.size());
-
-    std::swap(filtered_candidates, candidates);
+    rcta::PruneGraspsByVisibility(
+            candidates,
+            marker_poses,
+            camera_pose,
+            marker_incident_angle_threshold_rad);
 }
 
-void GraspObjectExecutor::rank_grasp_candidates(std::vector<GraspCandidate>& candidates, double marker_incident_angle) const
-{
-	const double min_u = 0.0;
-	const double max_u = 1.0;
-
-	std::sort(candidates.begin(), candidates.end(),
-	[&](const GraspCandidate& a, const GraspCandidate& b) -> bool
-	{
-		double mid_u = 0.5 * (min_u + max_u);
-		return fabs(a.u - mid_u) > fabs(b.u - mid_u);
-	});
-}
-
-void GraspObjectExecutor::cull_grasp_candidates(std::vector<GraspCandidate>& candidates, int max_candidates) const
+void GraspObjectExecutor::cull_grasp_candidates(std::vector<rcta::GraspCandidate>& candidates, int max_candidates) const
 {
 	std::reverse(candidates.begin(), candidates.end());
 	while (candidates.size() > max_candidates) {
@@ -1345,63 +1124,13 @@ void GraspObjectExecutor::cull_grasp_candidates(std::vector<GraspCandidate>& can
 	std::reverse(candidates.begin(), candidates.end());
 }
 
-void GraspObjectExecutor::visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps) const
+visualization_msgs::MarkerArray
+GraspObjectExecutor::getGraspCandidatesVisualization(
+    const std::vector<rcta::GraspCandidate>& grasps,
+    const std::string& ns) const
 {
-    ROS_INFO("Visualizing %zd grasps", grasps.size());
-    geometry_msgs::Vector3 triad_scale = geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
-
-    visualization_msgs::MarkerArray all_triad_markers;
-
-    // create triad markers to be reused for each grasp candidate
-    visualization_msgs::MarkerArray triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
-    for (visualization_msgs::Marker& marker : triad_markers.markers) {
-        marker.header.frame_id = current_goal_->gas_can_in_base_link.header.frame_id;
-        marker.ns = "candidate_grasp";
-    }
-
-    visualization_msgs::MarkerArray single_triad_markers;
-
-    // save the original marker transforms
-    std::vector<Eigen::Affine3d> marker_transforms;
-    marker_transforms.reserve(triad_markers.markers.size());
-    for (const auto& marker : triad_markers.markers) {
-        Eigen::Affine3d marker_transform;
-        tf::poseMsgToEigen(marker.pose, marker_transform);
-        marker_transforms.push_back(marker_transform);
-    }
-
-    int id = 0;
-    for (const GraspCandidate& candidate : grasps) {
-        // transform triad markers to the candidate grasp transform
-        for (visualization_msgs::Marker& marker : triad_markers.markers) {
-            marker.id = id++;
-            Eigen::Affine3d marker_transform;
-            tf::poseMsgToEigen(marker.pose, marker_transform);
-            Eigen::Affine3d new_marker_transform = candidate.pose * marker_transform;
-            tf::poseEigenToMsg(new_marker_transform, marker.pose);
-        }
-
-        // add triad markers for this grasp to the total marker set
-        all_triad_markers.markers.insert(all_triad_markers.markers.end(), triad_markers.markers.begin(), triad_markers.markers.end());
-
-        // publish the triad for this grasp by itself to a separate namespace, but keep the same id scheme so that older grasps are not overwritten
-        single_triad_markers.markers = triad_markers.markers;
-        assert(single_triad_markers.markers.size() == 4);
-        ROS_INFO("Publishing marker for grasp %d", single_triad_markers.markers.front().id >> 2); // each marker set should have 3 markers for the axes and 1 marker for the origin
-        for (visualization_msgs::Marker& marker : single_triad_markers.markers) {
-            marker.ns = "solo_candidate_grasp";
-        }
-        marker_arr_pub_.publish(single_triad_markers);
-        single_triad_markers.markers.clear();
-
-        // restore marker transforms to their original frame
-        for (std::size_t i = 0; i < triad_markers.markers.size(); ++i) {
-            tf::poseEigenToMsg(marker_transforms[i], triad_markers.markers[i].pose);
-        }
-    }
-
-    ROS_INFO("Visualizing %zd triad markers", all_triad_markers.markers.size());
-    marker_arr_pub_.publish(all_triad_markers);
+    const std::string& frame_id = current_goal_->gas_can_in_base_link.header.frame_id;
+    return rcta::GetGraspCandidatesVisualization(grasps, frame_id, ns);
 }
 
 void GraspObjectExecutor::clear_circle_from_grid(

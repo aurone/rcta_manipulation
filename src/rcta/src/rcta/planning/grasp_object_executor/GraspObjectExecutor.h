@@ -12,9 +12,12 @@
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <leatherman/print.h>
+#include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_model_loader/robot_model_loader.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
+#include <sbpl_arm_planner/visualizer_ros.h>
 #include <spellbook/costmap_extruder/CostmapExtruder.h>
 #include <spellbook/geometry/nurb/NURB.h>
 #include <tf/transform_listener.h>
@@ -64,6 +67,7 @@ public:
     friend bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition&);
 
     GraspObjectExecutor();
+    ~GraspObjectExecutor();
 
     bool initialize();
 
@@ -76,21 +80,6 @@ public:
 
 private:
 
-    struct GraspCandidate
-    {
-        Eigen::Affine3d pose;
-        Eigen::Affine3d pose_in_object;
-        double u;
-
-        GraspCandidate(
-                const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
-                const Eigen::Affine3d& T_object_grasp = Eigen::Affine3d::Identity(),
-                double u = -1.0) :
-            pose(grasp_candidate_transform),
-            pose_in_object(T_object_grasp),
-            u(u) { }
-    };
-
     struct AttachedMarker
     {
         int marker_id;
@@ -102,6 +91,8 @@ private:
     ros::NodeHandle ph_;
 
     ros::Subscriber costmap_sub_;
+
+    sbpl::VisualizerROS m_viz;
 
     typedef nav_msgs::OccupancyGrid::ConstPtr OccupancyGridConstPtr;
     typedef nav_msgs::OccupancyGrid::Ptr OccupancyGridPtr;
@@ -124,6 +115,9 @@ private:
     CostmapExtruder extruder_;
     ros::Publisher extrusion_octomap_pub_;
 
+    robot_model_loader::RobotModelLoaderPtr m_rml;
+    moveit::core::RobotModelPtr m_robot_model;
+
     hdt::RobotModelConstPtr robot_model_;
 
     std::string action_name_;
@@ -140,7 +134,7 @@ private:
 
     rcta::MoveArmGoal last_move_arm_pregrasp_goal_;
     rcta::MoveArmGoal last_move_arm_stow_goal_;
-    GraspCandidate last_successful_grasp_;
+    rcta::GraspCandidate last_successful_grasp_;
 
     typedef actionlib::SimpleActionClient<rcta::ViservoCommandAction> ViservoCommandActionClient;
     std::string viservo_command_action_name_;
@@ -169,16 +163,10 @@ private:
     GraspObjectExecutionStatus::Status status_;
     GraspObjectExecutionStatus::Status last_status_;
 
-    std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
-
-    double gas_can_scale_;
-
-    Eigen::Affine3d wrist_to_tool_;
-    double pregrasp_to_grasp_offset_m_;
-    Eigen::Affine3d grasp_to_pregrasp_;
+    rcta::GascanGraspPlanner m_grasp_planner;
 
     tf::TransformListener listener_;
-    std::vector<GraspCandidate> reachable_grasp_candidates_;
+    std::vector<rcta::GraspCandidate> reachable_grasp_candidates_;
 
     ros::Publisher marker_arr_pub_;
 
@@ -254,17 +242,17 @@ private:
 
     uint8_t execution_status_to_feedback_status(GraspObjectExecutionStatus::Status status);
 
-    /// @brief Sample uniformly along the grasp spline to produce pregrasp poses for the wrist
-    std::vector<GraspCandidate> sample_grasp_candidates(const Eigen::Affine3d& robot_to_object, int num_candidates) const;
-    void filter_grasp_candidates(
-    		std::vector<GraspCandidate>& candidates,
+    void filterGraspCandidates(
+    		std::vector<rcta::GraspCandidate>& candidates,
     		const Eigen::Affine3d& T_kinematics_robot,
     		const Eigen::Affine3d& T_camera_robot,
     		double marker_incident_angle_threshold_rad) const;
-    void rank_grasp_candidates(std::vector<GraspCandidate>& candidates, double marker_incident_angle) const;
-    void cull_grasp_candidates(std::vector<GraspCandidate>& candidates, int max_candidates) const;
+    void cull_grasp_candidates(std::vector<rcta::GraspCandidate>& candidates, int max_candidates) const;
 
-    void visualize_grasp_candidates(const std::vector<GraspCandidate>& grasps) const;
+    visualization_msgs::MarkerArray
+    getGraspCandidatesVisualization(
+        const std::vector<rcta::GraspCandidate>& grasps,
+        const std::string& ns) const;
 
     void clear_circle_from_grid(nav_msgs::OccupancyGrid& grid, double x, double y, double radius) const;
     bool within_bounds(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;

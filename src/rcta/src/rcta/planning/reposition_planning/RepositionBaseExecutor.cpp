@@ -92,7 +92,7 @@ bool RepositionBaseExecutor::initialize()
     rml_.reset(new robot_model_loader::RobotModelLoader);
     robot_model_ = rml_->getModel();
     if (!robot_model_) {
-        ROS_ERROR("Failed to load robot model");
+        ROS_ERROR("Failed to load Robot Model");
         return false;
     }
 
@@ -365,6 +365,11 @@ void RepositionBaseExecutor::goal_callback()
     // compatibility. Removing for now, but keep this in mind...it shouldn't
     // be necessary, strictly speaking
 //    const std::string world_frame = "abs_nwu";
+
+    // more generally...the position of the robot should be the position of the
+    // root link in the configured model frame, else we need to convert that
+    // here. this is because the camera pose is specified in the model frame and
+    // is compared against the object pose
 
     const geometry_msgs::PoseStamped& robot_pose = current_goal_->base_link_in_map;
     const std::string& map_frame = current_goal_->map.header.frame_id;
@@ -1323,14 +1328,27 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 /// \brief Filter grasp candidates by kinematics and visibility
 void RepositionBaseExecutor::pruneGraspCandidates(
     std::vector<rcta::GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_grasp_robot,
-    const Eigen::Affine3d& T_grasp_camera,
+    const Eigen::Affine3d& robot_pose,
+    const Eigen::Affine3d& camera_pose,
     double marker_incident_angle_threshold_rad) const
 {
-    ROS_INFO("Filter %zu grasp candidates", candidates.size());
     // run this first since this is significantly less expensive than IK
-    pruneGraspCandidatesVisibility(candidates, T_grasp_camera, marker_incident_angle_threshold_rad);
-    pruneGraspCandidatesIK(candidates, T_grasp_robot);
+
+    ROS_INFO("Filter %zu grasp candidates", candidates.size());
+
+    EigenSTL::vector_Affine3d marker_poses;
+    marker_poses.reserve(attached_markers_.size());
+    for (const auto& marker : attached_markers_) {
+        marker_poses.push_back(marker.link_to_marker);
+    }
+
+    rcta::PruneGraspsByVisibility(
+            candidates,
+            marker_poses,
+            camera_pose,
+            marker_incident_angle_threshold_rad);
+
+    pruneGraspCandidatesIK(candidates, robot_pose);
 }
 
 /// \brief Filter grasp candidates by kinematic feasibility (inverse kinematics)
@@ -1371,78 +1389,6 @@ void RepositionBaseExecutor::pruneGraspCandidatesIK(
     candidates = std::move(filtered_candidates);
 }
 
-/// \brief Filter grasp candidates by fiducial visibility.
-///
-/// Fiducial visibility defined by the angle of incidence between the viewer
-/// and the fiducial frame (assumed z normal).
-///
-/// \param[in,out] candidates Grasp candidates in the robot frame
-void RepositionBaseExecutor::pruneGraspCandidatesVisibility(
-    std::vector<rcta::GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_grasp_camera,
-    double marker_incident_angle_threshold_rad) const
-{
-    ROS_INFO("Filter %zu candidates via visibility", candidates.size());
-
-    auto it = std::remove_if(candidates.begin(), candidates.end(),
-            [&](const rcta::GraspCandidate& grasp_candidate)
-    {
-        Eigen::Affine3d T_camera_fid =
-                T_grasp_camera.inverse() *
-                grasp_candidate.pose *
-                attached_markers_[0].link_to_marker;
-
-        const bool publish_marker_triads = false;
-        if (publish_marker_triads) {
-            geometry_msgs::Vector3 scale(geometry_msgs::CreateVector3(0.1, 0.01, 0.01));
-            auto triads = msg_utils::create_triad_marker_arr(scale);
-            for (auto& m : triads.markers) {
-                // transform to the world frame
-                Eigen::Affine3d T_triad_marker;
-                tf::poseMsgToEigen(m.pose, T_triad_marker);
-                Eigen::Affine3d T_camera_triad =
-                        T_grasp_camera * T_camera_fid * T_triad_marker;
-                tf::poseEigenToMsg(T_camera_triad, m.pose);
-
-                // NOTE: assumption here that the grasp frame is the world
-                // frame; this wasn't always the case so be careful here if you
-                // don't want to pass the frame down to this call
-                m.header.frame_id = current_goal_->map.header.frame_id;
-                m.ns = "marker";
-            }
-            SV_SHOW_INFO(triads);
-        }
-
-        ROS_DEBUG("  Camera -> Marker: %s", to_string(T_camera_fid).c_str());
-        Eigen::Vector3d camera_view_axis = -Eigen::Vector3d::UnitZ();
-        Eigen::Vector3d marker_plane_normal;
-        marker_plane_normal.x() = T_camera_fid(0, 2);
-        marker_plane_normal.y() = T_camera_fid(1, 2);
-        marker_plane_normal.z() = T_camera_fid(2, 2);
-
-        ROS_DEBUG("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
-
-        double dp = marker_plane_normal.dot(camera_view_axis);
-        ROS_DEBUG("  Marker Normal * Camera View Axis: %0.3f", dp);
-
-        // the optimal situation is when the camera is facing the marker
-        // directly and this angle is 0
-        double angle = acos(dp);
-        ROS_DEBUG("  Angle: %0.3f", angle);
-
-        bool check_visibility = angle < marker_incident_angle_threshold_rad;
-        if (check_visibility) {
-            ROS_DEBUG("Grasp pose: %s", to_string(grasp_candidate.pose).c_str());
-        }
-        return !check_visibility;
-    });
-
-    size_t ridx = std::distance(candidates.begin(), it);
-
-    ROS_INFO("%zu/%zu visible candidates", ridx, candidates.size());
-    candidates.resize(ridx);
-}
-
 /// \brief Return a sequence of grasp candidates to try
 ///
 /// The grasp candidates are filtered by inverse kinematics and tag detection
@@ -1461,7 +1407,7 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     }
 
     ROS_INFO("Sampled %zd grasp poses", candidates.size());
-    visualizeGraspCandidates(candidates, "grasp_candidates_checkIKPLAN");
+    SV_SHOW_INFO(getGraspCandidatesVisualization(candidates, "grasp_candidates_checkIKPLAN"));
 
     moveit::core::RobotState robot_state = currentRobotState();
     robot_state.setJointPositions(robot_model_->getRootJoint(), robot_pose);
@@ -1476,19 +1422,9 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
 
     ROS_INFO("Produced %zd feasible grasp poses", candidates.size());
 
-    // sort grasp poses so that grasps in the middle of the spline are at the
-    // front of the list
-    const double min_u = 0.0;
-    const double max_u = 1.0;
+    rcta::RankGrasps(candidates);
 
-    std::sort(candidates.begin(), candidates.end(),
-            [&](const rcta::GraspCandidate& a, const rcta::GraspCandidate& b) -> bool
-            {
-                double mid_u = 0.5 * (min_u + max_u);
-                return fabs(a.u - mid_u) < fabs(b.u - mid_u);
-            });
-
-    visualizeGraspCandidates(candidates, "grasp_candidates_checkIKPLAN_filtered");
+    SV_SHOW_INFO(getGraspCandidatesVisualization(candidates, "grasp_candidates_checkIKPLAN_filtered"));
 
     if (candidates.empty()) {
         ROS_WARN("No reachable grasp candidates available");
@@ -1786,71 +1722,13 @@ void RepositionBaseExecutor::move_arm_command_result_cb(
     move_arm_command_result_ = result;
 }
 
-/// \brief Visualize grasp candidates
-/// \param T_world_grasp Transform from the world to the grasp frame
-void RepositionBaseExecutor::visualizeGraspCandidates(
-    const std::vector<rcta::GraspCandidate>& grasps,
-    const Eigen::Affine3d& T_world_grasp,
-    const std::string& ns) const
-{
-    ROS_INFO("Visualizing %zd grasp candidates", grasps.size());
-    geometry_msgs::Vector3 triad_scale =
-            geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
-
-    // create triad markers to be reused for each grasp candidate
-    auto triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
-    std::string marker_frame;
-    if (current_goal_) {
-        marker_frame = current_goal_->map.header.frame_id;
-    }
-
-    for (visualization_msgs::Marker& marker : triad_markers.markers) {
-        marker.header.frame_id = marker_frame;
-        marker.ns = ns;
-    }
-
-    visualization_msgs::MarkerArray all_markers;
-    all_markers.markers.resize(grasps.size() * triad_markers.markers.size());
-
-    // save the relative transform of each marker in the triad's frame
-    std::vector<Eigen::Affine3d> marker_transforms;
-    marker_transforms.reserve(triad_markers.markers.size());
-    for (const auto& marker : triad_markers.markers) {
-        Eigen::Affine3d marker_transform;
-        tf::poseMsgToEigen(marker.pose, marker_transform);
-        marker_transforms.push_back(marker_transform);
-    }
-
-    // transform each marker into the world frame
-    int id = 0;
-    for (size_t gidx = 0; gidx < grasps.size(); ++gidx) {
-        const rcta::GraspCandidate& candidate = grasps[gidx];
-        for (size_t midx = 0; midx < triad_markers.markers.size(); ++midx) {
-            size_t idx = triad_markers.markers.size() * gidx + midx;
-
-            // make a copy of the marker copy transformed into the world frame
-            visualization_msgs::Marker m = triad_markers.markers[midx];
-            Eigen::Affine3d T_world_marker =
-                    T_world_grasp *
-                    candidate.pose *
-                    marker_transforms[midx];
-            tf::poseEigenToMsg(T_world_marker, m.pose);
-
-            m.id = idx;
-            all_markers.markers[idx] = std::move(m);
-        }
-    }
-
-    ROS_DEBUG("Visualizing %zd triad markers", all_markers.markers.size());
-    SV_SHOW_INFO(all_markers);
-}
-
 /// \brief Visualize world-frame grasp candidates
-void RepositionBaseExecutor::visualizeGraspCandidates(
+visualization_msgs::MarkerArray
+RepositionBaseExecutor::getGraspCandidatesVisualization(
     const std::vector<rcta::GraspCandidate>& grasps,
     const std::string& ns) const
 {
-    return visualizeGraspCandidates(grasps, Eigen::Affine3d::Identity(), ns);
+    return rcta::GetGraspCandidatesVisualization(grasps, robot_model_->getModelFrame(), ns);
 }
 
 bool RepositionBaseExecutor::downloadMarkerParameters()

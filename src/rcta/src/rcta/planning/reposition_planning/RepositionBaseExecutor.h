@@ -9,6 +9,7 @@
 
 // system includes
 #include <Eigen/Dense>
+#include <Eigen/StdVector>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
 #include <moveit/robot_model/robot_model.h>
@@ -239,11 +240,6 @@ private:
     void pruneGraspCandidatesIK(
         std::vector<rcta::GraspCandidate>& candidates,
         const Eigen::Affine3d& T_grasp_robot) const;
-
-    void pruneGraspCandidatesVisibility(
-        std::vector<rcta::GraspCandidate>& candidates,
-        const Eigen::Affine3d& T_camera_robot,
-        double marker_incident_angle_threshold_rad) const;
     ///@}
 
     /// \name Reposition Search Policies
@@ -350,12 +346,8 @@ private:
         int angle_throttle = 1,
         int yaw_throttle = 1) const;
 
-    void visualizeGraspCandidates(
-        const std::vector<rcta::GraspCandidate>& grasps,
-        const Eigen::Affine3d& T_world_grasp,
-        const std::string& ns) const;
-
-    void visualizeGraspCandidates(
+    visualization_msgs::MarkerArray
+    getGraspCandidatesVisualization(
         const std::vector<rcta::GraspCandidate>& grasp,
         const std::string& ns) const;
 

@@ -2,17 +2,22 @@
 #define GASCAN_GRASP_PLANNER_H
 
 // standard includes
+#include <string>
 #include <vector>
 
 // system includes
 #include <Eigen/Dense>
 #include <ros/ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <eigen_stl_containers/eigen_stl_containers.h>
 
 namespace rcta {
 
 struct GraspCandidate
 {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     Eigen::Affine3d pose;
     Eigen::Affine3d pose_in_object;
     double u;
@@ -28,6 +33,20 @@ struct GraspCandidate
     {
     }
 };
+
+visualization_msgs::MarkerArray
+GetGraspCandidatesVisualization(
+    const std::vector<rcta::GraspCandidate>& grasps,
+    const std::string& frame_id,
+    const std::string& ns);
+
+void PruneGraspsByVisibility(
+    std::vector<rcta::GraspCandidate>& grasps,
+    const EigenSTL::vector_Affine3d& marker_poses,
+    const Eigen::Affine3d& camera_pose,
+    double ang_thresh);
+
+void RankGrasps(std::vector<rcta::GraspCandidate>& grasps);
 
 class GascanGraspPlanner
 {
@@ -59,7 +78,7 @@ public:
 
     const Nurb<Eigen::Vector3d>& spline() const { return m_grasp_spline; }
     const Eigen::Affine3d& wristToTool() const { return m_T_wrist_tool; }
-    const Eigen::Affine3d& pregraspToGrasp() const { return m_T_grasp_pregrasp; }
+    const Eigen::Affine3d& graspToPregrasp() const { return m_T_grasp_pregrasp; }
 
 private:
 
