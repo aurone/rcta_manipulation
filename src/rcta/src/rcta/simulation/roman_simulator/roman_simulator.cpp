@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
 
         ros::Time now = ros::Time::now();
 
-        state.utime = now.toNSec() * 1e3;
+        state.utime = now.toNSec() / 1e3;
         state.fault_status.utime = state.utime;
         state.state.utime = state.utime;
         state.right_hand_state.utime = state.utime;
