@@ -73,10 +73,12 @@ void spec_update_times(roman_client_ros_utils::RomanSpec& spec_rosmsg)
 }
 #endif
 
-RomanJointTrajectoryController::RomanJointTrajectoryController() :
+RomanJointTrajectoryController::RomanJointTrajectoryController(
+    const std::string& ns)
+:
     m_nh(),
     m_server(
-        ros::NodeHandle("right_limb"), "follow_joint_trajectory", false),
+        ros::NodeHandle(ns), "follow_joint_trajectory", false),
     m_roman_spec_pub(),
     m_roman_spec_reply_sub()
 {
@@ -206,10 +208,4 @@ void RomanJointTrajectoryController::romanSpecReplyCallback(
             m_server.setSucceeded(m_result);
         }
     }
-}
-
-int main(int argc, char* argv[])
-{
-    ros::init(argc, argv, "roman_joint_trajectory_controller");
-    return RomanJointTrajectoryController().run();
 }

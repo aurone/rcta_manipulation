@@ -16,7 +16,9 @@
     </include>
 
     <group if="$(arg live)">
-        <node name="roman_joint_trajectory_controller" pkg="rcta" type="roman_joint_trajectory_controller"/>
+        <node name="right_limb_joint_trajectory_controller" pkg="rcta" type="right_limb_joint_trajectory_controller"/>
+        <node name="left_limb_joint_trajectory_controller" pkg="rcta" type="left_limb_joint_trajectory_controller"/>
+        <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
         <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
             <rosparam param="source_list">[/roman_joint_states]</rosparam>
         </node>

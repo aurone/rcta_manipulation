@@ -16,7 +16,7 @@ class RomanJointTrajectoryController
 {
 public:
 
-    RomanJointTrajectoryController();
+    RomanJointTrajectoryController(const std::string& ns);
 
     ~RomanJointTrajectoryController();
 
