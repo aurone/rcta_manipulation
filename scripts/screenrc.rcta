@@ -22,4 +22,4 @@ screen -t repo
 stuff "roslaunch rcta reposition_base_executor.launch --screen"
 
 screen -t move
-stuff "roslaunch rcta roman_move_group.launch --screen"
+stuff "roslaunch rcta move_arm_node.launch --screen"
