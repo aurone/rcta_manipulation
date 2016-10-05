@@ -25,9 +25,9 @@
 #include <rcta/MoveArmAction.h>
 #include <rcta/ViservoCommandAction.h>
 #include <rcta/common/hdt_description/RobotModel.h>
+#include <rcta/planning/grasping/gascan_grasp_planner.h>
 
-namespace GraspObjectExecutionStatus
-{
+namespace GraspObjectExecutionStatus {
 
 enum Status
 {
@@ -49,7 +49,7 @@ enum Status
 
 std::string to_string(Status status);
 
-}
+} // namespace GraspObjectExecutionStatus
 
 class GraspObjectExecutor
 {
@@ -78,16 +78,16 @@ private:
 
     struct GraspCandidate
     {
-        Eigen::Affine3d grasp_candidate_transform;
-        Eigen::Affine3d T_object_grasp;
+        Eigen::Affine3d pose;
+        Eigen::Affine3d pose_in_object;
         double u;
 
         GraspCandidate(
                 const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
                 const Eigen::Affine3d& T_object_grasp = Eigen::Affine3d::Identity(),
                 double u = -1.0) :
-            grasp_candidate_transform(grasp_candidate_transform),
-            T_object_grasp(T_object_grasp),
+            pose(grasp_candidate_transform),
+            pose_in_object(T_object_grasp),
             u(u) { }
     };
 
@@ -171,7 +171,6 @@ private:
 
     std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
 
-    std::string gas_can_mesh_path_;
     double gas_can_scale_;
 
     Eigen::Affine3d wrist_to_tool_;

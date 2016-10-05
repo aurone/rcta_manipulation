@@ -16,8 +16,10 @@ target_link_libraries(
     ${urdf_parser_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
+    ${sbpl_arm_planner_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${SBPL_LIBRARIES}
+    gascan_grasp_planner
     msg_utils
     hdt_robot_model
     robotiq_common)

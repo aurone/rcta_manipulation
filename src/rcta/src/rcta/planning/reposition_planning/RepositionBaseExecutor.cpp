@@ -42,11 +42,11 @@ double sign(double val)
 RepositionBaseExecutor::RepositionBaseExecutor() :
     nh_(),
     ph_("~"),
-    viz_pub_(),
     pgrasp_map_pub_(),
     pobs_map_pub_(),
     pgrasp_exhaustive_map_pub_(),
     listener_(),
+    viz_(),
     action_name_("reposition_base_command"),
     as_(),
     rml_(),
@@ -65,13 +65,7 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     m_body_length(0.0),
     m_body_length_core(0.0),
     attached_markers_(),
-    gas_can_mesh_path_(),
-    gas_can_scale_(1.0),
-    max_grasp_candidates_(0),
-    pregrasp_to_grasp_offset_m_(0.0),
-    wrist_to_tool_(Eigen::Affine3d::Identity()),
-    grasp_to_pregrasp_(Eigen::Affine3d::Identity()),
-    grasp_spline_(),
+    m_max_grasp_samples(0),
     move_arm_command_client_(),
     move_arm_command_action_name_("move_arm"),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
@@ -81,6 +75,14 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     status_(RepositionBaseExecutionStatus::INVALID),
     last_status_(RepositionBaseExecutionStatus::INVALID)
 {
+    sbpl::viz::set_visualizer(&viz_);
+}
+
+RepositionBaseExecutor::~RepositionBaseExecutor()
+{
+    if (sbpl::viz::visualizer() == &viz_) {
+        sbpl::viz::unset_visualizer();
+    }
 }
 
 bool RepositionBaseExecutor::initialize()
@@ -121,19 +123,10 @@ bool RepositionBaseExecutor::initialize()
         ROS_INFO("  %s", tip_frame.c_str());
     }
 
-    if (!msg_utils::download_param(ph_, "gas_canister_mesh", gas_can_mesh_path_) ||
-        !msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_))
-    {
-        ROS_ERROR("Failed to download gas canister parameters");
-        return false;
+    if (!initGraspPlanner(ph_)) {
+        ROS_ERROR("Failed to initialize grasp planner");
     }
 
-    if (!downloadGraspingParameters(ph_)) {
-        ROS_ERROR("Failed to retrieve parameters for grasp database");
-        return false;
-    }
-
-    viz_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 100);
     pgrasp_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_map", 1);
     pobs_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
     pgrasp_exhaustive_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
@@ -205,65 +198,24 @@ bool RepositionBaseExecutor::initialize()
     return true;
 }
 
-bool RepositionBaseExecutor::downloadGraspingParameters(ros::NodeHandle& nh)
+bool RepositionBaseExecutor::initGraspPlanner(ros::NodeHandle& nh)
 {
+    ros::NodeHandle grasping_nh(nh, "grasping");
+    if (!m_grasp_planner.init(grasping_nh)) {
+        return false;
+    }
+
     // read in max grasps
-    if (!msg_utils::download_param(ph_, "max_grasp_candidates", max_grasp_candidates_) || max_grasp_candidates_ < 0) {
+    if (!msg_utils::download_param(nh, "max_grasp_candidates", m_max_grasp_samples) || m_max_grasp_samples < 0) {
         ROS_ERROR("Failed to retrieve 'max_grasp_candidates' from the param server or 'max_grasp_candidates' is negative");
         return false;
     }
 
-    std::vector<geometry_msgs::Point> control_points;
-    int degree;
-    if (!msg_utils::download_param(ph_, "degree", degree) || !msg_utils::download_param(ph_, "control_points", control_points)) {
-        ROS_ERROR("Failed to retrieve grasp spline parameters");
-        return false;
-    }
+    return true;
+}
 
-    std::vector<Eigen::Vector3d> grasp_spline_control_points(control_points.size());
-    for (std::size_t i = 0; i < control_points.size(); ++i) {
-        const geometry_msgs::Point& p = control_points[i];
-        grasp_spline_control_points[i] = Eigen::Vector3d(p.x, p.y, p.z);
-    }
-
-    grasp_spline_.reset(new Nurb<Eigen::Vector3d>(grasp_spline_control_points, degree));
-    if (!grasp_spline_) {
-        ROS_ERROR("Failed to instantiate Nurb");
-        return false;
-    }
-
-    ROS_INFO("Control Points:");
-    for (const Eigen::Vector3d& control_vertex : grasp_spline_->control_points()) {
-        ROS_INFO("    %s", to_string(control_vertex).c_str());
-    }
-
-    ROS_INFO("Knot Vector: %s", to_string(grasp_spline_->knots()).c_str());
-    ROS_INFO("Degree: %s", std::to_string(grasp_spline_->degree()).c_str());
-
-    ROS_INFO("Control Points:");
-    for (const Eigen::Vector3d& control_vertex : grasp_spline_->control_points()) {
-        ROS_INFO("    %s", to_string(control_vertex).c_str());
-    }
-
-    ROS_INFO("Knot Vector: %s", to_string(grasp_spline_->knots()).c_str());
-    ROS_INFO("Degree: %s", std::to_string(grasp_spline_->degree()).c_str());
-
-    geometry_msgs::Pose tool_pose_wrist_frame;
-    if (!msg_utils::download_param(ph_, "wrist_to_tool_transform", tool_pose_wrist_frame)) {
-        ROS_ERROR("Failed to retrieve 'wrist_to_tool_transform' from the param server");
-        return false;
-    }
-
-    tf::poseMsgToEigen(tool_pose_wrist_frame, wrist_to_tool_);
-    ROS_INFO("Wrist-to-Tool Transform: %s", to_string(wrist_to_tool_).c_str());
-
-    if (!msg_utils::download_param(ph_, "pregrasp_to_grasp_offset_m", pregrasp_to_grasp_offset_m_)) {
-        ROS_ERROR("Failed to retrieve 'pregrasp_to_grasp_offset_m' from the param server");
-        return false;
-    }
-
-    grasp_to_pregrasp_ = Eigen::Translation3d(-pregrasp_to_grasp_offset_m_, 0, 0);
-
+bool RepositionBaseExecutor::downloadGraspingParameters(ros::NodeHandle& nh)
+{
     return true;
 }
 
@@ -893,7 +845,7 @@ void RepositionBaseExecutor::pruneCollisionStates(
                 m.ns = "footprint_polygon_collisions";
                 m.id = base_footprint_viz_id++;
             }
-            viz_pub_.publish(fp_markers);
+            SV_SHOW_INFO(fp_markers);
         }
     }
     }
@@ -1369,28 +1321,28 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 }
 
 /// \brief Filter grasp candidates by kinematics and visibility
-void RepositionBaseExecutor::filterGraspCandidates(
-    std::vector<GraspCandidate>& candidates,
+void RepositionBaseExecutor::pruneGraspCandidates(
+    std::vector<rcta::GraspCandidate>& candidates,
     const Eigen::Affine3d& T_grasp_robot,
     const Eigen::Affine3d& T_grasp_camera,
     double marker_incident_angle_threshold_rad) const
 {
     ROS_INFO("Filter %zu grasp candidates", candidates.size());
     // run this first since this is significantly less expensive than IK
-    filterGraspCandidatesVisibility(candidates, T_grasp_camera, marker_incident_angle_threshold_rad);
-    filterGraspCandidatesIK(candidates, T_grasp_robot);
+    pruneGraspCandidatesVisibility(candidates, T_grasp_camera, marker_incident_angle_threshold_rad);
+    pruneGraspCandidatesIK(candidates, T_grasp_robot);
 }
 
 /// \brief Filter grasp candidates by kinematic feasibility (inverse kinematics)
-void RepositionBaseExecutor::filterGraspCandidatesIK(
-    std::vector<GraspCandidate>& candidates,
+void RepositionBaseExecutor::pruneGraspCandidatesIK(
+    std::vector<rcta::GraspCandidate>& candidates,
     const Eigen::Affine3d& T_grasp_robot) const
 {
     ROS_INFO("Filter %zu grasp candidate via IK", candidates.size());
-    std::vector<GraspCandidate> filtered_candidates;
+    std::vector<rcta::GraspCandidate> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
-    for (const GraspCandidate& grasp_candidate : candidates) {
+    for (const rcta::GraspCandidate& grasp_candidate : candidates) {
         moveit::core::RobotState robot_state(robot_model_);
         robot_state.setToDefaultValues();
         // place the robot in the grasp frame
@@ -1398,19 +1350,19 @@ void RepositionBaseExecutor::filterGraspCandidatesIK(
         robot_state.setJointPositions(root_joint, T_grasp_robot);
         robot_state.update();
 
-        ROS_DEBUG("test grasp candidate %s for ik solution", to_string(grasp_candidate.grasp_candidate_transform).c_str());
+        ROS_DEBUG("test grasp candidate %s for ik solution", to_string(grasp_candidate.pose).c_str());
 
         // check for an ik solution to this grasp pose
         std::vector<double> sol;
-        if (robot_state.setFromIK(manip_group_, grasp_candidate.grasp_candidate_transform)) {
+        if (robot_state.setFromIK(manip_group_, grasp_candidate.pose)) {
             robot_state.copyJointGroupPositions(manip_group_, sol);
-            GraspCandidate reachable_grasp_candidate(
-                    grasp_candidate.grasp_candidate_transform,
-                    grasp_candidate.T_object_grasp,
+            rcta::GraspCandidate reachable_grasp_candidate(
+                    grasp_candidate.pose,
+                    grasp_candidate.pose_in_object,
                     grasp_candidate.u);
             filtered_candidates.push_back(reachable_grasp_candidate);
 
-            ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
+            ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.pose).c_str());
             ROS_INFO("IK sol: %s", to_string(sol).c_str());
         }
     }
@@ -1425,46 +1377,48 @@ void RepositionBaseExecutor::filterGraspCandidatesIK(
 /// and the fiducial frame (assumed z normal).
 ///
 /// \param[in,out] candidates Grasp candidates in the robot frame
-void RepositionBaseExecutor::filterGraspCandidatesVisibility(
-    std::vector<GraspCandidate>& candidates,
+void RepositionBaseExecutor::pruneGraspCandidatesVisibility(
+    std::vector<rcta::GraspCandidate>& candidates,
     const Eigen::Affine3d& T_grasp_camera,
     double marker_incident_angle_threshold_rad) const
 {
     ROS_INFO("Filter %zu candidates via visibility", candidates.size());
-    std::vector<GraspCandidate> filtered_candidates;
-    filtered_candidates.reserve(candidates.size());
 
-    for (const GraspCandidate& grasp_candidate : candidates) {
-        // check for visibility of the ar marker to this grasp pose
-        Eigen::Affine3d T_camera_marker =
+    auto it = std::remove_if(candidates.begin(), candidates.end(),
+            [&](const rcta::GraspCandidate& grasp_candidate)
+    {
+        Eigen::Affine3d T_camera_fid =
                 T_grasp_camera.inverse() *
-                grasp_candidate.grasp_candidate_transform *
+                grasp_candidate.pose *
                 attached_markers_[0].link_to_marker;
 
         const bool publish_marker_triads = false;
         if (publish_marker_triads) {
-            auto triads = msg_utils::create_triad_marker_arr(geometry_msgs::CreateVector3(0.1, 0.01, 0.01));
+            geometry_msgs::Vector3 scale(geometry_msgs::CreateVector3(0.1, 0.01, 0.01));
+            auto triads = msg_utils::create_triad_marker_arr(scale);
             for (auto& m : triads.markers) {
                 // transform to the world frame
                 Eigen::Affine3d T_triad_marker;
                 tf::poseMsgToEigen(m.pose, T_triad_marker);
+                Eigen::Affine3d T_camera_triad =
+                        T_grasp_camera * T_camera_fid * T_triad_marker;
+                tf::poseEigenToMsg(T_camera_triad, m.pose);
+
                 // NOTE: assumption here that the grasp frame is the world
                 // frame; this wasn't always the case so be careful here if you
                 // don't want to pass the frame down to this call
-                Eigen::Affine3d T_camera_triad = T_grasp_camera * T_camera_marker * T_triad_marker;
-                tf::poseEigenToMsg(T_camera_triad, m.pose);
-                m.header.frame_id = current_goal_->map.header.frame_id; //camera_view_frame_;
+                m.header.frame_id = current_goal_->map.header.frame_id;
                 m.ns = "marker";
             }
-            viz_pub_.publish(triads);
+            SV_SHOW_INFO(triads);
         }
 
-        ROS_DEBUG("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
+        ROS_DEBUG("  Camera -> Marker: %s", to_string(T_camera_fid).c_str());
         Eigen::Vector3d camera_view_axis = -Eigen::Vector3d::UnitZ();
         Eigen::Vector3d marker_plane_normal;
-        marker_plane_normal.x() = T_camera_marker(0, 2);
-        marker_plane_normal.y() = T_camera_marker(1, 2);
-        marker_plane_normal.z() = T_camera_marker(2, 2);
+        marker_plane_normal.x() = T_camera_fid(0, 2);
+        marker_plane_normal.y() = T_camera_fid(1, 2);
+        marker_plane_normal.z() = T_camera_fid(2, 2);
 
         ROS_DEBUG("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
 
@@ -1478,18 +1432,15 @@ void RepositionBaseExecutor::filterGraspCandidatesVisibility(
 
         bool check_visibility = angle < marker_incident_angle_threshold_rad;
         if (check_visibility) {
-            GraspCandidate reachable_grasp_candidate(
-                    grasp_candidate.grasp_candidate_transform,
-                    grasp_candidate.T_object_grasp,
-                    grasp_candidate.u);
-            filtered_candidates.push_back(reachable_grasp_candidate);
-
-            ROS_DEBUG("Grasp pose: %s", to_string(grasp_candidate.grasp_candidate_transform).c_str());
+            ROS_DEBUG("Grasp pose: %s", to_string(grasp_candidate.pose).c_str());
         }
-    }
+        return !check_visibility;
+    });
 
-    ROS_INFO("%zu/%zu visible candidates", filtered_candidates.size(), candidates.size());
-    std::swap(filtered_candidates, candidates);
+    size_t ridx = std::distance(candidates.begin(), it);
+
+    ROS_INFO("%zu/%zu visible candidates", ridx, candidates.size());
+    candidates.resize(ridx);
 }
 
 /// \brief Return a sequence of grasp candidates to try
@@ -1497,60 +1448,53 @@ void RepositionBaseExecutor::filterGraspCandidatesVisibility(
 /// The grasp candidates are filtered by inverse kinematics and tag detection
 /// feasibility checks. The resulting sequence is sorted by the probability of
 /// success of the grasp.
-std::vector<RepositionBaseExecutor::GraspCandidate>
-RepositionBaseExecutor::generateFilteredGraspCandidates(
+bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     const Eigen::Affine3d& robot_pose,
-    const Eigen::Affine3d& object_pose)
+    const Eigen::Affine3d& object_pose,
+    std::vector<rcta::GraspCandidate>& candidates)
 {
     // generate grasps in the world frame
-    int max_num_candidates = max_grasp_candidates_; //100;
-    std::vector<GraspCandidate> grasp_candidates =
-            sampleGraspCandidates(object_pose, max_num_candidates);
+    int max_samples = m_max_grasp_samples; //100;
+    if (!m_grasp_planner.sampleGrasps(object_pose, max_samples, candidates)) {
+        ROS_ERROR("Failed to sample grasps");
+        return false;
+    }
 
-    ROS_INFO("Sampled %zd grasp poses", grasp_candidates.size());
-
-    visualizeGraspCandidates(grasp_candidates, "grasp_candidates_checkIKPLAN");
+    ROS_INFO("Sampled %zd grasp poses", candidates.size());
+    visualizeGraspCandidates(candidates, "grasp_candidates_checkIKPLAN");
 
     moveit::core::RobotState robot_state = currentRobotState();
     robot_state.setJointPositions(robot_model_->getRootJoint(), robot_pose);
     robot_state.update();
-    Eigen::Affine3d camera_pose =
+    const Eigen::Affine3d& camera_pose =
             robot_state.getGlobalLinkTransform(camera_view_frame_);
 
     ROS_INFO("world -> camera: %s", to_string(camera_pose).c_str());
 
-    filterGraspCandidates(
-        grasp_candidates,
-        robot_pose,
-        camera_pose,
-        sbpl::utils::ToRadians(45.0));
+    const double vis_angle_thresh = sbpl::utils::ToRadians(45.0);
+    pruneGraspCandidates(candidates, robot_pose, camera_pose, vis_angle_thresh);
 
-    ROS_INFO("Produced %zd reachable grasp poses", grasp_candidates.size());
+    ROS_INFO("Produced %zd feasible grasp poses", candidates.size());
 
     // sort grasp poses so that grasps in the middle of the spline are at the
     // front of the list
     const double min_u = 0.0;
     const double max_u = 1.0;
 
-    std::sort(grasp_candidates.begin(), grasp_candidates.end(),
-            [&](const GraspCandidate& a, const GraspCandidate& b) -> bool
+    std::sort(candidates.begin(), candidates.end(),
+            [&](const rcta::GraspCandidate& a, const rcta::GraspCandidate& b) -> bool
             {
                 double mid_u = 0.5 * (min_u + max_u);
                 return fabs(a.u - mid_u) < fabs(b.u - mid_u);
             });
 
-    // limit grasps to the configured amount
-    if (grasp_candidates.size() > max_grasp_candidates_) {
-        grasp_candidates.resize(max_grasp_candidates_);
-    }
+    visualizeGraspCandidates(candidates, "grasp_candidates_checkIKPLAN_filtered");
 
-    visualizeGraspCandidates(grasp_candidates, "grasp_candidates_checkIKPLAN_filtered");
-
-    if (grasp_candidates.empty()) {
+    if (candidates.empty()) {
         ROS_WARN("No reachable grasp candidates available");
     }
 
-    return grasp_candidates;
+    return true;
 }
 
 Eigen::Affine3d RepositionBaseExecutor::poseFrom2D(
@@ -1694,12 +1638,8 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 {
     ROS_INFO("check for feasible arm trajectory!");
 
-    std::vector<GraspCandidate> grasp_candidates;
-    try {
-        grasp_candidates = generateFilteredGraspCandidates(robot_pose, object_pose);
-    }
-    catch (const tf::TransformException& ex) {
-        ROS_WARN("Failed to generate grasp candidates %s", ex.what());
+    std::vector<rcta::GraspCandidate> grasp_candidates;
+    if (!generateFilteredGraspCandidates(robot_pose, object_pose, grasp_candidates)) {
         return 1;
     }
 
@@ -1725,11 +1665,11 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
     // a new service that can plan simultaneously for all grasp poses
     for (size_t gidx = 0; gidx < grasp_candidates.size(); ++gidx) {
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
-        const GraspCandidate& grasp = grasp_candidates[gidx];
+        const rcta::GraspCandidate& grasp = grasp_candidates[gidx];
 
         rcta::MoveArmGoal pregrasp_goal;
         pregrasp_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
-        tf::poseEigenToMsg(grasp.grasp_candidate_transform, pregrasp_goal.goal_pose);
+        tf::poseEigenToMsg(grasp.pose, pregrasp_goal.goal_pose);
 
         // set the pose of the robot
         pregrasp_goal.start_state.is_diff = true;
@@ -1831,189 +1771,11 @@ int RepositionBaseExecutor::checkIK(
     const Eigen::Affine3d& object_pose)
 {
     ROS_INFO("checkIK!");
-    auto candidates = generateFilteredGraspCandidates(robot_pose, object_pose);
-    return !candidates.empty();
-}
-
-/// \brief Sample a set of candidate grasp poses
-///
-/// Grasp candidates are defined as pregrasp poses for the "wrist" of the robot.
-/// The original grasp candidate is computed as follows
-///
-/// * A spline is specified, in the object frame, that defines possible poses to
-///   place the tool frame of a gripper to successfully grasp the object
-///
-/// * Points are sampled along the spline, as well as the derivative of the
-///   spline at that point.
-///
-/// * A direction for the grasp is chosen, orthogonal to the derivative at the
-///   grasp point. The exact grasp direction is the direction that minimizes the
-///   distance to the +z axis in the <grasp frame>
-///
-/// * The tool frame is chosen such that the +x axis is in line with the grasp
-///   direction, the +y direction follows the spline derivative, and the +z is
-///   chosen so as to create a right-hand coordinate system
-///
-/// * The wrist (grasp) frame is determined via a fixed offset from the tool
-///   frame
-///
-/// * The pregrasp frame is determined via a fixed offset from the grasp frame
-std::vector<RepositionBaseExecutor::GraspCandidate>
-RepositionBaseExecutor::sampleGraspCandidates(
-    const Eigen::Affine3d& T_grasp_object,
-    int num_candidates) const
-{
-    const double min_u = 0.0;
-    const double max_u = 1.0;
-
-//    auto ipow = [](int b, int e)
-//    {
-//        if (e == 0) {
-//            return 1;
-//        } else if (e % 2 == 0) {
-//            int r = ipow(b, e >> 1);
-//            return r * r;
-//        } else {
-//            return b * ipow(b, e - 1);
-//        }
-//    };
-//
-//    int l = 0;
-//    int sample_count = ipow(2, l) + 1;
-//    int sidx = 0;
-//    auto next_u = [&]()
-//    {
-//        if (sidx == sample_count) {
-//            ++l;
-//            sample_count = ipow(2, l) + 1;
-//            sidx = 0;
-//            while (l > 0 && sidx % 2 == 0 && sidx != sample_count) {
-//                ++sidx;
-//            }
-//        }
-//    };
-
-    std::vector<GraspCandidate> grasp_candidates;
-    grasp_candidates.reserve(num_candidates);
-    for (int i = 0; i < num_candidates; ++i) {
-        ROS_DEBUG("Candidate Pregrasp %3d", i);
-        // sample uniformly the position and derivative of the gas canister
-        // grasp spline
-        double u = (max_u - min_u) * i / (num_candidates - 1);
-
-        int knot_num = -1;
-        for (int j = 0; j < grasp_spline_->knots().size() - 1; ++j) {
-            double curr_knot = grasp_spline_->knot(j);
-            double next_knot = grasp_spline_->knot(j + 1);
-            if (u >= curr_knot && u < next_knot) {
-                knot_num = j;
-                break;
-            }
-        }
-
-        if (knot_num < grasp_spline_->degree() ||
-            knot_num >= grasp_spline_->knots().size() - grasp_spline_->degree())
-        {
-            ROS_DEBUG("Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
-            continue;
-        }
-
-        Eigen::Vector3d object_pos_robot_frame(T_grasp_object.translation());
-
-        Eigen::Vector3d sample_spline_point = Eigen::Affine3d(Eigen::Scaling(gas_can_scale_)) * (*grasp_spline_)(u);
-        Eigen::Vector3d sample_spline_deriv = grasp_spline_->deriv(u);
-
-        ROS_DEBUG("    Sample Spline Point [object frame]: %s", to_string(sample_spline_point).c_str());
-        ROS_DEBUG("    Sample Spline Deriv [object frame]: %s", to_string(sample_spline_deriv).c_str());
-
-        Eigen::Vector3d sample_spline_point_robot_frame =
-                T_grasp_object * sample_spline_point;
-
-        Eigen::Vector3d sample_spline_deriv_robot_frame =
-                T_grasp_object.rotation() * sample_spline_deriv.normalized();
-
-        ROS_DEBUG("    Sample Spline Point [target frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
-        ROS_DEBUG("    Sample Spline Deriv [target frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
-
-        // compute the normal to the grasp spline that most points "up" in the
-        // robot frame
-        Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
-        Eigen::Vector3d up_grasp_dir =
-                up_bias -
-                        up_bias.dot(sample_spline_deriv_robot_frame) *
-                        sample_spline_deriv_robot_frame;
-        up_grasp_dir.normalize();
-        up_grasp_dir *= -1.0;
-
-        // compute the normal to the grasp spline that most points "down" in the
-        // robot frame
-        Eigen::Vector3d down_bias(-Eigen::Vector3d::UnitZ());
-        Eigen::Vector3d down_grasp_dir =
-                down_bias -
-                        down_bias.dot(sample_spline_deriv_robot_frame) *
-                        sample_spline_deriv_robot_frame;
-        down_grasp_dir.normalize();
-        down_grasp_dir *= -1.0;
-
-        Eigen::Vector3d grasp_dir;
-        Eigen::Vector3d object_to_sample =
-                sample_spline_point_robot_frame - object_pos_robot_frame;
-        if (up_grasp_dir.dot(object_to_sample) < 0) {
-            grasp_dir = up_grasp_dir;
-        } else {
-            ROS_DEBUG("Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
-            continue;
-//            grasp_dir = down_grasp_dir;
-        }
-
-        ROS_DEBUG("    Grasp Direction [robot frame]: %s", to_string(grasp_dir).c_str());
-
-        Eigen::Vector3d grasp_candidate_dir_x = grasp_dir;
-        Eigen::Vector3d grasp_candidate_dir_y = sample_spline_deriv_robot_frame;
-        Eigen::Vector3d grasp_candidate_dir_z = grasp_dir.cross(sample_spline_deriv_robot_frame);
-
-        Eigen::Matrix3d grasp_rotation_matrix;
-        grasp_rotation_matrix(0, 0) = grasp_candidate_dir_x.x();
-        grasp_rotation_matrix(1, 0) = grasp_candidate_dir_x.y();
-        grasp_rotation_matrix(2, 0) = grasp_candidate_dir_x.z();
-        grasp_rotation_matrix(0, 1) = grasp_candidate_dir_y.x();
-        grasp_rotation_matrix(1, 1) = grasp_candidate_dir_y.y();
-        grasp_rotation_matrix(2, 1) = grasp_candidate_dir_y.z();
-        grasp_rotation_matrix(0, 2) = grasp_candidate_dir_z.x();
-        grasp_rotation_matrix(1, 2) = grasp_candidate_dir_z.y();
-        grasp_rotation_matrix(2, 2) = grasp_candidate_dir_z.z();
-
-        // robot_frame -> candidate tool frame pose
-        Eigen::Affine3d grasp_candidate_rotation =
-                Eigen::Translation3d(sample_spline_point_robot_frame) *
-                grasp_rotation_matrix;
-
-        // robot -> grasp candidate (desired tool) *
-        // tool -> wrist *
-        // wrist (grasp) -> pregrasp =
-        // robot -> wrist
-        Eigen::Affine3d candidate_wrist_transform =
-                grasp_candidate_rotation *
-                wrist_to_tool_.inverse() *
-                grasp_to_pregrasp_;
-
-        ROS_DEBUG("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
-
-        grasp_candidates.push_back(
-                GraspCandidate(candidate_wrist_transform, T_grasp_object.inverse() * candidate_wrist_transform, u));
-
-        const GraspCandidate& added = grasp_candidates.back();
-        Eigen::Affine3d flipped_candidate_transform =
-                added.grasp_candidate_transform *
-                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
-        grasp_candidates.push_back(
-                GraspCandidate(
-                        flipped_candidate_transform,
-                        T_grasp_object.inverse() * flipped_candidate_transform,
-                        added.u));
+    std::vector<rcta::GraspCandidate> candidates;
+    if (!generateFilteredGraspCandidates(robot_pose, object_pose, candidates)) {
+        return 0;
     }
-
-    return grasp_candidates;
+    return !candidates.empty();
 }
 
 void RepositionBaseExecutor::move_arm_command_result_cb(
@@ -2027,7 +1789,7 @@ void RepositionBaseExecutor::move_arm_command_result_cb(
 /// \brief Visualize grasp candidates
 /// \param T_world_grasp Transform from the world to the grasp frame
 void RepositionBaseExecutor::visualizeGraspCandidates(
-    const std::vector<GraspCandidate>& grasps,
+    const std::vector<rcta::GraspCandidate>& grasps,
     const Eigen::Affine3d& T_world_grasp,
     const std::string& ns) const
 {
@@ -2062,7 +1824,7 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
     // transform each marker into the world frame
     int id = 0;
     for (size_t gidx = 0; gidx < grasps.size(); ++gidx) {
-        const GraspCandidate& candidate = grasps[gidx];
+        const rcta::GraspCandidate& candidate = grasps[gidx];
         for (size_t midx = 0; midx < triad_markers.markers.size(); ++midx) {
             size_t idx = triad_markers.markers.size() * gidx + midx;
 
@@ -2070,7 +1832,7 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
             visualization_msgs::Marker m = triad_markers.markers[midx];
             Eigen::Affine3d T_world_marker =
                     T_world_grasp *
-                    candidate.grasp_candidate_transform *
+                    candidate.pose *
                     marker_transforms[midx];
             tf::poseEigenToMsg(T_world_marker, m.pose);
 
@@ -2080,12 +1842,12 @@ void RepositionBaseExecutor::visualizeGraspCandidates(
     }
 
     ROS_DEBUG("Visualizing %zd triad markers", all_markers.markers.size());
-    viz_pub_.publish(all_markers);
+    SV_SHOW_INFO(all_markers);
 }
 
 /// \brief Visualize world-frame grasp candidates
 void RepositionBaseExecutor::visualizeGraspCandidates(
-    const std::vector<GraspCandidate>& grasps,
+    const std::vector<rcta::GraspCandidate>& grasps,
     const std::string& ns) const
 {
     return visualizeGraspCandidates(grasps, Eigen::Affine3d::Identity(), ns);
@@ -2164,7 +1926,7 @@ void RepositionBaseExecutor::visualizeRobot(
     for (auto& marker : ma.markers) {
         marker.id = id++;
     }
-    viz_pub_.publish(ma);
+    SV_SHOW_INFO(ma);
 }
 
 #define METRICS_DEPRECATED 0

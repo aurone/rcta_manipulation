@@ -147,9 +147,7 @@ bool GraspObjectExecutor::initialize()
     // download grasping parameters
     ////////////////////////////////////////////////////////////////////////////////
 
-    if (!msg_utils::download_param(ph_, "gas_canister_mesh", gas_can_mesh_path_) ||
-        !msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_))
-    {
+    if (!msg_utils::download_param(ph_, "gas_canister_mesh_scale", gas_can_scale_)) {
         ROS_ERROR("Failed to download gas canister parameters");
         return false;
     }
@@ -447,7 +445,7 @@ int GraspObjectExecutor::run()
 
                 // 4. send a move arm goal for the best grasp
                 last_move_arm_pregrasp_goal_.type = rcta::MoveArmGoal::EndEffectorGoal;
-                tf::poseEigenToMsg(next_best_grasp.grasp_candidate_transform, last_move_arm_pregrasp_goal_.goal_pose);
+                tf::poseEigenToMsg(next_best_grasp.pose, last_move_arm_pregrasp_goal_.goal_pose);
 
                 last_move_arm_pregrasp_goal_.octomap = use_extrusion_octomap_ ?
                         *current_octomap_ : current_goal_->octomap;
@@ -859,13 +857,13 @@ int GraspObjectExecutor::run()
                 Eigen::Affine3d obj_body_offset_;
                 tf::Transform obj_body_offset_tf_(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, -0.05));
 		        tf::poseTFToEigen(obj_body_offset_tf_, obj_body_offset_);
-                Eigen::Affine3d obj_body_in_grasp_frame = last_successful_grasp_.T_object_grasp.inverse() * obj_body_offset_;
+                Eigen::Affine3d obj_body_in_grasp_frame = last_successful_grasp_.pose_in_object.inverse() * obj_body_offset_;
                 tf::poseEigenToMsg(obj_body_in_grasp_frame, attached_object.object.primitive_poses[0]);
 		        //nozzle
 		        Eigen::Affine3d obj_nozzle_offset_;
 		        tf::Transform obj_nozzle_offset_tf_ = tf::Transform(tf::Quaternion(tf::Vector3(1,0,0), 0.25*M_PI), tf::Vector3(0.0, 0.0, -0.05)) * tf::Transform(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, 0.15));
 		        tf::poseTFToEigen(obj_nozzle_offset_tf_, obj_nozzle_offset_);
-                Eigen::Affine3d obj_nozzle_in_grasp_frame = last_successful_grasp_.T_object_grasp.inverse() * obj_nozzle_offset_;
+                Eigen::Affine3d obj_nozzle_in_grasp_frame = last_successful_grasp_.pose_in_object.inverse() * obj_nozzle_offset_;
                 tf::poseEigenToMsg(obj_nozzle_in_grasp_frame, attached_object.object.primitive_poses[1]);
 
                 ROS_WARN("Using attached object!");
@@ -1253,7 +1251,7 @@ GraspObjectExecutor::sample_grasp_candidates(const Eigen::Affine3d& robot_to_obj
     for (int i = 0; i < original_size; ++i) {
         const GraspCandidate& grasp = grasp_candidates[i];
         Eigen::Affine3d flipped_candidate_transform =
-                grasp.grasp_candidate_transform * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
+                grasp.pose * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
         grasp_candidates.push_back(
                 GraspCandidate(flipped_candidate_transform, robot_to_object.inverse() * flipped_candidate_transform, grasp.u));
     }
@@ -1278,7 +1276,7 @@ void GraspObjectExecutor::filter_grasp_candidates(
 
         // check for an ik solution to this grasp pose
         Eigen::Affine3d T_kinematics_grasp =
-                T_kinematics_robot * grasp_candidate.grasp_candidate_transform;
+                T_kinematics_robot * grasp_candidate.pose;
 
         std::vector<double> fake_seed(robot_model_->joint_names().size(), 0.0);
         std::vector<double> sol;
@@ -1286,7 +1284,7 @@ void GraspObjectExecutor::filter_grasp_candidates(
 
         // check for visibility of the ar marker to this grasp pose
         Eigen::Affine3d T_camera_marker = // assume link == wrist
-            T_camera_robot * grasp_candidate.grasp_candidate_transform * attached_markers_[0].link_to_marker;
+            T_camera_robot * grasp_candidate.pose * attached_markers_[0].link_to_marker;
 
         ROS_INFO("  Camera -> Marker: %s", to_string(T_camera_marker).c_str());
         Eigen::Vector3d camera_view_axis(0.0, 0.0, -1.0); // negated
@@ -1314,7 +1312,7 @@ void GraspObjectExecutor::filter_grasp_candidates(
 
         // camera -> robot * robot -> wrist * wrist -> marker = camera -> marker
         if (check_ik && check_visibility) {
-            GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.T_object_grasp, grasp_candidate.u);
+            GraspCandidate reachable_grasp_candidate(T_kinematics_grasp, grasp_candidate.pose_in_object, grasp_candidate.u);
             filtered_candidates.push_back(reachable_grasp_candidate);
         }
     }
@@ -1379,7 +1377,7 @@ void GraspObjectExecutor::visualize_grasp_candidates(const std::vector<GraspCand
             marker.id = id++;
             Eigen::Affine3d marker_transform;
             tf::poseMsgToEigen(marker.pose, marker_transform);
-            Eigen::Affine3d new_marker_transform = candidate.grasp_candidate_transform * marker_transform;
+            Eigen::Affine3d new_marker_transform = candidate.pose * marker_transform;
             tf::poseEigenToMsg(new_marker_transform, marker.pose);
         }
 

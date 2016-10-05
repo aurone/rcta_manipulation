@@ -17,6 +17,7 @@
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
+#include <sbpl_arm_planner/visualizer_ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
 #include <spellbook/grid/grid.h>
 #include <tf/transform_datatypes.h>
@@ -26,8 +27,9 @@
 #include <visualization_msgs/Marker.h>
 
 // project includes
-#include <rcta/common/hdt_description/RobotModel.h>
 #include <rcta/MoveArmAction.h>
+#include <rcta/common/hdt_description/RobotModel.h>
+#include <rcta/planning/grasping/gascan_grasp_planner.h>
 
 //xytheta collision checking!
 #include "xytheta_collision_checker.h"
@@ -96,6 +98,8 @@ class RepositionBaseExecutor
 public:
 
     RepositionBaseExecutor();
+    ~RepositionBaseExecutor();
+
     bool initialize();
     int run();
 
@@ -105,21 +109,6 @@ public:
     };
 
 private:
-
-    struct GraspCandidate
-    {
-        Eigen::Affine3d grasp_candidate_transform;
-        Eigen::Affine3d T_object_grasp;
-        double u;
-
-        GraspCandidate(
-            const Eigen::Affine3d& grasp_candidate_transform = Eigen::Affine3d::Identity(),
-            const Eigen::Affine3d& T_object_grasp = Eigen::Affine3d::Identity(),
-            double u = -1.0) :
-                grasp_candidate_transform(grasp_candidate_transform), T_object_grasp(T_object_grasp), u(u)
-        {
-        }
-    };
 
     struct AttachedMarker
     {
@@ -137,6 +126,8 @@ private:
     ros::Publisher pgrasp_exhaustive_map_pub_;
 
     tf::TransformListener listener_;
+
+    sbpl::VisualizerROS viz_;
 
     std::string action_name_;
     typedef actionlib::SimpleActionServer<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
@@ -177,14 +168,8 @@ private:
     ///@{
     // the hand-generated grasping spline is done in model coordinates
     // and requires at least the scale to be brought into world coordinates
-    std::string gas_can_mesh_path_;
-    double gas_can_scale_;
-
-    int max_grasp_candidates_;
-    double pregrasp_to_grasp_offset_m_;
-    Eigen::Affine3d wrist_to_tool_;
-    Eigen::Affine3d grasp_to_pregrasp_;
-    std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
+    rcta::GascanGraspPlanner m_grasp_planner;
+    int m_max_grasp_samples;
     ///@}
 
     /// \name Arm Planning Constraints
@@ -204,6 +189,7 @@ private:
 
     /// \name Initialization
     ///@{
+    bool initGraspPlanner(ros::NodeHandle& nh);
     bool downloadGraspingParameters(ros::NodeHandle& nh);
     bool downloadMarkerParameters();
     ///@}
@@ -239,26 +225,23 @@ private:
 
     /// \name Grasp Candidate Selection
     ///@{
-    std::vector<GraspCandidate> generateFilteredGraspCandidates(
+    bool generateFilteredGraspCandidates(
         const Eigen::Affine3d& robot_pose,
-        const Eigen::Affine3d& object_pose);
+        const Eigen::Affine3d& object_pose,
+        std::vector<rcta::GraspCandidate>& candidates);
 
-    std::vector<GraspCandidate> sampleGraspCandidates(
-        const Eigen::Affine3d& T_grasp_object,
-        int num_candidates) const;
-
-    void filterGraspCandidates(
-        std::vector<GraspCandidate>& candidates,
+    void pruneGraspCandidates(
+        std::vector<rcta::GraspCandidate>& candidates,
         const Eigen::Affine3d& T_grasp_robot,
         const Eigen::Affine3d& T_camera_robot,
         double marker_incident_angle_threshold_rad) const;
 
-    void filterGraspCandidatesIK(
-        std::vector<GraspCandidate>& candidates,
+    void pruneGraspCandidatesIK(
+        std::vector<rcta::GraspCandidate>& candidates,
         const Eigen::Affine3d& T_grasp_robot) const;
 
-    void filterGraspCandidatesVisibility(
-        std::vector<GraspCandidate>& candidates,
+    void pruneGraspCandidatesVisibility(
+        std::vector<rcta::GraspCandidate>& candidates,
         const Eigen::Affine3d& T_camera_robot,
         double marker_incident_angle_threshold_rad) const;
     ///@}
@@ -368,12 +351,12 @@ private:
         int yaw_throttle = 1) const;
 
     void visualizeGraspCandidates(
-        const std::vector<GraspCandidate>& grasps,
+        const std::vector<rcta::GraspCandidate>& grasps,
         const Eigen::Affine3d& T_world_grasp,
         const std::string& ns) const;
 
     void visualizeGraspCandidates(
-        const std::vector<GraspCandidate>& grasp,
+        const std::vector<rcta::GraspCandidate>& grasp,
         const std::string& ns) const;
 
     void visualizeRobot(
