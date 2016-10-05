@@ -16,12 +16,19 @@
     </include>
 
     <group if="$(arg live)">
-        <node name="right_limb_joint_trajectory_controller" pkg="rcta" type="right_limb_joint_trajectory_controller"/>
-        <node name="left_limb_joint_trajectory_controller" pkg="rcta" type="left_limb_joint_trajectory_controller"/>
-        <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
+        <group if="$(arg fake)">
+            <node name="roman_simulator" pkg="rcta" type="roman_simulator"/>
+        </group>
+
+        <!-- joint state aggregator -->
         <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
             <rosparam param="source_list">[/roman_joint_states]</rosparam>
         </node>
+
+        <!-- action interfaces wrapping jpl controllers -->
+        <node name="right_limb_joint_trajectory_controller" pkg="rcta" type="right_limb_joint_trajectory_controller"/>
+        <node name="left_limb_joint_trajectory_controller" pkg="rcta" type="left_limb_joint_trajectory_controller"/>
+        <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
     </group>
     <group unless="$(arg live)">
         <group if="$(arg fake)">
@@ -40,10 +47,10 @@
             <!-- spawn simulated controllers -->
             <rosparam command="load" file="$(find rcta)/config/control/roman_control.yaml"/>
             <node name="controller_spawner" pkg="controller_manager" type="spawner"
-                    args="joint_state_controller
-                            left_limb_joint_trajectory_controller
-                            right_limb_joint_trajectory_controller
-                            torso_joint1_controller"/>
+                    args="joint_state_controller right_limb left_limb torso_joint1_controller"/>
+
+            <!-- dummy -->
+            <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
         </group>
     </group>
 

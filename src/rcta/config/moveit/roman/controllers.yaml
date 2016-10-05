@@ -1,5 +1,5 @@
 controller_list:
-    - name: right_limb_joint_trajectory_controller
+    - name: right_limb
       action_ns: follow_joint_trajectory
       type: FollowJointTrajectory
       default: true
@@ -11,7 +11,7 @@ controller_list:
         - limb_right_joint5
         - limb_right_joint6
         - limb_right_joint7
-    - name: left_limb_joint_trajectory_controller
+    - name: left_limb
       action_ns: follow_joint_trajectory
       type: FollowJointTrajectory
       default: true
