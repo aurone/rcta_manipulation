@@ -39,19 +39,20 @@ private:
     FollowJointTrajectoryActionServer::Feedback m_feedback;
     FollowJointTrajectoryActionServer::Result m_result;
 
-    roman_client_ros_utils::RomanState::ConstPtr m_state;
+    typedef roman_client_ros_utils::RomanState RomanState;
+    typedef roman_client_ros_utils::RomanSpecReply RomanSpecReply;
+
+    RomanState::ConstPtr m_state;
 
     std::map<std::string, int> m_joint_name_to_spec_index;
 
-    void romanStateCallback(
-        const roman_client_ros_utils::RomanState::ConstPtr& msg);
+    void romanStateCallback(const RomanState::ConstPtr& msg);
 
     void goalCallback();
 
     void preemptCallback();
 
-    void romanSpecReplyCallback(
-        const roman_client_ros_utils::RomanSpecReply::ConstPtr& msg);
+    void romanSpecReplyCallback(const RomanSpecReply::ConstPtr& msg);
 };
 
 #endif
