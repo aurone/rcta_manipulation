@@ -4,9 +4,8 @@
 // system includes
 #include <moveit/distance_field/propagation_distance_field.h>
 #include <ros/ros.h>
-#include <sbpl_arm_planner/action_set.h>
 #include <sbpl_arm_planner/occupancy_grid.h>
-#include <sbpl_arm_planner/arm_planner_interface.h>
+#include <sbpl_arm_planner/planner_interface.h>
 #include <sbpl_collision_checking/collision_space.h>
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
 
@@ -129,29 +128,20 @@ int main(int argc, char** argv)
         }
     }
 
-    ////////////////
-    // Action Set //
-    ////////////////
-
     std::string action_set_filename;
     if (!ph.getParam("action_set_filename", action_set_filename)) {
         ROS_ERROR("Failed to retrieve 'action_set_filename' from the param server");
         return 1;
     }
 
-    sbpl::manip::ActionSet as;
-    if (!sbpl::manip::ActionSet::Load(action_set_filename, as)) {
-        ROS_ERROR("Failed to load Action Set from '%s'", action_set_filename.c_str());
-        return FAILED_TO_LOAD_ACTION_SET;
-    }
-
     ////////////////////////
     // Planning Interface //
     ////////////////////////
 
-    sbpl::manip::ArmPlannerInterface planner(&robot_model, cspace.get(), &as, &grid);
+    sbpl::manip::PlannerInterface planner(&robot_model, cspace.get(), &grid);
 
     sbpl::manip::PlanningParams params;
+    params.action_filename = action_set_filename;
     // TODO: fill in planning params
     if (!planner.init(params)) {
         ROS_ERROR("Failed to initialize SBPL Arm Planner Interface");

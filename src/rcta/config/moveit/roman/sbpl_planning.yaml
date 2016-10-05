@@ -37,7 +37,7 @@ right_arm:
 
 planner_configs:
     ARAConfigDefault:
-        type: ARA*
+        type: arastar
         epsilon: 100.0
         use_bfs_heuristic: true
         bfs_res_x: 0.015
@@ -45,7 +45,7 @@ planner_configs:
         bfs_res_z: 0.015
         bfs_sphere_radius: 0.02
     MHAConfigDefault:
-        type: MHA*
+        type: mhastar
         epsilon: 100.0
         mha_epsilon: 2.0
         use_bfs_heuristic: true
@@ -54,7 +54,7 @@ planner_configs:
         bfs_res_z: 0.015
         bfs_sphere_radius: 0.02
     LARAConfigDefault:
-        type: LARA*
+        type: larastar
         epsilon: 100.0
         use_bfs_heuristic: true
         bfs_res_x: 0.015
