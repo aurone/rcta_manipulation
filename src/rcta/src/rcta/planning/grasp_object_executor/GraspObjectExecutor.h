@@ -160,8 +160,9 @@ private:
 
     rcta_msgs::GraspObjectCommandGoal::ConstPtr current_goal_;
 
-    GraspObjectExecutionStatus::Status status_;
     GraspObjectExecutionStatus::Status last_status_;
+    GraspObjectExecutionStatus::Status status_;
+    GraspObjectExecutionStatus::Status next_status_;
 
     rcta::GascanGraspPlanner m_grasp_planner;
 
@@ -182,6 +183,20 @@ private:
 
     void goal_callback();
     void preempt_callback();
+
+    GraspObjectExecutionStatus::Status onIdle();
+    GraspObjectExecutionStatus::Status onFault();
+    GraspObjectExecutionStatus::Status onGeneratingGrasps();
+    GraspObjectExecutionStatus::Status onPlanningArmMotionToPregrasp();
+    GraspObjectExecutionStatus::Status onExecutingArmMotionToPregrasp();
+    GraspObjectExecutionStatus::Status onOpeningGripper();
+    GraspObjectExecutionStatus::Status onExecutingVisualServoMotionToPregrasp();
+    GraspObjectExecutionStatus::Status onExecutingVisualServoMotionToGrasp();
+    GraspObjectExecutionStatus::Status onGraspingObject();
+    GraspObjectExecutionStatus::Status onRetractingGripper();
+    GraspObjectExecutionStatus::Status onPlanningArmMotionToStowPosition();
+    GraspObjectExecutionStatus::Status onExecutingArmMotionToStowPosition();
+    GraspObjectExecutionStatus::Status onCompletingGoal();
 
     void move_arm_command_active_cb();
     void move_arm_command_feedback_cb(const rcta::MoveArmFeedback::ConstPtr& feedback);
