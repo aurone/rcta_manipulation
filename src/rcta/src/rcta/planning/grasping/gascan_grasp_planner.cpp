@@ -121,7 +121,7 @@ void RankGrasps(std::vector<rcta::GraspCandidate>& grasps)
     const double min_u = 0.0;
     const double max_u = 1.0;
 
-    std::sort(candidates.begin(), candidates.end(),
+    std::sort(grasps.begin(), grasps.end(),
             [&](const rcta::GraspCandidate& a, const rcta::GraspCandidate& b) -> bool
             {
                 double mid_u = 0.5 * (min_u + max_u);
