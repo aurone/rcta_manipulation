@@ -14,8 +14,24 @@ pregrasp_to_grasp_offset_m: 0.08
 stow_positions:
 #    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, 77.0, 1.00, -24.00 ] }
 #    - { name: "two", joint_vector_degs: [ -78.00, -42.00, 11.00, 29.00, 9.00, 10.00, -29.00 ] }
-    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, -13.0, 1.00, 24.00 ] }
-    - { name: "two", joint_vector_degs: [ -73.00, -43.00, 11.00, 40.00, -85.00, 2.00, 25.00 ] }
+    - name: "one",
+      joint_vector_degs:
+        arm_1_shoulder_twist: 92.00,
+        arm_2_shoulder_lift: 84.00
+        arm_3_elbow_twist: -102.00
+        arm_4_elbow_lift: 59.00
+        arm_5_wrist_twist: -13.0
+        arm_6_wrist_lift: 1.00
+        arm_7_gripper_lift: 24.00
+    - name: "two",
+      joint_vector_degs:
+        arm_1_shoulder_twist: -73.00
+        arm_2_shoulder_lift: -43.00
+        arm_3_elbow_twist: 11.00
+        arm_4_elbow_lift: 40.00
+        arm_5_wrist_twist: -85.00
+        arm_6_wrist_lift: 2.00
+        arm_7_gripper_lift: 25.00
 
 max_grasp_candidates: 4 # the number of grasps to attempt to plan to
 

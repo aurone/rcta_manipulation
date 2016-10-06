@@ -12,6 +12,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <leatherman/print.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -59,7 +60,7 @@ class GraspObjectExecutor
     struct StowPosition
     {
         std::string name;
-        std::vector<double> joint_positions;
+        std::map<std::string, double> joint_positions;
     };
 
 public:
@@ -87,182 +88,244 @@ private:
         Eigen::Affine3d link_to_marker;
     };
 
-    ros::NodeHandle nh_;
-    ros::NodeHandle ph_;
-
-    ros::Subscriber costmap_sub_;
-
-    sbpl::VisualizerROS m_viz;
-
     typedef nav_msgs::OccupancyGrid::ConstPtr OccupancyGridConstPtr;
     typedef nav_msgs::OccupancyGrid::Ptr OccupancyGridPtr;
     typedef octomap_msgs::Octomap::Ptr OctomapPtr;
     typedef octomap_msgs::Octomap::ConstPtr OctomapConstPtr;
 
-    double object_filter_radius_m_;
+    typedef actionlib::SimpleActionServer<rcta_msgs::GraspObjectCommandAction> GraspObjectCommandActionServer;
+    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
+    typedef actionlib::SimpleActionClient<rcta::ViservoCommandAction> ViservoCommandActionClient;
+    typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
+
+    /// \name ROS stuff
+    ///@{
+    ros::NodeHandle nh_;
+    ros::NodeHandle ph_;
+
     ros::Publisher filtered_costmap_pub_;
-
-    OccupancyGridConstPtr last_occupancy_grid_; ///< most recent OccupancyGrid message
-    OccupancyGridPtr current_occupancy_grid_; ///< copy of most recent OccupancyGrid message when the goal was received
-
-    geometry_msgs::PoseStamped gas_can_in_grid_frame_;
-    bool wait_for_after_grasp_grid_;
-    ros::Time wait_for_grid_start_time_;
-    OccupancyGridConstPtr occupancy_grid_after_grasp_;
-
-    bool use_extrusion_octomap_; ///< Whether to override incoming octomaps with an extruded costmap variant
-    OctomapPtr current_octomap_; ///< extruded current occupancy grid
-    CostmapExtruder extruder_;
     ros::Publisher extrusion_octomap_pub_;
+    ros::Subscriber costmap_sub_;
+
+    tf::TransformListener listener_;
+
+    std::unique_ptr<GraspObjectCommandActionServer> as_;
+    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
+    std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
+    std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
+    std::string action_name_;
+    std::string move_arm_command_action_name_;
+    std::string viservo_command_action_name_;
+    std::string gripper_command_action_name_;
+
+    sbpl::VisualizerROS m_viz;
+    ///@}
 
     robot_model_loader::RobotModelLoaderPtr m_rml;
     moveit::core::RobotModelPtr m_robot_model;
-
     hdt::RobotModelConstPtr robot_model_;
+    CostmapExtruder extruder_;
+    rcta::GascanGraspPlanner m_grasp_planner;
+    planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
 
-    std::string action_name_;
-    typedef actionlib::SimpleActionServer<rcta_msgs::GraspObjectCommandAction> GraspObjectCommandActionServer;
-    std::unique_ptr<GraspObjectCommandActionServer> as_;
+    /// \name Global Parameters
+    ///@{
 
-    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
-    std::string move_arm_command_action_name_;
-    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
+    std::string m_camera_view_frame;
+    std::string m_manip_name;
+    moveit::core::JointModelGroup* m_manip_group;
+
+    /// Circumscribed radius of the object, used to remove object cells from
+    /// the occupancy grid and extruded octomap
+    double object_filter_radius_m_;
+
+    /// Whether to override incoming octomaps with an extruded costmap variant
+    bool use_extrusion_octomap_;
+
+    ///@}
+
+    /// \name GenerateGrasps Parameters
+    ///@{
+    std::vector<AttachedMarker> attached_markers_;
+    ///@}
+
+    /// \name PlanArmMotionToPregrasp Parameters
+    ///@{
+    int max_grasp_candidates_;
+    ///@}
+
+    /// \name PlanArmMotionToStow Parameters
+    ///@{
+    std::vector<StowPosition> stow_positions_;
+    ///@}
+
+    /// \name CompleteGoal Parameters
+    ///@{
+    double gas_can_detection_threshold_;
+    ///@}
+
+    /// \name Goal Context
+    ///@{
+
+    rcta_msgs::GraspObjectCommandGoal::ConstPtr current_goal_;
+
+    /// copy of most recent OccupancyGrid message when the goal was received
+    OccupancyGridPtr current_occupancy_grid_;
+
+    /// extruded current occupancy grid
+    OctomapPtr current_octomap_;
+
+    geometry_msgs::PoseStamped gas_can_in_grid_frame_;
+
+    ///@}
+
+    /// \name Internal state machine for move arm goal stages
+    ///@{
     bool sent_move_arm_goal_;
     bool pending_move_arm_command_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
     rcta::MoveArmResult::ConstPtr move_arm_command_result_;
+    ///@}
 
-    rcta::MoveArmGoal last_move_arm_pregrasp_goal_;
-    rcta::MoveArmGoal last_move_arm_stow_goal_;
-    rcta::GraspCandidate last_successful_grasp_;
-
-    typedef actionlib::SimpleActionClient<rcta::ViservoCommandAction> ViservoCommandActionClient;
-    std::string viservo_command_action_name_;
-    std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
+    /// \name Internal state machine for viservo goal stages
+    ///@{
     bool sent_viservo_command_;
     bool pending_viservo_command_;
     actionlib::SimpleClientGoalState viservo_command_goal_state_;
     rcta::ViservoCommandResult::ConstPtr viservo_command_result_;
+    ///@}
 
-    rcta::ViservoCommandGoal last_viservo_pregrasp_goal_;
-
-    typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperCommandActionClient;
-    std::string gripper_command_action_name_;
-    std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
+    /// \name Internal state machine for gripper goal stages
+    ///@{
     bool sent_gripper_command_;
     bool pending_gripper_command_;
     actionlib::SimpleClientGoalState gripper_command_goal_state_;
     control_msgs::GripperCommandResult::ConstPtr gripper_command_result_;
+    ///@}
 
-    rcta::ViservoCommandGoal last_viservo_grasp_goal_;
+    OccupancyGridConstPtr last_occupancy_grid_; ///< most recent OccupancyGrid message
 
-    int next_stow_position_to_attempt_;
+    /// \name Shared State
+    ///@{
 
-    rcta_msgs::GraspObjectCommandGoal::ConstPtr current_goal_;
-
-    GraspObjectExecutionStatus::Status last_status_;
-    GraspObjectExecutionStatus::Status status_;
-    GraspObjectExecutionStatus::Status next_status_;
-
-    rcta::GascanGraspPlanner m_grasp_planner;
-
-    tf::TransformListener listener_;
+    // shared(GenerateGrasps, PlanArmMotionToPregrasp)
+    // -> to plan to a number of different grasps, ranked by graspability
     std::vector<rcta::GraspCandidate> reachable_grasp_candidates_;
 
-    ros::Publisher marker_arr_pub_;
+    // shared(PlanArmMotionToPregrasp, ExecuteVisualServoMotionToPregrasp)
+    // -> to enforce visual servo to the same pose
+    rcta::MoveArmGoal last_move_arm_pregrasp_goal_;
 
-    std::vector<StowPosition> stow_positions_;
+    // shared(PlanArmMotionToPregrasp, PlanArmMotionToStow)
+    // -> to know how to attach the object to the arm
+    rcta::GraspCandidate last_successful_grasp_;
 
-    double gas_can_detection_threshold_;
+    // shared(ExecuteVisualServoMotionToPregrasp, ExecuteVisualServoMotionToGrasp)
+    // -> propagate wrist goal originating from PlanArmMotionToPregrasp
+    rcta::ViservoCommandGoal last_viservo_pregrasp_goal_;
 
-    int max_grasp_candidates_;
+    ///@}
 
-    std::vector<AttachedMarker> attached_markers_;
+    /// \name PlanArmMotionToStowPosition State
+    ///@{
+    int next_stow_position_to_attempt_;
+    ///@}
 
-    bool download_marker_params();
+    /// \name Completing state
+    ///@{
+    ros::Time wait_for_grid_start_time_;
+    ///@}
 
-    void goal_callback();
-    void preempt_callback();
+    bool downloadMarkerParams();
 
+    const moveit::core::RobotState& currentRobotState() const;
+    void processSceneUpdate(
+        planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType type);
+
+    void goalCallback();
+    void preemptCallback();
+
+    void onIdleEnter(GraspObjectExecutionStatus::Status from);
     GraspObjectExecutionStatus::Status onIdle();
-    GraspObjectExecutionStatus::Status onFault();
-    GraspObjectExecutionStatus::Status onGeneratingGrasps();
-    GraspObjectExecutionStatus::Status onPlanningArmMotionToPregrasp();
-    GraspObjectExecutionStatus::Status onExecutingArmMotionToPregrasp();
-    GraspObjectExecutionStatus::Status onOpeningGripper();
-    GraspObjectExecutionStatus::Status onExecutingVisualServoMotionToPregrasp();
-    GraspObjectExecutionStatus::Status onExecutingVisualServoMotionToGrasp();
-    GraspObjectExecutionStatus::Status onGraspingObject();
-    GraspObjectExecutionStatus::Status onRetractingGripper();
-    GraspObjectExecutionStatus::Status onPlanningArmMotionToStowPosition();
-    GraspObjectExecutionStatus::Status onExecutingArmMotionToStowPosition();
-    GraspObjectExecutionStatus::Status onCompletingGoal();
+    void onIdleExit(GraspObjectExecutionStatus::Status to);
 
-    void move_arm_command_active_cb();
-    void move_arm_command_feedback_cb(const rcta::MoveArmFeedback::ConstPtr& feedback);
-    void move_arm_command_result_cb(
+    void onFaultEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onFault();
+    void onFaultExit(GraspObjectExecutionStatus::Status to);
+
+    void onGeneratingGraspsEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onGeneratingGrasps();
+    void onGeneratingGraspsExit(GraspObjectExecutionStatus::Status to);
+
+    void onPlanningArmMotionToPregraspEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onPlanningArmMotionToPregrasp();
+    void onPlanningArmMotionToPregraspExit(GraspObjectExecutionStatus::Status to);
+
+    void onExecutingArmMotionToPregraspEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onExecutingArmMotionToPregrasp();
+    void onExecutingArmMotionToPregraspExit(GraspObjectExecutionStatus::Status to);
+
+    void onOpeningGripperEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onOpeningGripper();
+    void onOpeningGripperExit(GraspObjectExecutionStatus::Status to);
+
+    void onExecutingVisualServoMotionToPregraspEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onExecutingVisualServoMotionToPregrasp();
+    void onExecutingVisualServoMotionToPregraspExit(GraspObjectExecutionStatus::Status to);
+
+    void onExecutingVisualServoMotionToGraspEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onExecutingVisualServoMotionToGrasp();
+    void onExecutingVisualServoMotionToGraspExit(GraspObjectExecutionStatus::Status to);
+
+    void onGraspingObjectEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onGraspingObject();
+    void onGraspingObjectExit(GraspObjectExecutionStatus::Status to);
+
+    void onRetractingGripperEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onRetractingGripper();
+    void onRetractingGripperExit(GraspObjectExecutionStatus::Status to);
+
+    void onPlanningArmMotionToStowPositionEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onPlanningArmMotionToStowPosition();
+    void onPlanningArmMotionToStowPositionExit(GraspObjectExecutionStatus::Status to);
+
+    void onExecutingArmMotionToStowPositionEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onExecutingArmMotionToStowPosition();
+    void onExecutingArmMotionToStowPositionExit(GraspObjectExecutionStatus::Status to);
+
+    void onCompletingGoalEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onCompletingGoal();
+    void onCompletingGoalExit(GraspObjectExecutionStatus::Status to);
+
+    void moveArmResultCallback(
             const actionlib::SimpleClientGoalState& state,
             const rcta::MoveArmResult::ConstPtr& result);
 
-    void viservo_command_active_cb();
-    void viservo_command_feedback_cb(const rcta::ViservoCommandFeedback::ConstPtr& feedback);
-    void viservo_command_result_cb(
+    void viservoCommandResultCallback(
             const actionlib::SimpleClientGoalState& state,
             const rcta::ViservoCommandResult::ConstPtr& result);
 
-    void gripper_command_active_cb();
-    void gripper_command_feedback_cb(const control_msgs::GripperCommandFeedback::ConstPtr& feedback);
-    void gripper_command_result_cb(
+    void gripperCommandResultCallback(
             const actionlib::SimpleClientGoalState& state,
             const control_msgs::GripperCommandResult::ConstPtr& result);
 
-    void occupancy_grid_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+    void occupancyGridCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 
-    template <typename ActionType>
-    bool wait_for_action_server(
-        std::unique_ptr<actionlib::SimpleActionClient<ActionType>>& action_client,
-        const std::string& action_name,
-        const ros::Duration& poll_duration,
-        const ros::Duration& timeout)
-    {
-        ROS_INFO("Waiting for action server '%s'", action_name.c_str());
+    uint8_t executionStatusToFeedbackStatus(GraspObjectExecutionStatus::Status status);
 
-        if (!action_client) {
-            ROS_WARN("Action client is null");
-            return false;
-        }
-
-        ros::Time start = ros::Time::now();
-        while (timeout == ros::Duration(0) || ros::Time::now() < start + timeout) {
-            ros::spinOnce();
-            if (!action_client->isServerConnected()) {
-                action_client.reset(new actionlib::SimpleActionClient<ActionType>(action_name, false));
-                if (!action_client) {
-                    ROS_WARN("Failed to reinstantiate action client '%s'", action_name.c_str());
-                    return false;
-                }
-            }
-
-            if (action_client->isServerConnected()) {
-                return true;
-            }
-
-            poll_duration.sleep();
-
-            ROS_INFO("Waited %0.3f seconds for action server '%s'...", (ros::Time::now() - start).toSec(), action_name.c_str());
-        }
-
-        return false;
-    }
-
-    uint8_t execution_status_to_feedback_status(GraspObjectExecutionStatus::Status status);
-
-    void filterGraspCandidates(
+    void pruneGraspCandidates(
     		std::vector<rcta::GraspCandidate>& candidates,
-    		const Eigen::Affine3d& T_kinematics_robot,
-    		const Eigen::Affine3d& T_camera_robot,
+    		const Eigen::Affine3d& robot_pose,
+    		const Eigen::Affine3d& camera_pose,
     		double marker_incident_angle_threshold_rad) const;
-    void cull_grasp_candidates(std::vector<rcta::GraspCandidate>& candidates, int max_candidates) const;
+
+    void pruneGraspCandidatesIK(
+        std::vector<rcta::GraspCandidate>& candidates,
+        const Eigen::Affine3d& T_grasp_robot) const;
+
+    void cull_grasp_candidates(
+        std::vector<rcta::GraspCandidate>& candidates,
+        int max_candidates) const;
 
     visualization_msgs::MarkerArray
     getGraspCandidatesVisualization(
