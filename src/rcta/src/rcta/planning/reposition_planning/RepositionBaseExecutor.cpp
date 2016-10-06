@@ -54,7 +54,6 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     manip_group_(nullptr),
     manip_name_(),
     m_scene_monitor(),
-    robot_state_(),
     camera_view_frame_(),
     T_mount_robot_(),
     cc_(),
@@ -87,6 +86,11 @@ RepositionBaseExecutor::~RepositionBaseExecutor()
 
 bool RepositionBaseExecutor::initialize()
 {
+    //////////////////////////////////////////////////////////////////////////
+    // This could maybe be refactoreds, since there is a lot of commonality //
+    // with GraspObjectExecutor                                             //
+    //////////////////////////////////////////////////////////////////////////
+
     camera_view_frame_ = "camera_rgb_optical_frame";
 
     rml_.reset(new robot_model_loader::RobotModelLoader);
@@ -127,6 +131,10 @@ bool RepositionBaseExecutor::initialize()
         ROS_ERROR("Failed to initialize grasp planner");
     }
 
+    ///////////////////////////////////////////
+    // RepositionBaseExecutor-specific stuff //
+    ///////////////////////////////////////////
+
     pgrasp_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_map", 1);
     pobs_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
     pgrasp_exhaustive_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
@@ -145,8 +153,8 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-    as_->registerGoalCallback(boost::bind(&RepositionBaseExecutor::goal_callback, this));
-    as_->registerPreemptCallback(boost::bind(&RepositionBaseExecutor::preempt_callback, this));
+    as_->registerGoalCallback(boost::bind(&RepositionBaseExecutor::goalCallback, this));
+    as_->registerPreemptCallback(boost::bind(&RepositionBaseExecutor::preemptCallback, this));
 
     ROS_INFO("Starting action server '%s'...", action_name_.c_str());
     as_->start();
@@ -344,7 +352,7 @@ int RepositionBaseExecutor::run()
     return SUCCESS;
 }
 
-void RepositionBaseExecutor::goal_callback()
+void RepositionBaseExecutor::goalCallback()
 {
     ROS_INFO("Received a new goal");
     current_goal_ = as_->acceptNewGoal();
@@ -372,7 +380,7 @@ void RepositionBaseExecutor::goal_callback()
     // is compared against the object pose
 
     const geometry_msgs::PoseStamped& robot_pose = current_goal_->base_link_in_map;
-    const std::string& map_frame = current_goal_->map.header.frame_id;
+    const std::string& map_frame = map.header.frame_id;
     if (robot_pose.header.frame_id != map_frame) {
         try {
             ROS_INFO("transform robot pose from frame '%s' into frame '%s'", robot_pose.header.frame_id.c_str(), map_frame.c_str());
@@ -393,13 +401,13 @@ void RepositionBaseExecutor::goal_callback()
     }
 
     // update collision checker if valid map
-    if (!cc_->updateOccupancyGrid(current_goal_->map)) {
+    if (!cc_->updateOccupancyGrid(map)) {
         ROS_ERROR("Failed to update collision checker with latest map");
         as_->setAborted();
     }
 }
 
-void RepositionBaseExecutor::preempt_callback()
+void RepositionBaseExecutor::preemptCallback()
 {
 }
 
@@ -1332,8 +1340,6 @@ void RepositionBaseExecutor::pruneGraspCandidates(
     const Eigen::Affine3d& camera_pose,
     double marker_incident_angle_threshold_rad) const
 {
-    // run this first since this is significantly less expensive than IK
-
     ROS_INFO("Filter %zu grasp candidates", candidates.size());
 
     EigenSTL::vector_Affine3d marker_poses;
@@ -1342,6 +1348,7 @@ void RepositionBaseExecutor::pruneGraspCandidates(
         marker_poses.push_back(marker.link_to_marker);
     }
 
+    // run this first since this is significantly less expensive than IK
     rcta::PruneGraspsByVisibility(
             candidates,
             marker_poses,
@@ -1567,7 +1574,7 @@ bool RepositionBaseExecutor::tryFeasibleArmCheck(
     return false;
 }
 
-/// \brief Check for a feasible trajectory exists to grasp the object
+/// \brief Check for a feasible trajectory for the arm to grasp the object
 int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose)

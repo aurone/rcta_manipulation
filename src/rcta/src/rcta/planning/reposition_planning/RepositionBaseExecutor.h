@@ -94,6 +94,41 @@ struct SearchSpaceParams
     double yawStep;     ///< Discretization of yaw samples
 };
 
+/// Node handling requests to plan for the position of the base required to
+/// pickup an object
+///
+/// Notes on frames (in preparation for the inevitable integration issues
+/// related to tf):
+///
+/// * The reposition planner uses the same concept of a "planning frame" as in
+///   MoveIt!. I believe the decision on the planning frame is slightly more
+///   complicated in MoveIt!. Here it is just the model frame of the robot,
+///   which should either be the world frame (the parent in the virtual joint
+///   attached the robot to the world), or the root frame of the robot.
+///
+/// * Grasps are returned in the frame the object is specified in
+///
+/// * Grasps are checked against IK for feasibility--the frame of the IK checker
+///   is the model frame
+///
+/// * Grasps are checked against the camera pose for visibility--links of the
+///   robot are specified in the model frame
+///
+/// * For simplicity, most computations should assume entities are specified in
+///   the model frame, this means the input robot and object poses should be
+///   transformed into the model frame upon receipt (TODO). For example, if the
+///   model frame is the "map" frame and the input robot and object poses are in
+///   the "map" frame, then no transformation takes place; if the model frame is
+///   the root link of the robot, the robot pose will be the identity and the
+///   object pose will be the relative transform from the robot to the object.
+///
+/// * Visualizations are produced in the model frame
+///
+/// * Poses have their 2-d footprint projections checked against the collision
+///   map for collisions. The input occupancy grid might be specified in a frame
+///   other than the model frame (TODO: should the occupancy grid be transformed
+///   into the model frame, or should a copy of the robot and object poses in
+///   the occupancy grid's frame so that checks can be made directly).
 class RepositionBaseExecutor
 {
 public:
@@ -141,7 +176,6 @@ private:
 
     // TODO: monitor state to get the transform between the camera and the wrist
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
-    moveit::core::RobotStatePtr robot_state_;
 
     std::string camera_view_frame_;
 
@@ -233,8 +267,8 @@ private:
 
     void pruneGraspCandidates(
         std::vector<rcta::GraspCandidate>& candidates,
-        const Eigen::Affine3d& T_grasp_robot,
-        const Eigen::Affine3d& T_camera_robot,
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& camera_pose,
         double marker_incident_angle_threshold_rad) const;
 
     void pruneGraspCandidatesIK(
@@ -372,8 +406,8 @@ private:
         int& id) const;
     ///@}
 
-    void goal_callback();
-    void preempt_callback();
+    void goalCallback();
+    void preemptCallback();
 
     uint8_t execution_status_to_feedback_status(
         RepositionBaseExecutionStatus::Status status);
