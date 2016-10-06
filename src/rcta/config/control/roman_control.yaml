@@ -22,7 +22,7 @@ torso_joint1_controller:
     pid: { p: 500.0, i: 0.0, d: 1.0 }
 
 # left limb
-left_limb_joint_trajectory_controller:
+left_limb:
     type: effort_controllers/JointTrajectoryController
     joints:
         - limb_left_joint1
@@ -42,7 +42,7 @@ left_limb_joint_trajectory_controller:
         limb_left_joint7: { p: 500.0, i: 0.0, d: 1.0 }
 
 # right limb
-right_limb_joint_trajectory_controller:
+right_limb:
     type: effort_controllers/JointTrajectoryController
     joints:
         - limb_right_joint1

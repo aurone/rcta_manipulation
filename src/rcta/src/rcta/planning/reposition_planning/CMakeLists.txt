@@ -16,12 +16,14 @@ target_link_libraries(
     ${urdf_parser_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
+    ${sbpl_arm_planner_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${SBPL_LIBRARIES}
+    gascan_grasp_planner
     msg_utils
     hdt_robot_model
     robotiq_common)
 
 add_dependencies(
     reposition_planner_node
-    ${PROJECT_NAME}_generate_messages_cpp)
+    ${PROJECT_NAME}_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
