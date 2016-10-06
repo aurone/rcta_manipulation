@@ -12,9 +12,10 @@
     <build_depend>cmake_modules</build_depend>
     <build_depend>message_generation</build_depend>
 
+    <exec_depend>gazebo_ros</exec_depend>
+    <exec_depend>laser_filters</exec_depend>
     <exec_depend>message_runtime</exec_depend>
     <exec_depend>xacro</exec_depend>
-    <exec_depend>gazebo_ros</exec_depend>
 
     <depend>actionlib</depend>
     <depend>actionlib_msgs</depend>
