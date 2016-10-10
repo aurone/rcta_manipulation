@@ -4,7 +4,7 @@ screen -t core
 stuff "roscore^M"
 
 screen -t rviz
-stuff "rosrun rviz rviz"
+stuff "rosrun rviz rviz -d $ROS_WORKSPACE/config/rcta.rviz"
 
 screen -t sim
 stuff "roslaunch rcta quantico_simulation.launch"
@@ -12,7 +12,7 @@ stuff "roslaunch rcta quantico_simulation.launch"
 screen -t gaze
 stuff "rosrun gazebo_ros gzclient"
 
-screen -t robot
+screen -t ctrl
 stuff "roslaunch rcta roman_control.launch live:=false --screen"
 
 screen -t pose
