@@ -2,6 +2,7 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
     <xacro:include filename="$(find roman_model)/gazebo/robosimian_r_arm.gazebo.xacro"/>
     <xacro:include filename="$(find roman_model)/control/robosimian_r_arm.transmission.xacro"/>
+    <xacro:include filename="$(find robotiq_s_model_visualization)/cfg/s-model_articulated_macro.xacro"/>
 
     <xacro:macro name="robosimian_r_arm" params="name parent *origin namespace">
         <link name="limb_right_link0">
@@ -190,18 +191,18 @@
                 <inertia ixx="0.003190" ixy="0.000303" ixz="-0.000796" iyy="0.007459" iyz="-0.000709" izz="0.007727"/>
             </inertial>
             <visual>
-                <origin xyz="0.087500 0 0" rpy="0 3.141593 -1.570796"/>
+                <origin xyz="0.03016 -0.004 0" rpy="0 1.57080 0"/>
                 <geometry>
-                    <box size="0.13 0.13 0.11"/>
+                    <cylinder radius="0.05285" length="0.06032"/>
                 </geometry>
                 <material name="grey">
                     <color rgba="0.8 0.8 0.8 1"/>
                 </material>
             </visual>
             <collision>
-                <origin rpy="3.1415 -1.5708 0" xyz="0.0875 0 0"/>
+                <origin xyz="0.03016 -0.004 0" rpy="0 1.57080 0"/>
                 <geometry>
-                    <box size="0.13 0.13 0.11"/>
+                    <cylinder radius="0.05285" length="0.06032"/>
                 </geometry>
             </collision>
         </link>
@@ -276,6 +277,15 @@
             <child link="limb_right_link7"/>
             <limit effort="1000.0" lower="-6.283185" upper="6.283185" velocity="0.5"/>
             <dynamics damping="1.0" friction="10"/>
+        </joint>
+
+        <xacro:s-model_articulated prefix="limb_right_"/>
+
+        <joint name="limb_right_palm_joint" type="fixed">
+            <origin xyz="0.104775 -0.004 0" rpy="3.1415 0 1.57080"/>
+            <axis xyz="0 0 1"/>
+            <parent link="limb_right_link7"/>
+            <child link="limb_right_palm"/>
         </joint>
 
         <xacro:robosimian_r_arm_gazebo name="${name}" namespace="${namespace}"/>
