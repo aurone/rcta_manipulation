@@ -55,7 +55,10 @@ private:
     double m_rot_tolerance;
     double m_joint_tolerance;
 
+    // Goal shared between plan/execute requests so that parameters inherited
+    // from config don't have to be set every time.
     moveit_msgs::MoveGroupGoal m_goal;
+
     moveit_msgs::MoveGroupResult m_result;
 
     ros::AsyncSpinner m_spinner;

@@ -147,20 +147,21 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
         rcta::MoveArmResult result;
         result.success = false;
         m_move_arm_server->setAborted(result, "Unrecognized goal type");
+        return;
     }
 
-    if (success) {
-        rcta::MoveArmResult result;
-        result.success = true;
-        result.trajectory = result_traj;
-        m_move_arm_server->setSucceeded(result);
-    } else {
+    if (!success) {
         rcta::MoveArmResult result;
         result.success = false;
         result.trajectory;
         m_move_arm_server->setAborted(result, "Failed to plan path");
         return;
     }
+
+    rcta::MoveArmResult result;
+    result.success = true;
+    result.trajectory = result_traj;
+    m_move_arm_server->setSucceeded(result);
 }
 
 /// \brief Send a move group request with goal pose constraints
@@ -174,7 +175,7 @@ bool MoveArmNode::sendMoveGroupPoseGoal(
     const rcta::MoveArmGoal& goal)
 {
     if (!m_move_group_client->isServerConnected()) {
-        ROS_ERROR("server is not connected");
+        ROS_ERROR("Server is not connected");
         return false;
     }
 
@@ -234,11 +235,48 @@ bool MoveArmNode::sendMoveGroupPoseGoal(
     return true;
 }
 
-bool sendMoveGroupConfigGoal(
+bool MoveArmNode::sendMoveGroupConfigGoal(
     const moveit_msgs::PlanningOptions& ops,
     const rcta::MoveArmGoal& goal)
 {
+    if (!m_move_group_client->isServerConnected()) {
+        ROS_ERROR("Server is not connected");
+        return false;
+    }
 
+    moveit_msgs::MotionPlanRequest& req = m_goal.request;
+    req.start_state = goal.start_state;
+    req.goal_constraints.clear();
+
+    moveit_msgs::Constraints goal_constraints;
+    goal_constraints.name = "goal_constraints";
+
+    for (size_t jidx = 0; jidx < goal.goal_joint_state.name.size(); ++jidx) {
+        const std::string& joint_name = goal.goal_joint_state.name[jidx];
+        double joint_pos = goal.goal_joint_state.position[jidx];
+
+        moveit_msgs::JointConstraint joint_constraint;
+        joint_constraint.joint_name = joint_name;
+        joint_constraint.position = joint_pos;
+        joint_constraint.tolerance_above = m_joint_tolerance;
+        joint_constraint.tolerance_below = m_joint_tolerance;
+        joint_constraint.weight = 1.0;
+        goal_constraints.joint_constraints.push_back(joint_constraint);
+    }
+
+    req.goal_constraints.push_back(goal_constraints);
+
+    m_goal.planning_options = ops;
+
+    auto result_callback = boost::bind(
+            &MoveArmNode::moveGroupResultCallback, this, _1, _2);
+    m_move_group_client->sendGoal(m_goal, result_callback);
+
+    if (!m_move_group_client->waitForResult()) {
+        return false;
+    }
+
+    return true;
 }
 
 void MoveArmNode::moveGroupResultCallback(
