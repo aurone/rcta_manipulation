@@ -12,6 +12,7 @@
 #include <moveit_msgs/Constraints.h>
 #include <moveit_msgs/MoveGroupAction.h>
 #include <moveit_msgs/RobotState.h>
+#include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
 #include <trajectory_msgs/JointTrajectory.h>
 
@@ -40,6 +41,8 @@ private:
     ros::NodeHandle m_nh;
     ros::NodeHandle m_ph;
 
+    ros::Subscriber m_octomap_sub;
+
     typedef actionlib::SimpleActionServer<rcta::MoveArmAction> MoveArmActionServer;
     std::string m_server_name;
     std::unique_ptr<MoveArmActionServer> m_move_arm_server;
@@ -57,9 +60,15 @@ private:
 
     ros::AsyncSpinner m_spinner;
 
+    octomap_msgs::Octomap::ConstPtr m_octomap;
+
     void moveArm(const rcta::MoveArmGoal::ConstPtr& goal);
 
     bool sendMoveGroupPoseGoal(
+        const moveit_msgs::PlanningOptions& ops,
+        const rcta::MoveArmGoal& goal);
+
+    bool sendMoveGroupConfigGoal(
         const moveit_msgs::PlanningOptions& ops,
         const rcta::MoveArmGoal& goal);
 
@@ -82,6 +91,8 @@ private:
     void moveGroupResultCallback(
         const actionlib::SimpleClientGoalState& state,
         const moveit_msgs::MoveGroupResult::ConstPtr& result);
+
+    void octomapCallback(const octomap_msgs::Octomap::ConstPtr& msg);
 };
 
 } // namespace rcta

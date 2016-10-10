@@ -9,10 +9,14 @@ namespace rcta {
 MoveArmNode::MoveArmNode() :
     m_nh(),
     m_ph("~"),
+    m_octomap_sub(),
     m_server_name("move_arm"),
     m_move_arm_server(),
-    m_spinner(2)
+    m_spinner(2),
+    m_octomap()
 {
+    m_octomap_sub = m_nh.subscribe<octomap_msgs::Octomap>(
+            "octomap", 1, &MoveArmNode::octomapCallback, this);
 }
 
 bool MoveArmNode::init()
@@ -230,6 +234,13 @@ bool MoveArmNode::sendMoveGroupPoseGoal(
     return true;
 }
 
+bool sendMoveGroupConfigGoal(
+    const moveit_msgs::PlanningOptions& ops,
+    const rcta::MoveArmGoal& goal)
+{
+
+}
+
 void MoveArmNode::moveGroupResultCallback(
     const actionlib::SimpleClientGoalState& state,
     const moveit_msgs::MoveGroupResult::ConstPtr& result)
@@ -273,7 +284,29 @@ bool MoveArmNode::planToGoalJoints(
     const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    ROS_INFO("plan to goal joints");
+    assert(!goal.execute_path && goal.type == rcta::MoveArmGoal::EndEffectorGoal);
+
+    ROS_INFO("plan to goal pose");
+
+    moveit_msgs::PlanningOptions ops;
+    ops.planning_scene_diff.robot_state = goal.start_state;
+    ops.look_around = false;
+    ops.look_around_attempts = 0;
+    ops.max_safe_execution_cost = 1.0;
+    ops.plan_only = true;
+    ops.replan = false;
+    ops.replan_attempts = 0;
+    ops.replan_delay = 0.0;
+    if (!sendMoveGroupConfigGoal(ops, goal)) {
+        return false;
+    }
+
+    if (m_result.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
+        return false;
+    } else {
+        // TODO: slerp trajectory
+        return true;
+    }
     return false;
 }
 
@@ -311,6 +344,11 @@ bool MoveArmNode::moveToGoalJoints(
 {
     ROS_INFO("move to goal joints");
     return false;
+}
+
+void MoveArmNode::octomapCallback(const octomap_msgs::Octomap::ConstPtr& msg)
+{
+    m_octomap = msg;
 }
 
 } //namespace rcta
