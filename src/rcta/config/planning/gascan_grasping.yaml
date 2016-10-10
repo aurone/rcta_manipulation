@@ -16,13 +16,25 @@ grasping:
 
   wrist_to_tool_transform:
     position:
-      x: 0.12 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
+      x: 0.192 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
       y: 0.0
       z: 0.0
     orientation:
-      w: 1.0
-      x: 0.0
+      w: -0.707
+      x: 0.707
       y: 0.0
       z: 0.0
+
+# parameters for robotiq c-model gripper
+#  wrist_to_tool_transform:
+#    position:
+#      x: 0.12 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
+#      y: 0.0
+#      z: 0.0
+#    orientation:
+#      w: 1.0
+#      x: 0.0
+#      y: 0.0
+#      z: 0.0
 
   pregrasp_to_grasp_offset_m: 0.08
