@@ -67,14 +67,6 @@ private:
 
     void moveArm(const rcta::MoveArmGoal::ConstPtr& goal);
 
-    bool sendMoveGroupPoseGoal(
-        const moveit_msgs::PlanningOptions& ops,
-        const rcta::MoveArmGoal& goal);
-
-    bool sendMoveGroupConfigGoal(
-        const moveit_msgs::PlanningOptions& ops,
-        const rcta::MoveArmGoal& goal);
-
     bool planToGoalEE(
         const rcta::MoveArmGoal& goal,
         trajectory_msgs::JointTrajectory& traj);
@@ -90,6 +82,28 @@ private:
     bool moveToGoalJoints(
         const rcta::MoveArmGoal& goal,
         trajectory_msgs::JointTrajectory& traj);
+
+    // setup planning options for the current request, including slerping over
+    // the most recent octomap
+    void fillPlanOnlyOptions(
+        const rcta::MoveArmGoal& goal,
+        moveit_msgs::PlanningOptions& ops) const;
+
+    void fillPlanAndExecuteOptions(
+        const rcta::MoveArmGoal& goal,
+        moveit_msgs::PlanningOptions& ops) const;
+
+    void fillCommonOptions(
+        const rcta::MoveArmGoal& goal,
+        moveit_msgs::PlanningOptions& ops) const;
+
+    bool sendMoveGroupPoseGoal(
+        const moveit_msgs::PlanningOptions& ops,
+        const rcta::MoveArmGoal& goal);
+
+    bool sendMoveGroupConfigGoal(
+        const moveit_msgs::PlanningOptions& ops,
+        const rcta::MoveArmGoal& goal);
 
     void moveGroupResultCallback(
         const actionlib::SimpleClientGoalState& state,
