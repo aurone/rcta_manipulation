@@ -22,3 +22,8 @@
 - git:
     local-name: spellbook_ros
     uri: https://github.com/aurone/spellbook_ros.git
+- git:
+    local-name: robotiq
+    uri: https://github.com/ros-industrial/robotiq.git
+    version: indigo-devel
+
