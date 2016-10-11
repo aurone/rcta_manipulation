@@ -1,9 +1,0 @@
-<launch>
-    <node name="move_arm_node" pkg="hdt" type="move_arm_node" output="screen">
-        <rosparam command="load" file="$(find rcta)/config/hdt_arm_planner.yaml"/>
-        <rosparam command="load" file="$(find rcta)/config/hdt_collision_checking_with_gripper2.yaml"/>
-        <param name="action_set_filename" value="$(find rcta)/config/pr2.mprim"/>
-        <!-- <param name="object_filename" value="$(find sbpl_arm_planner_test)/env/tabletop_hdt.env"/> -->
-        <remap from="command" to="joint_path_command"/>
-    </node>
-</launch>
