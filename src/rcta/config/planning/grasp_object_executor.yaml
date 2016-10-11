@@ -1,15 +1,5 @@
-wrist_to_tool_transform:
-    position:
-        x: 0.12 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
-        y: 0.0
-        z: 0.0
-    orientation:
-        w: 1.0
-        x: 0.0
-        y: 0.0
-        z: 0.0
-
-pregrasp_to_grasp_offset_m: 0.08
+manipulator_group_name: right_arm
+mxa_grasp_candidates: 4
 
 stow_positions:
 #    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, 77.0, 1.00, -24.00 ] }
@@ -32,8 +22,6 @@ stow_positions:
         arm_5_wrist_twist: -85.00
         arm_6_wrist_lift: 2.00
         arm_7_gripper_lift: 25.00
-
-max_grasp_candidates: 4 # the number of grasps to attempt to plan to
 
 use_extrusion_octomap: true
 
