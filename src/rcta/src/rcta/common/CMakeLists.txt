@@ -5,5 +5,4 @@ add_subdirectory(hdt_kinematics)
 add_subdirectory(matplotpp)
 add_subdirectory(repeatability)
 add_subdirectory(world_model)
-#add_subdirectory(hdt_viz)
 
