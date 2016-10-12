@@ -3,6 +3,7 @@
     <xacro:include filename="$(find roman_model)/gazebo/robosimian_r_arm.gazebo.xacro"/>
     <xacro:include filename="$(find roman_model)/control/robosimian_r_arm.transmission.xacro"/>
     <xacro:include filename="$(find robotiq_s_model_visualization)/cfg/s-model_articulated_macro.xacro"/>
+    <xacro:include filename="$(find roman_model)/control/s-model_articulated.transmission.xacro"/>
 
     <xacro:macro name="robosimian_r_arm" params="name parent *origin namespace">
         <link name="limb_right_link0">
@@ -280,6 +281,7 @@
         </joint>
 
         <xacro:s-model_articulated prefix="limb_right_"/>
+        <xacro:s-model_articulated_transmission prefix="limb_right_"/>
 
         <joint name="limb_right_palm_joint" type="fixed">
             <origin xyz="0.104775 -0.004 0" rpy="3.1415 0 1.57080"/>

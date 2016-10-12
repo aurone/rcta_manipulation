@@ -3,6 +3,7 @@
     <xacro:include filename="$(find roman_model)/gazebo/robosimian_l_arm.gazebo.xacro"/>
     <xacro:include filename="$(find roman_model)/control/robosimian_l_arm.transmission.xacro"/>
     <xacro:include filename="$(find robotiq_s_model_visualization)/cfg/s-model_articulated_macro.xacro"/>
+    <xacro:include filename="$(find roman_model)/control/s-model_articulated.transmission.xacro"/>
 
     <xacro:macro name="robosimian_l_arm" params="name parent *origin namespace">
         <link name="limb_left_link0">
@@ -280,6 +281,7 @@
         </joint>
 
         <xacro:s-model_articulated prefix="limb_left_"/>
+        <xacro:s-model_articulated_transmission prefix="limb_left_"/>
 
         <!-- attach the robotiq gripper to the arm -->
         <joint name="limb_left_palm_joint" type="fixed">
