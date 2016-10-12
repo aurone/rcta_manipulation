@@ -19,7 +19,7 @@ track_right_joint_controller:
 torso_joint1_controller:
     type: effort_controllers/JointPositionController
     joint: torso_joint1
-    pid: { p: 500.0, i: 0.0, d: 1.0 }
+    pid: { p: 1600.0, d: 0.0, i: 0.0, i_clamp: 1.0 }
 
 # left limb
 left_limb:
@@ -33,13 +33,13 @@ left_limb:
         - limb_left_joint6
         - limb_left_joint7
     gains:
-        limb_left_joint1: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_left_joint2: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_left_joint3: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_left_joint4: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_left_joint5: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_left_joint6: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_left_joint7: { p: 500.0, i: 0.0, d: 1.0 }
+        limb_left_joint1: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint2: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint3: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint4: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint5: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint6: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint7: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
 
 # right limb
 right_limb:
@@ -53,10 +53,12 @@ right_limb:
         - limb_right_joint6
         - limb_right_joint7
     gains:
-        limb_right_joint1: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_right_joint2: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_right_joint3: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_right_joint4: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_right_joint5: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_right_joint6: { p: 500.0, i: 0.0, d: 1.0 }
-        limb_right_joint7: { p: 500.0, i: 0.0, d: 1.0 }
+        limb_right_joint1: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+        limb_right_joint2: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+        limb_right_joint3: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+        limb_right_joint4: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+        limb_right_joint5: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+        limb_right_joint6: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+        limb_right_joint7: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+    constraints:
+        goal_time: 10.0
