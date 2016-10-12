@@ -1,19 +1,19 @@
 manipulator_group_name: right_arm
-mxa_grasp_candidates: 4
+max_grasp_candidates: 4
 
 stow_positions:
 #    - { name: "one", joint_vector_degs: [ 92.00, 84.00, -102.00, 59.00, 77.0, 1.00, -24.00 ] }
 #    - { name: "two", joint_vector_degs: [ -78.00, -42.00, 11.00, 29.00, 9.00, 10.00, -29.00 ] }
-    - name: "one",
+    - name: "one"
       joint_vector_degs:
-        arm_1_shoulder_twist: 92.00,
+        arm_1_shoulder_twist: 92.00
         arm_2_shoulder_lift: 84.00
         arm_3_elbow_twist: -102.00
         arm_4_elbow_lift: 59.00
         arm_5_wrist_twist: -13.0
         arm_6_wrist_lift: 1.00
         arm_7_gripper_lift: 24.00
-    - name: "two",
+    - name: "two"
       joint_vector_degs:
         arm_1_shoulder_twist: -73.00
         arm_2_shoulder_lift: -43.00
@@ -23,8 +23,14 @@ stow_positions:
         arm_6_wrist_lift: 2.00
         arm_7_gripper_lift: 25.00
 
-use_extrusion_octomap: true
+# whether to extrude the current costmap and use as the octomap for queries to
+# the arm executor
+use_extrusion_octomap: false
 
+# circumscribed radius of the gascan to filter out of the costmap and to use
+# for detection of the gascan
 object_filter_radius_m: 0.3
 
+# the confidence (between 0 and 1) at which and above to consider the gascan
+# picked up
 gas_can_detection_threshold: 0.8
