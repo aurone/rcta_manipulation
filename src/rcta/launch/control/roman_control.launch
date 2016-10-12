@@ -50,7 +50,7 @@
                         -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
 
             <!-- spawn simulated controllers -->
-            <rosparam command="load" file="$(find rcta)/config/control/roman_control.yaml"/>
+            <rosparam command="load" file="$(find rcta)/config/robots/roman/control/roman_control.yaml"/>
             <node name="controller_spawner" pkg="controller_manager" type="spawner"
                     args="joint_state_controller right_limb left_limb torso_joint1_controller"/>
 
