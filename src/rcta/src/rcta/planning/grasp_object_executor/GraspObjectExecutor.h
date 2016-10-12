@@ -40,10 +40,10 @@ enum Status
     FAULT,
     GENERATING_GRASPS,
     MOVING_ARM_TO_PREGRASP,
+    MOVING_ARM_TO_GRASP,
     OPENING_GRIPPER,
     EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP,
     EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP,
-    MOVING_ARM_TO_GRASP,
     GRASPING_OBJECT,
     RETRACTING_GRIPPER,
     MOVING_ARM_TO_STOW,
@@ -209,20 +209,21 @@ private:
     /// \name Shared State
     ///@{
 
-    // shared(GenerateGrasps, PlanArmMotionToPregrasp)
+    // shared(GenerateGrasps, MoveArmToPregrasp)
     // -> to plan to a number of different grasps, ranked by graspability
     std::vector<rcta::GraspCandidate> reachable_grasp_candidates_;
 
-    // shared(PlanArmMotionToPregrasp, ExecuteVisualServoMotionToPregrasp)
+    // shared(MoveArmToPregrasp, ExecuteVisualServoMotionToPregrasp)
+    // shared(MoveArmToPregrasp, MoveArmToGrasp)
     // -> to enforce visual servo to the same pose
     rcta::MoveArmGoal last_move_arm_pregrasp_goal_;
 
-    // shared(PlanArmMotionToPregrasp, PlanArmMotionToStow)
+    // shared(MoveArmToPregrasp, MoveArmToStow)
     // -> to know how to attach the object to the arm
     rcta::GraspCandidate last_successful_grasp_;
 
     // shared(ExecuteVisualServoMotionToPregrasp, ExecuteVisualServoMotionToGrasp)
-    // -> propagate wrist goal originating from PlanArmMotionToPregrasp
+    // -> propagate wrist goal originating from MoveArmToPregrasp
     rcta::ViservoCommandGoal last_viservo_pregrasp_goal_;
 
     ///@}
@@ -261,6 +262,10 @@ private:
     void onMovingArmToPregraspEnter(GraspObjectExecutionStatus::Status from);
     GraspObjectExecutionStatus::Status onMovingArmToPregrasp();
     void onMovingArmToPregraspExit(GraspObjectExecutionStatus::Status to);
+
+    void onMovingArmToGraspEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onMovingArmToGrasp();
+    void onMovingArmToGraspExit(GraspObjectExecutionStatus::Status to);
 
     void onOpeningGripperEnter(GraspObjectExecutionStatus::Status from);
     GraspObjectExecutionStatus::Status onOpeningGripper();
