@@ -135,9 +135,9 @@ bool RepositionBaseExecutor::initialize()
     // RepositionBaseExecutor-specific stuff //
     ///////////////////////////////////////////
 
-    pgrasp_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_map", 1);
-    pobs_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
-    pgrasp_exhaustive_map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
+    pgrasp_map_pub_ = ph_.advertise<nav_msgs::OccupancyGrid>("pgrasp_map", 1);
+    pobs_map_pub_ = ph_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
+    pgrasp_exhaustive_map_pub_ = ph_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
 
     move_arm_command_client_.reset(new MoveArmActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
