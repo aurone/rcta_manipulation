@@ -1,4 +1,4 @@
-source ~/.screenrc
+source screenrc.common
 
 screen -t core
 stuff "roscore^M"

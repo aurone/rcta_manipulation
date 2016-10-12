@@ -1,0 +1,9 @@
+#change the hardstatus settings to give an window list at the bottom of the
+#screen, with the time and date and with the current window highlighted
+hardstatus alwayslastline 
+hardstatus string '%{= kW}%-Lw%{= KG}%50>%n%f* %t%{= kW}%+Lw%< %{= kG}%-=%D %d %M %Y %c:%s%{-}'
+startup_message off
+escape ^Xx
+defscrollback 4096
+vbell off
+altscreen on
