@@ -55,17 +55,17 @@ std::string to_string(Status status);
 
 } // namespace GraspObjectExecutionStatus
 
+struct StowPosition
+{
+    std::string name;
+    std::map<std::string, double> joint_positions;
+};
+
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position);
+
 class GraspObjectExecutor
 {
-    struct StowPosition
-    {
-        std::string name;
-        std::map<std::string, double> joint_positions;
-    };
-
 public:
-
-    friend bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition&);
 
     GraspObjectExecutor();
     ~GraspObjectExecutor();

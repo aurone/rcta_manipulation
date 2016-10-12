@@ -58,23 +58,35 @@ std::string to_string(Status status)
 
 } // namespace GraspObjectExecutionStatus
 
-bool extract_xml_value(
-    XmlRpc::XmlRpcValue& value,
-    GraspObjectExecutor::StowPosition& stow_position)
+bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position)
 {
-    if (!value.hasMember("name") || !value.hasMember("joint_vector_degs")) {
+    ROS_INFO("Extract stow position");
+
+    if (value.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
+        ROS_ERROR("Stow position config must be a struct");
         return false;
     }
 
-    GraspObjectExecutor::StowPosition tmp;
-    bool success =
-            msg_utils::extract_xml_value(value["name"], tmp.name) &&
-            msg_utils::extract_xml_value(value["joint_vector_degs"], tmp.joint_positions);
-
-    if (success) {
-        stow_position = tmp;
+    if (!value.hasMember("name") || !value.hasMember("joint_vector_degs")) {
+        ROS_ERROR("Stow position config must have members 'name' and 'joint_vector_degs'");
+        return false;
     }
-    return success;
+
+    std::string name;
+    if (!msg_utils::extract_xml_value(value["name"], name)) {
+        ROS_ERROR("Failed to extract 'name' field");
+        return false;
+    }
+
+    std::map<std::string, double> joint_positions;
+    if (!msg_utils::extract_xml_value(value["joint_vector_degs"], joint_positions)) {
+        ROS_ERROR("Failed to extract 'joint_vector_degs' field");
+        return false;
+    }
+
+    stow_position.name = std::move(name);
+    stow_position.joint_positions = std::move(joint_positions);
+    return true;
 }
 
 GraspObjectExecutor::GraspObjectExecutor() :
@@ -227,7 +239,8 @@ bool GraspObjectExecutor::initialize()
     }
 
     // subscribers
-    costmap_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>("costmap", 1, &GraspObjectExecutor::occupancyGridCallback, this);
+    costmap_sub_ = nh_.subscribe<nav_msgs::OccupancyGrid>(
+            "map", 1, &GraspObjectExecutor::occupancyGridCallback, this);
 
     // publishers
     extrusion_octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
@@ -277,7 +290,7 @@ int GraspObjectExecutor::run()
     GraspObjectExecutionStatus::Status status = GraspObjectExecutionStatus::IDLE;
     GraspObjectExecutionStatus::Status next_status = GraspObjectExecutionStatus::IDLE;
 
-    ros::Rate loop_rate(1.0);
+    ros::Rate loop_rate(10.0);
     while (ros::ok()) {
         ros::spinOnce();
 
@@ -1535,9 +1548,11 @@ void GraspObjectExecutor::clear_circle_from_grid(
                 (tr - circle_center).norm() <= circle_radius ||
                 (tl - circle_center).norm() <= circle_radius)
             {
-                grid_at(grid, gp(0), gp(1)) = 0;
-                ++num_cleared;
-                ROS_INFO("Clearing cell (%d, %d)", gp(0), gp(1));
+                if (grid_at(grid, gp(0), gp(1)) != 0) {
+                    grid_at(grid, gp(0), gp(1)) = 0;
+                    ++num_cleared;
+                    ROS_INFO("Clearing cell (%d, %d)", gp(0), gp(1));
+                }
             }
         }
     }

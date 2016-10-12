@@ -290,7 +290,7 @@ void GraspingCommandPanel::send_grasp_object_command()
     grasp_object_goal.id = grasp_object_goal_id++;
     grasp_object_goal.retry_count = 0;
 
-    // robot -> object = robot -> marker * marker -> object
+    // robot -> object = robot -> world * world -> object
     Eigen::Affine3d robot_to_object = T_world_robot_.inverse() * T_world_object_;
     grasp_object_goal.gas_can_in_base_link.header.frame_id = robot_model_->getModelFrame();
     tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
