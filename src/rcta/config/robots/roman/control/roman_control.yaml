@@ -19,7 +19,7 @@ track_right_joint_controller:
 torso_joint1_controller:
     type: effort_controllers/JointPositionController
     joint: torso_joint1
-    pid: { p: 1600.0, d: 0.0, i: 0.0, i_clamp: 1.0 }
+    pid: { p: 2000.0, d: 0.0, i: 0.0, i_clamp: 1.0 }
 
 # left limb
 left_limb:
@@ -33,13 +33,13 @@ left_limb:
         - limb_left_joint6
         - limb_left_joint7
     gains:
-        limb_left_joint1: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint2: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint3: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint4: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint5: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint6: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint7: { p: 1600.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint1: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint2: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint3: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint4: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint5: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint6: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+        limb_left_joint7: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
 
 # right limb
 right_limb:
@@ -62,3 +62,57 @@ right_limb:
         limb_right_joint7: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
     constraints:
         goal_time: 10.0
+
+right_gripper:
+    type: effort_controllers/JointTrajectoryController
+    joints:
+        - limb_right_finger_1_joint_1
+        - limb_right_finger_1_joint_2
+        - limb_right_finger_1_joint_3
+        - limb_right_finger_2_joint_1
+        - limb_right_finger_2_joint_2
+        - limb_right_finger_2_joint_3
+        - limb_right_finger_middle_joint_1
+        - limb_right_finger_middle_joint_2
+        - limb_right_finger_middle_joint_3
+        - limb_right_palm_finger_1_joint
+        - limb_right_palm_finger_2_joint
+    gains:
+        limb_right_finger_1_joint_1: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_1_joint_2: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_1_joint_3: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_2_joint_1: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_2_joint_2: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_2_joint_3: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_middle_joint_1: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_middle_joint_2: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_finger_middle_joint_3: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_palm_finger_1_joint: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_right_palm_finger_2_joint: { p: 100.0, d: 0.0, i: 0.0 }
+
+left_gripper:
+    type: effort_controllers/JointTrajectoryController
+    joints:
+        - limb_left_finger_1_joint_1
+        - limb_left_finger_1_joint_2
+        - limb_left_finger_1_joint_3
+        - limb_left_finger_2_joint_1
+        - limb_left_finger_2_joint_2
+        - limb_left_finger_2_joint_3
+        - limb_left_finger_middle_joint_1
+        - limb_left_finger_middle_joint_2
+        - limb_left_finger_middle_joint_3
+        - limb_left_palm_finger_1_joint
+        - limb_left_palm_finger_2_joint
+    gains:
+        limb_left_finger_1_joint_1: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_1_joint_2: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_1_joint_3: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_2_joint_1: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_2_joint_2: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_2_joint_3: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_middle_joint_1: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_middle_joint_2: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_finger_middle_joint_3: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_palm_finger_1_joint: { p: 100.0, d: 0.0, i: 0.0 }
+        limb_left_palm_finger_2_joint: { p: 100.0, d: 0.0, i: 0.0 }
