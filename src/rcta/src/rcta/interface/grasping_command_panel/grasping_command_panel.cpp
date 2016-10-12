@@ -90,6 +90,7 @@ void GraspingCommandPanel::load(const rviz::Config& config)
     float base_yaw;
     float object_x;
     float object_y;
+    float object_z;
     float object_yaw;
     config.mapGetString("global_frame", &global_frame);
     config.mapGetString("robot_description", &robot_description);
@@ -98,6 +99,7 @@ void GraspingCommandPanel::load(const rviz::Config& config)
     config.mapGetFloat("base_yaw", &base_yaw);
     config.mapGetFloat("object_x", &object_x);
     config.mapGetFloat("object_y", &object_y);
+    config.mapGetFloat("object_z", &object_z);
     config.mapGetFloat("object_yaw", &object_yaw);
 
     ROS_INFO("Robot Description: %s", robot_description.toStdString().c_str());
@@ -132,7 +134,7 @@ void GraspingCommandPanel::load(const rviz::Config& config)
             Eigen::AngleAxisd(base_yaw, Eigen::Vector3d::UnitZ());
 
     T_world_object_ =
-            Eigen::Translation3d(object_x, object_y, 0.0) *
+            Eigen::Translation3d(object_x, object_y, object_z) *
             Eigen::AngleAxisd(object_yaw, Eigen::Vector3d::UnitZ());
 
     update_object_marker_pose();
@@ -158,6 +160,7 @@ void GraspingCommandPanel::save(rviz::Config config) const
 
     config.mapSetValue("object_x", T_world_object_.translation()(0, 0));
     config.mapSetValue("object_y", T_world_object_.translation()(1, 0));
+    config.mapSetValue("object_z", T_world_object_.translation()(2, 0));
     msg_utils::get_euler_ypr(T_world_object_, yaw, pitch, roll);
     config.mapSetValue("object_yaw", yaw);
 }
