@@ -571,7 +571,7 @@ void GraspingCommandPanel::publish_phantom_robot_visualizations()
     ros::Duration d(0);
 
     visualization_msgs::MarkerArray marker_array;
-    gatherRobotMarkers(*robot_state_, link_names, color, ns, d, marker_array);
+    robot_state_->getRobotMarkers(marker_array, link_names, color, ns, d);
 
     // transform all markers from the robot frame into the global frame
     for (visualization_msgs::Marker& marker : marker_array.markers) {
@@ -602,7 +602,7 @@ void GraspingCommandPanel::publish_base_pose_candidate_visualization(
     ros::Duration d(0);
 
     visualization_msgs::MarkerArray marker_array;
-    gatherRobotMarkers(*robot_state_, link_names, color, ns, d, marker_array);
+    robot_state_->getRobotMarkers(marker_array, link_names, color, ns, d);
 
     Eigen::Affine3d T_world_candidate;
     tf::poseMsgToEigen(candidate_pose.pose, T_world_candidate);
@@ -878,93 +878,6 @@ void GraspingCommandPanel::teleport_andalite_command_result_cb(
     }
 
     pending_teleport_andalite_command_ = false;
-}
-
-bool GraspingCommandPanel::gatherRobotMarkers(
-    robot_state::RobotState& robot_state,
-    const std::vector<std::string>& link_names,
-    const std_msgs::ColorRGBA& color,
-    const std::string& ns,
-    const ros::Duration& d,
-    visualization_msgs::MarkerArray& markers,
-    bool include_attached)
-{
-    ////////////////////////////////////////////////////////////////////////////////
-    // Method derived from moveit_ros_planning/robot_state.cpp on groovy-devel
-    // branch version a5f7c1c728
-    ////////////////////////////////////////////////////////////////////////////////
-
-    std::size_t num_orig_markers = markers.markers.size();
-
-    ros::Time tm = ros::Time::now();
-    for (std::size_t i = 0; i < link_names.size(); ++i) {
-        visualization_msgs::Marker mark;
-        const robot_state::LinkModel* lm = robot_state_->getLinkModel(link_names[i]);
-        if (!lm) {
-            continue;
-        }
-
-        // add markers for attached objects
-        if (include_attached) {
-            std::vector<const robot_state::AttachedBody*> attached_bodies;
-            robot_state_->getAttachedBodies(attached_bodies, lm);
-            for (std::size_t j = 0; j < attached_bodies.size(); ++j) {
-                if (attached_bodies[j]->getShapes().size() > 0) {
-                    visualization_msgs::Marker att_mark;
-                    att_mark.header.frame_id = robot_state.getRobotModel()->getModelFrame();
-                    att_mark.header.stamp = tm;
-                    shapes::constructMarkerFromShape(attached_bodies[j]->getShapes()[0].get(), att_mark);
-                    tf::poseEigenToMsg(attached_bodies[j]->getGlobalCollisionBodyTransforms()[0], att_mark.pose);
-                    markers.markers.push_back(att_mark);
-                }
-            }
-        }
-
-        if (!lm || lm->getShapes().empty()) {
-            continue;
-        }
-
-        mark.header.frame_id = robot_state.getRobotModel()->getModelFrame();
-        mark.header.stamp = tm;
-        // TODO: other collision bodies
-        tf::poseEigenToMsg(robot_state_->getCollisionBodyTransform(link_names[i], 0), mark.pose);
-
-        // we prefer using the visual mesh, if a mesh is available
-        const std::string& mesh_resource = lm->getVisualMeshFilename();
-        if (mesh_resource.empty()) {
-            if (!shapes::constructMarkerFromShape(lm->getShapes().front().get(), mark)) {
-                continue;
-            }
-
-            // if the object is invisible (0 volume) we skip it
-            if (fabs(mark.scale.x * mark.scale.y * mark.scale.z) < std::numeric_limits<float>::epsilon()) {
-                continue;
-            }
-        }
-        else {
-            tf::poseEigenToMsg(robot_state_->getGlobalLinkTransform(link_names[i]), mark.pose);
-
-            mark.type = mark.MESH_RESOURCE;
-            mark.mesh_use_embedded_materials = false;
-            mark.mesh_resource = mesh_resource;
-            const Eigen::Vector3d &mesh_scale = lm->getVisualMeshScale();
-
-            mark.scale.x = mesh_scale[0];
-            mark.scale.y = mesh_scale[1];
-            mark.scale.z = mesh_scale[2];
-        }
-        markers.markers.push_back(mark);
-    }
-
-    for (std::size_t i = num_orig_markers; i < markers.markers.size(); ++i) {
-        visualization_msgs::Marker& m = markers.markers[i];
-        m.color = color;
-        m.ns = ns;
-        m.lifetime = d;
-        m.id = i;
-    }
-
-    return true;
 }
 
 void GraspingCommandPanel::update_base_pose_spinboxes()

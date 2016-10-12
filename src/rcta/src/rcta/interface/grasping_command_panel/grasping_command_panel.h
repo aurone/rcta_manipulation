@@ -178,15 +178,6 @@ private:
             const actionlib::SimpleClientGoalState& state,
             const rcta::TeleportAndaliteCommandResult::ConstPtr& result);
 
-    bool gatherRobotMarkers(
-            robot_state::RobotState& robot_state,
-            const std::vector<std::string>& link_names,
-            const std_msgs::ColorRGBA& color,
-            const std::string& ns,
-            const ros::Duration& d,
-            visualization_msgs::MarkerArray& markers,
-            bool include_attached = false);
-
     void update_object_marker_pose();
     void update_base_pose_spinboxes();
     void update_gui();
