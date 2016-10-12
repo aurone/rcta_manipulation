@@ -115,4 +115,46 @@
     <disable_collisions link1="limb_right_link5" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link6" link2="limb_right_link7" reason="Adjacent" />
     <disable_collisions link1="talon" link2="torso_link0" reason="Adjacent" />
+
+    <disable_collisions link1="limb_right_link7" link2="limb_right_palm" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_finger_1_link_0" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_finger_1_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_finger_2_link_0" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_finger_2_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_finger_middle_link_0" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_finger_middle_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_right_palm" link2="limb_right_tool0" reason="Adjacent" />
+
+    <disable_collisions link1="limb_right_finger_1_link_0" link2="limb_right_finger_1_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_right_finger_1_link_1" link2="limb_right_finger_1_link_2" reason="Adjacent" />
+    <disable_collisions link1="limb_right_finger_1_link_2" link2="limb_right_finger_1_link_3" reason="Adjacent" />
+
+    <disable_collisions link1="limb_right_finger_2_link_0" link2="limb_right_finger_2_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_right_finger_2_link_1" link2="limb_right_finger_2_link_2" reason="Adjacent" />
+    <disable_collisions link1="limb_right_finger_2_link_2" link2="limb_right_finger_2_link_3" reason="Adjacent" />
+
+    <disable_collisions link1="limb_right_finger_middle_link_0" link2="limb_right_finger_middle_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_right_finger_middle_link_1" link2="limb_right_finger_middle_link_2" reason="Adjacent" />
+    <disable_collisions link1="limb_right_finger_middle_link_2" link2="limb_right_finger_middle_link_3" reason="Adjacent" />
+
+    <disable_collisions link1="limb_left_link7" link2="limb_left_palm" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_finger_1_link_0" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_finger_1_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_finger_2_link_0" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_finger_2_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_finger_middle_link_0" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_finger_middle_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_palm" link2="limb_left_tool0" reason="Adjacent" />
+
+    <disable_collisions link1="limb_left_finger_1_link_0" link2="limb_left_finger_1_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_finger_1_link_1" link2="limb_left_finger_1_link_2" reason="Adjacent" />
+    <disable_collisions link1="limb_left_finger_1_link_2" link2="limb_left_finger_1_link_3" reason="Adjacent" />
+
+    <disable_collisions link1="limb_left_finger_2_link_0" link2="limb_left_finger_2_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_finger_2_link_1" link2="limb_left_finger_2_link_2" reason="Adjacent" />
+    <disable_collisions link1="limb_left_finger_2_link_2" link2="limb_left_finger_2_link_3" reason="Adjacent" />
+
+    <disable_collisions link1="limb_left_finger_middle_link_0" link2="limb_left_finger_middle_link_1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_finger_middle_link_1" link2="limb_left_finger_middle_link_2" reason="Adjacent" />
+    <disable_collisions link1="limb_left_finger_middle_link_2" link2="limb_left_finger_middle_link_3" reason="Adjacent" />
 </robot>
