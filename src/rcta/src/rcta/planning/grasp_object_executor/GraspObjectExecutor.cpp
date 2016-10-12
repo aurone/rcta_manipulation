@@ -1281,6 +1281,10 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
             ROS_INFO("    Error Text: %s", move_arm_command_goal_state_.getText().c_str());
             ROS_INFO("    result.success = %s", move_arm_command_result_ ? (move_arm_command_result_->success ? "TRUE" : "FALSE") : "null");
         }
+
+        // allow to try next stow
+        sent_move_arm_goal_ = false;
+        pending_move_arm_command_ = false;
     }
 
     return GraspObjectExecutionStatus::MOVING_ARM_TO_STOW;
