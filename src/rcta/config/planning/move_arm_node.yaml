@@ -1,0 +1,17 @@
+allowed_planning_time: 10.0
+planner_id: arastar
+group_name: right_arm
+pos_tolerance: 0.05
+rot_tolerance: 5.0
+joint_tolerance: 5.0
+tip_link: limb_right_link7
+workspace_frame: base_footprint
+
+workspace_min:
+    x: -0.5
+    y: -1.5
+    z: 0.0
+workspace_max:
+    x: 1.5
+    y: 0.5
+    z: 1.9
