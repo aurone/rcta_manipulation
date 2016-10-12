@@ -1218,8 +1218,8 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
         // TODO: include the attached object here
 
         moveit_msgs::AttachedCollisionObject attached_object;// = move_arm_stow_goal.attached_object;
-        attached_object.link_name = "arm_7_gripper_lift_link";
-        attached_object.object.id = "gas_can";
+        attached_object.link_name = m_manip_group->getSolverInstance()->getTipFrames().front();
+        attached_object.object.id = "gascan";
         attached_object.object.primitives.resize(2);
         attached_object.object.primitive_poses.resize(2);
         attached_object.object.primitives[0].type = shape_msgs::SolidPrimitive::BOX;
