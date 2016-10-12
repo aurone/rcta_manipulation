@@ -21,7 +21,7 @@
     <rosparam param="world_collision_model">
         size_x: 20.0
         size_y: 20.0
-        size_z: 2.0
+        size_z: 2.1
         origin_x: -10.0
         origin_y: -10.0
         origin_z: -0.10
