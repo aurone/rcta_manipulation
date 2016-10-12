@@ -24,7 +24,7 @@
         size_z: 2.0
         origin_x: -10.0
         origin_y: -10.0
-        origin_z: 0.0
+        origin_z: -0.10
         res_m: 0.05
         max_distance_m: 0.8
         frame_id: map
