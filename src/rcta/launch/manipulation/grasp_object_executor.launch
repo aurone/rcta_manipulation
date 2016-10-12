@@ -1,9 +1,8 @@
 <launch>
-    <node name="grasp_object_executor" pkg="hdt" type="grasp_object_executor" output="screen">
+    <node name="grasp_object_executor" pkg="rcta" type="grasp_object_executor" output="screen">
         <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
-        <rosparam command="load" file="$(find rcta)/config/gascan_grasping.yaml"/>
-        <rosparam command="load" file="$(find rcta)/config/grasp_object_executor.yaml"/>
-        <remap from="costmap" to="fixed_costmap_sim"/>
+        <rosparam command="load" file="$(find rcta)/config/planning/gascan_grasping.yaml"/>
+        <rosparam command="load" file="$(find rcta)/config/planning/grasp_object_executor.yaml"/>
     </node>
 </launch>
 
