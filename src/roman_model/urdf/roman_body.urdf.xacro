@@ -12,6 +12,7 @@
         </joint>
 
         <link name="torso_link0">
+            <!-- dummy inertial values -->
             <inertial>
                 <mass value="0.003141"/>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -20,7 +21,6 @@
             <visual>
                 <origin xyz="0.593 0 0" rpy="1.57080 1.57080 0"/>
                 <geometry>
-                    <!-- <box size="0.1 0.1 0.1"/> -->
                    <mesh filename="package://roman_model/meshes/roman_torso.stl" scale="1 1 1"/>
                 </geometry>
                 <material name="grey">
@@ -28,15 +28,20 @@
                 </material>
             </visual>
             <collision>
-                <origin rpy="3.1415 -1.57080 0" xyz="0.25 0 0"/>
+                <origin xyz="0.2965 0 0" rpy="3.1415 -1.57080 0"/>
                 <geometry>
-                    <cylinder length="0.145" radius="0.05"/>
+                    <box size="0.20 0.20 0.593"/>
+                </geometry>
+            </collision>
+            <collision>
+                <origin xyz="0.2965 0.15 0" rpy="3.1415 -1.57080 0"/>
+                <geometry>
+                    <box size="0.20 0.10 0.10"/>
                 </geometry>
             </collision>
         </link>
 
         <joint name="torso_joint1" type="revolute">
-<!--            <origin xyz="0.17203 0 0"  rpy="3.14159 0 0"/> -->
             <origin xyz="0.593 0 0" rpy="3.14159 0 0"/>
             <axis xyz="1 0 0"/>
             <parent link="torso_link0"/>
@@ -49,6 +54,7 @@
             <inertial>
                 <mass value="10.0"/>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
+                <!-- dummy moments -->
                 <inertia ixx="0.003141" ixy="0" ixz="0" iyy="0.003141" iyz="0" izz="0.003141"/>
             </inertial>
             <visual>
@@ -63,7 +69,8 @@
             <collision>
                 <origin xyz="0.0065 0 0" rpy="0 0 0"/>
                 <geometry>
-                    <box size="0.013 0.1 0.25"/>
+<!--                    <box size="0.013 0.1 0.25"/> -->
+                    <box size="0.013 0.4 0.4"/>
                 </geometry>
             </collision>
         </link>
