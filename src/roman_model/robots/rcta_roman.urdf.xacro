@@ -4,8 +4,7 @@
 
     <xacro:include filename="$(find roman_model)/urdf/talon.urdf.xacro"/>
     <xacro:include filename="$(find roman_model)/urdf/roman_body.urdf.xacro"/>
-    <xacro:include filename="$(find roman_model)/urdf/robosimian_l_arm.urdf.xacro"/>
-    <xacro:include filename="$(find roman_model)/urdf/robosimian_r_arm.urdf.xacro"/>
+    <xacro:include filename="$(find roman_model)/urdf/robosimian_arm.urdf.xacro"/>
 
     <xacro:include filename="$(find roman_model)/gazebo/gazebo.urdf.xacro"/>
 
@@ -19,12 +18,12 @@
     </xacro:roman_body>
 
     <!-- robosimian_l_arm origin was rpy="0 0.7854 -1.5708?"-->
-    <xacro:robosimian_l_arm name="robosimian_l_arm" parent="chest" namespace="$(arg namespace)">
+    <xacro:robosimian_arm prefix="limb_left_" parent="chest" namespace="$(arg namespace)">
         <origin xyz="0.0705 0.025 -0.1" rpy="0 1.5708 -1.5708"/>
-    </xacro:robosimian_l_arm>
+    </xacro:robosimian_arm>
 
     <!-- robosimian_r_arm origin was rpy="0 0.7854 -1.5708" ?-->
-    <xacro:robosimian_r_arm name="robosimian_r_arm" parent="chest" namespace="$(arg namespace)">
+    <xacro:robosimian_arm prefix="limb_right_" parent="chest" namespace="$(arg namespace)">
         <origin xyz="0.0705 0.025 0.1" rpy="0 -1.57080 -1.5708"/>
-    </xacro:robosimian_r_arm>
+    </xacro:robosimian_arm>
 </robot>
