@@ -17,6 +17,9 @@
 
     <group if="$(arg live)">
         <group if="$(arg fake)">
+            <!-- publishes dummy roman_client_ros_utils::RomanState and
+            sensor_msgs::JointState messages with a format similar to the
+            live translators -->
             <node name="roman_simulator" pkg="rcta" type="roman_simulator"/>
         </group>
 
