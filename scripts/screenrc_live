@@ -16,7 +16,7 @@ screen -t repo
 stuff "roslaunch rcta reposition_base_executor.launch --screen"
 
 screen -t move
-stuff "roslaunch rcta move_arm_node.launch --screen"
+stuff "roslaunch rcta move_arm_node.launch live:=true fake:=false --screen"
 
 screen -t grasp
 stuff "roslaunch rcta grasp_object_executor.launch --screen"

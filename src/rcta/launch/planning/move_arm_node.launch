@@ -1,9 +1,9 @@
 <launch>
-    <arg name="sim" default="false"/>
+    <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
 
     <include file="$(find rcta)/launch/moveit/roman/roman_move_group.launch">
-        <arg name="sim" value="$(arg sim)"/>
+        <arg name="live" value="$(arg live)"/>
         <arg name="fake" value="$(arg fake)"/>
     </include>
 

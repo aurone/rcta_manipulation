@@ -1,5 +1,5 @@
 <launch>
-    <arg name="sim" default="false"/>
+    <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
 
     <!-- move_group parameters -->
