@@ -39,15 +39,14 @@ enum Status
     IDLE = 0,
     FAULT,
     GENERATING_GRASPS,
-    PLANNING_ARM_MOTION_TO_PREGRASP,
-    EXECUTING_ARM_MOTION_TO_PREGRASP,
+    MOVING_ARM_TO_PREGRASP,
     OPENING_GRIPPER,
     EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP,
     EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP,
+    MOVING_ARM_TO_GRASP,
     GRASPING_OBJECT,
     RETRACTING_GRIPPER,
-    PLANNING_ARM_MOTION_TO_STOW_POSITION,
-    EXECUTING_ARM_MOTION_TO_STOW_POSITION,
+    MOVING_ARM_TO_STOW,
     COMPLETING_GOAL
 };
 
@@ -141,6 +140,8 @@ private:
 
     /// Whether to override incoming octomaps with an extruded costmap variant
     bool use_extrusion_octomap_;
+
+    bool skip_viservo_;
 
     ///@}
 
@@ -257,13 +258,9 @@ private:
     GraspObjectExecutionStatus::Status onGeneratingGrasps();
     void onGeneratingGraspsExit(GraspObjectExecutionStatus::Status to);
 
-    void onPlanningArmMotionToPregraspEnter(GraspObjectExecutionStatus::Status from);
-    GraspObjectExecutionStatus::Status onPlanningArmMotionToPregrasp();
-    void onPlanningArmMotionToPregraspExit(GraspObjectExecutionStatus::Status to);
-
-    void onExecutingArmMotionToPregraspEnter(GraspObjectExecutionStatus::Status from);
-    GraspObjectExecutionStatus::Status onExecutingArmMotionToPregrasp();
-    void onExecutingArmMotionToPregraspExit(GraspObjectExecutionStatus::Status to);
+    void onMovingArmToPregraspEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onMovingArmToPregrasp();
+    void onMovingArmToPregraspExit(GraspObjectExecutionStatus::Status to);
 
     void onOpeningGripperEnter(GraspObjectExecutionStatus::Status from);
     GraspObjectExecutionStatus::Status onOpeningGripper();
@@ -285,13 +282,9 @@ private:
     GraspObjectExecutionStatus::Status onRetractingGripper();
     void onRetractingGripperExit(GraspObjectExecutionStatus::Status to);
 
-    void onPlanningArmMotionToStowPositionEnter(GraspObjectExecutionStatus::Status from);
-    GraspObjectExecutionStatus::Status onPlanningArmMotionToStowPosition();
-    void onPlanningArmMotionToStowPositionExit(GraspObjectExecutionStatus::Status to);
-
-    void onExecutingArmMotionToStowPositionEnter(GraspObjectExecutionStatus::Status from);
-    GraspObjectExecutionStatus::Status onExecutingArmMotionToStowPosition();
-    void onExecutingArmMotionToStowPositionExit(GraspObjectExecutionStatus::Status to);
+    void onMovingArmToStowEnter(GraspObjectExecutionStatus::Status from);
+    GraspObjectExecutionStatus::Status onMovingArmToStow();
+    void onMovingArmToStowExit(GraspObjectExecutionStatus::Status to);
 
     void onCompletingGoalEnter(GraspObjectExecutionStatus::Status from);
     GraspObjectExecutionStatus::Status onCompletingGoal();

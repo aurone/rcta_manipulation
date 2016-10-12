@@ -31,10 +31,8 @@ std::string to_string(Status status)
         return "Fault";
     case GENERATING_GRASPS:
         return "GeneratingGrasps";
-    case PLANNING_ARM_MOTION_TO_PREGRASP:
-        return "PlanningArmMotionToPregrasp";
-    case EXECUTING_ARM_MOTION_TO_PREGRASP:
-        return "ExecutingArmMotionToPregrasp";
+    case MOVING_ARM_TO_PREGRASP:
+        return "MovingArmToPregrasp";
     case OPENING_GRIPPER:
         return "OpeningGripper";
     case EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP:
@@ -45,10 +43,8 @@ std::string to_string(Status status)
         return "GraspingObject";
     case RETRACTING_GRIPPER:
         return "RetractingGripper";
-    case PLANNING_ARM_MOTION_TO_STOW_POSITION:
-        return "PlanningArmMotionToStowPosition";
-    case EXECUTING_ARM_MOTION_TO_STOW_POSITION:
-        return "ExecutingArmMotionToStowPosition";
+    case MOVING_ARM_TO_STOW:
+        return "MovingArmToStow";
     case COMPLETING_GOAL:
         return "CompletingGoal";
     default:
@@ -102,9 +98,9 @@ GraspObjectExecutor::GraspObjectExecutor() :
     viservo_command_client_(),
     gripper_command_client_(),
     action_name_("grasp_object_command"),
-    move_arm_command_action_name_("move_arm_command"),
+    move_arm_command_action_name_("move_arm"),
     viservo_command_action_name_("viservo_command"),
-    gripper_command_action_name_("gripper_controller/gripper_command_action"),
+    gripper_command_action_name_("right_gripper/gripper_action"),
     m_viz(),
 
     object_filter_radius_m_(),
@@ -112,6 +108,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     last_occupancy_grid_(),
     current_occupancy_grid_(),
     use_extrusion_octomap_(false),
+    skip_viservo_(false),
     current_octomap_(),
     extruder_(100, false),
 
@@ -225,6 +222,11 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
+    if (!msg_utils::download_param(ph_, "skip_viservo", skip_viservo_)) {
+        ROS_ERROR("Failed to retrieve 'skip_viservo' from the param server");
+        return false;
+    }
+
     if (!msg_utils::download_param(ph_, "object_filter_radius_m", object_filter_radius_m_)) {
         ROS_ERROR("Failed to retrieve 'object_filter_radius_m' from the param server");
         return false;
@@ -307,13 +309,9 @@ int GraspObjectExecutor::run()
             {
                 onGeneratingGraspsEnter(prev_status);
             }   break;
-            case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
+            case GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP:
             {
-                onPlanningArmMotionToPregraspEnter(prev_status);
-            }   break;
-            case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP:
-            {
-                onExecutingArmMotionToPregraspEnter(prev_status);
+                onMovingArmToPregraspEnter(prev_status);
             }   break;
             case GraspObjectExecutionStatus::OPENING_GRIPPER:
             {
@@ -335,13 +333,9 @@ int GraspObjectExecutor::run()
             {
                 onRetractingGripperEnter(prev_status);
             }   break;
-            case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
+            case GraspObjectExecutionStatus::MOVING_ARM_TO_STOW:
             {
-                onPlanningArmMotionToStowPositionEnter(prev_status);
-            }   break;
-            case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION:
-            {
-                onExecutingArmMotionToStowPositionEnter(prev_status);
+                onMovingArmToStowEnter(prev_status);
             }   break;
             case GraspObjectExecutionStatus::COMPLETING_GOAL:
             {
@@ -374,13 +368,9 @@ int GraspObjectExecutor::run()
         {
             next_status = onGeneratingGrasps();
         }   break;
-        case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
+        case GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP:
         {
-            next_status = onPlanningArmMotionToPregrasp();
-        }   break;
-        case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP:
-        {
-            next_status = onExecutingArmMotionToPregrasp();
+            next_status = onMovingArmToPregrasp();
         }   break;
         case GraspObjectExecutionStatus::OPENING_GRIPPER:
         {
@@ -402,13 +392,9 @@ int GraspObjectExecutor::run()
         {
             next_status = onRetractingGripper();
         }   break;
-        case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
+        case GraspObjectExecutionStatus::MOVING_ARM_TO_STOW:
         {
-            next_status = onPlanningArmMotionToStowPosition();
-        }   break;
-        case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION:
-        {
-            next_status = onExecutingArmMotionToStowPosition();
+            next_status = onMovingArmToStow();
         }   break;
         case GraspObjectExecutionStatus::COMPLETING_GOAL:
         {
@@ -430,13 +416,9 @@ int GraspObjectExecutor::run()
             {
                 onGeneratingGraspsExit(next_status);
             }   break;
-            case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
+            case GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP:
             {
-                onPlanningArmMotionToPregraspExit(next_status);
-            }   break;
-            case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP:
-            {
-                onExecutingArmMotionToPregraspExit(next_status);
+                onMovingArmToPregraspExit(next_status);
             }   break;
             case GraspObjectExecutionStatus::OPENING_GRIPPER:
             {
@@ -458,13 +440,9 @@ int GraspObjectExecutor::run()
             {
                 onRetractingGripperExit(next_status);
             }   break;
-            case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
+            case GraspObjectExecutionStatus::MOVING_ARM_TO_STOW:
             {
-                onPlanningArmMotionToStowPositionExit(next_status);
-            }   break;
-            case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION:
-            {
-                onExecutingArmMotionToStowPositionExit(next_status);
+                onMovingArmToStowExit(next_status);
             }   break;
             case GraspObjectExecutionStatus::COMPLETING_GOAL:
             {
@@ -673,7 +651,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onGeneratingGrasps()
 
     ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
 
-    return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+    return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
 }
 
 void GraspObjectExecutor::onGeneratingGraspsExit(
@@ -682,7 +660,7 @@ void GraspObjectExecutor::onGeneratingGraspsExit(
 
 }
 
-void GraspObjectExecutor::onPlanningArmMotionToPregraspEnter(
+void GraspObjectExecutor::onMovingArmToPregraspEnter(
     GraspObjectExecutionStatus::Status from)
 {
     // limit the number of grasp attempts by the configured amount
@@ -691,7 +669,7 @@ void GraspObjectExecutor::onPlanningArmMotionToPregraspEnter(
     pending_move_arm_command_ = false;
 }
 
-GraspObjectExecutionStatus::Status GraspObjectExecutor::onPlanningArmMotionToPregrasp()
+GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToPregrasp()
 {
     if (!sent_move_arm_goal_) {
         if (reachable_grasp_candidates_.empty()) {
@@ -737,10 +715,6 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onPlanningArmMotionToPre
         reachable_grasp_candidates_.pop_back();
         last_successful_grasp_ = next_best_grasp;
     } else if (!pending_move_arm_command_) {
-        // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
-        // now since the move_arm action handles execution and there is
-        // presently no feedback to distinguish planning vs. execution
-
         ROS_INFO("Move Arm Goal is no longer pending");
         if (move_arm_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
             move_arm_command_result_ && move_arm_command_result_->success)
@@ -753,32 +727,15 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onPlanningArmMotionToPre
             ROS_INFO("    Simple Client Goal State: %s", move_arm_command_goal_state_.toString().c_str());
             ROS_INFO("    Error Text: %s", move_arm_command_goal_state_.getText().c_str());
             ROS_INFO("    result.success = %s", move_arm_command_result_ ? (move_arm_command_result_->success ? "TRUE" : "FALSE") : "null");
-            // stay in PLANNING_ARM_MOTION_TO_PREGRASP until there are no more grasps
+            // stay in MOVING_ARM_TO_PREGRASP until there are no more grasps
             // TODO: consider moving back to the stow position
         }
     }
 
-    return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+    return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
 }
 
-void GraspObjectExecutor::onPlanningArmMotionToPregraspExit(
-    GraspObjectExecutionStatus::Status to)
-{
-
-}
-
-void GraspObjectExecutor::onExecutingArmMotionToPregraspEnter(
-    GraspObjectExecutionStatus::Status from)
-{
-
-}
-
-GraspObjectExecutionStatus::Status GraspObjectExecutor::onExecutingArmMotionToPregrasp()
-{
-    return GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP;
-}
-
-void GraspObjectExecutor::onExecutingArmMotionToPregraspExit(
+void GraspObjectExecutor::onMovingArmToPregraspExit(
     GraspObjectExecutionStatus::Status to)
 {
 
@@ -844,7 +801,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onOpeningGripper()
             ROS_WARN("    Error Text: %s", gripper_command_goal_state_.getText().c_str());
             ROS_WARN("    result.reached_goal = %s", gripper_command_result_ ? (gripper_command_result_->reached_goal ? "TRUE" : "FALSE") : "null");
             ROS_WARN("    result.stalled = %s", gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
-            return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+            return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
         }
     }
 
@@ -933,7 +890,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onExecutingVisualServoMo
             ROS_INFO("    Error Text: %s", viservo_command_goal_state_.getText().c_str());
             ROS_INFO("    result.result = %s", viservo_command_result_ ? (viservo_command_result_->result == rcta::ViservoCommandResult::SUCCESS? "SUCCESS" : "NOT SUCCESS") : "null");
             ROS_WARN("Failed to complete visual servo motion to pregrasp");
-            return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP;
+            return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
         }
     }
 
@@ -1065,7 +1022,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onGraspingObject()
 
         if (gripper_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED && grabbed_object) {
             ROS_INFO("Gripper Command Succeeded");
-            return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
+            return GraspObjectExecutionStatus::MOVING_ARM_TO_STOW;
         }
         else {
             ROS_WARN("Close Gripper Command failed");
@@ -1138,7 +1095,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onRetractingGripper()
             ROS_INFO("    result.stalled = %s", gripper_command_result_ ? (gripper_command_result_->stalled ? "TRUE" : "FALSE") : "null");
         }
 
-        return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP; // Transfer back to planning regardless
+        return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP; // Transfer back to planning regardless
     }
 
     return GraspObjectExecutionStatus::RETRACTING_GRIPPER;
@@ -1150,7 +1107,7 @@ void GraspObjectExecutor::onRetractingGripperExit(
 
 }
 
-void GraspObjectExecutor::onPlanningArmMotionToStowPositionEnter(
+void GraspObjectExecutor::onMovingArmToStowEnter(
     GraspObjectExecutionStatus::Status from)
 {
     sent_move_arm_goal_ = false;
@@ -1158,7 +1115,7 @@ void GraspObjectExecutor::onPlanningArmMotionToStowPositionEnter(
     next_stow_position_to_attempt_ = 0;
 }
 
-GraspObjectExecutionStatus::Status GraspObjectExecutor::onPlanningArmMotionToStowPosition()
+GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
 {
     if (!sent_move_arm_goal_) {
         ROS_INFO("Sending Move Arm Goal to stow position");
@@ -1260,10 +1217,6 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onPlanningArmMotionToSto
         sent_move_arm_goal_ = true;
     }
     else if (!pending_move_arm_command_) {
-        // NOTE: short-circuiting "EXECUTING_ARM_MOTION_TO_PREGRASP" for
-        // now since the move_arm action handles execution and there is
-        // presently no feedback to distinguish planning vs. execution
-
         ROS_INFO("Move Arm Goal is no longer pending");
         if (move_arm_command_goal_state_ == actionlib::SimpleClientGoalState::SUCCEEDED &&
             move_arm_command_result_ && move_arm_command_result_->success)
@@ -1280,27 +1233,10 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onPlanningArmMotionToSto
         }
     }
 
-    return GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION;
+    return GraspObjectExecutionStatus::MOVING_ARM_TO_STOW;
 }
 
-void GraspObjectExecutor::onPlanningArmMotionToStowPositionExit(
-    GraspObjectExecutionStatus::Status to)
-{
-
-}
-
-void GraspObjectExecutor::onExecutingArmMotionToStowPositionEnter(
-    GraspObjectExecutionStatus::Status from)
-{
-
-}
-
-GraspObjectExecutionStatus::Status GraspObjectExecutor::onExecutingArmMotionToStowPosition()
-{
-    return GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION;
-}
-
-void GraspObjectExecutor::onExecutingArmMotionToStowPositionExit(
+void GraspObjectExecutor::onMovingArmToStowExit(
     GraspObjectExecutionStatus::Status to)
 {
 
@@ -1403,11 +1339,7 @@ uint8_t GraspObjectExecutor::executionStatusToFeedbackStatus(GraspObjectExecutio
     case GraspObjectExecutionStatus::FAULT:
         return -1;
     case GraspObjectExecutionStatus::GENERATING_GRASPS:
-    case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_PREGRASP:
-    case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_PREGRASP:
-        // note fall-through here instead of PLANNING_ARM_MOTION_TO_PREGRASP
-        // since planning and execution are rolled into one call to move_arm
-        return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
+    case GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP:
         return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
     case GraspObjectExecutionStatus::OPENING_GRIPPER:
     case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP:
@@ -1417,8 +1349,7 @@ uint8_t GraspObjectExecutor::executionStatusToFeedbackStatus(GraspObjectExecutio
     case GraspObjectExecutionStatus::GRASPING_OBJECT:
     case GraspObjectExecutionStatus::RETRACTING_GRIPPER:
         return rcta_msgs::GraspObjectCommandFeedback::GRASPING_OBJECT;
-    case GraspObjectExecutionStatus::PLANNING_ARM_MOTION_TO_STOW_POSITION:
-    case GraspObjectExecutionStatus::EXECUTING_ARM_MOTION_TO_STOW_POSITION:
+    case GraspObjectExecutionStatus::MOVING_ARM_TO_STOW:
         // same fall-through reasonining from above
         return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_STOW;
     case GraspObjectExecutionStatus::COMPLETING_GOAL:
