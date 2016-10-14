@@ -1,7 +1,7 @@
 source screenrc.common
 
 screen -t core
-stuff "roscore^M"
+#stuff "roscore^M"
 
 screen -t rviz
 stuff "rosrun rviz rviz -d $ROS_WORKSPACE/config/rcta.rviz"
