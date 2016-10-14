@@ -390,6 +390,9 @@ bool MoveArmNode::sendMoveGroupConfigGoal(
     req.start_state = goal.start_state;
     req.goal_constraints.clear();
 
+    // TODO: hack! temporarily override
+    req.planner_id = "arastar.joint_distance";
+
     moveit_msgs::Constraints goal_constraints;
     goal_constraints.name = "goal_constraints";
 
@@ -413,6 +416,9 @@ bool MoveArmNode::sendMoveGroupConfigGoal(
     auto result_callback = boost::bind(
             &MoveArmNode::moveGroupResultCallback, this, _1, _2);
     m_move_group_client->sendGoal(m_goal, result_callback);
+
+    // TODO: hack! reset planner id
+    m_ph.getParam("planner_id", req.planner_id);
 
     if (!m_move_group_client->waitForResult()) {
         return false;
