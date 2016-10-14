@@ -3,6 +3,7 @@ right_arm:
     planner_configs:
         - ARAConfigDefault
         - ARAWorkspaceConfigDefault
+        - ARAJointSpaceConfigDefault
         - MHAConfigDefault
         - LARAConfigDefault
 
@@ -47,6 +48,14 @@ planner_configs:
         bfs_sphere_radius: 0.02
     ARAWorkspaceConfigDefault:
         type: arastar.bfs.workspace
+        epsilon: 100.0
+        use_bfs_heuristic: true
+        bfs_res_x: 0.015
+        bfs_res_y: 0.015
+        bfs_res_z: 0.015
+        bfs_sphere_radius: 0.02
+    ARAJointSpaceConfigDefault:
+        type: arastar.joint_distance
         epsilon: 100.0
         use_bfs_heuristic: true
         bfs_res_x: 0.015
