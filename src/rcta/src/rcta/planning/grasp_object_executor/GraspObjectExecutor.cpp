@@ -500,7 +500,7 @@ void GraspObjectExecutor::goalCallback()
 
         // todo: save all the cells that didn't need to be cleared, so that we can check for their existence later
 
-        clear_circle_from_grid(
+        clearCircleFromGrid(
                 *current_occupancy_grid_,
                 gas_can_in_grid_frame_.pose.position.x,
                 gas_can_in_grid_frame_.pose.position.y,
@@ -632,6 +632,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onGeneratingGrasps()
 
 
     ROS_INFO("Attempting %zd grasps", reachable_grasp_candidates_.size());
+    SV_SHOW_INFO(getGraspCandidatesVisualization(reachable_grasp_candidates_, "reachable_candidates"));
 
     return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
 }
@@ -646,7 +647,7 @@ void GraspObjectExecutor::onMovingArmToPregraspEnter(
     GraspObjectExecutionStatus::Status from)
 {
     // limit the number of grasp attempts by the configured amount
-    cull_grasp_candidates(reachable_grasp_candidates_, max_grasp_candidates_);
+    limitGraspCandidates(reachable_grasp_candidates_, max_grasp_candidates_);
     sent_move_arm_goal_ = false;
     pending_move_arm_command_ = false;
 }
@@ -1313,7 +1314,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onCompletingGoal()
         // get here once we've received a newer costmap to evaluate for the object's position
         OccupancyGridConstPtr occupancy_grid_after_grasp = last_occupancy_grid_;
 
-        double success_pct = calc_prob_successful_grasp(
+        double success_pct = calcProbSuccessfulGrasp(
             *occupancy_grid_after_grasp,
             gas_can_in_grid_frame_.pose.position.x,
             gas_can_in_grid_frame_.pose.position.y,
@@ -1476,12 +1477,11 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
     candidates = std::move(filtered_candidates);
 }
 
-void GraspObjectExecutor::cull_grasp_candidates(std::vector<rcta::GraspCandidate>& candidates, int max_candidates) const
+void GraspObjectExecutor::limitGraspCandidates(
+    std::vector<rcta::GraspCandidate>& candidates,
+    int max_candidates) const
 {
-	std::reverse(candidates.begin(), candidates.end());
-	while (candidates.size() > max_candidates) {
-		candidates.pop_back();
-	}
+    candidates.resize(max_candidates);
 	std::reverse(candidates.begin(), candidates.end());
 }
 
@@ -1494,7 +1494,7 @@ GraspObjectExecutor::getGraspCandidatesVisualization(
     return rcta::GetGraspCandidatesVisualization(grasps, frame_id, ns);
 }
 
-void GraspObjectExecutor::clear_circle_from_grid(
+void GraspObjectExecutor::clearCircleFromGrid(
     nav_msgs::OccupancyGrid& grid,
     double circle_x, double circle_y,
     double circle_radius) const
@@ -1580,7 +1580,7 @@ const std::int8_t& GraspObjectExecutor::grid_at(const nav_msgs::OccupancyGrid& g
     return grid.data[grid_y * grid.info.width + grid_x];
 }
 
-double GraspObjectExecutor::calc_prob_successful_grasp(
+double GraspObjectExecutor::calcProbSuccessfulGrasp(
     const nav_msgs::OccupancyGrid& grid,
     double circle_x,
     double circle_y,

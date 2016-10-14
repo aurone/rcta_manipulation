@@ -321,7 +321,7 @@ private:
         std::vector<rcta::GraspCandidate>& candidates,
         const Eigen::Affine3d& T_grasp_robot) const;
 
-    void cull_grasp_candidates(
+    void limitGraspCandidates(
         std::vector<rcta::GraspCandidate>& candidates,
         int max_candidates) const;
 
@@ -330,14 +330,14 @@ private:
         const std::vector<rcta::GraspCandidate>& grasps,
         const std::string& ns) const;
 
-    void clear_circle_from_grid(nav_msgs::OccupancyGrid& grid, double x, double y, double radius) const;
+    void clearCircleFromGrid(nav_msgs::OccupancyGrid& grid, double x, double y, double radius) const;
     bool within_bounds(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
     void grid_to_world(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y, double& world_x, double& world_y) const;
     void world_to_grid(const nav_msgs::OccupancyGrid& grid, double world_x, double world_y, int& grid_x, int& grid_y) const;
     std::int8_t& grid_at(nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
     const std::int8_t& grid_at(const nav_msgs::OccupancyGrid& grid, int grid_x, int grid_y) const;
 
-    double calc_prob_successful_grasp(
+    double calcProbSuccessfulGrasp(
             const nav_msgs::OccupancyGrid& grid,
             double circle_x,
             double circle_y,
