@@ -16,7 +16,8 @@ grasping:
 
   wrist_to_tool_transform:
     position:
-      x: 0.192 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
+#      x: 0.192
+      x: 0.212
       y: 0.0
       z: 0.0
     orientation:
