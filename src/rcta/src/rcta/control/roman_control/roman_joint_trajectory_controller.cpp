@@ -185,6 +185,17 @@ void RomanJointTrajectoryController::goalCallback()
 //        ROS_INFO_STREAM(path_msg);
     spec_update_times(path_msg);
     m_roman_spec_pub.publish(path_msg);
+
+    if (!path_msg.waypoints.empty()) {
+        int duration_us = path_msg.waypoints.back().utime;
+        double duration_s = 5.0 * (double)duration_us / 1e6; // 2 inflation
+        ROS_INFO("Sleep for %d us (%0.3f seconds)", duration_us, duration_s);
+        ros::Duration(duration_s).sleep();
+        ROS_INFO("Done sleeping");
+    }
+
+    m_result.error_code = FollowJointTrajectoryActionServer::Result::SUCCESSFUL;
+    m_server.setSucceeded(m_result);
 #endif
 }
 
@@ -198,6 +209,7 @@ void RomanJointTrajectoryController::preemptCallback()
 void RomanJointTrajectoryController::romanSpecReplyCallback(
     const roman_client_ros_utils::RomanSpecReply::ConstPtr& msg)
 {
+    ROS_INFO("Received spec reply");
     if (m_server.isActive()) {
         if (!msg->attempted || msg->in_fault) {
             m_result.error_code = FollowJointTrajectoryActionServer::Result::INVALID_GOAL;
