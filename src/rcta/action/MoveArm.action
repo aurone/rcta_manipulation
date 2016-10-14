@@ -11,6 +11,8 @@ moveit_msgs/RobotState start_state
 octomap_msgs/Octomap octomap
 
 bool execute_path
+
+moveit_msgs/PlanningOptions planning_options
 ---
 # result
 bool success
