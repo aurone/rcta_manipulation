@@ -273,31 +273,23 @@ void MoveArmNode::fillCommonOptions(
     const rcta::MoveArmGoal& goal,
     moveit_msgs::PlanningOptions& ops) const
 {
-    if (m_octomap) {
+    ops.planning_scene_diff.robot_state.is_diff = true;
+
+    if (!goal.planning_options.planning_scene_diff.world.octomap.octomap.data.empty()) {
+        ops.planning_scene_diff.world.octomap = goal.planning_options.planning_scene_diff.world.octomap;
+    } else if (m_octomap) {
         ops.planning_scene_diff.world.octomap.header = m_octomap->header;
         ops.planning_scene_diff.world.octomap.origin.orientation.w = 1.0;
         ops.planning_scene_diff.world.octomap.octomap = *m_octomap;
     } else {
-        ROS_WARN("No octomap received to use for collision world");
+        ROS_WARN("Planning without an octomap");
     }
 
-    moveit_msgs::CollisionObject gpo;
-    gpo.header.frame_id; // TODO: planning frame?
+    ops.planning_scene_diff.world.collision_objects = goal.planning_options.planning_scene_diff.world.collision_objects;
+    ops.planning_scene_diff.world.collision_objects.push_back(createGroundPlaneObject());
 
-    shape_msgs::Plane ground_plane;
-    ground_plane.coef[0] = 0.0;
-    ground_plane.coef[1] = 0.0;
-    ground_plane.coef[2] = 1.0;
-    ground_plane.coef[3] = 0.0;
+    ops.planning_scene_diff.is_diff = true;
 
-    gpo.planes.push_back(ground_plane);
-    gpo.plane_poses.push_back(geometry_msgs::IdentityPose());
-
-    gpo.operation = moveit_msgs::CollisionObject::ADD;
-
-    ops.planning_scene_diff.world.collision_objects.push_back(gpo);
-
-    ops.planning_scene_diff.robot_state.is_diff = false;
     ops.look_around = false;
     ops.look_around_attempts = 0;
     ops.max_safe_execution_cost = 1.0;
@@ -440,6 +432,24 @@ void MoveArmNode::moveGroupResultCallback(
 void MoveArmNode::octomapCallback(const octomap_msgs::Octomap::ConstPtr& msg)
 {
     m_octomap = msg;
+}
+
+moveit_msgs::CollisionObject MoveArmNode::createGroundPlaneObject() const
+{
+    moveit_msgs::CollisionObject gpo;
+    gpo.header.frame_id; // TODO: planning frame?
+
+    shape_msgs::Plane ground_plane;
+    ground_plane.coef[0] = 0.0;
+    ground_plane.coef[1] = 0.0;
+    ground_plane.coef[2] = 1.0;
+    ground_plane.coef[3] = 0.0;
+
+    gpo.planes.push_back(ground_plane);
+    gpo.plane_poses.push_back(geometry_msgs::IdentityPose());
+
+    gpo.operation = moveit_msgs::CollisionObject::ADD;
+    return gpo;
 }
 
 } //namespace rcta

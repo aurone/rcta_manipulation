@@ -110,6 +110,8 @@ private:
         const moveit_msgs::MoveGroupResult::ConstPtr& result);
 
     void octomapCallback(const octomap_msgs::Octomap::ConstPtr& msg);
+
+    moveit_msgs::CollisionObject createGroundPlaneObject() const;
 };
 
 } // namespace rcta
