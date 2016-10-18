@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
+#include <moveit_msgs/AttachedCollisionObject.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -18,6 +19,73 @@
 // project includes
 #include <rcta/control/robotiq_controllers/gripper_model.h>
 #include <rcta/common/comms/actionlib.h>
+
+/// Create a collision object representing the gascan.
+///
+/// The gascan is represented by a simple box, bounding the body and handle of
+/// the gascan, and a cylinder, bounding the nozzle. This function only fills
+/// out the primitives and poses in the frame of the gascan. It does not fill
+/// out the message header, id, or collision object operation.
+moveit_msgs::CollisionObject CreateGascanCollisionObject()
+{
+    moveit_msgs::CollisionObject co;
+
+    double body_part_x = 0.0;           // 0.0
+    double body_part_y = 0.01303;       // 0.0
+    double body_part_z = -0.01241;      // -0.05
+    double body_part_qw = 1.0;          // 1.0
+    double body_part_qx = 0.0001895;    // 0.0
+    double body_part_qy = -0.009;       // 0.0
+    double body_part_qz = 0.021;        // 0.0
+    double body_part_dim_x = 0.212;     // 0.20
+    double body_part_dim_y = 0.296;     // 0.25
+    double body_part_dim_z = 0.296;     // 0.25
+
+    double noz_part_x = 0.00816;            // 0.0
+    double noz_part_y = -0.15700;           // 0.0
+    double noz_part_z = 0.15571;            // 0.15
+    double noz_part_qw = 0.932;             // (45 degs about x)
+    double noz_part_qx = 0.354;             // ^
+    double noz_part_qy = 0.028;             // ^
+    double noz_part_qz = -0.072;            // ^
+    double noz_part_radius = 0.5 * 0.052;   // 0.035
+    double noz_part_height = 0.183;         // 0.35
+
+    shape_msgs::SolidPrimitive body_part;
+    body_part.type = shape_msgs::SolidPrimitive::BOX;
+    body_part.dimensions.resize(3);
+    body_part.dimensions[shape_msgs::SolidPrimitive::BOX_X] = body_part_dim_x;
+    body_part.dimensions[shape_msgs::SolidPrimitive::BOX_Y] = body_part_dim_y;
+    body_part.dimensions[shape_msgs::SolidPrimitive::BOX_Z] = body_part_dim_z;
+
+    Eigen::Affine3d body_part_offset =
+            Eigen::Translation3d(body_part_x, body_part_y, body_part_z) *
+            Eigen::Quaterniond(body_part_qw, body_part_qx, body_part_qy, body_part_qz).normalized();
+    Eigen::Affine3d body_pose_in_grasp_frame = body_part_offset;
+    geometry_msgs::Pose body_part_pose;
+    tf::poseEigenToMsg(body_pose_in_grasp_frame, body_part_pose);
+
+    shape_msgs::SolidPrimitive nozzle_part;
+    nozzle_part.type = shape_msgs::SolidPrimitive::CYLINDER;
+    nozzle_part.dimensions.resize(2);
+    nozzle_part.dimensions[shape_msgs::SolidPrimitive::CYLINDER_HEIGHT] = noz_part_height;
+    nozzle_part.dimensions[shape_msgs::SolidPrimitive::CYLINDER_RADIUS] = noz_part_radius;
+
+    Eigen::Affine3d nozzle_pose_offset =
+            Eigen::Translation3d(noz_part_x, noz_part_y, noz_part_z) *
+            Eigen::Quaterniond(noz_part_qw, noz_part_qx, noz_part_qy, noz_part_qz).normalized();
+    Eigen::Affine3d nozzle_pose_in_grasp_frame = nozzle_pose_offset;
+    geometry_msgs::Pose nozzle_part_pose;
+    tf::poseEigenToMsg(nozzle_pose_in_grasp_frame, nozzle_part_pose);
+
+    co.primitives.reserve(2);
+    co.primitives.push_back(body_part);
+    co.primitive_poses.push_back(body_part_pose);
+    co.primitives.push_back(nozzle_part);
+    co.primitive_poses.push_back(nozzle_part_pose);
+
+    return co;
+}
 
 namespace GraspObjectExecutionStatus
 {
@@ -88,11 +156,11 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position)
 }
 
 GraspObjectExecutor::GraspObjectExecutor() :
-    // ros stuff
     nh_(),
     ph_("~"),
     filtered_costmap_pub_(),
     extrusion_octomap_pub_(),
+    attach_obj_pub_(),
     costmap_sub_(),
     listener_(),
     as_(),
@@ -104,34 +172,47 @@ GraspObjectExecutor::GraspObjectExecutor() :
     viservo_command_action_name_("viservo_command"),
     gripper_command_action_name_("right_gripper/gripper_action"),
     m_viz(),
-
+    m_rml(),
+    m_robot_model(),
+    extruder_(100, false),
+    m_grasp_planner(),
+    m_scene_monitor(),
+    m_gripper_links(),
+    m_camera_view_frame("camera_rgb_optical_frame"),
+    m_manip_name(),
+    m_manip_group(nullptr),
     object_filter_radius_m_(),
-
-    last_occupancy_grid_(),
-    current_occupancy_grid_(),
     use_extrusion_octomap_(false),
     skip_viservo_(false),
+    attached_markers_(),
+    max_grasp_candidates_(0),
+    stow_positions_(),
+    attach_obj_req_wait_(),
+    gas_can_detection_threshold_(0.0),
+    current_goal_(),
+    current_occupancy_grid_(),
     current_octomap_(),
-    extruder_(100, false),
-
+    gas_can_in_grid_frame_(),
     sent_move_arm_goal_(false),
     pending_move_arm_command_(false),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     move_arm_command_result_(),
-
     sent_viservo_command_(false),
     pending_viservo_command_(false),
     viservo_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     viservo_command_result_(),
-
     sent_gripper_command_(false),
     pending_gripper_command_(false),
     gripper_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     gripper_command_result_(),
-
+    last_occupancy_grid_(),
+    reachable_grasp_candidates_(),
     last_move_arm_pregrasp_goal_(),
-
-    current_goal_()
+    last_successful_grasp_(),
+    last_viservo_pregrasp_goal_(),
+    next_stow_position_to_attempt_(-1),
+    attach_obj_req_time_(),
+    wait_for_grid_start_time_()
 {
     sbpl::viz::set_visualizer(&m_viz);
 }
@@ -149,8 +230,6 @@ bool GraspObjectExecutor::initialize()
     // Copied from RepositionBaseExecutor to set up state monitoring and //
     // some other interesting stuff                                      //
     ///////////////////////////////////////////////////////////////////////
-
-    m_camera_view_frame = "camera_rgb_optical_frame";
 
     m_rml.reset(new robot_model_loader::RobotModelLoader);
     m_robot_model = m_rml->getModel();
@@ -247,8 +326,10 @@ bool GraspObjectExecutor::initialize()
             "map", 1, &GraspObjectExecutor::occupancyGridCallback, this);
 
     // publishers
-    extrusion_octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
     filtered_costmap_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
+    extrusion_octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
+    attach_obj_pub_ = nh_.advertise<moveit_msgs::AttachedCollisionObject>(
+            "attached_collision_object", 1);
 
     move_arm_command_client_.reset(new MoveArmActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
@@ -1163,6 +1244,75 @@ void GraspObjectExecutor::onRetractingGripperExit(
 void GraspObjectExecutor::onMovingArmToStowEnter(
     GraspObjectExecutionStatus::Status from)
 {
+    auto solver = m_manip_group->getSolverInstance();
+    const std::string& tip_link = solver->getTipFrames().front();
+
+    moveit_msgs::AttachedCollisionObject aco;
+
+    // aco.link_name
+    aco.link_name = tip_link;
+
+    // aco.object
+    aco.object = CreateGascanCollisionObject();
+
+    ROS_INFO("Create attached object with %zu shapes and %zu poses", aco.object.primitives.size(), aco.object.primitive_poses.size());
+
+    // transform the object to the grasp frame
+    const Eigen::Affine3d T_grasp_object =
+            last_successful_grasp_.pose_in_object.inverse();
+
+    for (geometry_msgs::Pose& pose : aco.object.primitive_poses) {
+        Eigen::Affine3d T_object_part;
+        tf::poseMsgToEigen(pose, T_object_part);
+        Eigen::Affine3d T_grasp_part = T_grasp_object * T_object_part;
+        tf::poseEigenToMsg(T_grasp_part, pose);
+    }
+
+    for (geometry_msgs::Pose& pose : aco.object.mesh_poses) {
+        Eigen::Affine3d T_object_part;
+        tf::poseMsgToEigen(pose, T_object_part);
+        Eigen::Affine3d T_grasp_part = T_grasp_object * T_object_part;
+        tf::poseEigenToMsg(T_grasp_part, pose);
+    }
+
+    aco.object.header.frame_id = tip_link;
+    aco.object.id = "gascan";
+    aco.object.operation = moveit_msgs::CollisionObject::ADD;
+
+//    aco.object.primitive_poses[0].position.x -= 0.15;
+//    aco.object.primitive_poses[1].position.x -= 0.15;
+
+    // aco.touch_links
+    aco.touch_links = {
+        "limb_right_link7",
+        "limb_right_palm",
+
+        "limb_right_finger_1_link_0",
+        "limb_right_finger_1_link_1",
+        "limb_right_finger_1_link_2",
+        "limb_right_finger_1_link_3",
+
+        "limb_right_finger_2_link_0",
+        "limb_right_finger_2_link_1",
+        "limb_right_finger_2_link_2",
+        "limb_right_finger_2_link_3",
+
+        "limb_right_finger_middle_link_0",
+        "limb_right_finger_middle_link_1",
+        "limb_right_finger_middle_link_2",
+        "limb_right_finger_middle_link_3",
+
+        "limb_right_tool",
+    };
+
+//    aco.detach_posture;
+
+    aco.weight = 1.0; //arbitrary (not used anyways)
+
+    attach_obj_pub_.publish(aco);
+
+    attach_obj_req_time_ = ros::Time::now();
+
     sent_move_arm_goal_ = false;
     pending_move_arm_command_ = false;
     next_stow_position_to_attempt_ = 0;
@@ -1218,49 +1368,6 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
         //include the attached object in the goal
         // TODO: include the attached object here
 
-        moveit_msgs::AttachedCollisionObject attached_object;// = move_arm_stow_goal.attached_object;
-        attached_object.link_name = m_manip_group->getSolverInstance()->getTipFrames().front();
-        attached_object.object.id = "gascan";
-        attached_object.object.primitives.resize(2);
-        attached_object.object.primitive_poses.resize(2);
-        attached_object.object.primitives[0].type = shape_msgs::SolidPrimitive::BOX;
-        attached_object.object.primitives[0].dimensions.resize(3);
-        //rough gas can dimensions
-        attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_X] = 0.20;
-        attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.25;
-        attached_object.object.primitives[0].dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.25;
-        //nozzle
-        attached_object.object.primitives[1].type = shape_msgs::SolidPrimitive::CYLINDER;
-        attached_object.object.primitives[1].dimensions.resize(2);
-        attached_object.object.primitives[1].dimensions[shape_msgs::SolidPrimitive::CYLINDER_HEIGHT] = 0.35;
-        attached_object.object.primitives[1].dimensions[shape_msgs::SolidPrimitive::CYLINDER_RADIUS] = 0.035;
-
-        //compute the pose of attachment based on grasp pose used
-        Eigen::Affine3d obj_body_offset_;
-        tf::Transform obj_body_offset_tf_(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, -0.05));
-        tf::poseTFToEigen(obj_body_offset_tf_, obj_body_offset_);
-        Eigen::Affine3d obj_body_in_grasp_frame = last_successful_grasp_.pose_in_object.inverse() * obj_body_offset_;
-        tf::poseEigenToMsg(obj_body_in_grasp_frame, attached_object.object.primitive_poses[0]);
-        //nozzle
-        Eigen::Affine3d obj_nozzle_offset_;
-        tf::Transform obj_nozzle_offset_tf_ = tf::Transform(tf::Quaternion(tf::Vector3(1,0,0), 0.25*M_PI), tf::Vector3(0.0, 0.0, -0.05)) * tf::Transform(tf::Quaternion::getIdentity(), tf::Vector3(0.0, 0.0, 0.15));
-        tf::poseTFToEigen(obj_nozzle_offset_tf_, obj_nozzle_offset_);
-        Eigen::Affine3d obj_nozzle_in_grasp_frame = last_successful_grasp_.pose_in_object.inverse() * obj_nozzle_offset_;
-        tf::poseEigenToMsg(obj_nozzle_in_grasp_frame, attached_object.object.primitive_poses[1]);
-
-        ROS_WARN("Using attached object!");
-        ROS_WARN("Object attached to xyz(%.3f, %.3f, %.3f) q_xyzw(%.3f, %.3f, %.3f, %.3f) relative to wrist!",
-                    attached_object.object.primitive_poses[0].position.x,
-                    attached_object.object.primitive_poses[0].position.y,
-                    attached_object.object.primitive_poses[0].position.z,
-                    attached_object.object.primitive_poses[0].orientation.x,
-                    attached_object.object.primitive_poses[0].orientation.y,
-                    attached_object.object.primitive_poses[0].orientation.z,
-                    attached_object.object.primitive_poses[0].orientation.w);
-
-        attached_object.object.primitive_poses[0].position.x -= 0.15;
-        attached_object.object.primitive_poses[1].position.x -= 0.15;
-        attached_object.weight = 1.0; //arbitrary (not used anyways)
         move_arm_stow_goal.execute_path = true;
 
         auto result_cb = boost::bind(&GraspObjectExecutor::moveArmResultCallback, this, _1, _2);

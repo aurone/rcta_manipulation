@@ -104,6 +104,7 @@ private:
 
     ros::Publisher filtered_costmap_pub_;
     ros::Publisher extrusion_octomap_pub_;
+    ros::Publisher attach_obj_pub_;
     ros::Subscriber costmap_sub_;
 
     tf::TransformListener listener_;
@@ -122,10 +123,10 @@ private:
 
     robot_model_loader::RobotModelLoaderPtr m_rml;
     moveit::core::RobotModelPtr m_robot_model;
-    hdt::RobotModelConstPtr robot_model_;
     CostmapExtruder extruder_;
     rcta::GascanGraspPlanner m_grasp_planner;
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
+    std::vector<std::string> m_gripper_links;
 
     /// \name Global Parameters
     ///@{
@@ -150,14 +151,15 @@ private:
     std::vector<AttachedMarker> attached_markers_;
     ///@}
 
-    /// \name PlanArmMotionToPregrasp Parameters
+    /// \name MoveArmToPregrasp Parameters
     ///@{
     int max_grasp_candidates_;
     ///@}
 
-    /// \name PlanArmMotionToStow Parameters
+    /// \name MoveArmToStow Parameters
     ///@{
     std::vector<StowPosition> stow_positions_;
+    ros::Duration attach_obj_req_wait_;
     ///@}
 
     /// \name CompleteGoal Parameters
@@ -228,9 +230,10 @@ private:
 
     ///@}
 
-    /// \name PlanArmMotionToStowPosition State
+    /// \name MoveArmToStowPosition State
     ///@{
     int next_stow_position_to_attempt_;
+    ros::Time attach_obj_req_time_;
     ///@}
 
     /// \name Completing state
