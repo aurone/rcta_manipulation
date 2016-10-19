@@ -38,7 +38,7 @@ moveit_msgs::CollisionObject CreateGascanCollisionObject()
     double body_part_qy = -0.009;       // 0.0
     double body_part_qz = 0.021;        // 0.0
     double body_part_dim_x = 0.212;     // 0.20
-    double body_part_dim_y = 0.296;     // 0.25
+    double body_part_dim_y = 0.2; //0.296;     // 0.25
     double body_part_dim_z = 0.296;     // 0.25
 
     double noz_part_x = 0.00816;            // 0.0
