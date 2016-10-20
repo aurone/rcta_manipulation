@@ -99,31 +99,31 @@ private:
 
     /// \name ROS stuff
     ///@{
-    ros::NodeHandle nh_;
-    ros::NodeHandle ph_;
+    ros::NodeHandle m_nh;
+    ros::NodeHandle m_ph;
 
-    ros::Publisher filtered_costmap_pub_;
-    ros::Publisher extrusion_octomap_pub_;
-    ros::Publisher attach_obj_pub_;
-    ros::Subscriber costmap_sub_;
+    ros::Publisher m_filtered_costmap_pub;
+    ros::Publisher m_extrusion_octomap_pub;
+    ros::Publisher m_attach_obj_pub;
+    ros::Subscriber m_costmap_sub;
 
-    tf::TransformListener listener_;
+    tf::TransformListener m_listener;
 
-    std::unique_ptr<GraspObjectCommandActionServer> as_;
-    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
-    std::unique_ptr<ViservoCommandActionClient> viservo_command_client_;
-    std::unique_ptr<GripperCommandActionClient> gripper_command_client_;
-    std::string action_name_;
-    std::string move_arm_command_action_name_;
-    std::string viservo_command_action_name_;
-    std::string gripper_command_action_name_;
+    std::unique_ptr<GraspObjectCommandActionServer> m_as;
+    std::unique_ptr<MoveArmActionClient> m_move_arm_command_client;
+    std::unique_ptr<ViservoCommandActionClient> m_viservo_command_client;
+    std::unique_ptr<GripperCommandActionClient> m_gripper_command_client;
+    std::string m_action_name;
+    std::string m_move_arm_command_action_name;
+    std::string m_viservo_command_action_name;
+    std::string m_gripper_command_action_name;
 
     sbpl::VisualizerROS m_viz;
     ///@}
 
     robot_model_loader::RobotModelLoaderPtr m_rml;
     moveit::core::RobotModelPtr m_robot_model;
-    CostmapExtruder extruder_;
+    CostmapExtruder m_extruder;
     rcta::GascanGraspPlanner m_grasp_planner;
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
     std::vector<std::string> m_gripper_links;
@@ -137,108 +137,108 @@ private:
 
     /// Circumscribed radius of the object, used to remove object cells from
     /// the occupancy grid and extruded octomap
-    double object_filter_radius_m_;
+    double m_object_filter_radius;
 
     /// Whether to override incoming octomaps with an extruded costmap variant
-    bool use_extrusion_octomap_;
+    bool m_use_extrusion_octomap;
 
-    bool skip_viservo_;
+    bool m_skip_viservo;
 
     ///@}
 
     /// \name GenerateGrasps Parameters
     ///@{
-    std::vector<AttachedMarker> attached_markers_;
+    std::vector<AttachedMarker> m_attached_markers;
     ///@}
 
     /// \name MoveArmToPregrasp Parameters
     ///@{
-    int max_grasp_candidates_;
+    int m_max_grasp_candidates;
     ///@}
 
     /// \name MoveArmToStow Parameters
     ///@{
-    std::vector<StowPosition> stow_positions_;
-    ros::Duration attach_obj_req_wait_;
+    std::vector<StowPosition> m_stow_positions;
+    ros::Duration m_attach_obj_req_wait;
     ///@}
 
     /// \name CompleteGoal Parameters
     ///@{
-    double gas_can_detection_threshold_;
+    double m_gas_can_detection_threshold;
     ///@}
 
     /// \name Goal Context
     ///@{
 
-    rcta_msgs::GraspObjectCommandGoal::ConstPtr current_goal_;
+    rcta_msgs::GraspObjectCommandGoal::ConstPtr m_current_goal;
 
     /// copy of most recent OccupancyGrid message when the goal was received
-    OccupancyGridPtr current_occupancy_grid_;
+    OccupancyGridPtr m_current_occupancy_grid;
 
     /// extruded current occupancy grid
-    OctomapPtr current_octomap_;
+    OctomapPtr m_current_octomap;
 
-    geometry_msgs::PoseStamped gas_can_in_grid_frame_;
+    geometry_msgs::PoseStamped m_gas_can_in_grid_frame;
 
     ///@}
 
     /// \name Internal state machine for move arm goal stages
     ///@{
-    bool sent_move_arm_goal_;
-    bool pending_move_arm_command_;
-    actionlib::SimpleClientGoalState move_arm_command_goal_state_;
-    rcta::MoveArmResult::ConstPtr move_arm_command_result_;
+    bool m_sent_move_arm_goal;
+    bool m_pending_move_arm_command;
+    actionlib::SimpleClientGoalState m_move_arm_command_goal_state;
+    rcta::MoveArmResult::ConstPtr m_move_arm_command_result;
     ///@}
 
     /// \name Internal state machine for viservo goal stages
     ///@{
-    bool sent_viservo_command_;
-    bool pending_viservo_command_;
-    actionlib::SimpleClientGoalState viservo_command_goal_state_;
-    rcta::ViservoCommandResult::ConstPtr viservo_command_result_;
+    bool m_sent_viservo_command;
+    bool m_pending_viservo_command;
+    actionlib::SimpleClientGoalState m_viservo_command_goal_state;
+    rcta::ViservoCommandResult::ConstPtr m_viservo_command_result;
     ///@}
 
     /// \name Internal state machine for gripper goal stages
     ///@{
-    bool sent_gripper_command_;
-    bool pending_gripper_command_;
-    actionlib::SimpleClientGoalState gripper_command_goal_state_;
-    control_msgs::GripperCommandResult::ConstPtr gripper_command_result_;
+    bool m_sent_gripper_command;
+    bool m_pending_gripper_command;
+    actionlib::SimpleClientGoalState m_gripper_command_goal_state;
+    control_msgs::GripperCommandResult::ConstPtr m_gripper_command_result;
     ///@}
 
-    OccupancyGridConstPtr last_occupancy_grid_; ///< most recent OccupancyGrid message
+    OccupancyGridConstPtr m_last_occupancy_grid; ///< most recent OccupancyGrid message
 
     /// \name Shared State
     ///@{
 
     // shared(GenerateGrasps, MoveArmToPregrasp)
     // -> to plan to a number of different grasps, ranked by graspability
-    std::vector<rcta::GraspCandidate> reachable_grasp_candidates_;
+    std::vector<rcta::GraspCandidate> m_reachable_grasp_candidates;
 
     // shared(MoveArmToPregrasp, ExecuteVisualServoMotionToPregrasp)
     // shared(MoveArmToPregrasp, MoveArmToGrasp)
     // -> to enforce visual servo to the same pose
-    rcta::MoveArmGoal last_move_arm_pregrasp_goal_;
+    rcta::MoveArmGoal m_last_move_arm_pregrasp_goal;
 
     // shared(MoveArmToPregrasp, MoveArmToStow)
     // -> to know how to attach the object to the arm
-    rcta::GraspCandidate last_successful_grasp_;
+    rcta::GraspCandidate m_last_successful_grasp;
 
     // shared(ExecuteVisualServoMotionToPregrasp, ExecuteVisualServoMotionToGrasp)
     // -> propagate wrist goal originating from MoveArmToPregrasp
-    rcta::ViservoCommandGoal last_viservo_pregrasp_goal_;
+    rcta::ViservoCommandGoal m_last_viservo_pregrasp_goal;
 
     ///@}
 
     /// \name MoveArmToStowPosition State
     ///@{
-    int next_stow_position_to_attempt_;
-    ros::Time attach_obj_req_time_;
+    int m_next_stow_position_to_attempt;
+    ros::Time m_attach_obj_req_time;
     ///@}
 
     /// \name Completing state
     ///@{
-    ros::Time wait_for_grid_start_time_;
+    ros::Time m_wait_for_grid_start_time;
     ///@}
 
     bool downloadMarkerParams();
@@ -315,10 +315,10 @@ private:
     uint8_t executionStatusToFeedbackStatus(GraspObjectExecutionStatus::Status status);
 
     void pruneGraspCandidates(
-    		std::vector<rcta::GraspCandidate>& candidates,
-    		const Eigen::Affine3d& robot_pose,
-    		const Eigen::Affine3d& camera_pose,
-    		double marker_incident_angle_threshold_rad) const;
+        std::vector<rcta::GraspCandidate>& candidates,
+        const Eigen::Affine3d& robot_pose,
+        const Eigen::Affine3d& camera_pose,
+        double marker_incident_angle_threshold_rad) const;
 
     void pruneGraspCandidatesIK(
         std::vector<rcta::GraspCandidate>& candidates,
@@ -345,6 +345,10 @@ private:
             double circle_x,
             double circle_y,
             double radius) const;
+
+    void transformCollisionObject(
+        moveit_msgs::CollisionObject& o,
+        const Eigen::Affine3d& t) const;
 };
 
 #endif
