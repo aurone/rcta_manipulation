@@ -203,19 +203,23 @@ void GraspingCommandPanel::refresh_global_frame()
 
 void GraspingCommandPanel::copyCurrentBasePose()
 {
-    tf::StampedTransform world_to_robot;
-    listener_.lookupTransform(global_frame_, robot_model_->getModelFrame(), ros::Time(0), world_to_robot);
-    tf::transformTFToEigen(world_to_robot, T_world_robot_);
+    try {
+        tf::StampedTransform world_to_robot;
+        listener_.lookupTransform(global_frame_, robot_model_->getModelFrame(), ros::Time(0), world_to_robot);
+        tf::transformTFToEigen(world_to_robot, T_world_robot_);
 
-    teleport_base_command_x_box_->setValue(T_world_robot_.translation()[0]);
-    teleport_base_command_y_box_->setValue(T_world_robot_.translation()[1]);
-    teleport_base_command_z_box_->setValue(T_world_robot_.translation()[2]);
+        teleport_base_command_x_box_->setValue(T_world_robot_.translation()[0]);
+        teleport_base_command_y_box_->setValue(T_world_robot_.translation()[1]);
+        teleport_base_command_z_box_->setValue(T_world_robot_.translation()[2]);
 
-    double roll, pitch, yaw;
-    msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
-    teleport_base_command_yaw_box_->setValue(sbpl::utils::ToDegrees(yaw));
+        double roll, pitch, yaw;
+        msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
+        teleport_base_command_yaw_box_->setValue(sbpl::utils::ToDegrees(yaw));
 
-    publish_phantom_robot_visualizations();
+        publish_phantom_robot_visualizations();
+    } catch (const tf::TransformException& ex) {
+        QMessageBox::critical(this, tr("Transform Exception"), tr("%1").arg(QString(ex.what())));
+    }
 }
 
 void GraspingCommandPanel::update_base_pose_x(double x)
