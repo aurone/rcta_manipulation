@@ -280,32 +280,27 @@ int RepositionBaseExecutor::run()
             }
         }   break;
         case RepositionBaseExecutionStatus::COMPUTING_REPOSITION_BASE: {
-            Eigen::Affine3d robot_pose;
-            tf::poseMsgToEigen(robot_pose_world_frame_.pose, robot_pose);
-
-            Eigen::Affine3d object_pose;
-            tf::poseMsgToEigen(current_goal_->gas_can_in_map.pose, object_pose);
-
             // NOTE: special for the gascan
-            Pose2D gascan_pose = poseEigen3ToSimpleGascan(object_pose);
+            Pose2D gascan_pose = poseEigen3ToSimpleGascan(m_obj_pose);
 
             const auto& map = current_goal_->map;
 
             std::vector<geometry_msgs::PoseStamped> candidate_base_poses;
 
-            if (tryFeasibleArmCheck(robot_pose, object_pose)) {
-                int err = checkFeasibleMoveToPregraspTrajectory(robot_pose, object_pose);
+            if (tryFeasibleArmCheck(m_rob_pose, m_obj_pose)) {
+                int err = checkFeasibleMoveToPregraspTrajectory(m_rob_pose, m_obj_pose);
                 ROS_DEBUG("arm plan result: %d", err);
                 if (err) {
                     int v_id = 0;
-                    visualizeRobot(robot_pose, 0, "base_checkIKPLAN_fail", v_id);
+                    visualizeRobot(m_rob_pose, 0, "base_checkIKPLAN_fail", v_id);
                 } else {
                     // you can grasp it now!
                     rcta_msgs::RepositionBaseCommandResult result;
                     result.result = rcta_msgs::RepositionBaseCommandResult::SUCCESS;
 
                     geometry_msgs::PoseStamped p;
-                    tf::poseEigenToMsg(robot_pose, p.pose);
+                    tf::poseEigenToMsg(m_rob_pose, p.pose);
+                    p.header.frame_id = robot_model_->getModelFrame();
                     candidate_base_poses.push_back(p);
                     result.candidate_base_poses = candidate_base_poses;
                     as_->setSucceeded(result);
@@ -313,7 +308,7 @@ int RepositionBaseExecutor::run()
                 }
             } else if (computeRobPose(
                     map,
-                    poseEigen3ToSimple(robot_pose),
+                    poseEigen3ToSimple(m_rob_pose),
                     gascan_pose,
                     candidate_base_poses))
             {
@@ -324,8 +319,8 @@ int RepositionBaseExecutor::run()
                 status_ = RepositionBaseExecutionStatus::IDLE;
             } else if (computeRobPoseExhaustive(
                     map,
-                    robot_pose,
-                    object_pose,
+                    m_rob_pose,
+                    m_obj_pose,
                     candidate_base_poses))
             {
                 rcta_msgs::RepositionBaseCommandResult result;
@@ -368,37 +363,82 @@ void RepositionBaseExecutor::goalCallback()
     ROS_INFO("    res: %0.3f", map.info.resolution);
     ROS_INFO("    data: <%zu elements>", map.data.size());
 
-    // NOTE: There was some fishy business going on here transforming the
-    // incoming pose to a pose specified in another frame, presumably for
-    // compatibility. Removing for now, but keep this in mind...it shouldn't
-    // be necessary, strictly speaking
-//    const std::string world_frame = "abs_nwu";
+    // transform the root pose into the model frame:
+    //     model -> root = model -> input * input -> root
+    //
+    // transform the object pose into the model frame:
+    //     model -> object = model -> input * input -> object
+    //
+    // example:
+    //   model = "base_footprint", input_robot = "map", input_object = "map"
+    //     "base_footprint" -> "base_footprint" = "base_footprint" -> "map" * "map -> "base_footprint"
+    //     "base_footprint" -> object = "base_footprint" -> "map" * "map" -> object = "base_footprint" -> "object"
+    //
+    // example:
+    //   model = "map", input_robot = "abs_nwu", input_object = "abs_nwu"
+    //     "map" -> "base_footprint" = "map" -> "abs_nwu" * "abs_nwu" -> "base_footprint
+    //     "map" -> "object" = "map" -> "abs_nwu" * "abs_nwu" -> "object"
 
-    // more generally...the position of the robot should be the position of the
-    // root link in the configured model frame, else we need to convert that
-    // here. this is because the camera pose is specified in the model frame and
-    // is compared against the object pose
-
-    const geometry_msgs::PoseStamped& robot_pose = current_goal_->base_link_in_map;
+    const geometry_msgs::PoseStamped& rob_pose_in = current_goal_->base_link_in_map;
+    const geometry_msgs::PoseStamped& obj_pose_in = current_goal_->gas_can_in_map;
     const std::string& map_frame = map.header.frame_id;
-    if (robot_pose.header.frame_id != map_frame) {
+
+    if (rob_pose_in.header.frame_id != robot_model_->getModelFrame()) {
+        ROS_INFO("Transform robot pose into model frame");
+        geometry_msgs::PoseStamped rob_pose_in_model;
         try {
-            ROS_INFO("transform robot pose from frame '%s' into frame '%s'", robot_pose.header.frame_id.c_str(), map_frame.c_str());
             listener_.transformPose(
-                    map_frame,
-                    robot_pose,
-                    robot_pose_world_frame_);
-        }
-        catch (const tf::TransformException& ex) {
-            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", current_goal_->base_link_in_map.header.frame_id.c_str(), map_frame.c_str(), ex.what());
+                    robot_model_->getModelFrame(),
+                    rob_pose_in,
+                    rob_pose_in_model);
+            tf::poseMsgToEigen(rob_pose_in_model.pose, m_rob_pose);
+        } catch (const tf::TransformException& ex) {
+            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", rob_pose_in.header.frame_id.c_str(), robot_model_->getModelFrame().c_str(), ex.what());
             as_->setAborted();
             return;
         }
+    } else {
+        tf::poseMsgToEigen(rob_pose_in.pose, m_rob_pose);
     }
-    else {
-        ROS_INFO("robot pose already in map frame :)");
-        robot_pose_world_frame_ = current_goal_->base_link_in_map;
+
+    if (obj_pose_in.header.frame_id != robot_model_->getModelFrame()) {
+        ROS_INFO("Transform object pose into model frame");
+        geometry_msgs::PoseStamped obj_pose_in_model;
+        try {
+            listener_.transformPose(
+                    robot_model_->getModelFrame(),
+                    obj_pose_in,
+                    obj_pose_in_model);
+            tf::poseMsgToEigen(obj_pose_in_model.pose, m_obj_pose);
+        } catch (const tf::TransformException& ex) {
+            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", obj_pose_in.header.frame_id.c_str(), robot_model_->getModelFrame().c_str(), ex.what());
+            as_->setAborted();
+            return;
+        }
+    } else {
+        tf::poseMsgToEigen(obj_pose_in.pose, m_obj_pose);
     }
+
+    if (map_frame != robot_model_->getModelFrame()) {
+        ROS_INFO("Lookup transform from model frame to grid frame");
+        tf::StampedTransform t;
+        try {
+            listener_.lookupTransform(map_frame, robot_model_->getModelFrame(), ros::Time(0), t);
+            tf::transformTFToEigen(t, m_T_model_grid);
+            m_T_grid_model = m_T_model_grid.inverse();
+        } catch (const tf::TransformException& ex) {
+            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", obj_pose_in.header.frame_id.c_str(), robot_model_->getModelFrame().c_str(), ex.what());
+            as_->setAborted();
+            return;
+        }
+    } else {
+        m_T_model_grid = Eigen::Affine3d::Identity();
+        m_T_grid_model = Eigen::Affine3d::Identity();
+    }
+
+    ROS_INFO("  Robot Pose [model frame]: %s", to_string(m_rob_pose).c_str());
+    ROS_INFO("  Gascan Pose [model frame]: %s", to_string(m_obj_pose).c_str());
+    ROS_INFO("  T_grid_model: %s", to_string(m_T_grid_model).c_str());
 
     // update collision checker if valid map
     if (!cc_->updateOccupancyGrid(map)) {
@@ -584,7 +624,7 @@ bool RepositionBaseExecutor::computeRobPose(
 
             geometry_msgs::PoseStamped candidate_pose;
 
-            candidate_pose.header.frame_id = map.header.frame_id;
+            candidate_pose.header.frame_id = robot_model_->getModelFrame();
             candidate_pose.header.stamp = ros::Time::now();
 
             Eigen::Affine3d T_world_robot_3d = poseEigen2ToEigen3(T_world_robot);
@@ -848,7 +888,10 @@ void RepositionBaseExecutor::pruneCollisionStates(
         Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
         Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
 
-        Pose2D rp = poseEigen2ToSimple(T_world_robot);
+        // Transform to simple pose in grid frame
+        Eigen::Affine3d T_model_robot = poseEigen2ToEigen3(T_world_robot);
+        Eigen::Affine3d T_grid_robot = m_T_model_grid.inverse() * T_model_robot;
+        Pose2D rp = poseEigen2ToSimple(poseEigen3ToEigen2(T_grid_robot));
 
         if (!cc_->isValidState(rp.x, rp.y, rp.yaw)) {
             // equivalent to pObs[i][j][k] = 0;
@@ -896,8 +939,12 @@ void RepositionBaseExecutor::computeArmCollisionProbabilities(
         Eigen::Affine2d T_mount_arm(
                 Eigen::Translation2d(m_arm_offset_x, m_arm_offset_y));
         Eigen::Affine2d T_world_arm = T_world_mount * T_mount_arm;
-        const double armx = T_world_arm.translation()[0];
-        const double army = T_world_arm.translation()[1];
+
+        Eigen::Affine3d T_model_arm = poseEigen2ToEigen3(T_world_arm);
+        Eigen::Affine3d T_grid_arm = m_T_model_grid.inverse() * T_model_arm;
+
+        const double armx = T_grid_arm.translation()[0];
+        const double army = T_grid_arm.translation()[1];
 
         double distObs = cc_->getCellObstacleDistance(armx, army);
         if (distObs < m_arm_length_core) {
@@ -943,8 +990,11 @@ void RepositionBaseExecutor::computeBaseCollisionProbabilities(
         Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
         Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
 
-        double bodyx = T_world_robot.translation()[0];
-        double bodyy = T_world_robot.translation()[1];
+        Eigen::Affine3d T_model_body = poseEigen2ToEigen3(T_world_robot);
+        Eigen::Affine3d T_grid_body = m_T_model_grid.inverse() * T_model_body;
+
+        double bodyx = T_grid_body.translation()[0];
+        double bodyy = T_grid_body.translation()[1];
 
         double distObs = cc_->getCellObstacleDistance(bodyx, bodyy);
         if (distObs < m_body_length_core) {
@@ -1038,8 +1088,7 @@ void RepositionBaseExecutor::projectProbabilityMap(
                     ROS_ERROR("Invalid discrete angle %d", cth);
                 }
                 grid.data[y * grid.info.width + x] = 0;
-            }
-            else {
+            } else {
                 if (cth < 0 || cth >= ss.nAng) {
                     ROS_ERROR("Invalid discrete angle %d", cth);
                 }
@@ -1311,7 +1360,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
             Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
 
             geometry_msgs::PoseStamped candidate_pose;
-            candidate_pose.header.frame_id = map.header.frame_id;
+            candidate_pose.header.frame_id = robot_model_->getModelFrame();
             candidate_pose.header.stamp = ros::Time::now();
             Eigen::Affine3d T_world_robot_3d = poseEigen2ToEigen3(T_world_robot);
             tf::poseEigenToMsg(T_world_robot_3d, candidate_pose.pose);
@@ -1884,8 +1933,7 @@ void RepositionBaseExecutor::aMetricIDontHaveTimeToMaintain()
                             jMax = j;
                             kMax = k;
                             cntTotMax++;
-                        }
-                        else {
+                        } else {
                             bTotMax(i, j, k) = false;
                             // /top_shelf pose
                             double robxf = rob(i, j, k).x;
@@ -1949,8 +1997,7 @@ void RepositionBaseExecutor::aMetricIDontHaveTimeToMaintain()
                                     jMax = j;
                                     kMax = k;
                                     cntTotMax++;
-                                }
-                                else {
+                                } else {
                                     bTotMax(i, j, k) = false;
                                 }
                                 // /top_shelf pose
@@ -2117,8 +2164,7 @@ void RepositionBaseExecutor::anotherMetricIDontHaveTimeToMaintain()
 
         ROS_WARN("    No candidate pose was found!");
         return false;
-    }
-    else if (cntTotMax > 1)	// if more than one candidate poses are selected
+    } else if (cntTotMax > 1)	// if more than one candidate poses are selected
             // (we can select poses with pTot higher than a THRESHOLD)
             {
         // a) sorting by difference of angular coordinates for current and desired poses
@@ -2140,8 +2186,7 @@ void RepositionBaseExecutor::anotherMetricIDontHaveTimeToMaintain()
                             jMax = j;
                             kMax = k;
                             cntTotMax++;
-                        }
-                        else {
+                        } else {
                             bTotMax(i, j, k) = false;
                             // /top_shelf pose
                             double robxf = rob(i, j, k).x;
@@ -2195,8 +2240,7 @@ void RepositionBaseExecutor::anotherMetricIDontHaveTimeToMaintain()
                                     jMax = j;
                                     kMax = k;
                                     cntTotMax++;
-                                }
-                                else {
+                                } else {
                                     bTotMax(i, j, k) = false;
                                     // /top_shelf pose
                                     double robxf = rob(i, j, k).x;

@@ -221,6 +221,10 @@ private:
     rcta_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
     RepositionBaseExecutionStatus::Status status_;
     RepositionBaseExecutionStatus::Status last_status_;
+    Eigen::Affine3d m_rob_pose;
+    Eigen::Affine3d m_obj_pose;
+    Eigen::Affine3d m_T_model_grid;
+    Eigen::Affine3d m_T_grid_model;
 
     /// \name Initialization
     ///@{
