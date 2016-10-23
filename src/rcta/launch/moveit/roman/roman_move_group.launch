@@ -5,7 +5,7 @@
     <!-- move_group parameters -->
     <arg name="allow_trajectory_execution"          default="true"/>
     <arg name="max_safe_path_cost"                  default="1"/>
-    <arg name="jiggle_fraction"                     default="0.05"/>
+    <arg name="jiggle_fraction"                     default="0.00694"/>
     <arg name="publish_monitored_planning_scene"    default="true"/>
 
     <arg name="fake_execution"                      value="$(arg fake)"/>
