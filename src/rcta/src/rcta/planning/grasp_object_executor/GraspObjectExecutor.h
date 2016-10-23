@@ -143,6 +143,7 @@ private:
     bool m_use_extrusion_octomap;
 
     bool m_skip_viservo;
+    bool m_attach_object;
 
     ///@}
 

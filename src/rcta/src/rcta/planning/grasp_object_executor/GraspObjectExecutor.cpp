@@ -37,8 +37,8 @@ moveit_msgs::CollisionObject CreateGascanCollisionObject()
     double body_part_qx = 0.0001895;    // 0.0
     double body_part_qy = -0.009;       // 0.0
     double body_part_qz = 0.021;        // 0.0
-    double body_part_dim_x = 0.212;     // 0.20
-    double body_part_dim_y = 0.212;     // 0.25
+    double body_part_dim_x = 0.20; //0.212;     // 0.20
+    double body_part_dim_y = 0.20; //0.212;     // 0.25
     double body_part_dim_z = 0.15; //0.296;     // 0.25
 
     double noz_part_x = 0.00816;            // 0.0
@@ -184,6 +184,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     m_object_filter_radius(),
     m_use_extrusion_octomap(false),
     m_skip_viservo(false),
+    m_attach_object(false),
     m_attached_markers(),
     m_max_grasp_candidates(0),
     m_stow_positions(),
@@ -817,7 +818,9 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToPregrasp()
 void GraspObjectExecutor::onMovingArmToPregraspExit(
     GraspObjectExecutionStatus::Status to)
 {
-
+    // TODO: inserting arbitrary sleeps to ensure that plans are not requested
+    // too quickly...this will unfortunately block the state pump atm
+    ros::Duration(1.0).sleep();
 }
 
 void GraspObjectExecutor::onMovingArmToGraspEnter(GraspObjectExecutionStatus::Status from)
@@ -888,6 +891,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToGrasp()
 
 void GraspObjectExecutor::onMovingArmToGraspExit(GraspObjectExecutionStatus::Status to)
 {
+    ros::Duration(1.0).sleep();
 }
 
 void GraspObjectExecutor::onOpeningGripperEnter(
@@ -1274,6 +1278,8 @@ void GraspObjectExecutor::onMovingArmToStowEnter(
     const Eigen::Affine3d& T_grasp_object =
             m_last_successful_grasp.pose_in_object.inverse();
 
+    ROS_INFO("Attaching gascan at offset %s from the wrist", to_string(T_grasp_object).c_str());
+
     transformCollisionObject(aco.object, T_grasp_object);
 
     aco.object.header.frame_id = tip_link;
@@ -1307,7 +1313,11 @@ void GraspObjectExecutor::onMovingArmToStowEnter(
 
     aco.weight = 1.0; //arbitrary (not used anyways)
 
-    m_attach_obj_pub.publish(aco);
+    // this would be ideal, but i really hate moveits start-in-collision-fixer
+    // which currently causes large jerks
+    if (m_attach_object) {
+        m_attach_obj_pub.publish(aco);
+    }
 
     m_attach_obj_req_time = ros::Time::now();
 
@@ -1399,7 +1409,13 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
 void GraspObjectExecutor::onMovingArmToStowExit(
     GraspObjectExecutionStatus::Status to)
 {
-
+    if (m_attach_object) {
+        moveit_msgs::AttachedCollisionObject aco;
+        aco.object.id = "gascan";
+        aco.object.operation = moveit_msgs::CollisionObject::REMOVE;
+        m_attach_obj_pub.publish(aco);
+    }
+    ros::Duration(1.0).sleep();
 }
 
 void GraspObjectExecutor::onCompletingGoalEnter(
