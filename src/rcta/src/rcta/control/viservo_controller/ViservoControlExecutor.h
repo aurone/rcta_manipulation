@@ -42,7 +42,7 @@ private:
 
     hdt::RobotModelPtr robot_model_;
 
-    typedef std::unique_ptr<sbpl::manip::KDLRobotModel> KDLRobotModelPtr;
+    typedef std::unique_ptr<sbpl::motion::KDLRobotModel> KDLRobotModelPtr;
     KDLRobotModelPtr kdl_robot_model_;
 
     std::string action_name_;

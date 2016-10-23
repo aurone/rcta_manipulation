@@ -58,7 +58,7 @@ int main(int argc, char** argv)
     const std::string chain_tip_link = planning_link;
 
     const int free_angle_index = 2;
-    sbpl::manip::KDLRobotModel robot_model(
+    sbpl::motion::KDLRobotModel robot_model(
         kinematics_frame,
         chain_tip_link,
         free_angle_index);
@@ -138,9 +138,9 @@ int main(int argc, char** argv)
     // Planning Interface //
     ////////////////////////
 
-    sbpl::manip::PlannerInterface planner(&robot_model, cspace.get(), &grid);
+    sbpl::motion::PlannerInterface planner(&robot_model, cspace.get(), &grid);
 
-    sbpl::manip::PlanningParams params;
+    sbpl::motion::PlanningParams params;
     params.action_filename = action_set_filename;
     // TODO: fill in planning params
     if (!planner.init(params)) {

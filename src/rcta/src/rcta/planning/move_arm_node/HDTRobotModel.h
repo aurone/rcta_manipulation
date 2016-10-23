@@ -15,9 +15,9 @@ namespace hdt {
 
 /// \brief Implements the RobotModel interface for use with sbpl planners
 class HDTRobotModel :
-    public virtual sbpl::manip::RobotModel,
-    public virtual sbpl::manip::ForwardKinematicsInterface,
-    public virtual sbpl::manip::InverseKinematicsInterface
+    public virtual sbpl::motion::RobotModel,
+    public virtual sbpl::motion::ForwardKinematicsInterface,
+    public virtual sbpl::motion::InverseKinematicsInterface
 {
 public:
 
@@ -41,7 +41,7 @@ public:
 
     /// \namem Reimplemented Public Functions from Extension
     ///@{
-    virtual sbpl::manip::Extension* getExtension(size_t class_code) override;
+    virtual sbpl::motion::Extension* getExtension(size_t class_code) override;
     ///@}
 
     bool checkJointLimits(
@@ -61,15 +61,15 @@ public:
         const std::vector<double>& pose,
         const std::vector<double>& start,
         std::vector<double>& solution,
-        sbpl::manip::ik_option::IkOption option =
-                sbpl::manip::ik_option::UNRESTRICTED) override;
+        sbpl::motion::ik_option::IkOption option =
+                sbpl::motion::ik_option::UNRESTRICTED) override;
 
     bool computeIK(
         const std::vector<double>& pose,
         const std::vector<double>& start,
         std::vector<std::vector<double>>& solutions,
-        sbpl::manip::ik_option::IkOption option =
-                sbpl::manip::ik_option::UNRESTRICTED) override;
+        sbpl::motion::ik_option::IkOption option =
+                sbpl::motion::ik_option::UNRESTRICTED) override;
     ///@}
 
 private:

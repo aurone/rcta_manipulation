@@ -75,11 +75,11 @@ double HDTRobotModel::accLimit(int jidx) const
     return 0.0;
 }
 
-sbpl::manip::Extension* HDTRobotModel::getExtension(size_t class_code)
+sbpl::motion::Extension* HDTRobotModel::getExtension(size_t class_code)
 {
-    if (class_code == sbpl::manip::GetClassCode<sbpl::manip::RobotModel>() ||
-        class_code == sbpl::manip::GetClassCode<sbpl::manip::ForwardKinematicsInterface>() ||
-        class_code == sbpl::manip::GetClassCode<sbpl::manip::InverseKinematicsInterface>())
+    if (class_code == sbpl::motion::GetClassCode<sbpl::motion::RobotModel>() ||
+        class_code == sbpl::motion::GetClassCode<sbpl::motion::ForwardKinematicsInterface>() ||
+        class_code == sbpl::motion::GetClassCode<sbpl::motion::InverseKinematicsInterface>())
     {
         return this;
     }
@@ -151,9 +151,9 @@ bool HDTRobotModel::computeIK(
     const std::vector<double>& pose,
     const std::vector<double>& start,
     std::vector<double>& solution,
-    sbpl::manip::ik_option::IkOption option)
+    sbpl::motion::ik_option::IkOption option)
 {
-    if (option != sbpl::manip::ik_option::UNRESTRICTED) {
+    if (option != sbpl::motion::ik_option::UNRESTRICTED) {
         ROS_WARN_ONCE("HDTRobotModel does not support restricted IK queries");
         return false;
     }
@@ -204,9 +204,9 @@ bool HDTRobotModel::computeIK(
     const std::vector<double>& pose,
     const std::vector<double>& start,
     std::vector<std::vector<double>>& solutions,
-    sbpl::manip::ik_option::IkOption option)
+    sbpl::motion::ik_option::IkOption option)
 {
-    if (option != sbpl::manip::ik_option::UNRESTRICTED) {
+    if (option != sbpl::motion::ik_option::UNRESTRICTED) {
         ROS_WARN_ONCE("HDTRobotModel does not support unrestricted IK calls");
         return false;
     }
