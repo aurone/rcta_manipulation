@@ -36,7 +36,7 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     rospack
     rviz
-    sbpl_arm_planner
+    smpl
     sbpl_collision_checking
     sbpl_geometry_utils
     spellbook_ros

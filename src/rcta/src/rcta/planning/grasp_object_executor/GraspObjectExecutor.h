@@ -18,7 +18,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
 #include <ros/ros.h>
-#include <sbpl_arm_planner/visualizer_ros.h>
+#include <smpl/debug/visualizer_ros.h>
 #include <spellbook/costmap_extruder/CostmapExtruder.h>
 #include <spellbook/geometry/nurb/NURB.h>
 #include <tf/transform_listener.h>

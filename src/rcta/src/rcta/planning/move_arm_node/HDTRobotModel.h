@@ -5,7 +5,7 @@
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
-#include <sbpl_arm_planner/robot_model.h>
+#include <smpl/robot_model.h>
 #include <urdf/model.h>
 
 // project includes

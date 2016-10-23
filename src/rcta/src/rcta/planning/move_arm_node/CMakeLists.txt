@@ -4,7 +4,7 @@ target_link_libraries(
     ${eigen_conversions_LIBRARIES}
     ${leatherman_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_arm_planner_LIBRARIES}
+    ${smpl_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
     ${tf_LIBRARIES}
     ${urdf_LIBRARIES}
@@ -17,7 +17,7 @@ target_link_libraries(
     hdt_arm_planning
     ${moveit_core_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_arm_planner_LIBRARIES}
+    ${smpl_LIBRARIES}
     ${sbpl_collision_checking_LIBRARIES}
     ${sbpl_kdl_robot_model_LIBRARIES})
 
@@ -29,7 +29,7 @@ target_link_libraries(
     ${leatherman_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_arm_planner_LIBRARIES}
+    ${smpl_LIBRARIES}
     ${sbpl_collision_checking_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
     ${sbpl_kdl_robot_model_LIBRARIES}

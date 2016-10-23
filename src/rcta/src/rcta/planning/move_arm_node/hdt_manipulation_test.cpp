@@ -4,8 +4,8 @@
 // system includes
 #include <moveit/distance_field/propagation_distance_field.h>
 #include <ros/ros.h>
-#include <sbpl_arm_planner/occupancy_grid.h>
-#include <sbpl_arm_planner/planner_interface.h>
+#include <smpl/occupancy_grid.h>
+#include <smpl/planner_interface.h>
 #include <sbpl_collision_checking/collision_space.h>
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
 
@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 
     const std::string kinematics_frame = "base_link";
     // planning for the wrist rather than the gripper base as in the
-    // sbpl_arm_planner_test - Andrew
+    // smpl_test - Andrew
     const std::string chain_tip_link = planning_link;
 
     const int free_angle_index = 2;

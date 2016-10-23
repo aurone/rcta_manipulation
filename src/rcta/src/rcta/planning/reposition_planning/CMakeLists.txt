@@ -16,7 +16,7 @@ target_link_libraries(
     ${urdf_parser_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
-    ${sbpl_arm_planner_LIBRARIES}
+    ${smpl_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${SBPL_LIBRARIES}
     gascan_grasp_planner

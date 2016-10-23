@@ -7,7 +7,7 @@ target_link_libraries(
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_arm_planner_LIBRARIES}
+    ${smpl_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_conversions_LIBRARIES}

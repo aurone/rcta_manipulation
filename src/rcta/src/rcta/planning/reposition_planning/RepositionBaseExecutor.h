@@ -18,7 +18,7 @@
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
-#include <sbpl_arm_planner/visualizer_ros.h>
+#include <smpl/debug/visualizer_ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
 #include <spellbook/grid/grid.h>
 #include <tf/transform_datatypes.h>
