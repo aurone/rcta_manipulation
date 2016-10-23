@@ -443,7 +443,11 @@ moveit_msgs::CollisionObject MoveArmNode::createGroundPlaneObject() const
     ground_plane.coef[0] = 0.0;
     ground_plane.coef[1] = 0.0;
     ground_plane.coef[2] = 1.0;
-    ground_plane.coef[3] = 0.0;
+
+    // TODO: derive this from the resolution set in the world collision model
+    // to be -0.5 * res, which should make one layer of voxels immediately
+    // beneath z = 0
+    ground_plane.coef[3] = 0.075;
 
     gpo.planes.push_back(ground_plane);
     gpo.plane_poses.push_back(geometry_msgs::IdentityPose());
