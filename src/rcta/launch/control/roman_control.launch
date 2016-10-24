@@ -63,7 +63,7 @@
         </group>
     </group>
 
-    <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/>
+<!--    <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/> -->
 
     <!-- all configurations need a robot state publisher -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
