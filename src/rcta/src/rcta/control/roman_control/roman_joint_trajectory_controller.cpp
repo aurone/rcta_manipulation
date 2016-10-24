@@ -20,10 +20,15 @@ void translate_jplspec_to_rosspec(
         spec_rosmsg.valid.push_back(spec.valid[m]);
     }
     spec_rosmsg.num_waypoints  = spec.num_waypoints;
+    spec_rosmsg.waypoints.resize(spec_rosmsg.num_waypoints);
     for(int w=0; w<spec_rosmsg.num_waypoints; w++)
     {
-        roman_client_ros_utils::RomanWaypoint wpt;
-        wpt.utime = spec.waypoints[w].timestamp;
+        roman_client_ros_utils::RomanWaypoint& wpt = spec_rosmsg.waypoints[w];
+        wpt.utime = (int64_t)spec.waypoints[w].timestamp;
+        if (w % 10 == 0) {
+            ROS_INFO("Waypoint Time (%d): %ld", w, wpt.utime);
+            ROS_INFO_STREAM("Waypoint Time (" << w << "): " << wpt.utime);
+        }
         wpt.num_joints = ROBOT_NUM_JOINTS;
         for (int j = 0; j < ROBOT_NUM_JOINTS; j++) {
             wpt.positions.push_back(spec.waypoints[w].positions[j]);
@@ -35,7 +40,14 @@ void translate_jplspec_to_rosspec(
         wpt.world2robot.orientation.x = spec.waypoints[w].world2robot.rot.x;
         wpt.world2robot.orientation.y = spec.waypoints[w].world2robot.rot.y;
         wpt.world2robot.orientation.z = spec.waypoints[w].world2robot.rot.z;
-        spec_rosmsg.waypoints.push_back(wpt);
+//        spec_rosmsg.waypoints.push_back(wpt);
+    }
+
+    for(int w=0; w<spec_rosmsg.num_waypoints; w++)
+    {
+        if (w % 10 == 0) {
+            ROS_INFO("Waypoint Time (%d): %ld", w, spec_rosmsg.waypoints[w].utime);
+        }
     }
 
     return;
