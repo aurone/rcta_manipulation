@@ -75,7 +75,7 @@
             </collision>
         </link>
 
-        <xacro:asus_camera name="camera" parent="chest">
+        <xacro:asus_camera name="asus" parent="chest">
             <origin xyz="0.05 -0.075 0" rpy="${-M_PI/2} 0.0 -2.09"/>
         </xacro:asus_camera>
 
