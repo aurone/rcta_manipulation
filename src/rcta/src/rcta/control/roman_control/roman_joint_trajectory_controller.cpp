@@ -49,7 +49,10 @@ void translate_rosspec_to_jplspec(
     memcpy(jplspec.valid, &spec_rosmsg.valid[0], sizeof(int) * ROBOT_NUM_MECHS);
     jplspec.num_waypoints =  spec_rosmsg.num_waypoints;
     for (int w = 0; w < jplspec.num_waypoints; w++) {
-        jplspec.waypoints[w].timestamp= spec_rosmsg.waypoints[w].utime;
+        jplspec.waypoints[w].timestamp= w * 1e5; //spec_rosmsg.waypoints[w].utime;
+        if (w % 10 == 0) {
+            ROS_INFO("Waypoint Time (%d): %ld", w, jplspec.waypoints[w].timestamp);
+        }
         memcpy(jplspec.waypoints[w].positions, &spec_rosmsg.waypoints[w].positions[0], sizeof(int) * ROBOT_NUM_JOINTS);
         jplspec.waypoints[w].world2robot.pos.x = spec_rosmsg.waypoints[w].world2robot.position.x;
         jplspec.waypoints[w].world2robot.pos.y = spec_rosmsg.waypoints[w].world2robot.position.y;
