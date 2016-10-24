@@ -91,7 +91,7 @@ bool RepositionBaseExecutor::initialize()
     // with GraspObjectExecutor                                             //
     //////////////////////////////////////////////////////////////////////////
 
-    camera_view_frame_ = "camera_rgb_optical_frame";
+    camera_view_frame_ = "asus_rgb_optical_frame";
 
     rml_.reset(new robot_model_loader::RobotModelLoader);
     robot_model_ = rml_->getModel();

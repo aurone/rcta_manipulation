@@ -178,7 +178,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     m_grasp_planner(),
     m_scene_monitor(),
     m_gripper_links(),
-    m_camera_view_frame("camera_rgb_optical_frame"),
+    m_camera_view_frame("asus_rgb_optical_frame"),
     m_manip_name(),
     m_manip_group(nullptr),
     m_object_filter_radius(),
