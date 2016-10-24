@@ -427,7 +427,7 @@ void RepositionBaseExecutor::goalCallback()
             tf::transformTFToEigen(t, m_T_model_grid);
             m_T_grid_model = m_T_model_grid.inverse();
         } catch (const tf::TransformException& ex) {
-            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", obj_pose_in.header.frame_id.c_str(), robot_model_->getModelFrame().c_str(), ex.what());
+            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", map_frame.c_str(), robot_model_->getModelFrame().c_str(), ex.what());
             as_->setAborted();
             return;
         }
