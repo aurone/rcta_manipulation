@@ -305,8 +305,11 @@ int RepositionBaseExecutor::run()
                     result.candidate_base_poses = candidate_base_poses;
                     as_->setSucceeded(result);
                     status_ = RepositionBaseExecutionStatus::IDLE;
+                    break;
                 }
-            } else if (computeRobPose(
+            }
+
+            if (computeRobPose(
                     map,
                     poseEigen3ToSimple(m_rob_pose),
                     gascan_pose,
