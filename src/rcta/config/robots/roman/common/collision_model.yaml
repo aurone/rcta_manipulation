@@ -59,49 +59,49 @@ robot_collision_model:
       radius: 0.02
       spheres:
 #        - { name: lr1s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
-        - { name: lr1s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.06 }
+        - { name: lr1s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link2
       auto: false
       radius: 0.02
       spheres:
-        - { name: lr2s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.06 }
-        - { name: lr2s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr2s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr2s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr2s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr2s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr2s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
+        - { name: lr2s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr2s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr2s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr2s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr2s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link3
       auto: false
       radius: 0.02
       spheres:
-        - { name: lr3s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
-        - { name: lr3s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.06 }
+        - { name: lr3s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.055 }
+        - { name: lr3s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link4
       auto: false
       radius: 0.02
       spheres:
-        - { name: lr4s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.06 }
-        - { name: lr4s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr4s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr4s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr4s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr4s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr4s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
+        - { name: lr4s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr4s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr4s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr4s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr4s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link5
       auto: false
       radius: 0.02
       spheres:
-        - { name: lr5s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
-        - { name: lr5s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.06 }
+        - { name: lr5s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.055 }
+        - { name: lr5s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link6
       auto: false
       radius: 0.02
       spheres:
-        - { name: lr6s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.06 }
-        - { name: lr6s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr6s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr6s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr6s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.06 }
-        - { name: lr6s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.06 }
+        - { name: lr6s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
+        - { name: lr6s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr6s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr6s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr6s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: lr6s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link7
       auto: false
       radius: 0.02
