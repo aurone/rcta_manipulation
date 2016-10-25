@@ -14,6 +14,9 @@ void translate_jplspec_to_rosspec(
     roman_spec_t& spec,
     roman_client_ros_utils::RomanSpec& spec_rosmsg)
 {
+    spec_rosmsg.waypoints.clear();
+    spec_rosmsg.valid.clear();
+
     spec_rosmsg.utime = ros::Time::now().toNSec() * 1e3;
     spec_rosmsg.num_mechanisms = ROBOT_NUM_MECHS;
     for (int m = 0; m < ROBOT_NUM_MECHS; m++) {
