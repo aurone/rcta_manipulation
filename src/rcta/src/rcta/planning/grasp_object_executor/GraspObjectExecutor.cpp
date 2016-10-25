@@ -284,6 +284,29 @@ bool GraspObjectExecutor::initialize()
     // GraspObjectExecutor-specific stuff //
     ////////////////////////////////////////
 
+    // TODO: get these from end-effector group in SRDF
+    m_gripper_links = {
+        "limb_right_link7",
+        "limb_right_palm",
+
+        "limb_right_finger_1_link_0",
+        "limb_right_finger_1_link_1",
+        "limb_right_finger_1_link_2",
+        "limb_right_finger_1_link_3",
+
+        "limb_right_finger_2_link_0",
+        "limb_right_finger_2_link_1",
+        "limb_right_finger_2_link_2",
+        "limb_right_finger_2_link_3",
+
+        "limb_right_finger_middle_link_0",
+        "limb_right_finger_middle_link_1",
+        "limb_right_finger_middle_link_2",
+        "limb_right_finger_middle_link_3",
+
+        "limb_right_tool",
+    };
+
     // read in stow positions
     if (!msg_utils::download_param(m_ph, "stow_positions", m_stow_positions)) {
         ROS_ERROR("Failed to retrieve 'stow_positions' from the param server");
@@ -539,6 +562,25 @@ void GraspObjectExecutor::goalCallback()
 
     m_next_stow_position_to_attempt = 0;
 
+    const geometry_msgs::PoseStamped& obj_pose_in = m_current_goal->gas_can_in_map;
+    if (obj_pose_in.header.frame_id != m_robot_model->getModelFrame()) {
+        ROS_INFO("Transform object pose into model frame");
+        geometry_msgs::PoseStamped obj_pose_in_model;
+        try {
+            m_listener.transformPose(
+                    m_robot_model->getModelFrame(),
+                    obj_pose_in,
+                    obj_pose_in_model);
+            tf::poseMsgToEigen(obj_pose_in_model.pose, m_obj_pose);
+        } catch (const tf::TransformException& ex) {
+            ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", obj_pose_in.header.frame_id.c_str(), m_robot_model->getModelFrame().c_str(), ex.what());
+            m_as->setAborted();
+            return;
+        }
+    } else {
+        tf::poseMsgToEigen(obj_pose_in.pose, m_obj_pose);
+    }
+
     // make a hard copy of the grid
     if (m_last_occupancy_grid) {
         m_current_occupancy_grid.reset(new nav_msgs::OccupancyGrid);
@@ -566,8 +608,7 @@ void GraspObjectExecutor::goalCallback()
                 m_gas_can_in_grid_frame.header.stamp = ros::Time(0);
 
                 m_listener.transformPose(grid_frame, gas_can_in_world_frame, m_gas_can_in_grid_frame);
-            }
-            catch (const tf::TransformException& ex) {
+            } catch (const tf::TransformException& ex) {
                 ROS_ERROR("Failed to lookup transform gas can into the grid frame. Assuming Identity");
                 ROS_ERROR("%s", ex.what());
                 m_gas_can_in_grid_frame = m_current_goal->gas_can_in_map;
@@ -1287,27 +1328,7 @@ void GraspObjectExecutor::onMovingArmToStowEnter(
     aco.object.operation = moveit_msgs::CollisionObject::ADD;
 
     // aco.touch_links
-    aco.touch_links = {
-        "limb_right_link7",
-        "limb_right_palm",
-
-        "limb_right_finger_1_link_0",
-        "limb_right_finger_1_link_1",
-        "limb_right_finger_1_link_2",
-        "limb_right_finger_1_link_3",
-
-        "limb_right_finger_2_link_0",
-        "limb_right_finger_2_link_1",
-        "limb_right_finger_2_link_2",
-        "limb_right_finger_2_link_3",
-
-        "limb_right_finger_middle_link_0",
-        "limb_right_finger_middle_link_1",
-        "limb_right_finger_middle_link_2",
-        "limb_right_finger_middle_link_3",
-
-        "limb_right_tool",
-    };
+    aco.touch_links = m_gripper_links;
 
 //    aco.detach_posture;
 
