@@ -515,9 +515,6 @@ bool RepositionBaseExecutor::computeRobPose(
     bool bCheckGrasp = true;
     bool bCheckObs = true;
 
-    // threshold for classifying clear and occupied regions
-    int mapObsThr = 1;
-
     // 5) candidate selection criterion
 
     // multiply a quadratic function to pTot (1 at diffYglob==0,
@@ -727,47 +724,49 @@ void RepositionBaseExecutor::computeGraspProbabilities(
 
                 // filter out all candidate poses that are not facing the object
                 // within the above-defined thresholds
-                if (diffAng >= secSide[0] && diffAng < secSide[1]) {
-                    // difference in heading between robot and object
-                    const double diffY =
-                            angles::normalize_angle(obj.yaw - rob(i, j, k).yaw);
+                if (diffAng < secSide[0] || diffAng > secSide[1]) {
+                    bTotMax(i, j, k) = false;
+                    continue;
+                }
 
-                    // maximum allowable angular distance away from most
-                    // desirable angle configuration
-                    const double diffYMax = std::max(
-                            fabs(secAngYaw[0] - bestAngYaw),
-                            fabs(secAngYaw[1] - bestAngYaw));
+                // difference in heading between robot and object
+                const double diffY =
+                        angles::normalize_angle(obj.yaw - rob(i, j, k).yaw);
 
-                    // maximum allowable linear distance away from most
-                    // desirable distance configuration
-                    const double diffDistMax = std::max(
-                            fabs(ss.distMin - bestDist),
-                            fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
+                // filter out all candidate poses where the difference in
+                // heading between the robot and the object lies outside the
+                // acceptable range
+                if (diffY < secAngYaw[0] || diffY > secAngYaw[1]) {
+                    bTotMax(i, j, k) = false;
+                    continue;
+                }
 
-                    // filter out all candidate poses where the difference in
-                    // heading between the robot and the object lies outside the
-                    // acceptable range
-                    if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
-                        // higher probability around diffY == bestAngYaw
-                        // pGrasp: quadratic function
-                        // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
+                // maximum allowable angular distance away from most
+                // desirable angle configuration
+                const double diffYMax = std::max(
+                        fabs(secAngYaw[0] - bestAngYaw),
+                        fabs(secAngYaw[1] - bestAngYaw));
+
+                // maximum allowable linear distance away from most
+                // desirable distance configuration
+                const double diffDistMax = std::max(
+                        fabs(ss.distMin - bestDist),
+                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
+
+                // higher probability around diffY == bestAngYaw
+                // pGrasp: quadratic function
+                // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
 //                        pGrasp(i, j, k) = sqrd((diffYMax - fabs(diffY - bestAngYaw) * scalepGrasp) / diffYMax);
 //                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
 
-                        // higher probability around diffY == bestAngYaw and
-                        // diffDist == bestDist
-                        // pGrasp: quadratic function
-                        // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
-                        pGrasp(i, j, k) =
-                                sqrd((diffYMax - fabs(diffY - bestAngYaw) * scalepGraspAngYaw) / diffYMax) *
-                                sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist) / diffDistMax),
-                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
-                    } else {
-                        bTotMax(i, j, k) = false;
-                    }
-                } else {
-                    bTotMax(i, j, k) = false;
-                }
+                // higher probability around diffY == bestAngYaw and
+                // diffDist == bestDist
+                // pGrasp: quadratic function
+                // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
+                pGrasp(i, j, k) =
+                        sqrd((diffYMax - fabs(diffY - bestAngYaw) * scalepGraspAngYaw) / diffYMax) *
+                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist) / diffDistMax),
+                pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
             }
         }
     }
@@ -1209,9 +1208,6 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
     bool bCheckObs = true;
     bool bCheckWork = false;
 
-    // threshold for classifying clear and occupied regions
-    int mapObsThr = 1;
-
     // multiply a quadratic function to pTot (1 at diffYglob==0,
     // (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
     double scaleDiffYglob = 0.05;
@@ -1266,38 +1262,38 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         // check for inverse kinematics and arm planning (if object is in
         // reachable range and within angle of view)
         for (int i = 0; i < ss.nDist; i++) {
-            for (int j = 0; j < ss.nAng; j++) {
-                for (int k = 0; k < ss.nYaw; k++) {
-                    if (bTotMax(i, j, k)) {
-                        geometry_msgs::PoseStamped candidate_base_pose;
-                        candidate_base_pose.header.frame_id = "/abs_nwu";
-                        candidate_base_pose.header.seq = 0;
-                        candidate_base_pose.header.stamp = ros::Time::now();
+        for (int j = 0; j < ss.nAng; j++) {
+        for (int k = 0; k < ss.nYaw; k++) {
+            if (bTotMax(i, j, k)) {
+                geometry_msgs::PoseStamped candidate_base_pose;
+                candidate_base_pose.header.frame_id = "/abs_nwu";
+                candidate_base_pose.header.seq = 0;
+                candidate_base_pose.header.stamp = ros::Time::now();
 
-                        double robY_base = rob(i, j, k).yaw;
-                        double robx_base = rob(i, j, k).x + cos(robY_base) * baseOffsetx;
-                        double roby_base = rob(i, j, k).y + sin(robY_base) * baseOffsetx;
-                        candidate_base_pose.pose.position.x = robx_base;
-                        candidate_base_pose.pose.position.y = roby_base;
-                        candidate_base_pose.pose.position.z = 0.0;
+                double robY_base = rob(i, j, k).yaw;
+                double robx_base = rob(i, j, k).x + cos(robY_base) * baseOffsetx;
+                double roby_base = rob(i, j, k).y + sin(robY_base) * baseOffsetx;
+                candidate_base_pose.pose.position.x = robx_base;
+                candidate_base_pose.pose.position.y = roby_base;
+                candidate_base_pose.pose.position.z = 0.0;
 
-                        tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0, 0.0, robY_base);
-                        candidate_base_pose.pose.orientation.x = robqf[0];
-                        candidate_base_pose.pose.orientation.y = robqf[1];
-                        candidate_base_pose.pose.orientation.z = robqf[2];
-                        candidate_base_pose.pose.orientation.w = robqf[3];
+                tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0, 0.0, robY_base);
+                candidate_base_pose.pose.orientation.x = robqf[0];
+                candidate_base_pose.pose.orientation.y = robqf[1];
+                candidate_base_pose.pose.orientation.z = robqf[2];
+                candidate_base_pose.pose.orientation.w = robqf[3];
 
-                        int retIKPLAN = checkIK(rp3, op3);
-                        if (retIKPLAN != 1) {
-                            bTotMax(i, j, k) = false;
-                            // checkIK failed!
-                            Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
-                            Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
-                            visualizeRobot(T_world_robot, 0, "base_candidates_failed_ik", base_failedik_viz_id);
-                        }
-                    }
+                int retIKPLAN = checkIK(rp3, op3);
+                if (retIKPLAN != 1) {
+                    bTotMax(i, j, k) = false;
+                    // checkIK failed!
+                    Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+                    Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+                    visualizeRobot(T_world_robot, 0, "base_candidates_failed_ik", base_failedik_viz_id);
                 }
             }
+        }
+        }
         }
     }
 
