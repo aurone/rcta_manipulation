@@ -1632,7 +1632,7 @@ GraspObjectExecutor::getGraspCandidatesVisualization(
     const std::vector<rcta::GraspCandidate>& grasps,
     const std::string& ns) const
 {
-    const std::string& frame_id = m_current_goal->gas_can_in_base_link.header.frame_id;
+    const std::string& frame_id = m_robot_model->getModelFrame();
     return rcta::GetGraspCandidatesVisualization(grasps, frame_id, ns);
 }
 
