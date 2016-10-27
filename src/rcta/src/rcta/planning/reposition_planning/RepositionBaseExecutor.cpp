@@ -605,6 +605,7 @@ bool RepositionBaseExecutor::computeRobPose(
     std::vector<RepositionBaseCandidate::candidate> cands;
     extractValidCandidatesSorted(ss, bTotMax, pTot, cands);
 
+    int cand_footprint_viz_id = 0;
     // finally, gather all pose candidates with valid probabilities
     for (size_t cidx = 0; cidx < cands.size(); ++cidx) {
         const auto& cand = cands[cidx];
@@ -633,6 +634,14 @@ bool RepositionBaseExecutor::computeRobPose(
             candidate_base_poses.push_back(candidate_pose);
 
             visualizeRobot(T_world_robot, (cand.pTot * 240) - 120, "base_probable_candidates", base_probcandidates_viz_id);
+
+            Pose2D rp = poseEigen2ToSimple(poseEigen3ToEigen2(T_world_robot_3d));
+            auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
+            for (auto& m : fp_markers.markers) {
+                m.ns = "candidate_footprints";
+                m.id = cand_footprint_viz_id++;
+            }
+            SV_SHOW_INFO(fp_markers);
         }
     }
 
