@@ -200,7 +200,7 @@ bool RepositionBaseExecutor::initialize()
     // core support polygon radius about the center of body (pObs = 0.0)
     m_body_length_core = 0.335; // 0.65
 
-    double baseOffsetx = -0.49 + 0.148975;  // -0.49, -0.5, -0.3, 0.0
+    double baseOffsetx = -0.49;// + 0.148975;  // -0.49, -0.5, -0.3, 0.0
     T_mount_robot_ = Eigen::Translation2d(baseOffsetx, 0.0);
 
     return true;
@@ -525,12 +525,6 @@ bool RepositionBaseExecutor::computeRobPose(
     double scaleDiffYglob = 0.05;
     // pTot threshold for bSortMetric==3
     double pTotThr = 0.0; // 0.5
-
-    // 6) /base_link offset from /top_shelf for final robot pose return
-
-    // /base_link to /base_link_front_bumper_part to /top_shelf
-    // /base_link to /base_link_front_bumper_part (in new Hokuyo setting)
-    double baseOffsetx = -0.49 + 0.148975;  // -0.49, -0.5, -0.3, 0.0
 
     // 5) flag for candidate sorting
     // 1: angle
