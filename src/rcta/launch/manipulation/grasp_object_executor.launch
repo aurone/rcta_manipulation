@@ -1,5 +1,6 @@
 <launch>
     <node name="grasp_object_executor" pkg="rcta" type="grasp_object_executor" output="screen">
+        <remap from="map" to="global_cosmtap/costmap/costmap"/>
         <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/gascan_grasping.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/grasp_object_executor.yaml"/>
