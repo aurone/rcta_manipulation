@@ -46,7 +46,7 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     pobs_map_pub_(),
     pgrasp_exhaustive_map_pub_(),
     listener_(),
-    viz_(),
+    viz_(ph_),
     action_name_("reposition_base_command"),
     as_(),
     rml_(),
@@ -1070,98 +1070,6 @@ bool RepositionBaseExecutor::multiplyProbabilities(
     return true;
 }
 
-/// \brief Construct an occupancy grid for visualizing probabilities.
-///
-/// \param map existing occupancy map for determining bounds, position, and res
-/// \param ss The search space parameterization; the following probability maps
-///     must have dimensions corresponding to the discretization set in this
-///     parameterization
-/// \param obj_pose Pose of the object in the world frame
-/// \param prob probabilites over the search space
-/// \param valid flags indicating whether probabilities may be pruned
-/// \param grid Output probability grid
-void RepositionBaseExecutor::projectProbabilityMap(
-    const nav_msgs::OccupancyGrid& map,
-    const SearchSpaceParams& ss,
-    const Pose2D& obj_pose,
-    const au::grid<3, double>& prob,
-    const au::grid<3, bool>& valid,
-    nav_msgs::OccupancyGrid& grid)
-{
-    grid.header.frame_id = map.header.frame_id;
-    grid.header.stamp = ros::Time(0);
-    grid.info = map.info;
-    grid.data.resize(map.data.size(), 0);
-
-    for (int x = 0; x < grid.info.width; ++x) {
-        for (int y = 0; y < grid.info.height; ++y) {
-            double wx = grid.info.origin.position.x + x * grid.info.resolution + 0.5 * grid.info.resolution;
-            double wy = grid.info.origin.position.y + y * grid.info.resolution + 0.5 * grid.info.resolution;
-            double rx = wx - obj_pose.x;
-            double ry = wy - obj_pose.y;
-            double r = std::sqrt(sqrd(rx) + sqrd(ry));
-            double th = angles::normalize_angle_positive(std::atan2(ry, rx));
-            int cr = (int)((r - ss.distMin) / ss.distStep);
-            int cth = (int)(angles::normalize_angle_positive(th - obj_pose.yaw) / ss.angStep + 0.5);
-            if (cth == ss.nAng) {
-                cth = 0;
-            }
-            if (cr < 0 || cr >= ss.nDist) {
-                // out of range of the sample space
-                if (cth < 0 || cth >= ss.nAng) {
-                    ROS_ERROR("Invalid discrete angle %d", cth);
-                }
-                grid.data[y * grid.info.width + x] = 0;
-            } else {
-                if (cth < 0 || cth >= ss.nAng) {
-                    ROS_ERROR("Invalid discrete angle %d", cth);
-                }
-                int valid_count = 0;
-                double d = 0.0;
-                for (int k = 0; k < prob.size(2); ++k) {
-                    if (valid(cr, cth, k)) {
-                        ++valid_count;
-                        d += prob(cr, cth, k);
-                    }
-                }
-                d = valid_count ? d /= valid_count : 0.0;
-                grid.data[y * grid.info.width + x] = (std::int8_t)(100.0 * d);
-            }
-        }
-    }
-}
-
-void RepositionBaseExecutor::visualizeBaseCandidates(
-    const au::grid<3, Pose2D>& cands,
-    const std::string& ns,
-    int radius_throttle,
-    int angle_throttle,
-    int yaw_throttle) const
-{
-    int raw_candidate_viz_id = 0;
-    int throttle_r = radius_throttle;
-    int throttle_a = angle_throttle;
-    int throttle_y = yaw_throttle;
-    for (int i = 0; i < cands.size(0); ++i) {
-        if (i % throttle_r != 0) {
-            continue;
-        }
-        for (int j = 0; j < cands.size(1); ++j) {
-            if (j % throttle_a != 0) {
-                continue;
-            }
-            for (int k = 0; k < cands.size(2); ++k) {
-                if (k % throttle_y != 0) {
-                    continue;
-                }
-                Eigen::Affine2d T_world_mount = poseSimpleToEigen2(cands(i, j, k));
-                Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
-                visualizeRobot(T_world_robot, 180, ns, raw_candidate_viz_id);
-            }
-        }
-    }
-}
-
 void RepositionBaseExecutor::generateCandidatePoseSamples(
     const Pose2D& obj_pose,
     const SearchSpaceParams& params,
@@ -1769,15 +1677,6 @@ void RepositionBaseExecutor::move_arm_command_result_cb(
     move_arm_command_result_ = result;
 }
 
-/// \brief Visualize world-frame grasp candidates
-visualization_msgs::MarkerArray
-RepositionBaseExecutor::getGraspCandidatesVisualization(
-    const std::vector<rcta::GraspCandidate>& grasps,
-    const std::string& ns) const
-{
-    return rcta::GetGraspCandidatesVisualization(grasps, robot_model_->getModelFrame(), ns);
-}
-
 bool RepositionBaseExecutor::downloadMarkerParameters()
 {
     double marker_to_link_x;
@@ -1813,6 +1712,108 @@ bool RepositionBaseExecutor::downloadMarkerParameters()
     attached_markers_.push_back(std::move(attached_marker));
     return true;
 }
+
+/// \brief Construct an occupancy grid for visualizing probabilities.
+///
+/// \param map existing occupancy map for determining bounds, position, and res
+/// \param ss The search space parameterization; the following probability maps
+///     must have dimensions corresponding to the discretization set in this
+///     parameterization
+/// \param obj_pose Pose of the object in the world frame
+/// \param prob probabilites over the search space
+/// \param valid flags indicating whether probabilities may be pruned
+/// \param grid Output probability grid
+void RepositionBaseExecutor::projectProbabilityMap(
+    const nav_msgs::OccupancyGrid& map,
+    const SearchSpaceParams& ss,
+    const Pose2D& obj_pose,
+    const au::grid<3, double>& prob,
+    const au::grid<3, bool>& valid,
+    nav_msgs::OccupancyGrid& grid)
+{
+    grid.header.frame_id = map.header.frame_id;
+    grid.header.stamp = ros::Time(0);
+    grid.info = map.info;
+    grid.data.resize(map.data.size(), 0);
+
+    for (int x = 0; x < grid.info.width; ++x) {
+        for (int y = 0; y < grid.info.height; ++y) {
+            double wx = grid.info.origin.position.x + x * grid.info.resolution + 0.5 * grid.info.resolution;
+            double wy = grid.info.origin.position.y + y * grid.info.resolution + 0.5 * grid.info.resolution;
+            double rx = wx - obj_pose.x;
+            double ry = wy - obj_pose.y;
+            double r = std::sqrt(sqrd(rx) + sqrd(ry));
+            double th = angles::normalize_angle_positive(std::atan2(ry, rx));
+            int cr = (int)((r - ss.distMin) / ss.distStep);
+            int cth = (int)(angles::normalize_angle_positive(th - obj_pose.yaw) / ss.angStep + 0.5);
+            if (cth == ss.nAng) {
+                cth = 0;
+            }
+            if (cr < 0 || cr >= ss.nDist) {
+                // out of range of the sample space
+                if (cth < 0 || cth >= ss.nAng) {
+                    ROS_ERROR("Invalid discrete angle %d", cth);
+                }
+                grid.data[y * grid.info.width + x] = 0;
+            } else {
+                if (cth < 0 || cth >= ss.nAng) {
+                    ROS_ERROR("Invalid discrete angle %d", cth);
+                }
+                int valid_count = 0;
+                double d = 0.0;
+                for (int k = 0; k < prob.size(2); ++k) {
+                    if (valid(cr, cth, k)) {
+                        ++valid_count;
+                        d += prob(cr, cth, k);
+                    }
+                }
+                d = valid_count ? d /= valid_count : 0.0;
+                grid.data[y * grid.info.width + x] = (std::int8_t)(100.0 * d);
+            }
+        }
+    }
+}
+
+void RepositionBaseExecutor::visualizeBaseCandidates(
+    const au::grid<3, Pose2D>& cands,
+    const std::string& ns,
+    int radius_throttle,
+    int angle_throttle,
+    int yaw_throttle) const
+{
+    int raw_candidate_viz_id = 0;
+    int throttle_r = radius_throttle;
+    int throttle_a = angle_throttle;
+    int throttle_y = yaw_throttle;
+    for (int i = 0; i < cands.size(0); ++i) {
+        if (i % throttle_r != 0) {
+            continue;
+        }
+        for (int j = 0; j < cands.size(1); ++j) {
+            if (j % throttle_a != 0) {
+                continue;
+            }
+            for (int k = 0; k < cands.size(2); ++k) {
+                if (k % throttle_y != 0) {
+                    continue;
+                }
+                Eigen::Affine2d T_world_mount = poseSimpleToEigen2(cands(i, j, k));
+                Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+                visualizeRobot(T_world_robot, 180, ns, raw_candidate_viz_id);
+            }
+        }
+    }
+}
+
+/// \brief Visualize world-frame grasp candidates
+visualization_msgs::MarkerArray
+RepositionBaseExecutor::getGraspCandidatesVisualization(
+    const std::vector<rcta::GraspCandidate>& grasps,
+    const std::string& ns) const
+{
+    return rcta::GetGraspCandidatesVisualization(grasps, robot_model_->getModelFrame(), ns);
+}
+
 void RepositionBaseExecutor::visualizeRobot(
     double x,
     double y,
