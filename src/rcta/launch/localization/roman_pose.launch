@@ -10,6 +10,9 @@
         </group>
     </group>
     <group unless="$(arg live)">
+        <!-- to be removed: here solely to be able to use bag files with data stamped with the abs_nwu frame -->
+        <node name="abs_nwu_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 abs_nwu map 50"/>
+
         <group if="$(arg fake)">
             <!-- fake localization -->
             <node name="map_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map odom_combined 100"/>
