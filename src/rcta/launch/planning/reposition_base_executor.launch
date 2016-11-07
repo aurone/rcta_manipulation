@@ -4,5 +4,9 @@
         <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/gascan_grasping.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/reposition_planner_node.yaml"/>
+
+        <rosparam param="disabled_namespaces">
+            - base_probable_candidates
+        </rosparam>
     </node>
 </launch>
