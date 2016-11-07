@@ -57,8 +57,8 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     camera_view_frame_(),
     T_mount_robot_(),
     cc_(),
-    m_arm_offset_x(0.0),
-    m_arm_offset_y(0.0),
+    m_arm_front_offset_x(0.0),
+    m_arm_front_offset_y(0.0),
     m_arm_length(0.0),
     m_arm_length_core(0.0),
     m_body_length(0.0),
@@ -185,23 +185,55 @@ bool RepositionBaseExecutor::initialize()
 
     cc_.reset(new XYThetaCollisionChecker(footprint_polygon, obs_thresh, num_heading_disc));
 
-    m_arm_offset_x = 0.3;
-    m_arm_offset_y = -0.5;   // -1.1,  0.0
+    double base_front_offset_x;
+    if (!msg_utils::download_param(ph_, "base_front_offset_x", base_front_offset_x) ||
+        !msg_utils::download_param(ph_, "arm_front_offset_x", m_arm_front_offset_x) ||
+        !msg_utils::download_param(ph_, "arm_front_offset_y", m_arm_front_offset_y) ||
+        !msg_utils::download_param(ph_, "arm_length", m_arm_length) ||
+        !msg_utils::download_param(ph_, "arm_length_core", m_arm_length_core) ||
+        !msg_utils::download_param(ph_, "body_length", m_body_length) ||
+        !msg_utils::download_param(ph_, "body_length_core", m_body_length_core))
+    {
+        return false;
+    }
 
-    // workspace radius about the center of arm
-    m_arm_length = 0.5; // 1.5
+    if (!msg_utils::download_param(ph_, "sampling/dist_min", m_ss.distMin) ||
+        !msg_utils::download_param(ph_, "sampling/dist_step", m_ss.distStep) ||
+        !msg_utils::download_param(ph_, "sampling/dist_count", m_ss.nDist) ||
+        !msg_utils::download_param(ph_, "sampling/ang_min", m_ss.angMin) ||
+        !msg_utils::download_param(ph_, "sampling/ang_step", m_ss.angStep) ||
+        !msg_utils::download_param(ph_, "sampling/ang_count", m_ss.nAng) ||
+        !msg_utils::download_param(ph_, "sampling/yaw_min", m_ss.yawMin) ||
+        !msg_utils::download_param(ph_, "sampling/yaw_step", m_ss.yawStep) ||
+        !msg_utils::download_param(ph_, "sampling/yaw_count", m_ss.nYaw))
+    {
+        return false;
+    }
 
-    // core workspace radius about the center of arm (pObs = 0.0)
-    m_arm_length_core = 0.3; // 0.6
+    m_ss.angMin = angles::from_degrees(m_ss.angMin);
+    m_ss.angStep = angles::from_degrees(m_ss.angStep);
+    m_ss.yawMin = angles::from_degrees(m_ss.yawMin);
+    m_ss.yawStep = angles::from_degrees(m_ss.yawStep);
 
-    // support polygon radius about the center of body
-    m_body_length = 0.5; // 0.8
+    if (!msg_utils::download_param(ph_, "exhaustive_sampling/dist_min", m_ss_exhaustive.distMin) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/dist_step", m_ss_exhaustive.distStep) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/dist_count", m_ss_exhaustive.nDist) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/ang_min", m_ss_exhaustive.angMin) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/ang_step", m_ss_exhaustive.angStep) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/ang_count", m_ss_exhaustive.nAng) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/yaw_min", m_ss_exhaustive.yawMin) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/yaw_step", m_ss_exhaustive.yawStep) ||
+        !msg_utils::download_param(ph_, "exhaustive_sampling/yaw_count", m_ss_exhaustive.nYaw))
+    {
+        return false;
+    }
 
-    // core support polygon radius about the center of body (pObs = 0.0)
-    m_body_length_core = 0.335; // 0.65
+    m_ss_exhaustive.angMin = angles::from_degrees(m_ss_exhaustive.angMin);
+    m_ss_exhaustive.angStep = angles::from_degrees(m_ss_exhaustive.angStep);
+    m_ss_exhaustive.yawMin = angles::from_degrees(m_ss_exhaustive.yawMin);
+    m_ss_exhaustive.yawStep = angles::from_degrees(m_ss_exhaustive.yawStep);
 
-    double baseOffsetx = -0.49;// + 0.148975;  // -0.49, -0.5, -0.3, 0.0
-    T_mount_robot_ = Eigen::Translation2d(baseOffsetx, 0.0);
+    T_mount_robot_ = Eigen::Translation2d(base_front_offset_x, 0.0);
 
     return true;
 }
@@ -500,20 +532,7 @@ bool RepositionBaseExecutor::computeRobPose(
     // PARAMETER SETTING //
     ///////////////////////
 
-    SearchSpaceParams ss;
-
-    // r in [min:step:min+step*n] + camera offset
-    ss.nDist = 6;       // 6
-    ss.distMin = 0.5;   // 0.6
-    ss.distStep = 0.1;  // 0.1
-
-    ss.nAng = 24;                               // 12
-    ss.angMin = angles::from_degrees(0.0);      // 0.0
-    ss.angStep = angles::from_degrees(15.0);    // 30.0
-
-    ss.nYaw = 9;                                // 5
-    ss.yawMin = angles::from_degrees(-20.0);    // -10.0
-    ss.yawStep = angles::from_degrees(5.0);     // 5.0
+    const SearchSpaceParams& ss = m_ss;
 
     bool bCheckGrasp = true;
     bool bCheckObs = true;
@@ -942,7 +961,7 @@ void RepositionBaseExecutor::computeArmCollisionProbabilities(
         }
         Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
         Eigen::Affine2d T_mount_arm(
-                Eigen::Translation2d(m_arm_offset_x, m_arm_offset_y));
+                Eigen::Translation2d(m_arm_front_offset_x, m_arm_front_offset_y));
         Eigen::Affine2d T_world_arm = T_world_mount * T_mount_arm;
 
         Eigen::Affine3d T_model_arm = poseEigen2ToEigen3(T_world_arm);
@@ -1194,21 +1213,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
     // PARAMETER SETTING //
     ///////////////////////
 
-    SearchSpaceParams ss;
-
-    // 0) search space
-    // r in [0.5:0.1:1.0] + camera offset
-    ss.nDist = 6;       // 6
-    ss.distMin = 0.5;   // 0.6
-    ss.distStep = 0.1;  // 0.1
-
-    ss.nAng = 12;                               // 12
-    ss.angMin = 0.0;                            // 0
-    ss.angStep = angles::from_degrees(30.0);    // 30
-
-    ss.nYaw = 9;                                // 5
-    ss.yawMin = angles::from_degrees(-20.0);    // -10
-    ss.yawStep = angles::from_degrees(5.0);     // 5
+    const SearchSpaceParams& ss = m_ss_exhaustive;
 
     bool bCheckGrasp = true;
     bool bCheckObs = true;
@@ -1270,33 +1275,17 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         for (int i = 0; i < ss.nDist; i++) {
         for (int j = 0; j < ss.nAng; j++) {
         for (int k = 0; k < ss.nYaw; k++) {
-            if (bTotMax(i, j, k)) {
-                geometry_msgs::PoseStamped candidate_base_pose;
-                candidate_base_pose.header.frame_id = "/abs_nwu";
-                candidate_base_pose.header.seq = 0;
-                candidate_base_pose.header.stamp = ros::Time::now();
+            if (!bTotMax(i, j, k)) {
+                continue;
+            }
 
-                double robY_base = rob(i, j, k).yaw;
-                double robx_base = rob(i, j, k).x + cos(robY_base) * baseOffsetx;
-                double roby_base = rob(i, j, k).y + sin(robY_base) * baseOffsetx;
-                candidate_base_pose.pose.position.x = robx_base;
-                candidate_base_pose.pose.position.y = roby_base;
-                candidate_base_pose.pose.position.z = 0.0;
-
-                tf::Quaternion robqf = tf::createQuaternionFromRPY(0.0, 0.0, robY_base);
-                candidate_base_pose.pose.orientation.x = robqf[0];
-                candidate_base_pose.pose.orientation.y = robqf[1];
-                candidate_base_pose.pose.orientation.z = robqf[2];
-                candidate_base_pose.pose.orientation.w = robqf[3];
-
-                int retIKPLAN = checkIK(rp3, op3);
-                if (retIKPLAN != 1) {
-                    bTotMax(i, j, k) = false;
-                    // checkIK failed!
-                    Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
-                    Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
-                    visualizeRobot(T_world_robot, 0, "base_candidates_failed_ik", base_failedik_viz_id);
-                }
+            int retIKPLAN = checkIK(rp3, op3);
+            if (checkIK(rp3, op3) != 1) {
+                bTotMax(i, j, k) = false;
+                // checkIK failed!
+                Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+                Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+                visualizeRobot(T_world_robot, 0, "base_candidates_failed_ik", base_failedik_viz_id);
             }
         }
         }

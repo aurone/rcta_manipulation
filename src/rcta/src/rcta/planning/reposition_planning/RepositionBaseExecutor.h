@@ -181,15 +181,19 @@ private:
 
     Eigen::Translation2d T_mount_robot_;
 
+    double m_base_front_offset_x;
+
+    SearchSpaceParams m_ss;
+    SearchSpaceParams m_ss_exhaustive;
+
     /// \name Planar Collision Constraints
     ///@{
     std::unique_ptr<XYThetaCollisionChecker> cc_;
 
-    double m_arm_offset_x;
-    double m_arm_offset_y;
+    double m_arm_front_offset_x;
+    double m_arm_front_offset_y;
     double m_arm_length;
     double m_arm_length_core;
-
     double m_body_length;
     double m_body_length_core;
     ///@}
