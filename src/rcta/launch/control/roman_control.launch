@@ -1,6 +1,7 @@
 <launch>
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
+
     <arg name="ns" default="false"/>
 
     <!-- start pose for the robot in gazebo -->
@@ -15,11 +16,25 @@
         <arg name="ns" value="$(arg ns)"/>
     </include>
 
+    <!-- run the roman gripper controller regardless of mode
+    * in live/real this will function correctly in tandem with the jpl/ros translators
+    * in all other modes this will function against the roman_simulator (no gazebo simulation of the gripper yet)
+     -->
+    <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
+
+    <!-- publish fake odometry in all modes except live/real -->
     <group if="$(arg live)">
         <group if="$(arg fake)">
-            <!-- publishes dummy roman_client_ros_utils::RomanState and
-            sensor_msgs::JointState messages with a format similar to the
-            live translators -->
+            <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/>
+        </group>
+    </group>
+    <group unless="$(arg live)">
+        <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/>
+    </group>
+
+    <group if="$(arg live)">
+        <group if="$(arg fake)">
+            <!-- fake "roman_state", "roman_joint_states", "roman_hand_open", and "roman_hand_close" -->
             <node name="roman_simulator" pkg="rcta" type="roman_simulator"/>
         </group>
 
@@ -31,13 +46,10 @@
         <!-- action interfaces wrapping jpl controllers -->
         <node name="right_limb_joint_trajectory_controller" pkg="rcta" type="right_limb_joint_trajectory_controller"/>
         <node name="left_limb_joint_trajectory_controller" pkg="rcta" type="left_limb_joint_trajectory_controller"/>
-        <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
     </group>
     <group unless="$(arg live)">
-        <!-- note: no need to remap or aggregate roman_joint_states here, but
-        we do need the fake gripper state for the gripper action to work -->
+        <!-- run the roman_simulator to fake gripper control state; ignore roman_joint_states -->
         <node name="roman_simulator" pkg="rcta" type="roman_simulator"/>
-        <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
 
         <group if="$(arg fake)">
             <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
@@ -63,8 +75,6 @@
         </group>
     </group>
 
-<!--    <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 100"/> -->
-
-    <!-- all configurations need a robot state publisher -->
+    <!-- everyone loves a robot state publisher -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 </launch>
