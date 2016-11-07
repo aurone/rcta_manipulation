@@ -1,8 +1,7 @@
 src/*
-!src/hdt
 !src/andalite_description
 !src/roman_model
-!src/roman_client_ros_utils
+!src/rcta_msgs
 !src/rcta
 devel/*
 build/*

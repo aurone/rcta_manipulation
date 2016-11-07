@@ -2,9 +2,6 @@
     local-name: gazebo_ros_pkgs
     uri: https://github.com/ros-simulation/gazebo_ros_pkgs.git
 - git:
-    local-name: rcta_msgs
-    uri: git@sbpl.pc.cs.cmu.edu:robots/hdt/hdt-msgs.git
-- git:
     local-name: leatherman
     uri: https://github.com/aurone/leatherman.git
 - git:
