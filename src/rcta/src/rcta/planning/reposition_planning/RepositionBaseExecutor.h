@@ -186,6 +186,9 @@ private:
     SearchSpaceParams m_ss;
     SearchSpaceParams m_ss_exhaustive;
 
+    double m_best_dist;
+    double m_best_dist_exhaustive;
+
     /// \name Planar Collision Constraints
     ///@{
     std::unique_ptr<XYThetaCollisionChecker> cc_;

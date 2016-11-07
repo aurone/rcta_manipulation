@@ -34,6 +34,12 @@ exhaustive_sampling:
   yaw_step: 5.0
   yaw_count: 9
 
+grasping:
+  best_dist: 0.7
+
+exhaustive_grasping:
+  best_dist: 0.6
+
 max_grasp_candidates: 20
 manipulator_group_name: right_arm
 footprint:

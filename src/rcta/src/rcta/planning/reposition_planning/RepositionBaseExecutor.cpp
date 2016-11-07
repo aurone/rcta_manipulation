@@ -233,6 +233,12 @@ bool RepositionBaseExecutor::initialize()
     m_ss_exhaustive.yawMin = angles::from_degrees(m_ss_exhaustive.yawMin);
     m_ss_exhaustive.yawStep = angles::from_degrees(m_ss_exhaustive.yawStep);
 
+    if (!msg_utils::download_param(ph_, "grasping/best_dist", m_best_dist) ||
+        !msg_utils::download_param(ph_, "exhaustive_grasping/best_dist", m_best_dist_exhaustive))
+    {
+        return false;
+    }
+
     T_mount_robot_ = Eigen::Translation2d(base_front_offset_x, 0.0);
 
     return true;
@@ -711,9 +717,6 @@ void RepositionBaseExecutor::computeGraspProbabilities(
     // distance-dependent "most desirable" heading offset
     double bestAngYaw;
 
-    // most desirable robot-object distance
-    double bestDist = 0.70;
-
     // pGrasp: quadratic function (1 at bestDist, (1 - scalepGraspDist)^2 at borders)
     double scalepGraspDist = 0.05; // 0.1
 
@@ -775,8 +778,8 @@ void RepositionBaseExecutor::computeGraspProbabilities(
                 // maximum allowable linear distance away from most
                 // desirable distance configuration
                 const double diffDistMax = std::max(
-                        fabs(ss.distMin - bestDist),
-                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
+                        fabs(ss.distMin - m_best_dist),
+                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - m_best_dist));
 
                 // higher probability around diffY == bestAngYaw
                 // pGrasp: quadratic function
@@ -790,7 +793,7 @@ void RepositionBaseExecutor::computeGraspProbabilities(
                 // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
                 pGrasp(i, j, k) =
                         sqrd((diffYMax - fabs(diffY - bestAngYaw) * scalepGraspAngYaw) / diffYMax) *
-                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist) / diffDistMax),
+                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - m_best_dist) * scalepGraspDist) / diffDistMax),
                 pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
             }
         }
@@ -810,7 +813,6 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
     int secDist[2] = { ss.nDist / 3, 2 * ss.nDist / 3 };
     double secAngYaw[2];
     double bestAngYaw;
-    double bestDist = 0.60;
 
 //    double secSide[2] = { angles::from_degrees(0.0), angles::from_degrees(45.0) };
 //    double secSide[2] = { angles::from_degrees(0.0), angles::from_degrees(20.0) };
@@ -853,8 +855,8 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
                 // b) object handle orientation to the right of the robot
                 double diffY = angles::normalize_angle(obj.yaw - rob(i, j, k).yaw);
                 double diffYMax = M_PI / 2.0;
-                double diffDistMax = std::max(fabs(ss.distMin - bestDist),
-                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - bestDist));
+                double diffDistMax = std::max(fabs(ss.distMin - m_best_dist_exhaustive),
+                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - m_best_dist_exhaustive));
                 // left-hand side and angle of view
                 if (diffAng >= secSide[0] && diffAng < secSide[1]) {
                     if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
@@ -885,7 +887,7 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
                 pGrasp(i, j, k) =
                         std::max(std::min(diffAng - angles::from_degrees(5.0), 0.0) / diffAngMax + 1.0, 0.0) * // ^1
                         sqrd((diffYMax - std::min(fabs(angles::normalize_angle(diffY - bestAngYaw)), fabs(angles::normalize_angle(diffY - M_PI - bestAngYaw))) * scalepGraspAngYaw) / (diffYMax)) *
-                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - bestDist) * scalepGraspDist) / (diffDistMax));
+                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - m_best_dist_exhaustive) * scalepGraspDist) / (diffDistMax));
                 pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
             }
         }
