@@ -204,6 +204,7 @@ bool RepositionBaseExecutor::initialize()
     {
         return false;
     }
+    T_mount_robot_ = Eigen::Translation2d(base_front_offset_x, 0.0);
 
     if (!msg_utils::download_param(ph_, "sampling/dist_min", m_ss.distMin) ||
         !msg_utils::download_param(ph_, "sampling/dist_step", m_ss.distStep) ||
@@ -247,7 +248,11 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-    T_mount_robot_ = Eigen::Translation2d(base_front_offset_x, 0.0);
+
+    m_prune_params.min_angle = angles::from_degrees(45.0);
+    m_prune_params.max_angle = angles::from_degrees(80.0);
+    m_prune_params.min_heading = angles::from_degrees(-5.0);
+    m_prune_params.max_heading = angles::from_degrees(40.0);
 
     return true;
 }
@@ -665,6 +670,7 @@ bool RepositionBaseExecutor::computeRobPose(
             for (auto& m : fp_markers.markers) {
                 m.ns = "candidate_footprints";
                 m.id = cand_footprint_viz_id++;
+                m.color = rainbow(cand.pTot);
             }
             SV_SHOW_INFO(fp_markers);
         }
@@ -707,18 +713,7 @@ void RepositionBaseExecutor::computeGraspProbabilities(
     // CONFIGURATION //
     ///////////////////
 
-    struct SearchSpacePruningParams
-    {
-        double min_heading;
-        double max_heading;
-        double min_angle;
-        double max_angle;
-    };
-    SearchSpacePruningParams params;
-    params.min_angle = angles::from_degrees(45.0);
-    params.max_angle = angles::from_degrees(80.0);
-    params.min_heading = angles::from_degrees(-5.0);
-    params.max_heading = angles::from_degrees(40.0);
+    const SimplePruningParams& params = m_prune_params;
 
     // distance-dependent "most desirable" heading offset
     double bestAngle = angles::from_degrees(60.0);
@@ -797,15 +792,11 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
     au::grid<3, double>& pGrasp,
     au::grid<3, bool>& bTotMax)
 {
+    const SimplePruningParams& params = m_prune_params;
+
     int base_seen_viz_id = 0;
 
-    int secDist[2] = { ss.nDist / 3, 2 * ss.nDist / 3 };
-    double secAngYaw[2];
-    double bestAngYaw;
-
-//    double secSide[2] = { angles::from_degrees(0.0), angles::from_degrees(45.0) };
-//    double secSide[2] = { angles::from_degrees(0.0), angles::from_degrees(20.0) };
-    double secSide[2] = { angles::from_degrees(-5.0), angles::from_degrees(40.0) };
+    double bestAngYaw = angles::from_degrees(-90.0);
 
     // pGrasp: quadratic function (1 at bestDist, (1-scalepGraspDist)^2 at borders)
     double scalepGraspDist = 0.05; // 0.1
@@ -813,64 +804,29 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
     // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGraspAngYaw)^2 at borders)
     double scalepGraspAngYaw = 0.3; // 0.05, 0.1
 
-    // heuristic probability of successful grasping
-    // a) position: the object should be within left-hand side of the robot and 45 deg angle of view
-    // exception: exclude poses at close distance, include ones in right-hand side at far distance
-    // b) orientation: the object handle should be directed to the right of the robot
-    // c) exception: allow more deviation at close distance, reject most of deviations at far distance
-
     for (int i = 0; i < ss.nDist; i++) {
-        // c) set acceptable object orientation range
-        if (i < secDist[0]) {
-            secAngYaw[0] = angles::from_degrees(45.0); // 15
-            secAngYaw[1] = angles::from_degrees(130.0); // 90, 100
-            bestAngYaw = angles::from_degrees(-90.0); // -60, 65, 60
-        } else if (i < secDist[1]) {
-            secAngYaw[0] = angles::from_degrees(45.0); // 15
-            secAngYaw[1] = angles::from_degrees(130.0); // 90
-            bestAngYaw = angles::from_degrees(-90.0); // -60, 60, 45
-        } else { // if (i >= secDist[1])
-            secAngYaw[0] = angles::from_degrees(45.0); // 15
-            secAngYaw[1] = angles::from_degrees(130.0); // 90, 60, 30
-            bestAngYaw = angles::from_degrees(-90.0); // -60, -120, 50, 15
-        }
-
         for (int j = 0; j < ss.nAng; j++) {
             for (int k = 0; k < ss.nYaw; k++) {
                 // object position (not orientation)
                 double rob2obj = atan2(obj.y - rob(i, j, k).y, obj.x - rob(i, j, k).x);
                 double diffAng = angles::normalize_angle(rob2obj - rob(i, j, k).yaw);
-                double diffAngMax = fabs(ss.yawMin - secSide[0]);
+                double diffAngMax = fabs(ss.yawMin - params.min_heading);
                 // b) object handle orientation to the right of the robot
                 double diffY = angles::normalize_angle(obj.yaw - rob(i, j, k).yaw);
                 double diffYMax = M_PI / 2.0;
                 double diffDistMax = std::max(fabs(ss.distMin - m_best_dist_exhaustive),
                         fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - m_best_dist_exhaustive));
+
                 // left-hand side and angle of view
-                if (diffAng >= secSide[0] && diffAng < secSide[1]) {
-                    if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
+                if (diffAng >= params.min_heading && diffAng < params.max_heading) {
+                    if (diffY >= params.min_angle && diffY <= params.max_angle) {
                         // EXCLUDE CANDIDATES WE HAVE ALREADY SEEN
                         bTotMax(i, j, k) = false;
                         Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
                         Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
                         visualizeRobot(T_world_robot, 0, "base_candidates_seen", base_seen_viz_id);
-                        // higher probability around diffY==bestAngYaw
-                        // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-//                        pGrasp(i, j, k) = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGrasp)/(diffYMax), 2.0 );
-//                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
-
-                        // higher probability around diffY==bestAngYaw and diffDist==bestDist
-                        // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-//                        pGrasp(i, j, k) = std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) * std::pow( (diffDistMax-fabs(ss.distMin+distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0));
-//                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
                     }
                 }
-                // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
-//                pGrasp(i, j, k) = std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0) *
-//                        std::pow( (diffYMax-fabs(diffY-bestAngYaw)*scalepGraspAngYaw)/(diffYMax), 2.0) *
-//                        std::pow( (diffDistMax-fabs(ss.distMin+ss.distStep*i-bestDist)*scalepGraspDist)/(diffDistMax), 2.0);
-//                pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
-//                pGrasp(i, j, k) = std::max( std::pow( std::max( std::min(diffAng-secSide[0], 0.0)/diffAngMax + 1.0, 0.0), 1.0)
 
                 // pGrasp: quadratic function (1 at bestAngYaw, (1-scalepGrasp)^2 at borders)
                 pGrasp(i, j, k) =
@@ -1845,6 +1801,27 @@ void RepositionBaseExecutor::visualizeRobot(
         marker.id = id++;
     }
     SV_SHOW_INFO(ma);
+}
+
+std_msgs::ColorRGBA RepositionBaseExecutor::rainbow(double d) const
+{
+    std_msgs::ColorRGBA color;
+    d = clamp(d, 0.0, 1.0);
+    color.a = 1.0;
+    if (d < 0.5) {
+        // interp between 0 = red and 0.5 = green
+        double alpha = 2.0 * d;
+        color.r = 1.0 - alpha;
+        color.g = alpha;
+        color.b = 0.0;
+    } else {
+        // interp between 0.5 = green and 1 => blue
+        double alpha = 2.0 * (d - 0.5);
+        color.r = 0.0;
+        color.g = 1.0 - alpha;
+        color.b = alpha;
+    }
+    return color;
 }
 
 #define METRICS_DEPRECATED 0

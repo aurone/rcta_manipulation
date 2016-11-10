@@ -78,7 +78,7 @@ struct Pose2D
     double yaw;
 };
 
-/// \brief Describes the space of discrete poses with respect to another pose
+/// Describes the space of discrete poses with respect to another pose
 struct SearchSpaceParams
 {
     int nDist;          ///< Number of radial samples
@@ -92,6 +92,16 @@ struct SearchSpaceParams
     int nYaw;           ///< Number of relative heading samples wrt the pivot heading
     double yawMin;      ///< Minimum relative heading offset from pivot heading
     double yawStep;     ///< Discretization of yaw samples
+};
+
+/// Defines how to split the search space between the exhaustive and non-
+/// exhaustive passes
+struct SimplePruningParams
+{
+    double min_heading;
+    double max_heading;
+    double min_angle;
+    double max_angle;
 };
 
 /// Node handling requests to plan for the position of the base required to
@@ -185,6 +195,8 @@ private:
 
     SearchSpaceParams m_ss;
     SearchSpaceParams m_ss_exhaustive;
+
+    SimplePruningParams m_prune_params;
 
     double m_best_dist;
     double m_best_dist_exhaustive;
@@ -415,6 +427,8 @@ private:
         int hue,
         const std::string& ns,
         int& id) const;
+
+    std_msgs::ColorRGBA rainbow(double d) const;
     ///@}
 
     void goalCallback();
