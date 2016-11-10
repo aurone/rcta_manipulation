@@ -39,6 +39,14 @@ double sign(double val)
     return (val >= 0) ? 1.0 : -1.0;
 }
 
+// quadratic function: returns 1 when value = best and (1 - scale)^2 at the
+// borders. Borders are defined as the two points at max_best_dist away from
+// best_dist
+double quad(double best, double value, double max_best_dist, double scale)
+{
+    return sqrd((max_best_dist - fabs(value - best) * scale) / max_best_dist);
+};
+
 RepositionBaseExecutor::RepositionBaseExecutor() :
     nh_(),
     ph_("~"),
@@ -576,8 +584,6 @@ bool RepositionBaseExecutor::computeRobPose(
     pGrasp.assign(1.0);
     bTotMax.assign(true);
 
-    // generate candidate robot poses (x, y, theta) from (radius, theta, yaw)
-    // around the object
     au::grid<3, Pose2D> rob;
     generateCandidatePoseSamples(object_pose, ss, rob);
 
@@ -701,99 +707,82 @@ void RepositionBaseExecutor::computeGraspProbabilities(
     // CONFIGURATION //
     ///////////////////
 
-    // Define cone in front in front of the robot within which the object is
-    // graspable
-//  double secSide[2] = { 0.0, angles::from_degrees(20.0) };
-//  double secSide[2] = { 0.0, angles::from_degrees(45.0) };
-    double secSide[2] = { angles::from_degrees(-5.0), angles::from_degrees(40.0) };
-
-    // partition radial samples into zones for distance-dependent allowable
-    // heading differences between the robot and the object
-    int secDist[2] = { 1 * ss.nDist / 3, 2 * ss.nDist / 3 };
-
-    // distance-dependent allowable heading offset range
-    double secAngYaw[2];
+    struct SearchSpacePruningParams
+    {
+        double min_heading;
+        double max_heading;
+        double min_angle;
+        double max_angle;
+    };
+    SearchSpacePruningParams params;
+    params.min_angle = angles::from_degrees(45.0);
+    params.max_angle = angles::from_degrees(80.0);
+    params.min_heading = angles::from_degrees(-5.0);
+    params.max_heading = angles::from_degrees(40.0);
 
     // distance-dependent "most desirable" heading offset
-    double bestAngYaw;
+    double bestAngle = angles::from_degrees(60.0);
+
+    // maximum allowable angular distance away from most
+    // desirable angle configuration
+    const double diffYMax = std::max(
+            fabs(params.min_angle - bestAngle),
+            fabs(params.max_angle - bestAngle));
+
+    // maximum allowable linear distance away from most
+    // desirable distance configuration
+    const double diffDistMax = std::max(
+            fabs(ss.distMin - m_best_dist),
+            fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - m_best_dist));
 
     // pGrasp: quadratic function (1 at bestDist, (1 - scalepGraspDist)^2 at borders)
     double scalepGraspDist = 0.05; // 0.1
 
-    // pGrasp: quadratic function (1 at bestAngYaw, (1 - scalepGraspAngYaw)^2 at borders)
+    // pGrasp: quadratic function (1 at bestAngle, (1 - scalepGraspAngYaw)^2 at borders)
     double scalepGraspAngYaw = 0.05; // 0.1
 
     ///////////////////////
     // END CONFIGURATION //
     ///////////////////////
 
-    for (int i = 0; i < ss.nDist; i++) {
-        // c) set acceptable object orientation range
-        if (i < secDist[0]) {
-            secAngYaw[0] = angles::from_degrees(45.0);  // 15,  15
-            secAngYaw[1] = angles::from_degrees(130.0); // 90, 100
-            bestAngYaw   = angles::from_degrees(60.0);  // 65,  65
-        } else if (i < secDist[1]) {
-            secAngYaw[0] = angles::from_degrees(45.0);  // 45, 15
-            secAngYaw[1] = angles::from_degrees(130.0); // 90, 90
-            bestAngYaw   = angles::from_degrees(60.0);  // 45, 45
-        } else { // if (i >= secDist[1])
-            secAngYaw[0] = angles::from_degrees(45.0);  // 15, 15
-            secAngYaw[1] = angles::from_degrees(130.0); // 90, 30
-            bestAngYaw   = angles::from_degrees(60.0);  // 50, 15
-        }
+    // Some history:
+    // * The best angle around the object was distance-from-the-object dependent.
 
+    for (int i = 0; i < ss.nDist; i++) {
+        const double dist = ss.distMin + ss.distStep * i;
         for (int j = 0; j < ss.nAng; ++j) {
             for (int k = 0; k < ss.nYaw; ++k) {
-                // angular coordinate of a vector from robot position to object
-                // position (not orientation)
-                double rob2obj = atan2(obj.y - rob(i, j, k).y, obj.x - rob(i, j, k).x);
-                double diffAng = angles::normalize_angle(rob2obj - rob(i, j, k).yaw);
+                const Pose2D& pose = rob(i, j, k);
+
+                // heading of a vector from robot position to object position
+                double rob2obj = atan2(obj.y - pose.y, obj.x - pose.x);
+
+                // deviation from directly facing the gascan
+                double diffAng = angles::normalize_angle(rob2obj - pose.yaw);
 
                 // filter out all candidate poses that are not facing the object
                 // within the above-defined thresholds
-                if (diffAng < secSide[0] || diffAng > secSide[1]) {
+                if (diffAng < params.min_heading ||
+                    diffAng > params.max_heading)
+                {
                     bTotMax(i, j, k) = false;
                     continue;
                 }
 
-                // difference in heading between robot and object
-                const double diffY =
-                        angles::normalize_angle(obj.yaw - rob(i, j, k).yaw);
+                // heading of the robot in the object frame
+                const double diffY = angles::normalize_angle(obj.yaw - pose.yaw);
 
                 // filter out all candidate poses where the difference in
                 // heading between the robot and the object lies outside the
                 // acceptable range
-                if (diffY < secAngYaw[0] || diffY > secAngYaw[1]) {
+                if (diffY < params.min_angle || diffY > params.max_angle) {
                     bTotMax(i, j, k) = false;
                     continue;
                 }
 
-                // maximum allowable angular distance away from most
-                // desirable angle configuration
-                const double diffYMax = std::max(
-                        fabs(secAngYaw[0] - bestAngYaw),
-                        fabs(secAngYaw[1] - bestAngYaw));
-
-                // maximum allowable linear distance away from most
-                // desirable distance configuration
-                const double diffDistMax = std::max(
-                        fabs(ss.distMin - m_best_dist),
-                        fabs(ss.distMin + ss.distStep * (ss.nDist - 1) - m_best_dist));
-
-                // higher probability around diffY == bestAngYaw
-                // pGrasp: quadratic function
-                // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
-//                        pGrasp(i, j, k) = sqrd((diffYMax - fabs(diffY - bestAngYaw) * scalepGrasp) / diffYMax);
-//                        pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
-
-                // higher probability around diffY == bestAngYaw and
-                // diffDist == bestDist
-                // pGrasp: quadratic function
-                // (1 at bestAngYaw, (1 - scalepGrasp)^2 at borders)
                 pGrasp(i, j, k) =
-                        sqrd((diffYMax - fabs(diffY - bestAngYaw) * scalepGraspAngYaw) / diffYMax) *
-                        sqrd((diffDistMax - fabs(ss.distMin + ss.distStep * i - m_best_dist) * scalepGraspDist) / diffDistMax),
+                        quad(bestAngle, diffY, diffYMax, scalepGraspAngYaw) *
+                        quad(m_best_dist, dist, diffDistMax, scalepGraspDist);
                 pGrasp(i, j, k) = std::max(pGrasp(i, j, k), pTotThr);
             }
         }
@@ -1072,6 +1061,7 @@ bool RepositionBaseExecutor::multiplyProbabilities(
     return true;
 }
 
+// generate candidate poses, in the model frame, for the "front" of the robot
 void RepositionBaseExecutor::generateCandidatePoseSamples(
     const Pose2D& obj_pose,
     const SearchSpaceParams& params,
