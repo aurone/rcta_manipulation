@@ -35,23 +35,6 @@
 //xytheta collision checking!
 #include "xytheta_collision_checker.h"
 
-namespace RepositionBaseCandidate {
-
-struct candidate
-{
-    int i;
-    int j;
-    int k;
-    double pTot;
-
-    bool operator<(const candidate& cand2) const
-    {
-        return pTot > cand2.pTot;
-    }
-};
-
-} // namespace RepositionBaseCandidate
-
 namespace RepositionBaseExecutionStatus {
 
 enum Status
@@ -166,6 +149,19 @@ private:
         Eigen::Affine3d link_to_marker;
     };
 
+    struct candidate
+    {
+        int i;
+        int j;
+        int k;
+        double pTot;
+
+        bool operator<(const candidate& cand2) const
+        {
+            return pTot > cand2.pTot;
+        }
+    };
+
     ros::NodeHandle nh_;
     ros::NodeHandle ph_;
 
@@ -187,7 +183,6 @@ private:
     moveit::core::JointModelGroup* manip_group_;
     std::string manip_name_;
 
-    // TODO: monitor state to get the transform between the camera and the wrist
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
 
     std::string camera_view_frame_;
@@ -229,6 +224,7 @@ private:
     int m_max_grasp_samples;
     ///@}
 
+    bool m_check_reach;
     au::grid<3, bool> m_reachable_table;
 
     /// \name Arm Planning Constraints
@@ -249,6 +245,9 @@ private:
     Eigen::Affine3d m_obj_pose;
     Eigen::Affine3d m_T_model_grid;
     Eigen::Affine3d m_T_grid_model;
+
+    // 0 -> model frame, 1 -> object frame, 2 -> grid frame
+    int m_cand_frame_option;
 
     /// \name Initialization
     ///@{
@@ -395,7 +394,7 @@ private:
         const SearchSpaceParams& ss,
         const au::grid<3, bool>& bTotMax,
         const au::grid<3, double>& pTot,
-        std::vector<RepositionBaseCandidate::candidate>& cands);
+        std::vector<candidate>& cands);
     ///@}
 
     ///\name Debug Visualization
@@ -445,6 +444,10 @@ private:
 
     void goalCallback();
     void preemptCallback();
+
+    void transformToOutputFrame(
+            const Eigen::Affine3d& in,
+            geometry_msgs::PoseStamped& out) const;
 
     uint8_t execution_status_to_feedback_status(
         RepositionBaseExecutionStatus::Status status);

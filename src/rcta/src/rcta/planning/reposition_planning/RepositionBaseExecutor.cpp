@@ -73,6 +73,8 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     m_body_length_core(0.0),
     attached_markers_(),
     m_max_grasp_samples(0),
+    m_check_reach(false),
+    m_reachable_table(),
     move_arm_command_client_(),
     move_arm_command_action_name_("move_arm"),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
@@ -80,7 +82,8 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     robot_pose_world_frame_(),
     current_goal_(),
     status_(RepositionBaseExecutionStatus::INVALID),
-    last_status_(RepositionBaseExecutionStatus::INVALID)
+    last_status_(RepositionBaseExecutionStatus::INVALID),
+    m_cand_frame_option(0)
 {
     sbpl::viz::set_visualizer(&viz_);
 }
@@ -253,17 +256,24 @@ bool RepositionBaseExecutor::initialize()
     m_prune_params.min_heading = angles::from_degrees(-5.0);
     m_prune_params.max_heading = angles::from_degrees(40.0);
 
-    m_reachable_table.resize(m_ss.nDist, m_ss.nAng, m_ss.nYaw);
-    m_reachable_table.assign(true);
+    if (!msg_utils::download_param(ph_, "candidate_frame", m_cand_frame_option)) {
+        return false;
+    }
 
-    auto then = std::chrono::high_resolution_clock::now();
-    au::grid<3, Pose2D> rob;
-    Pose2D zero(0.0, 0.0, 0.0);
-    generateCandidatePoseSamples(zero, m_ss, rob);
+//    m_check_reach = true;
+    if (m_check_reach) {
+        m_reachable_table.resize(m_ss.nDist, m_ss.nAng, m_ss.nYaw);
+        m_reachable_table.assign(true);
 
-    pruneUnreachingStates(m_ss, rob, zero, m_reachable_table);
-    auto now = std::chrono::high_resolution_clock::now();
-    ROS_INFO("Precomputing reachability table took %0.3f seconds", std::chrono::duration<double>(now - then).count());
+        auto then = std::chrono::high_resolution_clock::now();
+        au::grid<3, Pose2D> rob;
+        Pose2D zero(0.0, 0.0, 0.0);
+        generateCandidatePoseSamples(zero, m_ss, rob);
+
+        pruneUnreachingStates(m_ss, rob, zero, m_reachable_table);
+        auto now = std::chrono::high_resolution_clock::now();
+        ROS_INFO("Precomputing reachability table took %0.3f seconds", std::chrono::duration<double>(now - then).count());
+    }
 
     return true;
 }
@@ -361,10 +371,12 @@ int RepositionBaseExecutor::run()
                     result.result = rcta_msgs::RepositionBaseCommandResult::SUCCESS;
 
                     geometry_msgs::PoseStamped p;
-                    tf::poseEigenToMsg(m_rob_pose, p.pose);
-                    p.header.frame_id = robot_model_->getModelFrame();
+                    transformToOutputFrame(m_rob_pose, p);
+                    p.header.stamp = ros::Time::now();
                     candidate_base_poses.push_back(p);
+
                     result.candidate_base_poses = candidate_base_poses;
+
                     as_->setSucceeded(result);
                     status_ = RepositionBaseExecutionStatus::IDLE;
                     break;
@@ -488,7 +500,7 @@ void RepositionBaseExecutor::goalCallback()
         ROS_INFO("Lookup transform from model frame to grid frame");
         tf::StampedTransform t;
         try {
-            listener_.lookupTransform(map_frame, robot_model_->getModelFrame(), ros::Time(0), t);
+            listener_.lookupTransform(robot_model_->getModelFrame(), map_frame, ros::Time(0), t);
             tf::transformTFToEigen(t, m_T_model_grid);
             m_T_grid_model = m_T_model_grid.inverse();
         } catch (const tf::TransformException& ex) {
@@ -514,6 +526,32 @@ void RepositionBaseExecutor::goalCallback()
 
 void RepositionBaseExecutor::preemptCallback()
 {
+}
+
+/// Transform a pose, assumed to be in the model frame, to a chosen (via config)
+/// output frame. This function assumes the state of m_obj_pose, m_T_grid_model,
+/// and m_T_model_grid are relevant with respect to the currently active goal.
+void RepositionBaseExecutor::transformToOutputFrame(
+    const Eigen::Affine3d& robot_pose,
+    geometry_msgs::PoseStamped& out) const
+{
+    // TODO: add options for returning poses in the original frame of the
+    // robot or the object
+    if (m_cand_frame_option == 0) { // model frame
+        tf::poseEigenToMsg(robot_pose, out.pose);
+        out.header.frame_id = robot_model_->getModelFrame();
+    } else if (m_cand_frame_option == 1) { // object
+        Eigen::Affine3d T_object_robot = m_obj_pose.inverse() * robot_pose;
+        tf::poseEigenToMsg(T_object_robot, out.pose);
+        out.header.frame_id = "object"; // hmm not a real frame id
+    } else if (m_cand_frame_option == 2) { // grid frame
+        Eigen::Affine3d T_grid_robot = m_T_grid_model * robot_pose;
+        tf::poseEigenToMsg(T_grid_robot, out.pose);
+        out.header.frame_id = current_goal_->map.header.frame_id;
+    } else {
+        ROS_ERROR("Invalid candidate frame option. Defaulting to model frame");
+        tf::poseEigenToMsg(robot_pose, out.pose);
+    }
 }
 
 uint8_t RepositionBaseExecutor::execution_status_to_feedback_status(
@@ -566,7 +604,6 @@ bool RepositionBaseExecutor::computeRobPose(
 
     const bool bCheckGrasp = true;
     const bool m_check_distances = true;
-    const bool m_check_reach = false;
 
     double pTotThr = 0.0; // 0.5
 
@@ -648,7 +685,7 @@ bool RepositionBaseExecutor::computeRobPose(
             ss, rob, bTotMax, object_pose, robot_pose, scaleDiffYglob, pTotThr, pTot);
 
     // sort candidates with respect to pTot
-    std::vector<RepositionBaseCandidate::candidate> cands;
+    std::vector<candidate> cands;
     extractValidCandidatesSorted(ss, bTotMax, pTot, cands);
 
     int cand_footprint_viz_id = 0;
@@ -669,21 +706,21 @@ bool RepositionBaseExecutor::computeRobPose(
                     angles::to_degrees(angles::normalize_angle(rob(i, j, k).yaw)),
                     i, j, k, cand.pTot);
 
+
+            Eigen::Affine3d T_model_robot_3d = poseEigen2ToEigen3(T_world_robot);
+
             geometry_msgs::PoseStamped candidate_pose;
-
-            candidate_pose.header.frame_id = robot_model_->getModelFrame();
+            transformToOutputFrame(T_model_robot_3d, candidate_pose);
             candidate_pose.header.stamp = ros::Time::now();
-
-            Eigen::Affine3d T_world_robot_3d = poseEigen2ToEigen3(T_world_robot);
-            tf::poseEigenToMsg(T_world_robot_3d, candidate_pose.pose);
 
             candidate_base_poses.push_back(candidate_pose);
 
             visualizeRobot(T_world_robot, (cand.pTot * 240) - 120, "base_probable_candidates", base_probcandidates_viz_id);
 
-            Pose2D rp = poseEigen2ToSimple(poseEigen3ToEigen2(T_world_robot_3d));
+            Pose2D rp = poseEigen2ToSimple(poseEigen3ToEigen2(T_model_robot_3d));
             auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
             for (auto& m : fp_markers.markers) {
+                m.header.frame_id = robot_model_->getModelFrame();
                 m.ns = "candidate_footprints";
                 m.id = cand_footprint_viz_id++;
                 m.color = rainbow(cand.pTot);
@@ -696,10 +733,10 @@ bool RepositionBaseExecutor::computeRobPose(
         ROS_WARN("No probable candidate poses higher than a threshold!");
         ROS_WARN("Number of valid candidates: %zu", cands.size());
         return false;
-    } else {
-        ROS_INFO("Number of valid candidates: %zu", cands.size());
-        ROS_INFO("Number of probable candidates: %zu", candidate_base_poses.size());
     }
+
+    ROS_INFO("Number of valid candidates: %zu", cands.size());
+    ROS_INFO("Number of probable candidates: %zu", candidate_base_poses.size());
 
     return true;
 }
@@ -1206,7 +1243,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
             ss, rob, bTotMax, object_pose, robot_pose, scaleDiffYglob, pTotThr, pTot);
 
     // gather all valid candidates (p != 0)
-    std::vector<RepositionBaseCandidate::candidate> cands;
+    std::vector<candidate> cands;
     extractValidCandidatesSorted(ss, bTotMax, pTot, cands);
 
     // check for arm planning (at least 10 candidates)
@@ -1248,12 +1285,11 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 
             Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
             Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+            Eigen::Affine3d T_world_robot_3d = poseEigen2ToEigen3(T_world_robot);
 
             geometry_msgs::PoseStamped candidate_pose;
-            candidate_pose.header.frame_id = robot_model_->getModelFrame();
+            transformToOutputFrame(T_world_robot_3d, candidate_pose);
             candidate_pose.header.stamp = ros::Time::now();
-            Eigen::Affine3d T_world_robot_3d = poseEigen2ToEigen3(T_world_robot);
-            tf::poseEigenToMsg(T_world_robot_3d, candidate_pose.pose);
 
             candidate_base_poses.push_back(candidate_pose);
 
@@ -1267,7 +1303,6 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
     }
 
     ROS_INFO("    Number of IK feasible candidates: %d", cntTotMax);
-//    ROS_INFO("    Number of PLAN feasible candidates: %d", cntTotThr);
 
     return true;
 }
@@ -1653,14 +1688,14 @@ void RepositionBaseExecutor::extractValidCandidatesSorted(
     const SearchSpaceParams& ss,
     const au::grid<3, bool>& bTotMax,
     const au::grid<3, double>& pTot,
-    std::vector<RepositionBaseCandidate::candidate>& cands)
+    std::vector<candidate>& cands)
 {
     cands.clear();
     for (int j = 0; j < ss.nAng; j++) {
     for (int i = ss.nDist - 1; i >= 0; i--) {
     for (int k = ss.nYaw - 1; k >= 0; k--) {
         if (bTotMax(i, j, k)) {
-            RepositionBaseCandidate::candidate cand;
+            candidate cand;
             cand.i = i;
             cand.j = j;
             cand.k = k;
