@@ -18,6 +18,7 @@
 
     <param name="collision_detector" value="collision_detection/CollisionPluginSBPL"/>
     <rosparam command="load" file="$(find rcta)/config/robots/roman/common/collision_model.yaml"/>
+    <!--
     <rosparam param="world_collision_model">
         size_x: 20.0
         size_y: 20.0
@@ -27,7 +28,19 @@
         origin_z: -0.10
         res_m: 0.05
         max_distance_m: 0.8
-        frame_id: map
+        frame_id: base_footprint
+    </rosparam>
+    -->
+    <rosparam param="world_collision_model">
+        size_x: 3.0
+        size_y: 3.0
+        size_z: 2.0
+        origin_x: -1.5
+        origin_y: -1.5
+        origin_z: 0.0
+        res_m: 0.02
+        max_distance_m: 0.8 # will be buffed out by the largest sphere in the collision model
+        frame_id: base_footprint
     </rosparam>
     <rosparam param="self_collision_model">
         size_x: 3.0
@@ -38,7 +51,7 @@
         origin_z: 0.0
         res_m: 0.02
         max_distance_m: 0.2 # will be buffed out by the largest sphere in the collision model
-        frame_id: map
+        frame_id: base_footprint
     </rosparam>
 
     <!-- Planning Functionality -->
