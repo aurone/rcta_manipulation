@@ -1,5 +1,7 @@
 #include "MoveArmNode.h"
 
+// system includes
+#include <moveit/robot_model_loader/robot_model_loader.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
@@ -21,6 +23,13 @@ MoveArmNode::MoveArmNode() :
 
 bool MoveArmNode::init()
 {
+    robot_model_loader::RobotModelLoader::Options ops;
+    ops.load_kinematics_solvers_ = false;
+    robot_model_loader::RobotModelLoader loader(ops);
+    m_model_frame = loader.getModel()->getModelFrame();
+
+    ROS_INFO("Model Frame: %s", m_model_frame.c_str());
+
     auto move_arm_callback = boost::bind(&MoveArmNode::moveArm, this, _1);
     m_move_arm_server.reset(
             new MoveArmActionServer(m_server_name, move_arm_callback, false));
@@ -437,7 +446,7 @@ void MoveArmNode::octomapCallback(const octomap_msgs::Octomap::ConstPtr& msg)
 moveit_msgs::CollisionObject MoveArmNode::createGroundPlaneObject() const
 {
     moveit_msgs::CollisionObject gpo;
-    gpo.header.frame_id; // TODO: planning frame?
+    gpo.header.frame_id = m_model_frame;
 
     shape_msgs::Plane ground_plane;
     ground_plane.coef[0] = 0.0;

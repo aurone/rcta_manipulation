@@ -41,6 +41,8 @@ private:
     ros::NodeHandle m_nh;
     ros::NodeHandle m_ph;
 
+    std::string m_model_frame;
+
     ros::Subscriber m_octomap_sub;
 
     typedef actionlib::SimpleActionServer<rcta::MoveArmAction> MoveArmActionServer;

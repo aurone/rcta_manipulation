@@ -28,6 +28,7 @@ target_link_libraries(
     ${eigen_conversions_LIBRARIES}
     ${leatherman_LIBRARIES}
     ${moveit_core_LIBRARIES}
+    ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
     ${sbpl_collision_checking_LIBRARIES}
