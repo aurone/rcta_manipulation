@@ -1308,7 +1308,10 @@ void GraspObjectExecutor::onMovingArmToStowEnter(
     ROS_INFO("Create attached object with %zu shapes and %zu poses", aco.object.primitives.size(), aco.object.primitive_poses.size());
 
     // transform the object to the grasp frame
+
+    // T_grasp_object = T_grasp_pregrasp * T_pregrasp_object;
     const Eigen::Affine3d& T_grasp_object =
+            m_grasp_planner.graspToPregrasp() *
             m_last_successful_grasp.pose_in_object.inverse();
 
     ROS_INFO("Attaching gascan at offset %s from the wrist", to_string(T_grasp_object).c_str());
