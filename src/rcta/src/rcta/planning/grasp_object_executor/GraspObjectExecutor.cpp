@@ -872,7 +872,7 @@ void GraspObjectExecutor::onMovingArmToGraspEnter(GraspObjectExecutionStatus::St
 GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToGrasp()
 {
     if (!m_sent_move_arm_goal) {
-        ROS_WARN("Sending Move Arm Goal to pregrasp pose");
+        ROS_WARN("Sending Move Arm Goal to grasp pose");
         if (!rcta::ReconnectActionClient(
                 m_move_arm_command_client,
                 m_move_arm_command_action_name,
@@ -1589,6 +1589,9 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
     std::vector<rcta::GraspCandidate> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
+    int pregrasp_ik_filter_count = 0;
+    int grasp_ik_filter_count = 0;
+
     for (const rcta::GraspCandidate& grasp_candidate : candidates) {
         moveit::core::RobotState robot_state(m_robot_model);
         robot_state.setToDefaultValues();
@@ -1599,22 +1602,38 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
 
         ROS_DEBUG("test grasp candidate %s for ik solution", to_string(grasp_candidate.pose).c_str());
 
-        // check for an ik solution to this grasp pose
-        std::vector<double> sol;
-        if (robot_state.setFromIK(m_manip_group, grasp_candidate.pose)) {
-            robot_state.copyJointGroupPositions(m_manip_group, sol);
-            rcta::GraspCandidate reachable_grasp_candidate(
-                    grasp_candidate.pose,
-                    grasp_candidate.pose_in_object,
-                    grasp_candidate.u);
-            filtered_candidates.push_back(reachable_grasp_candidate);
-
-            ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.pose).c_str());
-            ROS_INFO("IK sol: %s", to_string(sol).c_str());
+        // check for an ik solution to the pre-grasp pose
+        if (!robot_state.setFromIK(m_manip_group, grasp_candidate.pose)) {
+            ++pregrasp_ik_filter_count;
+            continue;
         }
+
+        // check for an ik solution to the grasp pose
+        if (!robot_state.setFromIK(
+            m_manip_group,
+            grasp_candidate.pose * m_grasp_planner.pregraspToGrasp()))
+        {
+            ++grasp_ik_filter_count;
+            continue;
+        }
+
+        // push back this grasp pose
+        rcta::GraspCandidate reachable_grasp_candidate(
+                grasp_candidate.pose,
+                grasp_candidate.pose_in_object,
+                grasp_candidate.u);
+        filtered_candidates.push_back(reachable_grasp_candidate);
+        ROS_INFO("Pregrasp pose: %s", to_string(grasp_candidate.pose).c_str());
+
+        // log the ik solution to the grasp pose
+        std::vector<double> sol;
+        robot_state.copyJointGroupPositions(m_manip_group, sol);
+        ROS_INFO("IK sol: %s", to_string(sol).c_str());
     }
 
     ROS_INFO("%zu/%zu reachable candidates", filtered_candidates.size(), candidates.size());
+    ROS_INFO("  %d pregrasp ik failures", pregrasp_ik_filter_count);
+    ROS_INFO("  %d grasp ik failures", grasp_ik_filter_count);
     candidates = std::move(filtered_candidates);
 }
 
