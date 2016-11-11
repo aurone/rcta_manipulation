@@ -527,7 +527,8 @@ bool GraspingCommandPanel::valid_global_frame(const std::string& frame) const
         "abs_nwu",
         "abs_ned",
         "/abs_nwu",
-        "/abs_ned"
+        "/abs_ned",
+        "map",
     };
 
     if (robot_model_) {
