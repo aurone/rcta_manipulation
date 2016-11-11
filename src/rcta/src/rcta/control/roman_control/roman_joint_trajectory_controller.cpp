@@ -206,7 +206,7 @@ void RomanJointTrajectoryController::goalCallback()
 
     if (!path_msg.waypoints.empty()) {
         int duration_us = path_msg.waypoints.back().utime;
-        double duration_s = 5.0 * (double)duration_us / 1e6; // 2 inflation
+        double duration_s = 3.0 * (double)duration_us / 1e6; // 2 inflation
         ROS_INFO("Sleep for %d us (%0.3f seconds)", duration_us, duration_s);
         ros::Duration(duration_s).sleep();
         ROS_INFO("Done sleeping");
