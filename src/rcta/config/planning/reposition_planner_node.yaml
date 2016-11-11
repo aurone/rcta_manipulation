@@ -40,6 +40,8 @@ grasping:
 exhaustive_grasping:
   best_dist: 0.6
 
+candidate_frame: 2
+
 max_grasp_candidates: 3
 manipulator_group_name: right_arm
 footprint:
