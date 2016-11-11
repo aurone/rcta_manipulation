@@ -73,7 +73,7 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     m_body_length_core(0.0),
     attached_markers_(),
     m_max_grasp_samples(0),
-    m_check_reach(false),
+    m_check_reach(true),
     m_reachable_table(),
     move_arm_command_client_(),
     move_arm_command_action_name_("move_arm"),
