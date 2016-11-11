@@ -716,13 +716,11 @@ void GraspObjectExecutor::onGeneratingGraspsEnter(
 
 GraspObjectExecutionStatus::Status GraspObjectExecutor::onGeneratingGrasps()
 {
-    Eigen::Affine3d object_pose;
-    tf::poseMsgToEigen(m_current_goal->gas_can_in_map.pose, object_pose);
     std::vector<rcta::GraspCandidate> candidates;
 
     // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
     int max_samples = 100;
-    if (!m_grasp_planner.sampleGrasps(object_pose, max_samples, candidates)) {
+    if (!m_grasp_planner.sampleGrasps(m_obj_pose, max_samples, candidates)) {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;
     }
@@ -817,9 +815,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToPregrasp()
         gascan.header.frame_id = m_robot_model->getModelFrame();
         gascan.id = "gascan";
         gascan.operation = moveit_msgs::CollisionObject::ADD;
-        Eigen::Affine3d object_pose;
-        tf::poseMsgToEigen(m_current_goal->gas_can_in_map.pose, object_pose);
-        transformCollisionObject(gascan, object_pose);
+        transformCollisionObject(gascan, m_obj_pose);
 
         m_last_move_arm_pregrasp_goal.planning_options.planning_scene_diff.is_diff = true;
         m_last_move_arm_pregrasp_goal.planning_options.planning_scene_diff.world.collision_objects.push_back(gascan);
@@ -923,6 +919,8 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToGrasp()
             ROS_INFO("    Error Text: %s", m_move_arm_command_goal_state.getText().c_str());
             ROS_INFO("    result.success = %s", m_move_arm_command_result ? (m_move_arm_command_result->success ? "TRUE" : "FALSE") : "null");
             return GraspObjectExecutionStatus::FAULT;
+            // TODO: move back to "moving to pregrasp" until there
+            // are no more (pregrasp, grasp) transitions to try
         }
     }
 
