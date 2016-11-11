@@ -69,6 +69,7 @@ public:
     void setGraspToPregraspTransform(const Eigen::Affine3d& T_grasp_pregrasp)
     {
         m_T_grasp_pregrasp = T_grasp_pregrasp;
+        m_T_pregrasp_grasp = m_T_grasp_pregrasp.inverse();
     }
 
     bool sampleGrasps(
@@ -79,6 +80,7 @@ public:
     const Nurb<Eigen::Vector3d>& spline() const { return m_grasp_spline; }
     const Eigen::Affine3d& wristToTool() const { return m_T_wrist_tool; }
     const Eigen::Affine3d& graspToPregrasp() const { return m_T_grasp_pregrasp; }
+    const Eigen::Affine3d& pregraspToGrasp() const { return m_T_pregrasp_grasp; }
 
 private:
 
@@ -88,6 +90,7 @@ private:
 
     Eigen::Affine3d m_T_wrist_tool;
     Eigen::Affine3d m_T_grasp_pregrasp;
+    Eigen::Affine3d m_T_pregrasp_grasp;
 };
 
 } // namespace rcta

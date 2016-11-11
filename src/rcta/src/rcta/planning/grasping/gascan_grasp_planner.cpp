@@ -136,7 +136,8 @@ GascanGraspPlanner::GascanGraspPlanner() :
     m_grasp_spline(),
     m_gascan_scale(1.0),
     m_T_wrist_tool(Eigen::Affine3d::Identity()),
-    m_T_grasp_pregrasp(Eigen::Affine3d::Identity())
+    m_T_grasp_pregrasp(Eigen::Affine3d::Identity()),
+    m_T_pregrasp_grasp(Eigen::Affine3d::Identity())
 {
 }
 
