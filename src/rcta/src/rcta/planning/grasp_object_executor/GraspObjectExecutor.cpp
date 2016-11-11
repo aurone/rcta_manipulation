@@ -192,7 +192,6 @@ GraspObjectExecutor::GraspObjectExecutor() :
     m_current_goal(),
     m_current_occupancy_grid(),
     m_current_octomap(),
-    m_gas_can_in_grid_frame(),
     m_sent_move_arm_goal(false),
     m_pending_move_arm_command(false),
     m_move_arm_command_goal_state(actionlib::SimpleClientGoalState::SUCCEEDED),
@@ -551,6 +550,11 @@ int GraspObjectExecutor::run()
 
 void GraspObjectExecutor::goalCallback()
 {
+    if (m_as->isActive()) {
+        ROS_WARN("I'm busy!");
+        return;
+    }
+
     ROS_INFO("Received a new goal");
     m_current_goal = m_as->acceptNewGoal();
     ROS_INFO("  Goal ID: %u", m_current_goal->id);
@@ -589,44 +593,35 @@ void GraspObjectExecutor::goalCallback()
     // get the gas can pose in the frame of the occupancy grid
     if (m_current_occupancy_grid) {
         const std::string& grid_frame = m_current_occupancy_grid->header.frame_id;
-        const std::string& world_frame = m_current_goal->gas_can_in_map.header.frame_id;
+        const std::string& model_frame = m_robot_model->getModelFrame();
 
-        // clear m_gas_can_in_grid_frame
-        m_gas_can_in_grid_frame.header.frame_id = "";
-        m_gas_can_in_grid_frame.header.stamp = ros::Time(0);
-        m_gas_can_in_grid_frame.header.seq = 0;
-        m_gas_can_in_grid_frame.pose = geometry_msgs::IdentityPose();
+        if (grid_frame != m_robot_model->getModelFrame()) {
+            ROS_INFO("Lookup transform from model frame to grid frame");
+            tf::StampedTransform t;
 
-        if (grid_frame != world_frame) {
-            ROS_INFO("Transforming gas can into frame '%s' to clear from the occupancy grid", grid_frame.c_str());
             try {
-                geometry_msgs::PoseStamped gas_can_in_world_frame = m_current_goal->gas_can_in_map;
-                gas_can_in_world_frame.header.stamp = ros::Time(0);
-
-                m_gas_can_in_grid_frame.header.frame_id = m_current_occupancy_grid->header.frame_id;
-                m_gas_can_in_grid_frame.header.stamp = ros::Time(0);
-
-                m_listener.transformPose(grid_frame, gas_can_in_world_frame, m_gas_can_in_grid_frame);
+                m_listener.lookupTransform(m_robot_model->getModelFrame(), grid_frame, ros::Time(0), t);
+                tf::transformTFToEigen(t, m_T_model_grid);
+                m_T_grid_model = m_T_model_grid.inverse();
             } catch (const tf::TransformException& ex) {
-                ROS_ERROR("Failed to lookup transform gas can into the grid frame. Assuming Identity");
-                ROS_ERROR("%s", ex.what());
-                m_gas_can_in_grid_frame = m_current_goal->gas_can_in_map;
+                ROS_ERROR("Failed to lookup transform from '%s' to '%s' (%s)", m_robot_model->getModelFrame().c_str(), grid_frame.c_str(), ex.what());
+                m_as->setAborted();
+                return;
             }
         } else {
-            ROS_INFO("Gas can already exists in grid frame '%s'", grid_frame.c_str());
-            m_gas_can_in_grid_frame = m_current_goal->gas_can_in_map;
-            m_gas_can_in_grid_frame.header.stamp = ros::Time(0);
+            m_T_model_grid = Eigen::Affine3d::Identity();
+            m_T_grid_model = Eigen::Affine3d::Identity();
         }
-
-        ROS_INFO("Gas Can Pose [grid frame: %s]: %s", grid_frame.c_str(), to_string(m_gas_can_in_grid_frame.pose).c_str());
 
         // TODO: save all the cells that didn't need to be cleared, so that we
         // can check for their existence later
 
+        Eigen::Affine3d T_grid_obj = m_T_grid_model * m_obj_pose;
+        ROS_INFO("Object Pose [grid frame]: %s", to_string(T_grid_obj).c_str());
         clearCircleFromGrid(
                 *m_current_occupancy_grid,
-                m_gas_can_in_grid_frame.pose.position.x,
-                m_gas_can_in_grid_frame.pose.position.y,
+                T_grid_obj.translation()[0],
+                T_grid_obj.translation()[1],
                 m_object_filter_radius);
 
         m_filtered_costmap_pub.publish(m_current_occupancy_grid);
@@ -1453,10 +1448,12 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onCompletingGoal()
         // get here once we've received a newer costmap to evaluate for the object's position
         OccupancyGridConstPtr occupancy_grid_after_grasp = m_last_occupancy_grid;
 
+        Eigen::Affine3d T_grid_obj = m_T_grid_model * m_obj_pose;
+
         double success_pct = calcProbSuccessfulGrasp(
             *occupancy_grid_after_grasp,
-            m_gas_can_in_grid_frame.pose.position.x,
-            m_gas_can_in_grid_frame.pose.position.y,
+            T_grid_obj.translation()[0],
+            T_grid_obj.translation()[1],
             m_object_filter_radius);
 
         occupancy_grid_after_grasp.reset();

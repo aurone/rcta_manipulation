@@ -179,8 +179,6 @@ private:
     /// extruded current occupancy grid
     OctomapPtr m_current_octomap;
 
-    geometry_msgs::PoseStamped m_gas_can_in_grid_frame;
-
     Eigen::Affine3d m_obj_pose;
     Eigen::Affine3d m_T_grid_model;
     Eigen::Affine3d m_T_model_grid;
