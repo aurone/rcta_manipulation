@@ -20,15 +20,42 @@ stow_positions:
 #        arm_5_wrist_twist: -85.00
 #        arm_6_wrist_lift: 2.00
 #        arm_7_gripper_lift: 25.00
+#    - name: "one"
+#      joint_vector_degs:
+#        limb_right_joint1: -61.58
+#        limb_right_joint2: 54.91
+#        limb_right_joint3: 7.82
+#        limb_right_joint4: 93.64
+#        limb_right_joint5: -51.47
+#        limb_right_joint6: 20.10
+#        limb_right_joint7: -10.96
     - name: "one"
       joint_vector_degs:
-        limb_right_joint1: -61.58
-        limb_right_joint2: 54.91
-        limb_right_joint3: 7.82
-        limb_right_joint4: 93.64
-        limb_right_joint5: -51.47
-        limb_right_joint6: 20.10
-        limb_right_joint7: -10.96
+        limb_right_joint1: 245.0
+        limb_right_joint2: -91.09
+        limb_right_joint3: -106.72
+        limb_right_joint4: 3.02
+        limb_right_joint5: 50.00
+        limb_right_joint6: -94.526
+        limb_right_joint7: -41.04
+    - name: "two"
+      joint_vector_degs:
+        limb_right_joint1: 16.28
+        limb_right_joint2: 59.05
+        limb_right_joint3: -110.92
+        limb_right_joint4: -4.66
+        limb_right_joint5: 39.32
+        limb_right_joint6: 85.82
+        limb_right_joint7: -98.53
+    - name: "three"
+      joint_vector_degs:
+        limb_right_joint1: 40.0
+        limb_right_joint2: -90.0
+        limb_right_joint3: -90.0
+        limb_right_joint4: 180.0
+        limb_right_joint5: 90.0
+        limb_right_joint6: 0.0
+        limb_right_joint7: 180.0
 
 # whether to extrude the current costmap and use as the octomap for queries to
 # the arm executor
