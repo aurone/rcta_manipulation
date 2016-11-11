@@ -279,6 +279,7 @@ private:
         double z = 0.0, double R = 0.0, double P = 0.0) const;
 
     Pose2D poseEigen3ToSimpleGascan(const Eigen::Affine3d& object_pose) const;
+    Eigen::Affine3d poseSimpleGascanToEigen3(const Pose2D& object_pose) const;
     ///@}
 
     /// \name Grasp Candidate Selection
@@ -343,6 +344,12 @@ private:
         const au::grid<3, Pose2D>& rob,
         au::grid<3, bool>& bTotMax);
 
+    void pruneUnreachingStates(
+        const SearchSpaceParams& ss,
+        const au::grid<3, Pose2D>& rob,
+        const Pose2D& obj,
+        au::grid<3, bool>& bTotMax);
+
     void computeArmCollisionProbabilities(
         const SearchSpaceParams& ss,
         const au::grid<3, Pose2D>& rob,
@@ -361,7 +368,7 @@ private:
         const au::grid<3, bool>& b,
         au::grid<3, double>& p);
 
-    int checkIK(
+    bool checkIK(
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose);
 

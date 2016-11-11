@@ -45,7 +45,7 @@ double sign(double val)
 double quad(double best, double value, double max_best_dist, double scale)
 {
     return sqrd((max_best_dist - fabs(value - best) * scale) / max_best_dist);
-};
+}
 
 RepositionBaseExecutor::RepositionBaseExecutor() :
     nh_(),
@@ -94,10 +94,10 @@ RepositionBaseExecutor::~RepositionBaseExecutor()
 
 bool RepositionBaseExecutor::initialize()
 {
-    //////////////////////////////////////////////////////////////////////////
-    // This could maybe be refactoreds, since there is a lot of commonality //
-    // with GraspObjectExecutor                                             //
-    //////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
+    // This could maybe be refactored, since there is a lot of commonality //
+    // with GraspObjectExecutor                                            //
+    /////////////////////////////////////////////////////////////////////////
 
     camera_view_frame_ = "asus_rgb_optical_frame";
 
@@ -553,22 +553,11 @@ bool RepositionBaseExecutor::computeRobPose(
 
     const SearchSpaceParams& ss = m_ss;
 
-    bool bCheckGrasp = true;
-    bool bCheckObs = true;
+    const bool bCheckGrasp = true;
+    const bool m_check_distances = true;
+    const bool m_check_reach = false;
 
-    // 5) candidate selection criterion
-
-    // multiply a quadratic function to pTot (1 at diffYglob==0,
-    // (1-wDiffYglob)^2 at diffYglob==M_PI) for bSortMetric==3
-    double scaleDiffYglob = 0.05;
-    // pTot threshold for bSortMetric==3
     double pTotThr = 0.0; // 0.5
-
-    // 5) flag for candidate sorting
-    // 1: angle
-    // 2: angle position
-    // 3: pTot threshold (default)
-    int bSortMetric = 3;
 
     ///////////////////////////
     // END PARAMETER SETTING //
@@ -578,17 +567,6 @@ bool RepositionBaseExecutor::computeRobPose(
     // (r, th): polar coordinate with respect to the object with the center fixed at the origin and the nozzle aligned to 0 rad
     // (Y): orientation about z-axis
 
-    // binary flag to indicate whether the probability is zero and the state
-    // can be pruned; true -> non-zero
-    au::grid<3, bool> bTotMax(ss.nDist, ss.nAng, ss.nYaw);
-
-    au::grid<3, double> pGrasp(ss.nDist, ss.nAng, ss.nYaw);
-    au::grid<3, double> pObs(ss.nDist, ss.nAng, ss.nYaw);
-
-    pObs.assign(1.0);
-    pGrasp.assign(1.0);
-    bTotMax.assign(true);
-
     au::grid<3, Pose2D> rob;
     generateCandidatePoseSamples(object_pose, ss, rob);
 
@@ -597,6 +575,13 @@ bool RepositionBaseExecutor::computeRobPose(
         visualizeBaseCandidates(rob, "raw_candidates", 3, 4, 3);
     }
 
+    // binary flag to indicate whether the probability is zero and the state
+    // can be pruned; true -> non-zero
+    au::grid<3, bool> bTotMax(ss.nDist, ss.nAng, ss.nYaw);
+    bTotMax.assign(true);
+
+    au::grid<3, double> pGrasp(ss.nDist, ss.nAng, ss.nYaw);
+    pGrasp.assign(1.0);
     if (bCheckGrasp) {
         computeGraspProbabilities(ss, rob, object_pose, pTotThr, pGrasp, bTotMax);
 
@@ -608,7 +593,9 @@ bool RepositionBaseExecutor::computeRobPose(
         }
     }
 
-    if (bCheckObs) {
+    au::grid<3, double> pObs(ss.nDist, ss.nAng, ss.nYaw);
+    pObs.assign(1.0);
+    if (m_check_distances) {
         // filter out poses where the robot is definitely in collision
         pruneCollisionStates(ss, rob, bTotMax);
 
@@ -623,11 +610,17 @@ bool RepositionBaseExecutor::computeRobPose(
         computeBaseCollisionProbabilities(ss, rob, pObs, bTotMax);
     }
 
+//    au::grid<3, double> pReach(ss.nDist, ss.nAng, ss.nYaw);
+    if (m_check_reach) {
+        pruneUnreachingStates(ss, rob, object_pose, bTotMax);
+    }
+
     // TODO: robot arm workspace limit should be included here!
 
     au::grid<3, double> pTot;
     multiplyProbabilities(pGrasp, pObs, bTotMax, pTot);
 
+    const double scaleDiffYglob = 0.05;
     scaleByHeadingDifference(
             ss, rob, bTotMax, object_pose, robot_pose, scaleDiffYglob, pTotThr, pTot);
 
@@ -839,7 +832,7 @@ void RepositionBaseExecutor::computeExhaustiveGraspProbabilities(
     }
 }
 
-/// \brief Update the probabilities of collision free, with respect to the base
+/// Update the probabilities of collision free, with respect to the base.
 ///
 /// The projected footprint of the robot is checked for collisions with the
 /// occupancy grid. If a collision is found, the probability of being collision
@@ -873,6 +866,34 @@ void RepositionBaseExecutor::pruneCollisionStates(
                 m.id = base_footprint_viz_id++;
             }
             SV_SHOW_INFO(fp_markers);
+        }
+    }
+    }
+    }
+}
+
+void RepositionBaseExecutor::pruneUnreachingStates(
+    const SearchSpaceParams& ss,
+    const au::grid<3, Pose2D>& rob,
+    const Pose2D& object_pose,
+    au::grid<3, bool>& bTotMax)
+{
+    for (int i = 0; i < ss.nDist; ++i) {
+    for (int j = 0; j < ss.nAng; ++j) {
+    for (int k = 0; k < ss.nYaw; ++k) {
+        if (!bTotMax(i, j, k)) {
+            continue;
+        }
+
+        Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
+        Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+
+        // Transform to simple pose in grid frame
+        Eigen::Affine3d T_model_robot = poseEigen2ToEigen3(T_world_robot);
+        Eigen::Affine3d T_model_object = poseSimpleGascanToEigen3(object_pose);
+
+        if (!checkIK(T_model_robot, T_model_object)) {
+            bTotMax(i, j, k) = false;
         }
     }
     }
@@ -1135,8 +1156,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
                 continue;
             }
 
-            int retIKPLAN = checkIK(rp3, op3);
-            if (checkIK(rp3, op3) != 1) {
+            if (!checkIK(rp3, op3)) {
                 bTotMax(i, j, k) = false;
                 // checkIK failed!
                 Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
@@ -1263,6 +1283,9 @@ void RepositionBaseExecutor::pruneGraspCandidatesIK(
     std::vector<rcta::GraspCandidate> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
+    int pregrasp_ik_filter_count = 0;
+    int grasp_ik_filter_count = 0;
+
     for (const rcta::GraspCandidate& grasp_candidate : candidates) {
         moveit::core::RobotState robot_state(robot_model_);
         robot_state.setToDefaultValues();
@@ -1273,22 +1296,38 @@ void RepositionBaseExecutor::pruneGraspCandidatesIK(
 
         ROS_DEBUG("test grasp candidate %s for ik solution", to_string(grasp_candidate.pose).c_str());
 
-        // check for an ik solution to this grasp pose
-        std::vector<double> sol;
-        if (robot_state.setFromIK(manip_group_, grasp_candidate.pose)) {
-            robot_state.copyJointGroupPositions(manip_group_, sol);
-            rcta::GraspCandidate reachable_grasp_candidate(
-                    grasp_candidate.pose,
-                    grasp_candidate.pose_in_object,
-                    grasp_candidate.u);
-            filtered_candidates.push_back(reachable_grasp_candidate);
-
-            ROS_INFO("Grasp pose: %s", to_string(grasp_candidate.pose).c_str());
-            ROS_INFO("IK sol: %s", to_string(sol).c_str());
+        // check for an ik solution to the pre-grasp pose
+        if (!robot_state.setFromIK(manip_group_, grasp_candidate.pose)) {
+            ++pregrasp_ik_filter_count;
+            continue;
         }
+
+        // check for an ik solution to the grasp pose
+        if (!robot_state.setFromIK(
+            manip_group_,
+            grasp_candidate.pose * m_grasp_planner.pregraspToGrasp()))
+        {
+            ++grasp_ik_filter_count;
+            continue;
+        }
+
+        // push back this grasp pose
+        rcta::GraspCandidate reachable_grasp_candidate(
+                grasp_candidate.pose,
+                grasp_candidate.pose_in_object,
+                grasp_candidate.u);
+        filtered_candidates.push_back(reachable_grasp_candidate);
+        ROS_INFO("Pregrasp pose: %s", to_string(grasp_candidate.pose).c_str());
+
+        // log the ik solution to the grasp pose
+        std::vector<double> sol;
+        robot_state.copyJointGroupPositions(manip_group_, sol);
+        ROS_INFO("IK sol: %s", to_string(sol).c_str());
     }
 
     ROS_INFO("%zu/%zu reachable candidates", filtered_candidates.size(), candidates.size());
+    ROS_INFO("  %d pregrasp ik failures", pregrasp_ik_filter_count);
+    ROS_INFO("  %d grasp ik failures", grasp_ik_filter_count);
     candidates = std::move(filtered_candidates);
 }
 
@@ -1426,6 +1465,16 @@ Pose2D RepositionBaseExecutor::poseEigen3ToSimpleGascan(
     // M_PI / 2 offset due to definition of object frame in new mesh file
     gascan_pose.yaw = angles::normalize_angle(gascan_pose.yaw - 0.5 * M_PI);
     return gascan_pose;
+}
+
+Eigen::Affine3d RepositionBaseExecutor::poseSimpleGascanToEigen3(
+    const Pose2D& object_pose) const
+{
+    const double z_on_ground = 0.156666;
+    return Eigen::Translation3d(object_pose.x, object_pose.y, z_on_ground) *
+        Eigen::AngleAxisd(
+                angles::normalize_angle(object_pose.yaw + 0.5 * M_PI),
+                Eigen::Vector3d::UnitZ());
 }
 
 bool RepositionBaseExecutor::tryFeasibleArmCheck(
@@ -1605,7 +1654,7 @@ void RepositionBaseExecutor::extractValidCandidatesSorted(
     std::sort(cands.begin(), cands.end());
 }
 
-int RepositionBaseExecutor::checkIK(
+bool RepositionBaseExecutor::checkIK(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose)
 {
