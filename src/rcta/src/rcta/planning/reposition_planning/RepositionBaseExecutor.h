@@ -76,6 +76,9 @@ struct Pose2D
     double x;
     double y;
     double yaw;
+
+    Pose2D() = default;
+    Pose2D(double x, double y, double yaw) : x(x), y(y), yaw(yaw) { }
 };
 
 /// Describes the space of discrete poses with respect to another pose
@@ -225,6 +228,8 @@ private:
     rcta::GascanGraspPlanner m_grasp_planner;
     int m_max_grasp_samples;
     ///@}
+
+    au::grid<3, bool> m_reachable_table;
 
     /// \name Arm Planning Constraints
     /// @{

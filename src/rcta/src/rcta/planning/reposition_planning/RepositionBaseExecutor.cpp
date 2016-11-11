@@ -248,11 +248,22 @@ bool RepositionBaseExecutor::initialize()
         return false;
     }
 
-
     m_prune_params.min_angle = angles::from_degrees(45.0);
     m_prune_params.max_angle = angles::from_degrees(80.0);
     m_prune_params.min_heading = angles::from_degrees(-5.0);
     m_prune_params.max_heading = angles::from_degrees(40.0);
+
+    m_reachable_table.resize(m_ss.nDist, m_ss.nAng, m_ss.nYaw);
+    m_reachable_table.assign(true);
+
+    auto then = std::chrono::high_resolution_clock::now();
+    au::grid<3, Pose2D> rob;
+    Pose2D zero(0.0, 0.0, 0.0);
+    generateCandidatePoseSamples(zero, m_ss, rob);
+
+    pruneUnreachingStates(m_ss, rob, zero, m_reachable_table);
+    auto now = std::chrono::high_resolution_clock::now();
+    ROS_INFO("Precomputing reachability table took %0.3f seconds", std::chrono::duration<double>(now - then).count());
 
     return true;
 }
@@ -612,7 +623,19 @@ bool RepositionBaseExecutor::computeRobPose(
 
 //    au::grid<3, double> pReach(ss.nDist, ss.nAng, ss.nYaw);
     if (m_check_reach) {
-        pruneUnreachingStates(ss, rob, object_pose, bTotMax);
+        for (int i = 0; i < ss.nDist; ++i) {
+        for (int j = 0; j < ss.nAng; ++j) {
+        for (int k = 0; k < ss.nYaw; ++k) {
+            if (!bTotMax(i, j, k)) {
+                continue;
+            }
+
+            if (!m_reachable_table(i, j, k)) {
+                bTotMax(i, j, k) = false;
+            }
+        }
+        }
+        }
     }
 
     // TODO: robot arm workspace limit should be included here!
@@ -1317,12 +1340,12 @@ void RepositionBaseExecutor::pruneGraspCandidatesIK(
                 grasp_candidate.pose_in_object,
                 grasp_candidate.u);
         filtered_candidates.push_back(reachable_grasp_candidate);
-        ROS_INFO("Pregrasp pose: %s", to_string(grasp_candidate.pose).c_str());
+        ROS_DEBUG("Pregrasp pose: %s", to_string(grasp_candidate.pose).c_str());
 
         // log the ik solution to the grasp pose
         std::vector<double> sol;
         robot_state.copyJointGroupPositions(manip_group_, sol);
-        ROS_INFO("IK sol: %s", to_string(sol).c_str());
+        ROS_DEBUG("IK sol: %s", to_string(sol).c_str());
     }
 
     ROS_INFO("%zu/%zu reachable candidates", filtered_candidates.size(), candidates.size());
@@ -1357,7 +1380,7 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     const Eigen::Affine3d& camera_pose =
             robot_state.getGlobalLinkTransform(camera_view_frame_);
 
-    ROS_INFO("world -> camera: %s", to_string(camera_pose).c_str());
+    ROS_DEBUG("world -> camera: %s", to_string(camera_pose).c_str());
 
     const double vis_angle_thresh = sbpl::utils::ToRadians(45.0);
     pruneGraspCandidates(candidates, robot_pose, camera_pose, vis_angle_thresh);
@@ -1367,10 +1390,6 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     rcta::RankGrasps(candidates);
 
     SV_SHOW_INFO(getGraspCandidatesVisualization(candidates, "grasp_candidates_checkIKPLAN_filtered"));
-
-    if (candidates.empty()) {
-        ROS_WARN("No reachable grasp candidates available");
-    }
 
     return true;
 }
@@ -1658,7 +1677,6 @@ bool RepositionBaseExecutor::checkIK(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose)
 {
-    ROS_INFO("checkIK!");
     std::vector<rcta::GraspCandidate> candidates;
     if (!generateFilteredGraspCandidates(robot_pose, object_pose, candidates)) {
         return 0;

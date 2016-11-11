@@ -14,9 +14,7 @@ GetGraspCandidatesVisualization(
     const std::string& frame_id,
     const std::string& ns)
 {
-    ROS_INFO("Visualizing %zd grasp candidates", grasps.size());
-    geometry_msgs::Vector3 triad_scale =
-            geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
+    auto triad_scale = geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
 
     // create triad markers to be reused for each grasp candidate
     auto triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
