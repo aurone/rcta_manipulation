@@ -87,8 +87,7 @@ moveit_msgs::CollisionObject CreateGascanCollisionObject()
     return co;
 }
 
-namespace GraspObjectExecutionStatus
-{
+namespace GraspObjectExecutionStatus {
 
 std::string to_string(Status status)
 {

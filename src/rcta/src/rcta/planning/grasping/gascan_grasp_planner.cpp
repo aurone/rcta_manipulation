@@ -85,22 +85,22 @@ void PruneGraspsByVisibility(
                             grasp_candidate.pose *
                             T_wrist_marker;
 
-                    ROS_DEBUG("  Camera -> Marker: %s", to_string(T_camera_fid).c_str());
+                    ROS_DEBUG_NAMED("grasping", "  Camera -> Marker: %s", to_string(T_camera_fid).c_str());
                     Eigen::Vector3d camera_view_axis = -Eigen::Vector3d::UnitZ();
                     Eigen::Vector3d marker_plane_normal;
                     marker_plane_normal.x() = T_camera_fid(0, 2);
                     marker_plane_normal.y() = T_camera_fid(1, 2);
                     marker_plane_normal.z() = T_camera_fid(2, 2);
 
-                    ROS_DEBUG("  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
+                    ROS_DEBUG_NAMED("grasping", "  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
 
                     double dp = marker_plane_normal.dot(camera_view_axis);
-                    ROS_DEBUG("  Marker Normal * Camera View Axis: %0.3f", dp);
+                    ROS_DEBUG_NAMED("grasping", "  Marker Normal * Camera View Axis: %0.3f", dp);
 
                     // the optimal situation is when the camera is facing the
                     // marker directly and this angle is 0
                     double angle = acos(dp);
-                    ROS_DEBUG("  Angle: %0.3f", angle);
+                    ROS_DEBUG_NAMED("grasping", "  Angle: %0.3f", angle);
 
                     return angle < ang_thresh;
                 });
@@ -219,7 +219,7 @@ bool GascanGraspPlanner::init(ros::NodeHandle& nh)
         return false;
     }
     Eigen::Affine3d T_grasp_pregrasp(
-            Eigen::Translation3d(-pregrasp_to_grasp_offset_x_m, 0, 0));
+            Eigen::Translation3d(-pregrasp_to_grasp_offset_x_m, 0.0, 0.0));
     setGraspToPregraspTransform(T_grasp_pregrasp);
 
     return true;
@@ -249,7 +249,7 @@ bool GascanGraspPlanner::init(ros::NodeHandle& nh)
 ///
 /// * The pregrasp frame is determined via a fixed offset from the grasp frame
 bool GascanGraspPlanner::sampleGrasps(
-    const Eigen::Affine3d& T_grasp_object,
+    const Eigen::Affine3d& object_pose,
     int max_samples,
     std::vector<GraspCandidate>& candidates)
 {
@@ -289,7 +289,7 @@ bool GascanGraspPlanner::sampleGrasps(
 
     candidates.reserve(max_samples);
     for (int i = 0; i < max_samples; ++i) {
-        ROS_DEBUG("Candidate Pregrasp %3d", i);
+        ROS_DEBUG_NAMED("grasping", "Candidate Pregrasp %3d", i);
         // sample uniformly the position and derivative of the gas canister
         // grasp spline
         double u = (max_u - min_u) * i / (max_samples - 1);
@@ -307,66 +307,55 @@ bool GascanGraspPlanner::sampleGrasps(
         if (knot_num < m_grasp_spline.degree() ||
             knot_num >= m_grasp_spline.knots().size() - m_grasp_spline.degree())
         {
-            ROS_DEBUG("Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
+            ROS_DEBUG_NAMED("grasping", "Skipping grasp_spline(%0.3f) [point governed by same knot more than once]", u);
             continue;
         }
 
-        Eigen::Vector3d object_pos_robot_frame(T_grasp_object.translation());
 
-        Eigen::Vector3d sample_spline_point =
-                Eigen::Affine3d(Eigen::Scaling(m_gascan_scale)) *
-                m_grasp_spline(u);
-        Eigen::Vector3d sample_spline_deriv = m_grasp_spline.deriv(u);
+        Eigen::Vector3d sample_point_in_obj =
+                Eigen::Scaling(m_gascan_scale) * m_grasp_spline(u);
+        Eigen::Vector3d sample_deriv_in_obj = m_grasp_spline.deriv(u);
 
-        ROS_DEBUG("    Sample Spline Point [object frame]: %s", to_string(sample_spline_point).c_str());
-        ROS_DEBUG("    Sample Spline Deriv [object frame]: %s", to_string(sample_spline_deriv).c_str());
+        ROS_DEBUG_NAMED("grasping", "    Sample Spline Point [object frame]: %s", to_string(sample_point_in_obj).c_str());
+        ROS_DEBUG_NAMED("grasping", "    Sample Spline Deriv [object frame]: %s", to_string(sample_deriv_in_obj).c_str());
 
-        Eigen::Vector3d sample_spline_point_robot_frame =
-                T_grasp_object * sample_spline_point;
+        Eigen::Vector3d sample_spline_point = object_pose * sample_point_in_obj;
 
-        Eigen::Vector3d sample_spline_deriv_robot_frame =
-                T_grasp_object.rotation() * sample_spline_deriv.normalized();
+        Eigen::Vector3d sample_spline_deriv = object_pose.rotation() * sample_deriv_in_obj.normalized();
 
-        ROS_DEBUG("    Sample Spline Point [target frame]: %s", to_string(sample_spline_point_robot_frame).c_str());
-        ROS_DEBUG("    Sample Spline Deriv [target frame]: %s", to_string(sample_spline_deriv_robot_frame).c_str());
+        ROS_DEBUG_NAMED("grasping", "    Sample Spline Point [target frame]: %s", to_string(sample_spline_point).c_str());
+        ROS_DEBUG_NAMED("grasping", "    Sample Spline Deriv [target frame]: %s", to_string(sample_spline_deriv).c_str());
 
-        // compute the normal to the grasp spline that most points "up" in the
-        // robot frame
+        // compute the normal to the grasp spline that most points "up"
         Eigen::Vector3d up_bias(Eigen::Vector3d::UnitZ());
         Eigen::Vector3d up_grasp_dir =
-                up_bias -
-                        up_bias.dot(sample_spline_deriv_robot_frame) *
-                        sample_spline_deriv_robot_frame;
+                up_bias - up_bias.dot(sample_spline_deriv) * sample_spline_deriv;
         up_grasp_dir.normalize();
         up_grasp_dir *= -1.0;
 
-        // compute the normal to the grasp spline that most points "down" in the
-        // robot frame
+        // compute the normal to the grasp spline that most points "down"
         Eigen::Vector3d down_bias(-Eigen::Vector3d::UnitZ());
         Eigen::Vector3d down_grasp_dir =
-                down_bias -
-                        down_bias.dot(sample_spline_deriv_robot_frame) *
-                        sample_spline_deriv_robot_frame;
+                down_bias - down_bias.dot(sample_spline_deriv) * sample_spline_deriv;
         down_grasp_dir.normalize();
         down_grasp_dir *= -1.0;
 
+        Eigen::Vector3d object_pos(object_pose.translation());
         Eigen::Vector3d grasp_dir;
-        Eigen::Vector3d object_to_sample =
-                sample_spline_point_robot_frame - object_pos_robot_frame;
+        Eigen::Vector3d object_to_sample = sample_spline_point - object_pos;
         if (up_grasp_dir.dot(object_to_sample) < 0) {
             grasp_dir = up_grasp_dir;
         } else {
-            ROS_DEBUG("Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
+            ROS_DEBUG_NAMED("grasping", "Skipping grasp_spline(%0.3f) [derivative goes backwards along the spline]", u);
             continue;
 //            grasp_dir = down_grasp_dir;
         }
 
-        ROS_DEBUG("    Grasp Direction [robot frame]: %s", to_string(grasp_dir).c_str());
+        ROS_DEBUG_NAMED("grasping", "    Grasp Direction [robot frame]: %s", to_string(grasp_dir).c_str());
 
         Eigen::Vector3d grasp_candidate_dir_x = grasp_dir;
-        Eigen::Vector3d grasp_candidate_dir_y = sample_spline_deriv_robot_frame;
-        Eigen::Vector3d grasp_candidate_dir_z =
-                grasp_dir.cross(sample_spline_deriv_robot_frame);
+        Eigen::Vector3d grasp_candidate_dir_y = sample_spline_deriv;
+        Eigen::Vector3d grasp_candidate_dir_z = grasp_dir.cross(sample_spline_deriv);
 
         Eigen::Matrix3d grasp_rotation_matrix;
         grasp_rotation_matrix(0, 0) = grasp_candidate_dir_x.x();
@@ -379,25 +368,25 @@ bool GascanGraspPlanner::sampleGrasps(
         grasp_rotation_matrix(1, 2) = grasp_candidate_dir_z.y();
         grasp_rotation_matrix(2, 2) = grasp_candidate_dir_z.z();
 
-        // robot_frame -> candidate tool frame pose
+        // model frame -> candidate tool frame pose
         Eigen::Affine3d grasp_candidate_rotation =
-                Eigen::Translation3d(sample_spline_point_robot_frame) *
+                Eigen::Translation3d(sample_spline_point) *
                 grasp_rotation_matrix;
 
-        // robot -> grasp candidate (desired tool) *
+        // model -> grasp candidate (desired tool) *
         // tool -> wrist *
-        // wrist (grasp) -> pregrasp =
-        // robot -> wrist
+        // wrist (grasp) -> wrist (pregrasp) =
+        // model -> wrist (pregrasp)
         Eigen::Affine3d candidate_wrist_transform =
                 grasp_candidate_rotation *
                 m_T_wrist_tool.inverse() *
                 m_T_grasp_pregrasp;
 
-        ROS_DEBUG("    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
+        ROS_DEBUG_NAMED("grasping", "    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
 
         candidates.emplace_back(
                 candidate_wrist_transform,
-                T_grasp_object.inverse() * candidate_wrist_transform,
+                object_pose.inverse() * candidate_wrist_transform,
                 u);
 
         const GraspCandidate& added = candidates.back();
@@ -406,7 +395,7 @@ bool GascanGraspPlanner::sampleGrasps(
                 Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
         candidates.emplace_back(
                 flipped_candidate_transform,
-                T_grasp_object.inverse() * flipped_candidate_transform,
+                object_pose.inverse() * flipped_candidate_transform,
                 added.u);
     }
 
