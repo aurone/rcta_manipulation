@@ -7,7 +7,9 @@
 #include <Eigen/Dense>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
+#include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/AttachedCollisionObject.h>
+#include <moveit_msgs/GetStateValidity.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -277,6 +279,11 @@ bool GraspObjectExecutor::initialize()
         ROS_ERROR("Failed to retrieve 'max_grasp_candidates' from the param server or 'max_grasp_candidates' is negative");
         return false;
     }
+
+    m_check_state_validity_client.reset(new ros::ServiceClient);
+    *m_check_state_validity_client =
+            m_nh.serviceClient<moveit_msgs::GetStateValidity>(
+                    "check_state_validity");
 
     ////////////////////////////////////////
     // GraspObjectExecutor-specific stuff //
@@ -1589,6 +1596,7 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
 
     int pregrasp_ik_filter_count = 0;
     int grasp_ik_filter_count = 0;
+    int collision_filter_count = 0;
 
     for (const rcta::GraspCandidate& grasp_candidate : candidates) {
         moveit::core::RobotState robot_state(m_robot_model);
@@ -1615,6 +1623,16 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
             continue;
         }
 
+        moveit_msgs::GetStateValidityRequest req;
+
+        req.group_name = m_manip_group->getName();
+        moveit::core::robotStateToRobotStateMsg(robot_state, req.robot_state);
+        moveit_msgs::GetStateValidityResponse res;
+        if (!m_check_state_validity_client->call(req, res) || !res.valid) {
+            ++collision_filter_count;
+            continue;
+        }
+
         // push back this grasp pose
         rcta::GraspCandidate reachable_grasp_candidate(
                 grasp_candidate.pose,
@@ -1632,6 +1650,7 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
     ROS_INFO("%zu/%zu reachable candidates", filtered_candidates.size(), candidates.size());
     ROS_INFO("  %d pregrasp ik failures", pregrasp_ik_filter_count);
     ROS_INFO("  %d grasp ik failures", grasp_ik_filter_count);
+    ROS_INFO("  %d grasp collision failures", collision_filter_count);
     candidates = std::move(filtered_candidates);
 }
 

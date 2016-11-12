@@ -118,6 +118,8 @@ private:
     std::string m_viservo_command_action_name;
     std::string m_gripper_command_action_name;
 
+    std::unique_ptr<ros::ServiceClient> m_check_state_validity_client;
+
     sbpl::VisualizerROS m_viz;
     ///@}
 
