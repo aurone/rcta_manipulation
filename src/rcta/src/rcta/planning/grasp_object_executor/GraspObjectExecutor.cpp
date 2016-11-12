@@ -902,7 +902,8 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToGrasp()
         }
 
         rcta::MoveArmGoal grasp_goal;
-        grasp_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
+//        grasp_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
+        grasp_goal.type = rcta::MoveArmGoal::CartesianGoal;
 
         // compute goal pose for grasping from pregrasp pose
         Eigen::Affine3d pregrasp_pose; // model -> wrist (pregrasp)
