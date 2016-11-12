@@ -1599,6 +1599,7 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
     int collision_filter_count = 0;
 
     for (const rcta::GraspCandidate& grasp_candidate : candidates) {
+        // TODO: use current state here instead?
         moveit::core::RobotState robot_state(m_robot_model);
         robot_state.setToDefaultValues();
         // place the robot in the grasp frame
