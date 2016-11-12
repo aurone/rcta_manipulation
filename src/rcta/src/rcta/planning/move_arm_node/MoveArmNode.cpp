@@ -1,6 +1,7 @@
 #include "MoveArmNode.h"
 
 // system includes
+#include <eigen_conversions/eigen_msg.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <sbpl_geometry_utils/utils.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -66,6 +67,8 @@ bool MoveArmNode::init()
         ROS_ERROR("Failed to retrieve 'group_name' from the param server");
         return false;
     }
+    m_move_group.reset(new move_group_interface::MoveGroup(group_name));
+
     m_ph.param("pos_tolerance", pos_tolerance, 0.05);
     m_ph.param("rot_tolerance", rot_tolerance_deg, 5.0);
     m_ph.param("joint_tolerance", joint_tolerance_deg, 5.0);
@@ -151,6 +154,12 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
         } else {
             success = planToGoalEE(*request, result_traj);
         }
+    } else if (request->type == rcta::MoveArmGoal::CartesianGoal) {
+        if (execute) {
+            success = moveToGoalCartesian(*request, result_traj);
+        } else {
+            success = planToGoalCartesian(*request, result_traj);
+        }
     } else {
         ROS_ERROR("Unrecognized goal type");
         rcta::MoveArmResult result;
@@ -218,6 +227,26 @@ bool MoveArmNode::planToGoalJoints(
     return false;
 }
 
+bool MoveArmNode::planToGoalCartesian(
+    const rcta::MoveArmGoal& goal,
+    trajectory_msgs::JointTrajectory& traj)
+{
+    assert(!goal.execute_path && goal.type == rcta::MoveArmGoal::CartesianGoal);
+    ROS_INFO("Move Along Cartesian Path");
+    std::vector<geometry_msgs::Pose> waypoints;
+    waypoints.push_back(m_move_group->getCurrentPose().pose);
+    waypoints.push_back(goal.goal_pose);
+    Eigen::Vector3d start_pos, finish_pos;
+    tf::pointMsgToEigen(waypoints.front().position, start_pos);
+    tf::pointMsgToEigen(waypoints.back().position, finish_pos);
+    double eef_step = 0.01;
+    double jump_thresh = 2.0;
+    moveit_msgs::RobotTrajectory rtraj;
+    double pct = m_move_group->computeCartesianPath(
+            waypoints, eef_step, jump_thresh, rtraj, true, nullptr);
+    return pct >= 1.0;
+}
+
 bool MoveArmNode::moveToGoalEE(
     const rcta::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
@@ -260,6 +289,34 @@ bool MoveArmNode::moveToGoalJoints(
         // TODO: slerp trajectory
         return true;
     }
+}
+
+bool MoveArmNode::moveToGoalCartesian(
+    const rcta::MoveArmGoal& goal,
+    trajectory_msgs::JointTrajectory& traj)
+{
+    assert(goal.execute_path && goal.type == rcta::MoveArmGoal::CartesianGoal);
+    ROS_INFO("Move Along Cartesian Path");
+    std::vector<geometry_msgs::Pose> waypoints;
+    waypoints.push_back(m_move_group->getCurrentPose().pose);
+    waypoints.push_back(goal.goal_pose);
+    Eigen::Vector3d start_pos, finish_pos;
+    tf::pointMsgToEigen(waypoints.front().position, start_pos);
+    tf::pointMsgToEigen(waypoints.back().position, finish_pos);
+    double eef_step = 0.01;
+    double jump_thresh = 2.0;
+    moveit_msgs::RobotTrajectory rtraj;
+    double pct = m_move_group->computeCartesianPath(
+            waypoints, eef_step, jump_thresh, rtraj, true, nullptr);
+    if (pct >= 1.00) {
+        ROS_INFO("Execute Cartesian Path");
+        move_group_interface::MoveGroup::Plan plan;
+        plan.trajectory_ = rtraj;
+        auto err = m_move_group->execute(plan);
+        return err == moveit_msgs::MoveItErrorCodes::SUCCESS;
+    }
+
+    return false;
 }
 
 void MoveArmNode::fillPlanOnlyOptions(
