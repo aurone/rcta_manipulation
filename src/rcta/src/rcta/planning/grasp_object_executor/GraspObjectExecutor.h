@@ -56,6 +56,7 @@ std::string to_string(Status status);
 struct StowPosition
 {
     std::string name;
+    std::string type;
     std::map<std::string, double> joint_positions;
 };
 

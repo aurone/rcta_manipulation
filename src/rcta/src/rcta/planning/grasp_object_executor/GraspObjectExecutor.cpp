@@ -134,7 +134,10 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position)
         return false;
     }
 
-    if (!value.hasMember("name") || !value.hasMember("joint_vector_degs")) {
+    if (!value.hasMember("name") ||
+        !value.hasMember("type") ||
+        !value.hasMember("joint_vector_degs"))
+    {
         ROS_ERROR("Stow position config must have members 'name' and 'joint_vector_degs'");
         return false;
     }
@@ -145,6 +148,12 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position)
         return false;
     }
 
+    std::string type;
+    if (!msg_utils::extract_xml_value(value["type"], type)) {
+        ROS_ERROR("Failed to extract 'type' field");
+        return false;
+    }
+
     std::map<std::string, double> joint_positions;
     if (!msg_utils::extract_xml_value(value["joint_vector_degs"], joint_positions)) {
         ROS_ERROR("Failed to extract 'joint_vector_degs' field");
@@ -152,6 +161,7 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position)
     }
 
     stow_position.name = std::move(name);
+    stow_position.type = std::move(type);
     stow_position.joint_positions = std::move(joint_positions);
     return true;
 }
@@ -318,12 +328,14 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
+    // log stow sequences and convert to radians from degrees
     ROS_INFO("Stow Sequences:");
     int seqno = 0;
     for (auto& sequence : m_stow_sequences) {
         ROS_INFO("  Sequence %d", seqno++);
         for (StowPosition& position : sequence) {
-            ROS_INFO("    %s:", position.name.c_str());
+            ROS_INFO("    Name: %s", position.name.c_str());
+            ROS_INFO("    Type: %s", position.type.c_str());
             for (auto& entry : position.joint_positions) {
                 ROS_INFO("      %s: %0.3f", entry.first.c_str(), entry.second);
                 entry.second = entry.second * M_PI / 180.0;
@@ -1396,13 +1408,36 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
 
         rcta::MoveArmGoal move_arm_stow_goal;
 
-        move_arm_stow_goal.type = rcta::MoveArmGoal::JointGoal;
-
-        move_arm_stow_goal.goal_joint_state.name.reserve(stow_position.joint_positions.size());
-        move_arm_stow_goal.goal_joint_state.position.reserve(stow_position.joint_positions.size());
-        for (const auto& entry : stow_position.joint_positions) {
-            move_arm_stow_goal.goal_joint_state.name.push_back(entry.first);
-            move_arm_stow_goal.goal_joint_state.position.push_back(entry.second);
+        // fill the appropriate goal type
+        if (stow_position.type == "pose") {
+            move_arm_stow_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
+            auto rs = currentRobotState();
+            for (const auto& entry : stow_position.joint_positions) {
+                rs.setVariablePosition(entry.first, entry.second);
+            }
+            rs.updateLinkTransforms();
+            const Eigen::Affine3d tip_pose =
+                    rs.getGlobalLinkTransform(m_manip_group->getOnlyOneEndEffectorTip());
+            tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
+        } else if (stow_position.type == "cart") {
+            move_arm_stow_goal.type = rcta::MoveArmGoal::CartesianGoal;
+            move_arm_stow_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
+            auto rs = currentRobotState();
+            for (const auto& entry : stow_position.joint_positions) {
+                rs.setVariablePosition(entry.first, entry.second);
+            }
+            rs.updateLinkTransforms();
+            const Eigen::Affine3d tip_pose =
+                    rs.getGlobalLinkTransform(m_manip_group->getOnlyOneEndEffectorTip());
+            tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
+        } else {
+            move_arm_stow_goal.type = rcta::MoveArmGoal::JointGoal;
+            move_arm_stow_goal.goal_joint_state.name.reserve(stow_position.joint_positions.size());
+            move_arm_stow_goal.goal_joint_state.position.reserve(stow_position.joint_positions.size());
+            for (const auto& entry : stow_position.joint_positions) {
+                move_arm_stow_goal.goal_joint_state.name.push_back(entry.first);
+                move_arm_stow_goal.goal_joint_state.position.push_back(entry.second);
+            }
         }
 
         move_arm_stow_goal.octomap = m_use_extrusion_octomap ?
