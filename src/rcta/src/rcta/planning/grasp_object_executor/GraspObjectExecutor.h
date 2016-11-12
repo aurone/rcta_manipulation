@@ -11,7 +11,6 @@
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
-#include <leatherman/print.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
@@ -161,7 +160,7 @@ private:
 
     /// \name MoveArmToStow Parameters
     ///@{
-    std::vector<StowPosition> m_stow_positions;
+    std::vector<std::vector<StowPosition>> m_stow_sequences;
     ros::Duration m_attach_obj_req_wait;
     ///@}
 
@@ -237,7 +236,8 @@ private:
 
     /// \name MoveArmToStowPosition State
     ///@{
-    int m_next_stow_position_to_attempt;
+    int m_next_stow_sequence;
+    int m_next_stow_position;
     ros::Time m_attach_obj_req_time;
     ///@}
 

@@ -5,8 +5,8 @@
 
 // system includes
 #include <Eigen/Dense>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
+#include <leatherman/print.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/GetStateValidity.h>
@@ -188,7 +188,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     m_attach_object(false),
     m_attached_markers(),
     m_max_grasp_candidates(0),
-    m_stow_positions(),
+    m_stow_sequences(),
     m_attach_obj_req_wait(),
     m_gas_can_detection_threshold(0.0),
     m_current_goal(),
@@ -211,7 +211,7 @@ GraspObjectExecutor::GraspObjectExecutor() :
     m_last_move_arm_pregrasp_goal(),
     m_last_successful_grasp(),
     m_last_viservo_pregrasp_goal(),
-    m_next_stow_position_to_attempt(-1),
+    m_next_stow_sequence(-1),
     m_attach_obj_req_time(),
     m_wait_for_grid_start_time()
 {
@@ -313,17 +313,21 @@ bool GraspObjectExecutor::initialize()
     };
 
     // read in stow positions
-    if (!msg_utils::download_param(m_ph, "stow_positions", m_stow_positions)) {
+    if (!msg_utils::download_param(m_ph, "stow_sequences", m_stow_sequences)) {
         ROS_ERROR("Failed to retrieve 'stow_positions' from the param server");
         return false;
     }
 
-    ROS_INFO("Stow Positions:");
-    for (StowPosition& position : m_stow_positions) {
-        ROS_INFO("  %s:", position.name.c_str());
-        for (auto& entry : position.joint_positions) {
-            ROS_INFO("    %s: %0.3f", entry.first.c_str(), entry.second);
-            entry.second = entry.second * M_PI / 180.0;
+    ROS_INFO("Stow Sequences:");
+    int seqno = 0;
+    for (auto& sequence : m_stow_sequences) {
+        ROS_INFO("  Sequence %d", seqno++);
+        for (StowPosition& position : sequence) {
+            ROS_INFO("    %s:", position.name.c_str());
+            for (auto& entry : position.joint_positions) {
+                ROS_INFO("      %s: %0.3f", entry.first.c_str(), entry.second);
+                entry.second = entry.second * M_PI / 180.0;
+            }
         }
     }
 
@@ -570,7 +574,7 @@ void GraspObjectExecutor::goalCallback()
     ROS_INFO("  Gas Can Pose [robot frame: %s]: %s", m_current_goal->gas_can_in_base_link.header.frame_id.c_str(), to_string(m_current_goal->gas_can_in_base_link.pose).c_str());
     ROS_INFO("  Octomap ID: %s", m_current_goal->octomap.id.c_str());
 
-    m_next_stow_position_to_attempt = 0;
+    m_next_stow_sequence = 0;
 
     const geometry_msgs::PoseStamped& obj_pose_in = m_current_goal->gas_can_in_map;
     if (obj_pose_in.header.frame_id != m_robot_model->getModelFrame()) {
@@ -1346,11 +1350,30 @@ void GraspObjectExecutor::onMovingArmToStowEnter(
 
     m_sent_move_arm_goal = false;
     m_pending_move_arm_command = false;
-    m_next_stow_position_to_attempt = 0;
+    m_next_stow_sequence = 0;
+    m_next_stow_position = 0;
 }
 
 GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
 {
+    // transition to fault if we exhausted stow sequences
+    if (m_next_stow_sequence >= m_stow_sequences.size()) {
+        rcta_msgs::GraspObjectCommandResult result;
+        std::string error = "Ran out of stow positions to attempt";
+        ROS_ERROR("%s", error.c_str());
+        result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+        m_as->setAborted(result, error);
+        m_next_stow_sequence = 0;
+        return GraspObjectExecutionStatus::FAULT;
+    }
+
+    // transition to completing goal if we finished the stow sequence
+    if (m_next_stow_position >= m_stow_sequences[m_next_stow_sequence].size()) {
+        ROS_INFO("Finished stow sequence");
+        return GraspObjectExecutionStatus::COMPLETING_GOAL;
+    }
+
+    // pump the stow sequence state machine
     if (!m_sent_move_arm_goal) {
         ROS_INFO("Sending Move Arm Goal to stow position");
         if (!rcta::ReconnectActionClient(
@@ -1364,31 +1387,20 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             m_as->setAborted(result, ss.str());
-            m_next_stow_position_to_attempt = 0;
+            m_next_stow_sequence = 0;
             return GraspObjectExecutionStatus::FAULT;
         }
 
-        if (m_next_stow_position_to_attempt >= m_stow_positions.size()) {
-            rcta_msgs::GraspObjectCommandResult result;
-            std::string error = "Ran out of stow positions to attempt";
-            ROS_ERROR("%s", error.c_str());
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            m_as->setAborted(result, error);
-            m_next_stow_position_to_attempt = 0;
-            return GraspObjectExecutionStatus::FAULT;
-        }
-
-        // 4. send a move arm goal for the best grasp
-
-        const StowPosition& next_stow_position = m_stow_positions[m_next_stow_position_to_attempt++];
+        const std::vector<StowPosition>& stow_sequence = m_stow_sequences[m_next_stow_sequence];
+        const StowPosition& stow_position = stow_sequence[m_next_stow_position];
 
         rcta::MoveArmGoal move_arm_stow_goal;
 
         move_arm_stow_goal.type = rcta::MoveArmGoal::JointGoal;
 
-        move_arm_stow_goal.goal_joint_state.name.reserve(next_stow_position.joint_positions.size());
-        move_arm_stow_goal.goal_joint_state.position.reserve(next_stow_position.joint_positions.size());
-        for (const auto& entry : next_stow_position.joint_positions) {
+        move_arm_stow_goal.goal_joint_state.name.reserve(stow_position.joint_positions.size());
+        move_arm_stow_goal.goal_joint_state.position.reserve(stow_position.joint_positions.size());
+        for (const auto& entry : stow_position.joint_positions) {
             move_arm_stow_goal.goal_joint_state.name.push_back(entry.first);
             move_arm_stow_goal.goal_joint_state.position.push_back(entry.second);
         }
@@ -1396,8 +1408,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
         move_arm_stow_goal.octomap = m_use_extrusion_octomap ?
                 *m_current_octomap : m_current_goal->octomap;
 
-        //include the attached object in the goal
-        // TODO: include the attached object here
+        // TODO: include the attached object here just for this request
 
         move_arm_stow_goal.execute_path = true;
 
@@ -1408,20 +1419,24 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
         m_sent_move_arm_goal = true;
     } else if (!m_pending_move_arm_command) {
         ROS_INFO("Move Arm Goal is no longer pending");
+
+        // transition to completing goal
         if (m_move_arm_command_goal_state == actionlib::SimpleClientGoalState::SUCCEEDED &&
             m_move_arm_command_result && m_move_arm_command_result->success)
         {
             ROS_INFO("Move Arm Command succeeded");
-            m_next_stow_position_to_attempt = 0;
-            return GraspObjectExecutionStatus::COMPLETING_GOAL;
+            ++m_next_stow_position;
         } else {
             ROS_INFO("Move Arm Command failed");
             ROS_INFO("    Simple Client Goal State: %s", m_move_arm_command_goal_state.toString().c_str());
             ROS_INFO("    Error Text: %s", m_move_arm_command_goal_state.getText().c_str());
             ROS_INFO("    result.success = %s", m_move_arm_command_result ? (m_move_arm_command_result->success ? "TRUE" : "FALSE") : "null");
+
+            ++m_next_stow_sequence;
+            m_next_stow_position = 0;
         }
 
-        // allow to try next stow
+        // reset the move arm state machine
         m_sent_move_arm_goal = false;
         m_pending_move_arm_command = false;
     }
@@ -1446,7 +1461,7 @@ void GraspObjectExecutor::onCompletingGoalEnter(
 {
     ros::Time now = ros::Time::now();
     m_wait_for_grid_start_time = now;
-    ROS_INFO("Waiting for a costmap more recent than %s", boost::posix_time::to_simple_string(now.toBoost()).c_str());
+    ROS_INFO("Waiting for a costmap more recent than %0.3f", now.toSec());
 }
 
 GraspObjectExecutionStatus::Status GraspObjectExecutor::onCompletingGoal()
