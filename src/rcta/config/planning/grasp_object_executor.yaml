@@ -31,7 +31,8 @@ stow_sequences:
 #         limb_right_joint6: 20.10
 #         limb_right_joint7: -10.96
     -
-      - name: "one"
+      - name: "tomahawk"
+        type: "joint"
         joint_vector_degs:
           limb_right_joint1: 245.0
           limb_right_joint2: -91.09
@@ -41,7 +42,8 @@ stow_sequences:
           limb_right_joint6: -94.526
           limb_right_joint7: -41.04
     -
-      - name: "two"
+      - name: "withdraw"
+        type: "joint"
         joint_vector_degs:
           limb_right_joint1: 16.28
           limb_right_joint2: 59.05
@@ -51,7 +53,8 @@ stow_sequences:
           limb_right_joint6: 85.82
           limb_right_joint7: -98.53
     -
-      - name: "three"
+      - name: "lance"
+        type: "joint"
         joint_vector_degs:
           limb_right_joint1: 40.0
           limb_right_joint2: -90.0
