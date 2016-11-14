@@ -271,6 +271,9 @@ bool RepositionBaseExecutor::initialize()
         generateCandidatePoseSamples(zero, m_ss, rob);
 
         pruneUnreachingStates(m_ss, rob, zero, m_reachable_table);
+        size_t reachable = std::count(m_reachable_table.begin(), m_reachable_table.end(), true);
+        ROS_INFO("%zu reachable poses", reachable);
+
         auto now = std::chrono::high_resolution_clock::now();
         ROS_INFO("Precomputing reachability table took %0.3f seconds", std::chrono::duration<double>(now - then).count());
     }
@@ -938,6 +941,8 @@ void RepositionBaseExecutor::pruneUnreachingStates(
     const Pose2D& object_pose,
     au::grid<3, bool>& bTotMax)
 {
+//    int viz_idx = 0;
+//    visualization_msgs::MarkerArray ma;
     for (int i = 0; i < ss.nDist; ++i) {
     for (int j = 0; j < ss.nAng; ++j) {
     for (int k = 0; k < ss.nYaw; ++k) {
@@ -945,19 +950,35 @@ void RepositionBaseExecutor::pruneUnreachingStates(
             continue;
         }
 
-        Eigen::Affine2d T_world_mount = poseSimpleToEigen2(rob(i, j, k));
-        Eigen::Affine2d T_world_robot = T_world_mount * T_mount_robot_;
+        Eigen::Affine2d T_object_mount = poseSimpleToEigen2(rob(i, j, k));
+        Eigen::Affine2d T_object_robot = T_object_mount * T_mount_robot_;
 
         // Transform to simple pose in grid frame
-        Eigen::Affine3d T_model_robot = poseEigen2ToEigen3(T_world_robot);
-        Eigen::Affine3d T_model_object = poseSimpleGascanToEigen3(object_pose);
+        Eigen::Affine3d T_model_robot(Eigen::Affine3d::Identity()); // = poseEigen2ToEigen3(T_world_robot);
+        Eigen::Affine3d T_model_object = poseEigen2ToEigen3(T_object_robot).inverse(); //poseSimpleGascanToEigen3(object_pose);
+
+        ROS_INFO("Test IK from robot = %s, object = %s", to_string(T_model_robot).c_str(), to_string(T_model_object).c_str());
 
         if (!checkIK(T_model_robot, T_model_object)) {
             bTotMax(i, j, k) = false;
+        } else {
+//            Pose2D rp = poseEigen2ToSimple(T_object_robot);
+//            auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
+//            for (auto& m : fp_markers.markers) {
+//                m.header.frame_id = robot_model_->getModelFrame();
+//                m.ns = "reaching_candidates";
+//                m.id = viz_idx++;
+//                m.color.r = 0;
+//                m.color.g = 1.0;
+//                m.color.b = 1.0;
+//                m.color.a = 1.0;
+//            }
+//            ma.markers.insert(ma.markers.end(), fp_markers.markers.begin(), fp_markers.markers.end());
         }
     }
     }
     }
+//    SV_SHOW_INFO(ma);
 }
 
 /// \brief Update the probabilities of collision free, with respect to the arm
