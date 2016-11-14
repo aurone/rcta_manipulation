@@ -24,6 +24,9 @@
     <group name="right_gripper">
         <link name="limb_right_link7"/>
     </group>
+    <group name="body">
+        <joint name="world_joint"/>
+    </group>
     <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
     <end_effector name="left_gripper" parent_link="limb_left_link7" group="left_gripper" parent_group="left_arm" />
     <end_effector name="right_gripper" parent_link="limb_right_link7" group="right_gripper" parent_group="right_arm" />
