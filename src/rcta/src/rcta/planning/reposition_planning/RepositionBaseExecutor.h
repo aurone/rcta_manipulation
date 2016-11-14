@@ -455,9 +455,6 @@ private:
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
         const rcta::MoveArmResult::ConstPtr& result);
-
-    void aMetricIDontHaveTimeToMaintain();
-    void anotherMetricIDontHaveTimeToMaintain();
 };
 
 #endif
