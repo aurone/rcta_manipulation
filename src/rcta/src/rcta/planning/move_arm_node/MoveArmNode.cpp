@@ -239,7 +239,8 @@ bool MoveArmNode::planToGoalCartesian(
     Eigen::Vector3d start_pos, finish_pos;
     tf::pointMsgToEigen(waypoints.front().position, start_pos);
     tf::pointMsgToEigen(waypoints.back().position, finish_pos);
-    double eef_step = 0.01;
+    double eef_step = 0.1;
+    ROS_INFO("Compute cartesian path at %0.3f meters", eef_step);
     double jump_thresh = 2.0;
     moveit_msgs::RobotTrajectory rtraj;
     double pct = m_move_group->computeCartesianPath(
@@ -303,7 +304,8 @@ bool MoveArmNode::moveToGoalCartesian(
     Eigen::Vector3d start_pos, finish_pos;
     tf::pointMsgToEigen(waypoints.front().position, start_pos);
     tf::pointMsgToEigen(waypoints.back().position, finish_pos);
-    double eef_step = 0.01;
+    double eef_step = 0.1;
+    ROS_INFO("Compute cartesian path at %0.3f meters", eef_step);
     double jump_thresh = 2.0;
     moveit_msgs::RobotTrajectory rtraj;
     double pct = m_move_group->computeCartesianPath(
