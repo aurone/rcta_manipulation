@@ -1432,12 +1432,27 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onMovingArmToStow()
                     rs.getGlobalLinkTransform(m_manip_group->getOnlyOneEndEffectorTip());
             tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
         } else {
+            const auto& rs = currentRobotState();
+
+            // NOTE: this bit assumes all single-dof joint
+            std::vector<double> vars(m_manip_group->getVariableCount());
+            rs.copyJointGroupPositions(m_manip_group, vars);
+
             move_arm_stow_goal.type = rcta::MoveArmGoal::JointGoal;
-            move_arm_stow_goal.goal_joint_state.name.reserve(stow_position.joint_positions.size());
-            move_arm_stow_goal.goal_joint_state.position.reserve(stow_position.joint_positions.size());
+            move_arm_stow_goal.goal_joint_state.name = m_manip_group->getVariableNames();
+            move_arm_stow_goal.goal_joint_state.position = vars;
             for (const auto& entry : stow_position.joint_positions) {
-                move_arm_stow_goal.goal_joint_state.name.push_back(entry.first);
-                move_arm_stow_goal.goal_joint_state.position.push_back(entry.second);
+                auto jit = std::find(
+                        m_manip_group->getVariableNames().begin(),
+                        m_manip_group->getVariableNames().end(),
+                        entry.first);
+                if (jit == m_manip_group->getVariableNames().end()) {
+                    ROS_WARN("Joint '%s' not found in the group", entry.first.c_str());
+                    continue;
+                }
+
+                int jidx =  std::distance(m_manip_group->getVariableNames().begin(), jit);
+                move_arm_stow_goal.goal_joint_state.position[jidx] = entry.second;
             }
         }
 
