@@ -24,10 +24,27 @@ void translate_jplspec_to_rosspec(
     }
     spec_rosmsg.num_waypoints  = spec.num_waypoints;
     spec_rosmsg.waypoints.resize(spec_rosmsg.num_waypoints);
+
+    const int64_t min_wp_time = 46000;
     for(int w=0; w<spec_rosmsg.num_waypoints; w++)
     {
         roman_client_ros_utils::RomanWaypoint& wpt = spec_rosmsg.waypoints[w];
         wpt.utime = (int64_t)spec.waypoints[w].timestamp;
+        if (w > 0) {
+            roman_client_ros_utils::RomanWaypoint& pwp = spec_rosmsg.waypoints[w - 1];
+            const int64_t diff_time = wpt.utime - pwp.utime;
+            if (diff_time < min_wp_time) {
+                ROS_INFO("Deadbanding time");
+                wpt.utime = pwp.utime + min_wp_time;
+
+                // shift all timestamps by the amount we "added in" here
+                const int64_t shift_time = wpt.utime - (int64_t)spec.waypoints[w].timestamp;
+                for (int ww = w; ww < spec.num_waypoints; ++ww) {
+                    spec.waypoints[w].timestamp += shift_time;
+                }
+            }
+        }
+
         if (w % 10 == 0) {
             ROS_INFO("Waypoint Time (%d): %ld", w, wpt.utime);
             ROS_INFO_STREAM("Waypoint Time (" << w << "): " << wpt.utime);
