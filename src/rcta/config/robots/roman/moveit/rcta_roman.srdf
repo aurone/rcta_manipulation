@@ -28,9 +28,9 @@
     <end_effector name="left_gripper" parent_link="limb_left_link7" group="left_gripper" parent_group="left_arm" />
     <end_effector name="right_gripper" parent_link="limb_right_link7" group="right_gripper" parent_group="right_arm" />
     <!--VIRTUAL JOINT: Purpose: this element defines a virtual joint between a robot link and an external frame of reference (considered fixed with respect to the robot)-->
-<!--    <virtual_joint name="world_joint" type="floating" parent_frame="map" child_link="base_footprint"/> -->
+    <virtual_joint name="world_joint" type="floating" parent_frame="map" child_link="base_footprint"/>
     <!--PASSIVE JOINT: Purpose: this element is used to mark joints that are not actuated-->
-<!--    <passive_joint name="world_joint" /> -->
+    <passive_joint name="world_joint" />
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
     <disable_collisions link1="base_link" link2="chest" reason="Never" />
     <disable_collisions link1="base_link" link2="limb_left_link0" reason="Never" />
