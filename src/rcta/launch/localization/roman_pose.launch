@@ -15,7 +15,7 @@
 
         <group if="$(arg fake)">
             <!-- fake localization -->
-            <node name="map_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map odom_combined 100"/>
+            <node name="map_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 abs_nwu odom_combined 100"/>
         </group>
         <group unless="$(arg fake)">
             <node name="hector_mapping" pkg="hector_mapping" type="hector_mapping">
