@@ -19,4 +19,7 @@
     <group ns="right_arm">
         <param name="mprim_filename" value="$(find rcta)/config/robots/roman/right_arm.mprim"/>
     </group>
+    <group ns="right_arm_and_torso">
+        <param name="mprim_filename" value="$(find rcta)/config/robots/roman/right_arm_and_torso.mprim"/>
+    </group>
 </launch>
