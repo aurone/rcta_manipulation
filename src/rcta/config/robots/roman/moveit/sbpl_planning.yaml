@@ -34,6 +34,43 @@ right_arm:
     shortcut_type: joint_position_velocity_space
     interpolate_path: true
 
+right_arm_and_torso:
+    ### Available Search Parameters ###
+    planner_configs:
+        - ARAConfigDefault
+        - ARAWorkspaceConfigDefault
+        - ARAJointSpaceConfigDefault
+        - MHAConfigDefault
+        - LARAConfigDefault
+
+    ### Graph Parameters ###
+
+    # angular resolution of each active joint variable
+    discretization:
+        limb_right_joint1: 0.017453292519943
+        limb_right_joint2: 0.017453292519943
+        limb_right_joint3: 0.017453292519943
+        limb_right_joint4: 0.017453292519943
+        limb_right_joint5: 0.017453292519943
+        limb_right_joint6: 0.017453292519943
+        limb_right_joint7: 0.017453292519943
+        torso_joint1: 0.017453292519943
+
+    ### Action Parameters ###
+
+    # mprim_filename: uploaded via roslaunch
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
+    use_xyzrpy_snap_mprim: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
+    xyzrpy_snap_dist_thresh: 0.04 #0.2
+    short_dist_mprims_thresh: 0.4
+    shortcut_path: true
+    shortcut_type: joint_position_velocity_space
+    interpolate_path: true
+
 right_arm:
     ### Available Search Parameters ###
     planner_configs:
