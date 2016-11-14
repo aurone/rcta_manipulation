@@ -938,8 +938,8 @@ void RepositionBaseExecutor::pruneUnreachingStates(
     const Pose2D& object_pose,
     au::grid<3, bool>& bTotMax)
 {
-//    int viz_idx = 0;
-//    visualization_msgs::MarkerArray ma;
+    int viz_idx = 0;
+    visualization_msgs::MarkerArray ma;
     for (int i = 0; i < ss.nDist; ++i) {
     for (int j = 0; j < ss.nAng; ++j) {
     for (int k = 0; k < ss.nYaw; ++k) {
@@ -959,23 +959,23 @@ void RepositionBaseExecutor::pruneUnreachingStates(
         if (!checkIK(T_model_robot, T_model_object)) {
             bTotMax(i, j, k) = false;
         } else {
-//            Pose2D rp = poseEigen2ToSimple(T_object_robot);
-//            auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
-//            for (auto& m : fp_markers.markers) {
-//                m.header.frame_id = robot_model_->getModelFrame();
-//                m.ns = "reaching_candidates";
-//                m.id = viz_idx++;
-//                m.color.r = 0;
-//                m.color.g = 1.0;
-//                m.color.b = 1.0;
-//                m.color.a = 1.0;
-//            }
-//            ma.markers.insert(ma.markers.end(), fp_markers.markers.begin(), fp_markers.markers.end());
+            Pose2D rp = poseEigen2ToSimple(T_object_robot);
+            auto fp_markers = cc_->getFootprintVisualization(rp.x, rp.y, rp.yaw);
+            for (auto& m : fp_markers.markers) {
+                m.header.frame_id = robot_model_->getModelFrame();
+                m.ns = "reaching_candidates";
+                m.id = viz_idx++;
+                m.color.r = 0;
+                m.color.g = 1.0;
+                m.color.b = 1.0;
+                m.color.a = 1.0;
+            }
+            ma.markers.insert(ma.markers.end(), fp_markers.markers.begin(), fp_markers.markers.end());
         }
     }
     }
     }
-//    SV_SHOW_INFO(ma);
+    SV_SHOW_INFO(ma);
 }
 
 /// \brief Update the probabilities of collision free, with respect to the arm
@@ -1172,7 +1172,6 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 
     bool bCheckGrasp = true;
     bool bCheckObs = true;
-    bool bCheckWork = false;
 
     double pTotThr = 0.0; // 0.5
 
@@ -1207,7 +1206,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
         computeBaseCollisionProbabilities(ss, rob, pObs, bTotMax);
     }
 
-    if (bCheckWork) {
+    if (m_check_reach) {
         for (int i = 0; i < ss.nDist; ++i) {
         for (int j = 0; j < ss.nAng; ++j) {
         for (int k = 0; k < ss.nYaw; ++k) {
