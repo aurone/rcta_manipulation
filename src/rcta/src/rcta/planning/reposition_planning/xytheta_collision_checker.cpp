@@ -99,14 +99,14 @@ visualization_msgs::MarkerArray
 XYThetaCollisionChecker::getFootprintVisualization(
     double x, double y, double theta) const
 {
-    if (!initialized()) {
-        ROS_WARN("No valid map data received");
-        return visualization_msgs::MarkerArray();
-    }
+//    if (!initialized()) {
+//        ROS_WARN("No valid map data received");
+//        return visualization_msgs::MarkerArray();
+//    }
 
     visualization_msgs::MarkerArray ma;
     visualization_msgs::Marker m;
-    m.header.frame_id = m_grid.header.frame_id;
+    m.header.frame_id = initialized() ? m_grid.header.frame_id : std::string();
     m.ns = "footprint_polygon";
     m.id = 0;
     m.type = visualization_msgs::Marker::LINE_STRIP;
