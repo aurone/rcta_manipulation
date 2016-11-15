@@ -17,8 +17,8 @@ grasping:
   wrist_to_tool_transform:
     position:
 #      x: 0.192
-      x: 0.22 # 0.212
-      y: 0.0
+      x: 0.27 # 0.212
+      y: -0.05
       z: 0.0
     orientation:
       w: -0.707
