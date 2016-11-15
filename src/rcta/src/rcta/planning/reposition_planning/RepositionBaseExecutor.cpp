@@ -1526,6 +1526,8 @@ Eigen::Affine3d RepositionBaseExecutor::poseSimpleGascanToEigen3(
                 Eigen::Vector3d::UnitZ());
 }
 
+/// Return whether the robot is close enough to a candidate to bother validating
+/// the current pose against the arm planner
 bool RepositionBaseExecutor::tryFeasibleArmCheck(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose) const
@@ -1535,31 +1537,25 @@ bool RepositionBaseExecutor::tryFeasibleArmCheck(
 
     Pose2D op = poseEigen3ToSimpleGascan(object_pose);
 
-    // check for inverse kinematics and arm planning (if object is in reachable
-    // range and within angle of view)
-    // TODO: a more general than (distMin + (nDist-1)*ss.distStep) determined in computeRobPose()
-//    double secDist[2] = { 0.3, 1.5 };
-    double secDist[2] = { 0.5, 1.0 };
     Eigen::Vector2d dp = Eigen::Vector2d(op.x, op.y) - T_world_mount.translation();
+
+    const double min_dist = 0.5;
+    const double max_dist = 1.0;
+    const double min_heading = angles::from_degrees(-5.0);
+    const double max_heading = angles::from_degrees(40.0);
+    const double min_angle = angles::from_degrees(45.0);
+    const double max_angle = angles::from_degrees(130.0);
+
+    const double dist = dp.norm();
 
     Eigen::Rotation2Dd robot_yaw(0.0);
     robot_yaw.fromRotationMatrix(T_world_mount.rotation());
-    double distRob2Obj = dp.norm();
-    if (distRob2Obj >= secDist[0] && distRob2Obj <= secDist[1]) {
-        // TODO: a more general than secSide[2] determined in computeRobPose()
-//        double secSide[2] = { -20.0 / 180.0 * M_PI, 45.0 / 180.0 * M_PI };
-        double secSide[2] = { angles::from_degrees(-5.0), angles::from_degrees(40.0) };
-        // angular coordinate of a vector from robot position to object position
-        double rob2obj = std::atan2(dp.y(), dp.x());
+    if (dist >= min_dist && dist <= max_dist) {
+        const double rob2obj = std::atan2(dp.y(), dp.x());
         double diffAng = angles::normalize_angle(rob2obj - robot_yaw.angle());
-        if (diffAng >= secSide[0] && diffAng <= secSide[1]) {
-            // left-hand side and angle of view
-            double secAngYaw[2];
-            secAngYaw[0] = 45.0 / 180.0 * M_PI;
-            secAngYaw[1] = 130.0 / 180.0 * M_PI;
-
+        if (diffAng >= min_heading && diffAng <= max_heading) {
             double diffY = angles::normalize_angle(op.yaw - robot_yaw.angle());
-            if (diffY >= secAngYaw[0] && diffY <= secAngYaw[1]) {
+            if (diffY >= min_angle && diffY <= max_angle) {
                 return true;
             }
         }
