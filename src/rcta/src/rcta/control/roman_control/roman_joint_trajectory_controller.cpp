@@ -25,7 +25,7 @@ void translate_jplspec_to_rosspec(
     spec_rosmsg.num_waypoints  = spec.num_waypoints;
     spec_rosmsg.waypoints.resize(spec_rosmsg.num_waypoints);
 
-    const int64_t min_wp_time = 46000;
+    const int64_t min_wp_time = 80000; // 46000
     for(int w=0; w<spec_rosmsg.num_waypoints; w++)
     {
         roman_client_ros_utils::RomanWaypoint& wpt = spec_rosmsg.waypoints[w];
