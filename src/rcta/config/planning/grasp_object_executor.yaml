@@ -32,7 +32,7 @@ stow_sequences:
 #         limb_right_joint7: -10.96
     -
       - name: "tomahawk"
-        type: "joint"
+        type: "pose"
         joint_vector_degs:
           limb_right_joint1: 245.0
           limb_right_joint2: -91.09
