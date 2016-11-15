@@ -1,4 +1,4 @@
-base_front_offset_x: -0.37 #-0.49
+base_front_offset_x: -0.52 #-0.49
 
 arm_front_offset_x: 0.3
 arm_front_offset_y: -0.5  # -1.1, 0.0
@@ -9,36 +9,36 @@ body_length: 0.5          # 0.8
 body_length_core: 0.335   # 0.65
 
 sampling:
-  dist_min: 0.4 #0.5
+  dist_min: 0.5 #0.4 #0.5
   dist_step: 0.1
-  dist_count: 6
+  dist_count: 5
 
   ang_min: 0.0
   ang_step: 15.0
   ang_count: 24
 
-  yaw_min: -20.0
+  yaw_min: -5.0
   yaw_step: 5.0
-  yaw_count: 9
+  yaw_count: 3
 
 exhaustive_sampling:
-  dist_min: 0.4 #0.5
+  dist_min: 0.5 #0.5
   dist_step: 0.1
-  dist_count: 6
+  dist_count: 5
 
   ang_min: 0.0
-  ang_step: 30.0
-  ang_count: 12
+  ang_step: 15.0
+  ang_count: 24
 
   yaw_min: -5.0 #-20.0
   yaw_step: 5.0
   yaw_count: 3 #9
 
 grasping:
-  best_dist: 0.6 #0.7
+  best_dist: 0.8 #0.7
 
 exhaustive_grasping:
-  best_dist: 0.6
+  best_dist: 0.7
 
 # 0 for moveit model frame, 1 for object frame, 2 for input grid frame
 candidate_frame: 2
