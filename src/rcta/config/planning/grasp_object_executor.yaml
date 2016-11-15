@@ -1,4 +1,4 @@
-manipulator_group_name: right_arm
+manipulator_group_name: right_arm_and_torso
 max_grasp_candidates: 4
 
 stow_sequences:
@@ -41,6 +41,11 @@ stow_sequences:
           limb_right_joint5: 50.00
           limb_right_joint6: -94.526
           limb_right_joint7: -41.04
+          torso_joint1: 0.0
+      - name: "torso_back"
+        type: "joint"
+        joint_vector_degs:
+          torso_joint1: 0.0
     -
       - name: "withdraw"
         type: "joint"
@@ -52,6 +57,7 @@ stow_sequences:
           limb_right_joint5: 39.32
           limb_right_joint6: 85.82
           limb_right_joint7: -98.53
+          torso_joint1: 0.0
     -
       - name: "lance"
         type: "joint"
@@ -63,6 +69,7 @@ stow_sequences:
           limb_right_joint5: 90.0
           limb_right_joint6: 0.0
           limb_right_joint7: 180.0
+          torso_joint1: 0.0
 
 # whether to extrude the current costmap and use as the octomap for queries to
 # the arm executor

@@ -44,7 +44,7 @@ exhaustive_grasping:
 candidate_frame: 2
 
 max_grasp_candidates: 3
-manipulator_group_name: right_arm
+manipulator_group_name: right_arm_and_torso
 footprint:
   - { x: -0.6, y: -0.4 }
   - { x:  0.6, y: -0.4 }
