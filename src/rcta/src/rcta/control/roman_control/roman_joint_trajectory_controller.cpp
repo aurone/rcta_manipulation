@@ -85,7 +85,7 @@ void translate_rosspec_to_jplspec(
         if (w % 10 == 0) {
             ROS_INFO("Waypoint Time (%d): %ld", w, jplspec.waypoints[w].timestamp);
         }
-        memcpy(jplspec.waypoints[w].positions, &spec_rosmsg.waypoints[w].positions[0], sizeof(int) * ROBOT_NUM_JOINTS);
+        memcpy(jplspec.waypoints[w].positions, &spec_rosmsg.waypoints[w].positions[0], sizeof(double) * ROBOT_NUM_JOINTS);
         jplspec.waypoints[w].world2robot.pos.x = spec_rosmsg.waypoints[w].world2robot.position.x;
         jplspec.waypoints[w].world2robot.pos.y = spec_rosmsg.waypoints[w].world2robot.position.y;
         jplspec.waypoints[w].world2robot.pos.z = spec_rosmsg.waypoints[w].world2robot.position.z;
@@ -206,6 +206,7 @@ void RomanJointTrajectoryController::goalCallback()
         waypoint.num_joints = ROBOT_NUM_JOINTS;
 
         std::vector<double> positions(m_joint_name_to_spec_index.size(), 0.0);
+
         for (size_t i = 0; i < m_goal->trajectory.joint_names.size(); ++i) {
             const std::string& joint_name = m_goal->trajectory.joint_names[i];
             double pos = pt.positions[i];
