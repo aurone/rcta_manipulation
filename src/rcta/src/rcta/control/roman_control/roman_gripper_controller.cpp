@@ -78,7 +78,7 @@ void RomanGripperController::goalCallback()
 
     // prepare command
     cmd.utime = ros::Time::now().toNSec() / 1e3;
-    cmd.mode = roman_client_ros_utils::RobotiqSimpleCmd::MODE_PINCH;
+    cmd.mode = roman_client_ros_utils::RobotiqSimpleCmd::MODE_BASIC; ///MODE_PINCH;
     if (m_hand == Hand::Right) {
         cmd.mech = roman_client_ros_utils::RobotiqSimpleCmd::MECH_RIGHT;
     } else {
