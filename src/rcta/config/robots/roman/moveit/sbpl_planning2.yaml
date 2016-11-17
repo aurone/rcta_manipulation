@@ -118,5 +118,5 @@ graph_configs:
 shortcut_configs:
   PVJointConfigDefault:
     shortcut_path: true
-    shortcut_type: joint_position_velocity_space
+    shortcutter: joint_position_velocity_space
     interpolate_path: true

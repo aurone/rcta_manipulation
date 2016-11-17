@@ -15,11 +15,11 @@
     <param name="request_adapters" value="$(arg planning_adapters)"/>
     <param name="start_state_max_bounds_error" value="$(arg start_state_max_bounds_error)"/>
 
-    <rosparam command="load" file="$(find rcta)/config/robots/roman/moveit/sbpl_planning.yaml"/>
-    <group ns="right_arm">
+    <rosparam command="load" file="$(find rcta)/config/robots/roman/moveit/sbpl_planning2.yaml"/>
+    <group ns="graph_configs/RightArmManipLatticeConfigDefault">
         <param name="mprim_filename" value="$(find rcta)/config/robots/roman/right_arm.mprim"/>
     </group>
-    <group ns="right_arm_and_torso">
+    <group ns="graph_configs/RightArmAndTorsoManipLatticeConfigDefault">
         <param name="mprim_filename" value="$(find rcta)/config/robots/roman/right_arm_and_torso.mprim"/>
     </group>
 </launch>

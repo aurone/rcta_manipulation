@@ -60,6 +60,9 @@ private:
     double m_rot_tolerance;
     double m_joint_tolerance;
 
+    std::string m_pose_goal_planner_id;
+    std::string m_joint_goal_planner_id;
+
     // Goal shared between plan/execute requests so that parameters inherited
     // from config don't have to be set every time.
     moveit_msgs::MoveGroupGoal m_goal;
