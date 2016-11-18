@@ -25,6 +25,11 @@ right_arm:
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
+    - name: arastar.bfs.manip_egraph
+      search_config: ARAConfigDefault
+      heuristic_config: BFSConfigDefault
+      graph_config: RightArmManipLatticeEgraphConfigDefault
+      shortcut_config: PVJointConfigDefault
 
 right_arm_and_torso:
   planner_configs:
@@ -91,6 +96,26 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
+  RightArmManipLatticeEgraphConfigDefault:
+    graph: manip_lattice_egraph
+    discretization:
+      limb_right_joint1: 0.017453292519943
+      limb_right_joint2: 0.017453292519943
+      limb_right_joint3: 0.017453292519943
+      limb_right_joint4: 0.017453292519943
+      limb_right_joint5: 0.017453292519943
+      limb_right_joint6: 0.017453292519943
+      limb_right_joint7: 0.017453292519943
+    # mprim_filename: uploaded via roslaunch
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
+    use_xyzrpy_snap_mprim: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
+    xyzrpy_snap_dist_thresh: 0.04 #0.2
+    short_dist_mprims_thresh: 0.4
+    egraph_path: /home/aurone/.ros/egraph_paths
   RightArmWorkspaceConfigDefault:
     graph: workspace
   RightArmAndTorsoManipLatticeConfigDefault:
