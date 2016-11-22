@@ -25,9 +25,9 @@ right_arm:
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: arastar.bfs.manip_egraph
+    - name: arastar.bfs_egraph.manip_egraph
       search_config: ARAConfigDefault
-      heuristic_config: BFSConfigDefault
+      heuristic_config: BFSEGraphConfig
       graph_config: RightArmManipLatticeEgraphConfigDefault
       shortcut_config: PVJointConfigDefault
 
@@ -69,6 +69,12 @@ search_configs:
 heuristic_configs:
   BFSConfigDefault:
     heuristic: bfs
+    bfs_res_x: 0.015
+    bfs_res_y: 0.015
+    bfs_res_z: 0.015
+    bfs_sphere_radius: 0.02
+  BFSEGraphConfig:
+    heuristic: bfs_egraph
     bfs_res_x: 0.015
     bfs_res_y: 0.015
     bfs_res_z: 0.015
