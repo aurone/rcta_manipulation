@@ -125,7 +125,6 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
-    egraph_path: /home/aurone/.ros/egraph_paths
   RightArmWorkspaceConfigDefault:
     graph: workspace
   RightArmAndTorsoManipLatticeConfigDefault:
