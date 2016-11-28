@@ -25,8 +25,8 @@ right_arm:
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: arastar.bfs_egraph.manip_egraph
-      search_config: ARAConfigDefault
+    - name: egwastar.bfs_egraph.manip_egraph
+      search_config: EGWAConfigDefault
       heuristic_config: BFSEGraphConfig
       graph_config: RightArmManipLatticeEgraphConfigDefault
       shortcut_config: PVJointConfigDefault
@@ -65,6 +65,9 @@ search_configs:
   LARAConfigDefault:
     search: larastar
     epsilon: 100.0
+  EGWAConfigDefault:
+    search: egwastar
+    epsilon: 100.0
 
 heuristic_configs:
   BFSConfigDefault:
@@ -78,6 +81,7 @@ heuristic_configs:
     bfs_res_x: 0.015
     bfs_res_y: 0.015
     bfs_res_z: 0.015
+    egraph_epsilon: 20.0
     bfs_sphere_radius: 0.02
   JointDistConfigDefault:
     heuristic: joint_distance
