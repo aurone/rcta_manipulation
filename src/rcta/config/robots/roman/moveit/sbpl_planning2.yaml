@@ -1,31 +1,31 @@
 right_arm:
   planner_configs:
-    - name: right_arm_ARA_BFS_ML
+    right_arm_ARA_BFS_ML:
       search_config: ARAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_ARA_BFS_WS
+    right_arm_ARA_BFS_WS:
       search_config: ARAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmWorkspaceConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_ARA_JD_ML
+    right_arm_ARA_JD_ML:
       search_config: ARAConfigDefault
       heuristic_config: JointDistConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_MHA_BFS_ML
+    right_arm_MHA_BFS_ML:
       search_config: ARAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_LARA_BFS_ML
+    right_arm_LARA_BFS_ML:
       search_config: LARAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: egwastar.bfs_egraph.manip_egraph
+    right_arm_EGWA_DEG_MLEG:
       search_config: EGWAConfigDefault
       heuristic_config: BFSEGraphConfig
       graph_config: RightArmManipLatticeEgraphConfigDefault
@@ -33,22 +33,22 @@ right_arm:
 
 right_arm_and_torso:
   planner_configs:
-    - name: right_arm_and_torso_ARA_BFS_ML
+    right_arm_and_torso_ARA_BFS_ML:
       search_config: ARAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmAndTorsoManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_and_torso_ARA_JD_ML
+    right_arm_and_torso_ARA_JD_ML:
       search_config: ARAConfigDefault
       heuristic_config: JointDistConfigDefault
       graph_config: RightArmAndTorsoManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_and_torso_MHA_BFS_ML
+    right_arm_and_torso_MHA_BFS_ML:
       search_config: MHAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmAndTorsoManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
-    - name: right_arm_and_torso_LARA_BFS_ML
+    right_arm_and_torso_LARA_BFS_ML:
       search_config: LARAConfigDefault
       heuristic_config: BFSConfigDefault
       graph_config: RightArmAndTorsoManipLatticeConfigDefault
