@@ -11,7 +11,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <rospack/rospack.h>
 #include <visualization_msgs/Marker.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/msg_utils/msg_utils.h>
 
@@ -247,8 +247,8 @@ bool SplineVisualizer::init_canister_marker()
 
     base_footprint_to_gas_canister_ =
             Eigen::Translation3d(1, 0, 0.1) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(60.0), Eigen::Vector3d(0, 0, 1)) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(90.0), Eigen::Vector3d(1, 0, 0));
+            Eigen::AngleAxisd(sbpl::angles::to_radians(60.0), Eigen::Vector3d(0, 0, 1)) *
+            Eigen::AngleAxisd(sbpl::angles::to_radians(90.0), Eigen::Vector3d(1, 0, 0));
 
     tf::poseEigenToMsg(base_footprint_to_gas_canister_, canister_marker_.pose);
 

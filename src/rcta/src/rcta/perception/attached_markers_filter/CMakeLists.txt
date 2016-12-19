@@ -3,7 +3,6 @@ target_link_libraries(
     attached_markers_filter
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${tf_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     hdt_robot_model)

@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 
 FakeMarkerPublisher::FakeMarkerPublisher() :
         nh_(),
@@ -50,9 +50,9 @@ int FakeMarkerPublisher::run()
 
     Eigen::Affine3d wrist_to_marker_transform =
                     Eigen::Translation3d(wrist_to_marker_x, wrist_to_marker_y, wrist_to_marker_z) *
-    				Eigen::AngleAxisd(sbpl::utils::ToRadians(wrist_to_marker_Y), Eigen::Vector3d(0, 0, 1)) *
-                    Eigen::AngleAxisd(sbpl::utils::ToRadians(wrist_to_marker_P), Eigen::Vector3d(0, 1, 0)) *
-    				Eigen::AngleAxisd(sbpl::utils::ToRadians(wrist_to_marker_R), Eigen::Vector3d(1, 0, 0));
+                    Eigen::AngleAxisd(sbpl::angles::to_radians(wrist_to_marker_Y), Eigen::Vector3d(0, 0, 1)) *
+                    Eigen::AngleAxisd(sbpl::angles::to_radians(wrist_to_marker_P), Eigen::Vector3d(0, 1, 0)) *
+                    Eigen::AngleAxisd(sbpl::angles::to_radians(wrist_to_marker_R), Eigen::Vector3d(1, 0, 0));
 
     ros::Rate loop_rate(10.0);
     int marker_seqno = 0;

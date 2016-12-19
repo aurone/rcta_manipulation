@@ -3,6 +3,7 @@ target_link_libraries(
     hdt_robot_model
     ${leatherman_LIBRARIES}
     ${roscpp_LIBRARIES}
+    ${smpl_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
     ${urdf_LIBRARIES}
     ${urdf_parser_LIBRARIES}

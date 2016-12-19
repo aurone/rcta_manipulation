@@ -9,7 +9,6 @@ target_link_libraries(
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     hdt_robot_model)
 

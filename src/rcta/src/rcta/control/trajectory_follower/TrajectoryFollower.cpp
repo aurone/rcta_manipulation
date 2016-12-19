@@ -6,7 +6,7 @@
 // system includes
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <sbpl_geometry_utils/angles.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/utils/RunUponDestruction.h>
@@ -198,7 +198,7 @@ TrajectoryFollower::retime_trajectory(const control_msgs::FollowJointTrajectoryG
             for (size_t jidx = 0; jidx < robot_model_->num_joints(); ++jidx) {
                 double min_limit = robot_model_->min_limits()[jidx];
                 double max_limit = robot_model_->max_limits()[jidx];
-                double angle_dist = sbpl::utils::ShortestAngleDistWithLimits(point.positions[jidx], prev_point.positions[jidx], min_limit, max_limit);
+                double angle_dist = sbpl::angles::ShortestAngleDistWithLimits(point.positions[jidx], prev_point.positions[jidx], min_limit, max_limit);
                 double max_velocity_rps = robot_model_->max_velocity_limits()[jidx];
                 double required_joint_time_s = fabs(angle_dist / max_velocity_rps);
                 required_wp_time_s = std::max(required_wp_time_s, required_joint_time_s);
@@ -210,7 +210,7 @@ TrajectoryFollower::retime_trajectory(const control_msgs::FollowJointTrajectoryG
             for (size_t jidx = 0; jidx < robot_model_->num_joints(); ++jidx) {
                 double min_limit = robot_model_->min_limits()[jidx];
                 double max_limit = robot_model_->max_limits()[jidx];
-                double angle_dist_rad = sbpl::utils::ShortestAngleDistWithLimits(point.positions[jidx], prev_point.positions[jidx], min_limit, max_limit);
+                double angle_dist_rad = sbpl::angles::ShortestAngleDistWithLimits(point.positions[jidx], prev_point.positions[jidx], min_limit, max_limit);
                 double max_velocity_rps = robot_model_->max_velocity_limits()[jidx];
                 new_point.velocities[jidx] = (required_wp_time_s == 0.0) ? (0.0) : (std::min(angle_dist_rad / required_wp_time_s, max_velocity_rps));
             }

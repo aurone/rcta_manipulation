@@ -14,7 +14,6 @@ target_link_libraries(
     ${moveit_ros_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${rviz_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_LIBRARIES}
     hdt_robot_model

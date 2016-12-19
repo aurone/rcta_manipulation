@@ -9,7 +9,7 @@
 
 // system includes
 #include <eigen_conversions/eigen_msg.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
@@ -239,7 +239,7 @@ int RepeatabilityMeasurementNode::run()
             std::vector<double> seed = egress_position.to_joint_vector();
             ROS_DEBUG("Generating IK solutions starting from seed state %s", to_string(seed).c_str());
             hdt::IKSolutionGenerator iksols =
-                    robot_model_->search_all_ik_solutions(mount_to_eef, seed, sbpl::utils::ToRadians(1.0));
+                    robot_model_->search_all_ik_solutions(mount_to_eef, seed, sbpl::angles::to_radians(1.0));
 
             // Retrieve all IK Solutions
             std::vector<std::vector<double>> all_solutions;
@@ -609,9 +609,9 @@ auto RepeatabilityMeasurementNode::generate_sample_poses() -> std::vector<Sample
 
                             Eigen::Affine3d sample_transform_camera_frame =
                                 Eigen::Translation3d(sample_x, sample_y, sample_z) *
-                                Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_roll), Eigen::Vector3d::UnitX()) *
-                                Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_pitch), Eigen::Vector3d::UnitY()) *
-                                Eigen::AngleAxisd(sbpl::utils::ToRadians(sample_yaw), Eigen::Vector3d::UnitZ()) *
+                                Eigen::AngleAxisd(sbpl::angles::to_radians(sample_roll), Eigen::Vector3d::UnitX()) *
+                                Eigen::AngleAxisd(sbpl::angles::to_radians(sample_pitch), Eigen::Vector3d::UnitY()) *
+                                Eigen::AngleAxisd(sbpl::angles::to_radians(sample_yaw), Eigen::Vector3d::UnitZ()) *
                                 camera_frame_to_tool_frame_rotation_;
 
                             SamplePose sample;

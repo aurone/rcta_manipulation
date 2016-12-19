@@ -7,7 +7,8 @@
 // system includes
 #include <leatherman/print.h>
 #include <ros/ros.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <sbpl_geometry_utils/angles.h>
+#include <smpl/angles.h>
 #include <urdf_parser/urdf_parser.h>
 
 // project includes
@@ -28,13 +29,13 @@ double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std
 
     auto squared = [](double x) { return x * x; };
     double dist = 0.0;
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[0], joints2[0]));
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[1], joints2[1]));
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[2], joints2[2]));
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[3], joints2[3]));
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[4], joints2[4]));
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[5], joints2[5]));
-    dist += squared(sbpl::utils::ShortestAngleDist(joints1[6], joints2[6]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[0], joints2[0]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[1], joints2[1]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[2], joints2[2]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[3], joints2[3]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[4], joints2[4]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[5], joints2[5]));
+    dist += squared(sbpl::angles::shortest_angle_dist(joints1[6], joints2[6]));
     return dist;
 }
 
@@ -114,7 +115,7 @@ bool IKSolutionGenerator::operator()(std::vector<double>& solution)
                     // odd iterations search up from the canonical free angle
                     double up_free_angle = free_angle_seed + ((curr_iteration_ + 1) >> 1) * search_res_;
                     ROS_DEBUG("Attempting free angle of %0.3f", up_free_angle);
-                    if (sbpl::utils::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
+                    if (sbpl::angles::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
                         seed_[robot_model_->free_angle_index()] = up_free_angle;
                         curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
                         seed_[robot_model_->free_angle_index()] = free_angle_seed;
@@ -130,7 +131,7 @@ bool IKSolutionGenerator::operator()(std::vector<double>& solution)
                     // even iterations search down from the canonical free angle
                     double down_free_angle = free_angle_seed - ((curr_iteration_ + 1) >> 1) * search_res_;
                     ROS_DEBUG("Attempting free angle of %0.3f", down_free_angle);
-                    if (sbpl::utils::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
+                    if (sbpl::angles::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
                         seed_[robot_model_->free_angle_index()] = down_free_angle;
                         curr_gen_ = robot_model_->compute_all_ik_solutions(eef_transform_, seed_);
                         seed_[robot_model_->free_angle_index()] = free_angle_seed;
@@ -240,9 +241,9 @@ bool RobotModel::within_joint_limits(const std::vector<double>& joint_vals) cons
 {
     const std::vector<double>& lower_limits = safety_limits_enabled_ ? min_safety_limits_ : min_limits_;
     const std::vector<double>& upper_limits = safety_limits_enabled_ ? max_safety_limits_ : max_limits_;
-    if (!sbpl::utils::AreJointsWithinLimits(joint_vals, lower_limits, upper_limits)) {
+    if (!sbpl::angles::AreJointsWithinLimits(joint_vals, lower_limits, upper_limits)) {
         std::vector<double> angles_copy = joint_vals;
-        if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, lower_limits, upper_limits)) {
+        if (sbpl::angles::NormalizeAnglesIntoRange(angles_copy, lower_limits, upper_limits)) {
             ROS_WARN("Joint angles are not within limits when unnormalized");
             return true;
         }
@@ -255,9 +256,9 @@ bool RobotModel::within_joint_limits(const std::vector<double>& joint_vals) cons
 
 bool RobotModel::within_safety_joint_limits(const std::vector<double>& joint_vals) const
 {
-    if (!sbpl::utils::AreJointsWithinLimits(joint_vals, min_safety_limits_, max_safety_limits_)) {
+    if (!sbpl::angles::AreJointsWithinLimits(joint_vals, min_safety_limits_, max_safety_limits_)) {
         std::vector<double> angles_copy = joint_vals;
-        if (sbpl::utils::NormalizeAnglesIntoRange(angles_copy, min_safety_limits_, max_safety_limits_)) {
+        if (sbpl::angles::NormalizeAnglesIntoRange(angles_copy, min_safety_limits_, max_safety_limits_)) {
             ROS_WARN("Joint angles are not within limits when unnormalized");
             return true;
         }
@@ -354,7 +355,7 @@ bool RobotModel::search_nearest_ik(
             double up_free_angle = free_angle_seed + ((num_iterations + 1) >> 1) * free_angle_search_res;
             double down_free_angle = free_angle_seed - ((num_iterations + 1) >> 1) * free_angle_search_res;
 
-            if (sbpl::utils::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
+            if (sbpl::angles::IsJointWithinLimits(up_free_angle, free_angle_min, free_angle_max)) {
                 in_bounds = true;
                 cseed[free_angle_index_] = up_free_angle;
                 if (compute_nearest_ik(eef_transform, cseed, solution_out)) {
@@ -362,7 +363,7 @@ bool RobotModel::search_nearest_ik(
                 }
             }
 
-            if (!found_solution && sbpl::utils::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
+            if (!found_solution && sbpl::angles::IsJointWithinLimits(down_free_angle, free_angle_min, free_angle_max)) {
                 in_bounds = true;
                 cseed[free_angle_index_] = down_free_angle;
                 if (compute_nearest_ik(eef_transform, cseed, solution_out)) {

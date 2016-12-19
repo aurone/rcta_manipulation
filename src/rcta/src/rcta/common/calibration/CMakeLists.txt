@@ -12,7 +12,7 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${tf_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES})
+    ${smpl_LIBRARIES})
 
 install(
     TARGETS measure_eef_error fake_marker_pub

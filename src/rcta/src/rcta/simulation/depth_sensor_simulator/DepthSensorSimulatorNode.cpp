@@ -14,7 +14,7 @@
 #include <SDL.h>
 #include <GL/glew.h>
 #include <rospack/rospack.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <spellbook/utils/RunUponDestruction.h>
 
 #define GL_CALL(fun, ...) fun(__VA_ARGS__); if (glGetError() != GL_NO_ERROR) { ROS_ERROR("Call to " #fun " return an error"); }
@@ -273,7 +273,7 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
 //    Eigen::Affine3f view_matrix = Eigen::Affine3f::Identity();
     Eigen::Affine3f view_matrix(Eigen::Translation3f(0.0f, 0.0f, -5.0f)); // camera -> world (where the camera faces down the -z axis)
 
-    Eigen::Projective3f projection_matrix = CreatePerspectiveMatrix(sbpl::utils::ToRadians(60.0), 1.0f, 0.01f, 100.0f); // clip -> camera
+    Eigen::Projective3f projection_matrix = CreatePerspectiveMatrix(sbpl::angles::to_radians(60.0), 1.0f, 0.01f, 100.0f); // clip -> camera
 //    Eigen::Projective3f projection_matrix(Eigen::Projective3f::Identity());
 
     // clip -> model

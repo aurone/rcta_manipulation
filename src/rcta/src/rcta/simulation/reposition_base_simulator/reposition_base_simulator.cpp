@@ -8,7 +8,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/utils/RunUponDestruction.h>
 
@@ -142,10 +142,10 @@ void RepositionBaseSimulator::goal_callback()
     double object_yaw, pitch, roll;
     msg_utils::get_euler_ypr(object_transform, object_yaw, pitch, roll);
 
-    ROS_INFO("Object Yaw: %0.3f degs", sbpl::utils::ToDegrees(object_yaw));
+    ROS_INFO("Object Yaw: %0.3f degs", sbpl::angles::to_degrees(object_yaw));
 
     // we want the heading of the object to be offset 60 degrees from the heading of the base
-    const double canonical_heading_diff_rad = sbpl::utils::ToRadians(60.0);
+    const double canonical_heading_diff_rad = sbpl::angles::to_radians(60.0);
 
     // sort candidate base poses to get the pose whose heading is most ideally offset from the object's heading
     auto compare_poses = [&] (const geometry_msgs::PoseStamped& a, const geometry_msgs::PoseStamped& b)
@@ -158,8 +158,8 @@ void RepositionBaseSimulator::goal_callback()
         msg_utils::get_euler_ypr(a_transform, a_yaw, tmp_pitch, tmp_roll);
         msg_utils::get_euler_ypr(b_transform, b_yaw, tmp_pitch, tmp_roll);
 
-        double canonical_heading_diff_a = fabs(canonical_heading_diff_rad - sbpl::utils::ShortestAngleDiff(object_yaw, a_yaw));
-        double canonical_heading_diff_b = fabs(canonical_heading_diff_rad - sbpl::utils::ShortestAngleDiff(object_yaw, b_yaw));
+        double canonical_heading_diff_a = fabs(canonical_heading_diff_rad - sbpl::angles::shortest_angle_diff(object_yaw, a_yaw));
+        double canonical_heading_diff_b = fabs(canonical_heading_diff_rad - sbpl::angles::shortest_angle_diff(object_yaw, b_yaw));
         return canonical_heading_diff_a < canonical_heading_diff_b;
     };
 
@@ -171,7 +171,7 @@ void RepositionBaseSimulator::goal_callback()
         tf::poseMsgToEigen(pose.pose, candidate_transform);
         double r, p, y;
         msg_utils::get_euler_ypr(candidate_transform, y, p, r);
-        ROS_INFO(" -> Yaw: %0.3f", sbpl::utils::ToDegrees(y));
+        ROS_INFO(" -> Yaw: %0.3f", sbpl::angles::to_degrees(y));
     }
 
     while (candidate_base_poses.size() > max_out_candidates_) {

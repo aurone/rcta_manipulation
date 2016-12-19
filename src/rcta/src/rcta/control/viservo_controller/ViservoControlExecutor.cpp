@@ -8,7 +8,8 @@
 // system includes
 #include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <sbpl_geometry_utils/angles.h>
+#include <smpl/angles.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
@@ -55,10 +56,10 @@ ViservoControlExecutor::ViservoControlExecutor() :
     marker_validity_timeout_(), // read from param server
     wrist_transform_estimate_(),
     max_translational_velocity_mps_(0.40),
-    max_rotational_velocity_rps_(sbpl::utils::ToRadians(90.0)), // 90 degrees in 4 seconds
+    max_rotational_velocity_rps_(sbpl::angles::to_radians(90.0)), // 90 degrees in 4 seconds
     deadband_joint_velocities_rps_(),
     minimum_joint_velocities_rps_(),
-    max_joint_velocities_rps_(7, sbpl::utils::ToRadians(20.0)),
+    max_joint_velocities_rps_(7, sbpl::angles::to_radians(20.0)),
     listener_(),
     camera_frame_("camera_rgb_frame"),
     wrist_frame_("arm_7_gripper_lift_link"),
@@ -286,7 +287,7 @@ int ViservoControlExecutor::run()
         KDL::FrameVel fv_frame = compute_ee_velocity(*curr_joint_state_);
 
         ROS_INFO("EE at %s", to_string(fv_frame.p.p).c_str());
-        ROS_INFO("Rotating %0.3f deg/s about %s", sbpl::utils::ToDegrees(fv_frame.M.w.Norm()), to_string(fv_frame.M.w).c_str());
+        ROS_INFO("Rotating %0.3f deg/s about %s", sbpl::angles::to_degrees(fv_frame.M.w.Norm()), to_string(fv_frame.M.w).c_str());
         ROS_INFO("EE moving at %s (%0.3f m/s)", to_string(fv_frame.p.v).c_str(), fv_frame.p.v.Norm());
 
         Eigen::Vector3d ee_vel_mount_frame(fv_frame.p.v(0), fv_frame.p.v(1), fv_frame.p.v(2));
@@ -296,7 +297,7 @@ int ViservoControlExecutor::run()
         Eigen::Vector3d ee_rot_vel_camera_frame = camera_to_mount.rotation() * ee_rot_vel_mount_frame;
 
         ROS_INFO("EE Pos Velocity [camera frame]: %s", to_string(ee_vel_camera_frame).c_str());
-        ROS_INFO("EE Rot Velocity [camera frame]: %0.3f deg/s about %s", sbpl::utils::ToDegrees(ee_rot_vel_camera_frame.norm()), to_string(ee_rot_vel_camera_frame.normalized()).c_str());
+        ROS_INFO("EE Rot Velocity [camera frame]: %0.3f deg/s about %s", sbpl::angles::to_degrees(ee_rot_vel_camera_frame.norm()), to_string(ee_rot_vel_camera_frame.normalized()).c_str());
 
         // Incorporate new marker measurements and estimate the current wrist pose from them
         if (!update_wrist_pose_estimate()) {
@@ -365,19 +366,19 @@ int ViservoControlExecutor::run()
 
         msg_utils::get_euler_ypr(goal_wrist_transform, yaw, pitch, roll);
         ROS_INFO("Goal Wrist Transform [camera frame]: %s", to_string(goal_wrist_transform).c_str());
-        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::angles::to_degrees(roll), sbpl::angles::to_degrees(pitch), sbpl::angles::to_degrees(yaw));
 
         msg_utils::get_euler_ypr(camera_to_ee, yaw, pitch, roll);
         ROS_INFO("Curr Wrist Transform Belief [camera frame]: %s", to_string(camera_to_ee).c_str());
-        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::angles::to_degrees(roll), sbpl::angles::to_degrees(pitch), sbpl::angles::to_degrees(yaw));
 
         msg_utils::get_euler_ypr(wrist_transform_estimate_, yaw, pitch, roll);
         ROS_INFO("Curr Wrist Transform Estimate [camera frame]: %s", to_string(wrist_transform_estimate_).c_str());
-        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::angles::to_degrees(roll), sbpl::angles::to_degrees(pitch), sbpl::angles::to_degrees(yaw));
 
         msg_utils::get_euler_ypr(camera_to_mount.inverse() * wrist_transform_estimate_, yaw, pitch, roll);
         ROS_INFO("Curr Wrist Transform Estimate [mount frame]: %s", to_string(camera_to_mount.inverse() * wrist_transform_estimate_).c_str());
-        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::angles::to_degrees(roll), sbpl::angles::to_degrees(pitch), sbpl::angles::to_degrees(yaw));
 
         ROS_INFO("Error: %s", to_string(error).c_str());
 
@@ -425,7 +426,7 @@ int ViservoControlExecutor::run()
         Eigen::AngleAxisd aa_error(error.rotation());
         double angle_error = aa_error.angle();
 
-        ROS_INFO("    Rotation Error: %0.3f degs about %s", sbpl::utils::ToDegrees(angle_error), to_string(aa_error.axis()).c_str());
+        ROS_INFO("    Rotation Error: %0.3f degs about %s", sbpl::angles::to_degrees(angle_error), to_string(aa_error.axis()).c_str());
 
         double angular_velocity_rps = angle_error;
         if (fabs(angular_velocity_rps) > fabs(max_rotational_velocity_rps_)) {
@@ -460,7 +461,7 @@ int ViservoControlExecutor::run()
 
         ROS_INFO("Target Wrist Transform [camera frame]: %s", to_string(camera_to_target_wrist_transform).c_str());
         msg_utils::get_euler_ypr(camera_to_target_wrist_transform, roll, pitch, yaw);
-        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::utils::ToDegrees(roll), sbpl::utils::ToDegrees(pitch), sbpl::utils::ToDegrees(yaw));
+        ROS_INFO("    Euler Angles: r: %0.3f degs, p: %0.3f degs, y: %0.3f degs", sbpl::angles::to_degrees(roll), sbpl::angles::to_degrees(pitch), sbpl::angles::to_degrees(yaw));
 
         Eigen::Affine3d mount_to_target_wrist = camera_to_mount.inverse() * camera_to_target_wrist_transform;
         ROS_INFO("Target Wrist Transform [mount frame]: %s", to_string(mount_to_target_wrist).c_str());
@@ -601,7 +602,7 @@ void ViservoControlExecutor::goal_callback()
 
     // TODO: to manipulator frame
     Eigen::Affine3d mount_to_corrected_goal = camera_to_mount.inverse() * corrected_goal_rot;
-    auto ikgen = robot_model_->search_all_ik_solutions(mount_to_corrected_goal, curr_joint_state_->position, sbpl::utils::ToRadians(1.0));
+    auto ikgen = robot_model_->search_all_ik_solutions(mount_to_corrected_goal, curr_joint_state_->position, sbpl::angles::to_radians(1.0));
     std::vector<double> sol;
     if (!ikgen(sol)) {
         ROS_ERROR("No IK Solution exists for corrected goal position");
@@ -829,13 +830,13 @@ bool ViservoControlExecutor::download_marker_params()
     deadband_joint_velocities_rps_ = msg_utils::to_radians(deadband_joint_velocities_dps);
     minimum_joint_velocities_rps_ = msg_utils::to_radians(minimum_joint_velocities_dps);
 
-    goal_rot_tolerance_ = sbpl::utils::ToRadians(goal_rot_tolerance_);
+    goal_rot_tolerance_ = sbpl::angles::to_radians(goal_rot_tolerance_);
 
     attached_marker_.link_to_marker = Eigen::Affine3d(
             Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
+            Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+            Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
     return success;
 }
@@ -893,13 +894,13 @@ bool ViservoControlExecutor::safe_joint_delta(const std::vector<double>& from, c
         double max_angle = robot_model_->max_limits()[solidx];
 
         bool safe_joint_command =
-                sbpl::utils::ShortestAngleDistWithLimits(to_angle, from_angle, min_angle, max_angle) <
-                sbpl::utils::ToRadians(angle_threshold_degs);
+                sbpl::angles::ShortestAngleDistWithLimits(to_angle, from_angle, min_angle, max_angle) <
+                sbpl::angles::to_radians(angle_threshold_degs);
 
         if (!safe_joint_command) {
             ROS_DEBUG("Next joint state too far away from current joint state (%0.3f degs - %0.3f degs > %0.3f degs)",
-                sbpl::utils::ToDegrees(to_angle),
-                sbpl::utils::ToDegrees(from_angle),
+                sbpl::angles::to_degrees(to_angle),
+                sbpl::angles::to_degrees(from_angle),
                 angle_threshold_degs);
             return false;
         }
@@ -961,8 +962,8 @@ void ViservoControlExecutor::update_histogram()
 {
     // keep track of which joints have moved in the wrong direction
     for (std::size_t i = 0; i < last_curr_.size(); ++i) {
-        if (signf(curr_joint_state_->position[i] - last_curr_[i], sbpl::utils::ToRadians(1.0)) !=
-            signf(last_diff_[i], sbpl::utils::ToRadians(1.0)))
+        if (signf(curr_joint_state_->position[i] - last_curr_[i], sbpl::angles::to_radians(1.0)) !=
+            signf(last_diff_[i], sbpl::angles::to_radians(1.0)))
         {
             ++misbehaved_joints_histogram_[i];
         }
@@ -1045,7 +1046,7 @@ bool ViservoControlExecutor::choose_best_ik_solution(
     std::vector<double>& to,
     std::string& why)
 {
-    double ik_search_res = sbpl::utils::ToRadians(1.0);
+    double ik_search_res = sbpl::angles::to_radians(1.0);
     hdt::IKSolutionGenerator ikgen = robot_model_->search_all_ik_solutions(ee_transform, from, ik_search_res);
     std::vector<std::vector<double>> ik_solutions;
     static const int max_ik_solutions = 100;

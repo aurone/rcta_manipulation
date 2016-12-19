@@ -5,7 +5,6 @@ target_link_libraries(
     ${leatherman_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${tf_LIBRARIES}
     ${urdf_LIBRARIES}
     ${urdf_parser_LIBRARIES}
@@ -34,7 +33,6 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
     ${sbpl_collision_checking_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${sbpl_kdl_robot_model_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_LIBRARIES}

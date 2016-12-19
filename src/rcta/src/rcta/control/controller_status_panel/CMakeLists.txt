@@ -13,7 +13,7 @@ add_library(
 target_link_libraries(
     hdt_controller_plugins
     ${QT_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
+    ${smpl_LIBRARIES}
     qwt)
 add_dependencies(hdt_controller_plugins ${PROJECT_NAME}_generate_messages_cpp)
 

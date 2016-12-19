@@ -13,7 +13,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <geometric_shapes/shape_operations.h>
 #include <geometry_msgs/TransformStamped.h>
-#include <sbpl_geometry_utils/geometry.h>
+#include <smpl/angles.h>
 #include <sensor_msgs/JointState.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -214,7 +214,7 @@ void GraspingCommandPanel::copyCurrentBasePose()
 
         double roll, pitch, yaw;
         msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
-        teleport_base_command_yaw_box_->setValue(sbpl::utils::ToDegrees(yaw));
+        teleport_base_command_yaw_box_->setValue(sbpl::angles::to_degrees(yaw));
 
         publish_phantom_robot_visualizations();
     } catch (const tf::TransformException& ex) {
@@ -242,7 +242,7 @@ void GraspingCommandPanel::update_base_pose_z(double z)
 
 void GraspingCommandPanel::update_base_pose_yaw(double yaw_deg)
 {
-    double yaw_rad = sbpl::utils::ToRadians(yaw_deg);
+    double yaw_rad = sbpl::angles::to_radians(yaw_deg);
     T_world_robot_ =
             Eigen::Translation3d(T_world_robot_.translation()) *
             Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d(0.0, 0.0, 1.0));
@@ -897,7 +897,7 @@ void GraspingCommandPanel::update_base_pose_spinboxes()
     teleport_base_command_y_box_->setValue(T_world_robot_.translation()(1, 0));
     double yaw, pitch, roll;
     msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
-    teleport_base_command_yaw_box_->setValue(sbpl::utils::ToDegrees(yaw));
+    teleport_base_command_yaw_box_->setValue(sbpl::angles::to_degrees(yaw));
     connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
     connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
     connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));

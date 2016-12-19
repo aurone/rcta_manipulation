@@ -6,7 +6,7 @@
 
 // system includes
 #include <boost/algorithm/string.hpp>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 
 // project includes
 #include <rcta/ClearEmergencyStop.h>
@@ -152,7 +152,7 @@ void ControllerStatusPanelWidget::joint_states_callback(const sensor_msgs::Joint
             continue; // not an arm joint
         }
 
-        past_joint_states_[jidx].push_back(sbpl::utils::ToDegrees(joint_val));
+        past_joint_states_[jidx].push_back(sbpl::angles::to_degrees(joint_val));
     }
 
 
@@ -189,7 +189,7 @@ void ControllerStatusPanelWidget::raw_joint_states_callback(const sensor_msgs::J
             continue; // not an arm joint
         }
 
-        past_raw_joint_states_[jidx].push_back(sbpl::utils::ToDegrees(joint_val));
+        past_raw_joint_states_[jidx].push_back(sbpl::angles::to_degrees(joint_val));
     }
 
     // update the data associated with the curves and refresh the joint state plots
@@ -413,7 +413,7 @@ void hdt::ControllerStatusPanelWidget::initialize_gui()
     ui->raw_joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
     ui->raw_joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
     ui->raw_joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
-    ui->raw_joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
+    ui->raw_joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::angles::to_degrees(M_PI), sbpl::angles::to_degrees(M_PI));
 
     ////////////////////////////////////////////////////////////////////////////////
     // Set up joint states visualization
@@ -445,6 +445,6 @@ void hdt::ControllerStatusPanelWidget::initialize_gui()
     ui->joint_states_plot->setAxisAutoScale(QwtPlot::xBottom, false);
     ui->joint_states_plot->setAxisTitle(QwtPlot::yLeft, tr("Joint Value (deg)"));
     ui->joint_states_plot->setAxisTitle(QwtPlot::xBottom, tr("Time (s)"));
-    ui->joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::utils::ToDegrees(M_PI), sbpl::utils::ToDegrees(M_PI));
+    ui->joint_states_plot->setAxisScale(QwtPlot::yLeft, -sbpl::angles::to_degrees(M_PI), sbpl::angles::to_degrees(M_PI));
 }
 

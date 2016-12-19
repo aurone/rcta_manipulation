@@ -10,7 +10,7 @@
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/GetStateValidity.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/random/gaussian.h>
@@ -752,7 +752,7 @@ GraspObjectExecutionStatus::Status GraspObjectExecutor::onGeneratingGrasps()
 
     ROS_INFO("world -> camera: %s", to_string(camera_pose).c_str());
 
-    const double vis_angle_thresh = sbpl::utils::ToRadians(45.0);
+    const double vis_angle_thresh = sbpl::angles::to_radians(45.0);
     pruneGraspCandidates(candidates, robot_state.getGlobalLinkTransform(m_robot_model->getRootLink()), camera_pose, vis_angle_thresh);
 
     ROS_INFO("Produced %zd reachable grasp poses", candidates.size());
@@ -1961,9 +1961,9 @@ bool GraspObjectExecutor::downloadMarkerParams()
 
     attached_marker.link_to_marker = Eigen::Affine3d(
         Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
-        Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
-        Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
-        Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
+        Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+        Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+        Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
     m_attached_markers.push_back(std::move(attached_marker));
 

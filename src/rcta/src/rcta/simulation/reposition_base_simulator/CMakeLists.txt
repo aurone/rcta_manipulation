@@ -4,7 +4,6 @@ target_link_libraries(
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${spellbook_ros_LIBRARIES})
 add_dependencies(reposition_base_simulator ${catkin_EXPORTED_TARGETS})
 

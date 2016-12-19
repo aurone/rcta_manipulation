@@ -7,7 +7,7 @@
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <sensor_msgs/JointState.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
@@ -162,9 +162,9 @@ private:
 
                 std::vector<Eigen::Affine3d> marker_transform_candidates = {
                         camera_to_actual_marker,
-                        camera_to_actual_marker * Eigen::AngleAxisd(sbpl::utils::ToRadians( 90.0), Eigen::Vector3d(0.0, 0.0, 1.0)),
-                        camera_to_actual_marker * Eigen::AngleAxisd(sbpl::utils::ToRadians(180.0), Eigen::Vector3d(0.0, 0.0, 1.0)),
-                        camera_to_actual_marker * Eigen::AngleAxisd(sbpl::utils::ToRadians(270.0), Eigen::Vector3d(0.0, 0.0, 1.0))
+                        camera_to_actual_marker * Eigen::AngleAxisd(sbpl::angles::to_radians( 90.0), Eigen::Vector3d(0.0, 0.0, 1.0)),
+                        camera_to_actual_marker * Eigen::AngleAxisd(sbpl::angles::to_radians(180.0), Eigen::Vector3d(0.0, 0.0, 1.0)),
+                        camera_to_actual_marker * Eigen::AngleAxisd(sbpl::angles::to_radians(270.0), Eigen::Vector3d(0.0, 0.0, 1.0))
                 };
 
                 // get the most likely offset transform candidate
@@ -248,9 +248,9 @@ private:
 
         attached_marker.link_to_marker = Eigen::Affine3d(
             Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
-            Eigen::AngleAxisd(sbpl::utils::ToRadians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
+            Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+            Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
         attached_markers_.push_back(std::move(attached_marker));
 

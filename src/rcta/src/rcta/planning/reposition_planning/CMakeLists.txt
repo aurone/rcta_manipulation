@@ -15,7 +15,6 @@ target_link_libraries(
     ${urdf_model_LIBRARIES}
     ${urdf_parser_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${smpl_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${SBPL_LIBRARIES}

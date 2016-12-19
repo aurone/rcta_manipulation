@@ -8,7 +8,6 @@ target_link_libraries(
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${tf_LIBRARIES}

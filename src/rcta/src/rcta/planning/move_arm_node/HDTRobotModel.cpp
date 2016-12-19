@@ -8,7 +8,7 @@
 #include <eigen_conversions/eigen_kdl.h>
 #include <leatherman/print.h>
 #include <leatherman/viz.h>
-#include <sbpl_geometry_utils/utils.h>
+#include <smpl/angles.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <tf/LinearMath/Quaternion.h>
@@ -190,7 +190,7 @@ bool HDTRobotModel::computeIK(
     ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
     pub_.publish(ma);
     std::vector<double> fake_start = start;
-    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::utils::ToRadians(1.0));
+    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::angles::to_radians(1.0));
     if (res) {
         ROS_WARN("IK Succeeded");
     }
@@ -242,7 +242,7 @@ bool HDTRobotModel::computeIK(
     pub_.publish(ma);
 
     std::vector<double> fake_start(7, 0);
-    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, fake_start, sbpl::utils::ToRadians(1.0));
+    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, fake_start, sbpl::angles::to_radians(1.0));
     std::vector<double> sol;
     while(ik_gen(sol)){
       solutions.push_back(sol);
