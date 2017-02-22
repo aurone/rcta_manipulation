@@ -1,4 +1,7 @@
 - git:
+    local-name: andalite_description
+    uri: https://github.com/aurone/andalite_description.git
+- git:
     local-name: gazebo_ros_pkgs
     uri: https://github.com/ros-simulation/gazebo_ros_pkgs.git
 - git:
@@ -10,6 +13,12 @@
 - git:
     local-name: moveit_scenarios
     uri: https://github.com/aurone/moveit_scenarios.git
+- git:
+    local-name: rcta_msgs
+    uri: https://github.com/aurone/rcta_msgs.git
+- git:
+    local-name: roman_model
+    uri: https://github.com/aurone/roman_model.git
 - git:
     local-name: sbpl_geometry_utils
     uri: https://github.com/sbpl/sbpl_geometry_utils.git

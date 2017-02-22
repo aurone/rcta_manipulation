@@ -1,6 +1,0 @@
-<launch>
-    <arg name="ns" default="false"/>
-
-    <param if="$(arg ns)"     name="robot_description" command="$(find xacro)/xacro.py '$(find roman_model)/robots/rcta_roman.urdf.xacro' namespace:=true"/>
-    <param unless="$(arg ns)" name="robot_description" command="$(find xacro)/xacro.py '$(find roman_model)/robots/rcta_roman.urdf.xacro' namespace:=false"/>
-</launch>
