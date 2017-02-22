@@ -4,7 +4,7 @@ screen -t core
 stuff "roscore^M"
 
 screen -t rviz
-stuff "rosrun rviz rviz -d $ROS_WORKSPACE/config/rcta.rviz"
+stuff "rosrun rviz rviz -d `rospack find rcta`/config/rcta.rviz"
 
 screen -t ctrl
 stuff "roslaunch rcta roman_control.launch live:=false fake:=true --screen"
