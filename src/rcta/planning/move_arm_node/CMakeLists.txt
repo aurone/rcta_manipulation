@@ -10,16 +10,6 @@ target_link_libraries(
     ${urdf_parser_LIBRARIES}
     hdt_robot_model)
 
-add_executable(hdt_manipulation_test hdt_manipulation_test.cpp)
-target_link_libraries(
-    hdt_manipulation_test
-    hdt_arm_planning
-    ${moveit_core_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${smpl_LIBRARIES}
-    ${sbpl_collision_checking_LIBRARIES}
-    ${sbpl_kdl_robot_model_LIBRARIES})
-
 add_executable(move_arm_node move_arm_node.cpp MoveArmNode.cpp)
 target_link_libraries(
     move_arm_node

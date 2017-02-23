@@ -102,12 +102,12 @@ bool ViservoControlExecutor::initialize()
     const std::string& chain_root_link = "arm_mount_panel_dummy";
     const std::string& chain_tip_link = robot_model_->joint_names().back() + "_link";
     const int free_angle = 4;
-    kdl_robot_model_.reset(new sbpl::motion::KDLRobotModel(chain_root_link, chain_tip_link, free_angle));
+    kdl_robot_model_.reset(new sbpl::motion::KDLRobotModel());
     if (!kdl_robot_model_) {
         ROS_ERROR("Failed to instantiate KDL Robot Model");
     }
 
-    if (!kdl_robot_model_->init(urdf_string, robot_model_->joint_names())) {
+    if (!kdl_robot_model_->init(urdf_string,robot_model_->joint_names(), chain_root_link, chain_tip_link, free_angle)) {
         ROS_ERROR("Failed to initialize KDL Robot Model");
         return false;
     }
