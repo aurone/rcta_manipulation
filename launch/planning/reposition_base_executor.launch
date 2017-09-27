@@ -1,5 +1,8 @@
 <launch>
-    <include file="$(find rcta)/launch/moveit/roman/planning_context.launch"/>
+    <include file="$(find rcta)/launch/moveit/roman/planning_context.launch">
+        <arg name="load_robot_description" value="true"/>
+    </include>
+
     <node name="reposition_planner_node" pkg="rcta" type="reposition_planner_node" output="screen">
         <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
         <rosparam command="load" file="$(find rcta)/config/planning/gascan_grasping.yaml"/>

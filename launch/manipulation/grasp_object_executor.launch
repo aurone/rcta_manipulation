@@ -1,4 +1,8 @@
 <launch>
+    <include file="$(find rcta)/launch/moveit/roman/planning_context.launch">
+        <arg name="load_robot_description" value="true"/>
+    </include>
+
     <node name="grasp_object_executor" pkg="rcta" type="grasp_object_executor" output="screen">
         <remap from="map" to="global_costmap/costmap/costmap"/>
         <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
