@@ -24,8 +24,8 @@
     local-name: sbpl_geometry_utils
     uri: https://github.com/sbpl/sbpl_geometry_utils.git
 - git:
-    local-name: sbpl_manipulation
-    uri: https://github.com/aurone/sbpl_manipulation.git
+    local-name: smpl
+    uri: https://github.com/aurone/smpl.git
 - git:
     local-name: spellbook_ros
     uri: https://github.com/aurone/spellbook_ros.git
