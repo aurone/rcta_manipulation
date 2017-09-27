@@ -56,10 +56,6 @@
                 <param name="use_gui" value="false"/>
                 <rosparam param="source_list">[/move_group/fake_controller_joint_states]</rosparam>
             </node>
-
-            <!-- dummy to keep move_group from hanging -->
-            <node name="right_limb_joint_trajectory_controller" pkg="rcta" type="right_limb_joint_trajectory_controller"/>
-            <node name="left_limb_joint_trajectory_controller" pkg="rcta" type="left_limb_joint_trajectory_controller"/>
         </group>
         <group unless="$(arg fake)">
             <!-- spawn the robot in gazebo -->
