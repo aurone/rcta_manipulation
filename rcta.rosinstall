@@ -4,6 +4,7 @@
 - git:
     local-name: gazebo_ros_pkgs
     uri: https://github.com/ros-simulation/gazebo_ros_pkgs.git
+    version: indigo-devel
 - git:
     local-name: leatherman
     uri: https://github.com/aurone/leatherman.git
