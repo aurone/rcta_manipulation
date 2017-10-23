@@ -27,7 +27,7 @@
         origin_z: -0.10
         res_m: 0.05
         max_distance_m: 0.8
-        frame_id: map
+        frame_id: relative_flu
     </rosparam>
     <!--
     <rosparam param="world_collision_model">
