@@ -22,16 +22,6 @@
      -->
     <node name="roman_gripper_controller" pkg="rcta" type="roman_gripper_controller"/>
 
-    <!-- publish fake odometry in all modes except live/real -->
-    <group if="$(arg live)">
-        <group if="$(arg fake)">
-            <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
-        </group>
-    </group>
-    <group unless="$(arg live)">
-        <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
-    </group>
-
     <group if="$(arg live)">
         <group if="$(arg fake)">
             <!-- fake "roman_state", "roman_joint_states", "roman_hand_open", and "roman_hand_close" -->
