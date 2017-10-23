@@ -140,6 +140,8 @@ robot_collision_model:
       spheres:
         - { name: lr7s0, x: 0.165, y: 0.0, z: 0.0, radius: 0.13 }
   collision_groups:
+    - name: body
+      groups: [ right_arm_and_torso, left_arm ]
     - name: left_arm
       links:
         - name: limb_left_link0
