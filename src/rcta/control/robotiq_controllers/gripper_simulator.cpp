@@ -26,8 +26,8 @@ GripperSimulator::GripperSimulator(boost::asio::io_service& io_service) :
     io_service_(io_service),
     timer_(io_service),
     loop_rate_hz_(200.0),
-    routput_registers_({0, 0, 0, 0, INITIAL_VELOCITY_, INITIAL_FORCE_}),
-    rinput_registers_({0, 0, 0, 0, 0, 0}),
+    routput_registers_{0, 0, 0, 0, INITIAL_VELOCITY_, INITIAL_FORCE_},
+    rinput_registers_{0, 0, 0, 0, 0, 0},
     position_(model_.maximum_width()),
     target_pos_(0x00), // fully open
     activation_status_(ActivationStatusNotActivated),
@@ -36,10 +36,10 @@ GripperSimulator::GripperSimulator(boost::asio::io_service& io_service) :
     activating_(false),
     releasing_(false),
     // LEDs initialized to their powered-on and done-booting state
-    controller_power_led_({ LED::Blue, LED::Continuous }),
-    gripper_power_led_({ LED::Blue, LED::Continuous }),
-    comms_led_({ LED::Green, LED::Blinking }),
-    fault_led_({ LED::Red, LED::Off }),
+    controller_power_led_{ LED::Blue, LED::Continuous },
+    gripper_power_led_{ LED::Blue, LED::Continuous },
+    comms_led_{ LED::Green, LED::Blinking },
+    fault_led_{ LED::Red, LED::Off },
     last_update_()
 {
 }
