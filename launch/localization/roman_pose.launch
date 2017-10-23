@@ -1,4 +1,10 @@
 <launch>
+    <!-- This launch file describes the necessary params/nodes to integrate
+    pose with the manipulation stack. The sole requirement that this launch file
+    satisfies is that transform information must be provided between the global
+    frame 'map' and the root link of the robot, 'base_footprint'.
+    -->
+
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
     <arg name="ns" default="false"/>

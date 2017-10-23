@@ -1,4 +1,37 @@
 <launch>
+    <!-- This launch file describes the necessary params/nodes to integrate
+    platform control and intrinsic state information with the manipulation
+    stack. In particular, each configuration satisfies these basic requirements:
+
+    * The URDF is available on the param server with key 'robot_description'
+
+    * Intrinsic state information of the robot is provided on the topic
+      'joint_states' with type sensor_msgs/JointState
+
+    * An action server is available to accept commands to executive joint
+      trajectories for the right arm,
+      via the action interface 'right_arm/follow_joint_trajectory',
+      with type control_msgs/FollowJointTrajectoryAction
+
+    * An action server is available to accept commands to executive joint
+      trajectories for the left arm,
+      via the action interface 'left_arm/follow_joint_trajectory',
+      with type control_msgs/FollowJointTrajectoryAction
+
+    * An action server is available to accept commands to open or close the
+      right gripper,
+      via the action interface 'right_gripper/gripper_action',
+      with type control_msgs/GripperCommand
+
+    * An action server is available to accept commands to open or close the
+      left gripper,
+      via the action interface 'left_gripper/gripper_action',
+      with type control_msgs/GripperCommand
+
+    * The transform network intrinsic to the robot is provided on topic /tf with
+      type tf/tfMessage
+    -->
+
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
 
