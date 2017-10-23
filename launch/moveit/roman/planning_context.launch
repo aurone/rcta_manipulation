@@ -15,6 +15,14 @@
     <!-- Load updated joint limits (override information from URDF) -->
     <group ns="$(arg robot_description)_planning">
         <rosparam command="load" file="$(find rcta)/config/robots/roman/moveit/joint_limits.yaml"/>
+
+        <!-- NOTE(Andrew): this parameter specifies the maximum timeout to wait
+        for transforms for shapes (robot links, attached objects, scene
+        geometry) to become available for filtering input point clouds.
+        Currently, the arm appears to be updating slowly and failure to update
+        transforms in this case throws away the entire point cloud
+        -->
+        <param name="shape_transform_cache_lookup_wait_time" value="0.5"/>
     </group>
 
     <!-- Load default settings for kinematics; these settings are overridden -->
