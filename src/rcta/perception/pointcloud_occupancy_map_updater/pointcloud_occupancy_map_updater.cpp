@@ -58,20 +58,13 @@ public:
     PointCloudOccupancyMapUpdater();
     virtual ~PointCloudOccupancyMapUpdater();
 
-    virtual bool setParams(XmlRpc::XmlRpcValue& params);
+    bool setParams(XmlRpc::XmlRpcValue& params) override;
 
-    virtual bool initialize();
-    virtual void start();
-    virtual void stop();
-    virtual ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape);
-    virtual void forgetShape(ShapeHandle handle);
-
-protected:
-
-    virtual void updateMask(
-            const sensor_msgs::PointCloud2& cloud,
-            const Eigen::Vector3d& sensor_origin,
-            std::vector<int>& mask);
+    bool initialize() override;
+    void start() override;
+    void stop() override;
+    ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape) override;
+    void forgetShape(ShapeHandle handle) override;
 
 private:
 
@@ -98,9 +91,18 @@ private:
     boost::scoped_ptr<point_containment_filter::ShapeMask> shape_mask_;
     std::vector<int> mask_;
 
+    void updateMask(
+        const sensor_msgs::PointCloud2& cloud,
+        const Eigen::Vector3d& sensor_origin,
+        std::vector<int>& mask);
+
     bool getShapeTransform(ShapeHandle h, Eigen::Affine3d& transform) const;
     void cloudMsgCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
     void stopHelper();
+
+    bool updateTransformCache(
+        const std::string& target_frame,
+        const ros::Time& target_time);
 };
 
 PointCloudOccupancyMapUpdater::PointCloudOccupancyMapUpdater()
@@ -250,7 +252,7 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
         }
     }
     after = high_resolution_clock::now();
-    ROS_INFO("  Lookup cloud transform took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Lookup cloud transform took %lf seconds", display_time_unit(after - before).count());
 
     // compute sensor origin in map frame
     const tf::Vector3& sensor_origin_tf = map_H_sensor.getOrigin();
@@ -263,14 +265,14 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
         return;
     }
     after = high_resolution_clock::now();
-    ROS_INFO("  Update transform cache took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Update transform cache took %lf seconds", display_time_unit(after - before).count());
 
     before = high_resolution_clock::now();
     // mask out points on the robot
     shape_mask_->maskContainment(*cloud_msg, sensor_origin_eigen, 0.0, max_range_, mask_);
     updateMask(*cloud_msg, sensor_origin_eigen, mask_);
     after = high_resolution_clock::now();
-    ROS_INFO("  Update mask took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Update mask took %lf seconds", display_time_unit(after - before).count());
 
     octomap::KeySet free_cells, occupied_cells, model_cells, clip_cells;
     boost::scoped_ptr<sensor_msgs::PointCloud2> filtered_cloud;
@@ -299,7 +301,7 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
     before = high_resolution_clock::now();
     tree_->lockRead();
     after = high_resolution_clock::now();
-    ROS_INFO("  Read-locking took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Read-locking took %lf seconds", display_time_unit(after - before).count());
 
    try {
         before = high_resolution_clock::now();
@@ -347,7 +349,7 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
             }
         }
         after = high_resolution_clock::now();
-        ROS_INFO("  Ray tracing took %lf seconds", display_time_unit(after - before).count());
+        ROS_DEBUG("  Ray tracing took %lf seconds", display_time_unit(after - before).count());
 
         before = high_resolution_clock::now();
         // compute the free cells along each ray that ends at an occupied cell
@@ -371,7 +373,7 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
             }
         }
         after = high_resolution_clock::now();
-        ROS_INFO("  Gathering cell types took %lf seconds", display_time_unit(after - before).count());
+        ROS_DEBUG("  Gathering cell types took %lf seconds", display_time_unit(after - before).count());
     } catch (...) {
         tree_->unlockRead();
         return;
@@ -385,7 +387,7 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
         occupied_cells.erase(*it);
     }
     after = high_resolution_clock::now();
-    ROS_INFO("  Filtering model cells took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Filtering model cells took %lf seconds", display_time_unit(after - before).count());
 
     // occupied cells are not free
     before = high_resolution_clock::now();
@@ -393,12 +395,12 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
         free_cells.erase(*it);
     }
     after = high_resolution_clock::now();
-    ROS_INFO("  Reinsert obstacle cells took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Reinsert obstacle cells took %lf seconds", display_time_unit(after - before).count());
 
     before = high_resolution_clock::now();
     tree_->lockWrite();
     after = high_resolution_clock::now();
-    ROS_INFO("  Write-locking took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Write-locking took %lf seconds", display_time_unit(after - before).count());
 
     before = high_resolution_clock::now();
     try {
@@ -421,10 +423,10 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
         ROS_ERROR("Internal error while updating octree");
     }
     after = high_resolution_clock::now();
-    ROS_INFO("  Update of octree took %lf seconds", display_time_unit(after - before).count());
+    ROS_DEBUG("  Update of octree took %lf seconds", display_time_unit(after - before).count());
 
     tree_->unlockWrite();
-    ROS_INFO("Processed point cloud in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
+    ROS_DEBUG("Processed point cloud in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
     tree_->triggerUpdateCallback();
 
     if (filtered_cloud) {
@@ -432,6 +434,22 @@ void PointCloudOccupancyMapUpdater::cloudMsgCallback(
         pcd_modifier.resize(filtered_cloud_size);
         filtered_cloud_publisher_.publish(*filtered_cloud);
     }
+}
+
+bool PointCloudOccupancyMapUpdater::updateTransformCache(
+    const std::string& target_frame,
+    const ros::Time& target_time)
+{
+    if (transform_provider_callback_) {
+        if (!transform_provider_callback_(target_frame, target_time, transform_cache_)) {
+            ROS_WARN_THROTTLE(1, "Failed to update all transforms to the target time");
+        } else {
+            ROS_INFO_THROTTLE(1, "Updated all transforms");
+        }
+    } else {
+        ROS_WARN_THROTTLE(1, "No callback provided for updating the transform cache for octomap updaters");
+    }
+    return true;
 }
 
 }
