@@ -1,0 +1,7 @@
+<library path="libpointcloud_occupancy_map_updater">
+    <class name="occupancy_map_monitor/PointCloudOccupancyMapUpdater"
+            type="occupancy_map_monitor::PointCloudOccupancyMapUpdater"
+            base_class_type="occupancy_map_monitor::OccupancyMapUpdater">
+        <description>Point Cloud Occupancy Map Updater</description>
+    </class>
+</library>

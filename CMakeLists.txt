@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
     moveit_core
     moveit_planners_sbpl
+    moveit_ros_perception
     moveit_ros_planning
     moveit_ros_planning_interface
     moveit_ros_move_group

@@ -41,6 +41,7 @@
     <depend>moveit_ros_move_group</depend>
     <depend>moveit_ros_planning</depend>
     <depend>moveit_ros_planning_interface</depend>
+    <depend>moveit_ros_perception</depend>
     <depend>moveit_simple_controller_manager</depend>
     <depend>nav_msgs</depend>
     <depend>ntcansckplugin</depend>
@@ -77,5 +78,6 @@
         <rviz plugin="${prefix}/config/pluginlib/move_group_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/config/pluginlib/gripper_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/config/pluginlib/viservo_command_panel_plugin_description.xml"/>
+        <moveit_ros_perception plugin="${prefix}/config/pluginlib/pointcloud_occupancy_map_updater.xml"/>
     </export>
 </package>

@@ -1,2 +1,3 @@
 add_subdirectory(attached_markers_filter)
+add_subdirectory(pointcloud_occupancy_map_updater)
 #add_subdirectory(pick_and_place_node)
