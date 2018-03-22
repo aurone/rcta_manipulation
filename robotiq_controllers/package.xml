@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>robotiq_controllers</name>
+    <version>0.0.0</version>
+    <description>
+        This package provides a model of the Robotiq C-Model 85 gripper,
+        a simulator to model its comms protocol, a command-line interface to
+        command the gripper, and a ROS driver that provides joint states of
+        the gripper and an action server to command the gripper.
+    </description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>actionlib</depend>
+    <depend>control_msgs</depend>
+    <depend>roscpp</depend>
+    <depend>sensor_msgs</depend>
+</package>
