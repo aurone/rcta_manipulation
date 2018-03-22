@@ -10,4 +10,23 @@
     <buildtool_depend>catkin</buildtool_depend>
 
     <exec_depend>gazebo_ros</exec_depend>
+
+    <depend>actionlib</depend>
+    <depend>eigen_conversions</depend>
+    <depend>libglew-dev</depend>
+    <depend>nav_msgs</depend>
+    <depend>opengl</depend>
+    <depend>rosbag</depend>
+    <depend>roscpp</depend>
+    <depend>rospack</depend>
+    <depend>sdl2</depend>
+    <depend>smpl</depend>
+    <depend>spellbook_ros</depend>
+    <depend>tf</depend>
+    <depend>tf_conversions</depend>
+
+    <export>
+        <gazebo_ros gazebo_media_path="${prefix}/models"/>
+        <gazebo_ros gazebo_model_path="${prefix}/models"/>
+    </export>
 </package>

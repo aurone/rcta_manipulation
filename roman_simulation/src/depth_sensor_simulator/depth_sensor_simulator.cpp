@@ -1,4 +1,8 @@
-#include "DepthSensorSimulatorNode.h"
+#include <SDL.h>
+#include <ros/ros.h>
+
+#include <moveit_msgs/PlanningSceneWorld.h>
+#include <ros/ros.h>
 
 // standard includes
 #include <cmath>
@@ -18,6 +22,33 @@
 #include <spellbook/utils/RunUponDestruction.h>
 
 #define GL_CALL(fun, ...) fun(__VA_ARGS__); if (glGetError() != GL_NO_ERROR) { ROS_ERROR("Call to " #fun " return an error"); }
+
+class DepthSensorSimulatorNode
+{
+public:
+
+    DepthSensorSimulatorNode();
+    ~DepthSensorSimulatorNode();
+
+    enum RunResult
+    {
+        SUCCESS = 0,
+        FAILED_TO_INITIALIZE
+    };
+    int run(int argc, char* argv[]);
+
+private:
+
+    ros::NodeHandle nh_;
+    ros::NodeHandle ph_;
+
+    ros::Subscriber planning_scene_world_sub_;
+    ros::Publisher point_cloud_pub_;
+
+    moveit_msgs::PlanningSceneWorld::ConstPtr last_planning_scene_world_;
+
+    void planning_scene_world_cb(const moveit_msgs::PlanningSceneWorld::ConstPtr& msg);
+};
 
 static Eigen::Projective3f CreatePerspectiveMatrix(float fovy, float aspect, float near, float far)
 {
@@ -381,4 +412,11 @@ void DepthSensorSimulatorNode::planning_scene_world_cb(const moveit_msgs::Planni
     for (const auto& collision_object : last_planning_scene_world_->collision_objects) {
 //        collision_object.
     }
+}
+
+int main(int argc, char* argv[])
+{
+    SDL_SetMainReady();
+    ros::init(argc, argv, "depth_sensor_simulator");
+    return DepthSensorSimulatorNode().run(argc, argv);
 }
