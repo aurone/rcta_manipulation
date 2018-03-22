@@ -11,7 +11,8 @@ find_package(
         control_msgs 
         roscpp 
         roman_client_ros_utils
-        robotiq_controllers)
+        robotiq_controllers
+        sensor_msgs)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -24,7 +25,13 @@ include_directories(${catkin_INCLUDE_DIRS})
 
 catkin_package()
 
-set(COMMON_LIBS 
+add_executable(roman_simulator src/roman_simulator/roman_simulator.cpp)
+target_link_libraries(
+    roman_simulator 
+    ${roman_client_ros_utils_LIBRARIES} 
+    ${roscpp_LIBRARIES})
+
+set(ROMAN_JOINT_TRAJECTORY_CONTROLLER_COMMON_LIBS 
     ${actionlib_LIBRARIES}
     ${control_msgs_LIBRARIES} 
     ${roscpp_LIBRARIES} 
@@ -32,17 +39,23 @@ set(COMMON_LIBS
 
 add_executable(
     right_limb_joint_trajectory_controller
-    src/right_limb_joint_trajectory_controller.cpp
-    src/roman_joint_trajectory_controller.cpp)
-target_link_libraries(right_limb_joint_trajectory_controller ${COMMON_LIBS})
+    src/roman_joint_trajectory_controller/right_limb_joint_trajectory_controller.cpp
+    src/roman_joint_trajectory_controller/roman_joint_trajectory_controller.cpp)
+target_link_libraries(
+    right_limb_joint_trajectory_controller 
+    ${ROMAN_JOINT_TRAJECTORY_CONTROLLER_COMMON_LIBS})
 
 add_executable(
     left_limb_joint_trajectory_controller
-    src/left_limb_joint_trajectory_controller.cpp
-    src/roman_joint_trajectory_controller.cpp)
-target_link_libraries(left_limb_joint_trajectory_controller ${COMMON_LIBS})
+    src/roman_joint_trajectory_controller/left_limb_joint_trajectory_controller.cpp
+    src/roman_joint_trajectory_controller/roman_joint_trajectory_controller.cpp)
+target_link_libraries(
+    left_limb_joint_trajectory_controller 
+    ${ROMAN_JOINT_TRAJECTORY_CONTROLLER_COMMON_LIBS})
 
-add_executable(roman_gripper_controller src/roman_gripper_controller.cpp)
+add_executable(
+    roman_gripper_controller 
+    src/roman_gripper_controller/roman_gripper_controller.cpp)
 target_link_libraries(
     roman_gripper_controller
     ${actionlib_LIBRARIES}

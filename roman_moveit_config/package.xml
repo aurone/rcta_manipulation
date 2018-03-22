@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>roman_moveit_config</name>
+    <version>0.0.0</version>
+    <description>The roman_moveit_config package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <exec_depend>moveit_ros_move_group</exec_depend>
+    <exec_depend>moveit_planners_ompl</exec_depend>
+    <exec_depend>moveit_planners_sbpl</exec_depend>
+    <exec_depend>moveit_ros_visualization</exec_depend>
+    <exec_depend>roman_model</exec_depend>
+    <exec_depend>kdl_kinematics_plugin</exec_depend>
+</package>

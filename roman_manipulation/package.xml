@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>roman_manipulation</name>
+    <version>0.0.0</version>
+    <description>The roman_manipulation package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <exec_depend>controller_manager</exec_depend>
+    <exec_depend>gazebo_ros</exec_depend>
+    <exec_depend>hector_mapping</exec_depend>
+    <exec_depend>joint_state_publisher</exec_depend>
+    <exec_depend>robot_state_publisher</exec_depend>
+    <exec_depend>roman_control</exec_depend>
+    <exec_depend>roman_model</exec_depend>
+    <exec_depend>roman_simulation</exec_depend>
+    <exec_depend>tf</exec_depend>
+</package>

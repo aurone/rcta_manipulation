@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12)
-project(roman_manipulation)
+project(roman_simulation)
 
 find_package(catkin REQUIRED)
 

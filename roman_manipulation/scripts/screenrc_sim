@@ -4,25 +4,25 @@ screen -t core
 stuff "roscore^M"
 
 screen -t rviz
-stuff "rosrun rviz rviz -d `rospack find rcta`/config/rcta.rviz"
+stuff "rosrun rviz rviz -d `rospack find roman_manipulation`/config/rcta.rviz"
 
 screen -t sim
-stuff "roslaunch rcta quantico_simulation.launch"
+stuff "roslaunch roman_manipulation quantico_simulation.launch"
 
 screen -t gaze
 stuff "rosrun gazebo_ros gzclient"
 
 screen -t ctrl
-stuff "roslaunch rcta roman_control.launch live:=false --screen"
+stuff "roslaunch roman_manipulation roman_control.launch live:=false --screen"
 
 screen -t pose
-stuff "roslaunch rcta roman_pose.launch live:=false --screen"
+stuff "roslaunch roman_manipulation roman_pose.launch live:=false --screen"
 
 screen -t repo
-stuff "roslaunch rcta reposition_base_executor.launch --screen"
+stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
 
 screen -t move
-stuff "roslaunch rcta move_arm_node.launch live:=false fake:=false --screen"
+stuff "roslaunch roman_manipulation move_arm_node.launch live:=false fake:=false --screen"
 
 screen -t grasp
-stuff "roslaunch rcta grasp_object_executor.launch --screen"
+stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"

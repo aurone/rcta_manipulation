@@ -12,12 +12,12 @@
 
     <!-- Load the URDF, SRDF and other .yaml configuration files on the -->
     <!-- param server -->
-    <include file="$(find rcta)/launch/moveit/roman/planning_context.launch">
+    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="true"/>
     </include>
 
     <param name="collision_detector" value="collision_detection/CollisionPluginSBPL"/>
-    <rosparam command="load" file="$(find rcta)/config/robots/roman/common/collision_model.yaml"/>
+    <rosparam command="load" file="$(find roman_moveit_config)/config/collision_model.yaml"/>
     <rosparam param="world_collision_model">
         size_x: 20.0
         size_y: 20.0
@@ -55,17 +55,17 @@
     </rosparam>
 
     <!-- Planning Functionality -->
-    <include ns="move_group" file="$(find rcta)/config/robots/roman/moveit/planning_pipeline.launch.xml">
+    <include ns="move_group" file="$(find roman_moveit_config)/config/planning_pipeline.launch.xml">
         <arg name="pipeline" value="sbpl"/>
     </include>
 
     <!-- Trajectory Execution Functionality -->
-    <include if="$(arg allow_trajectory_execution)" ns="move_group" file="$(find rcta)/config/robots/roman/moveit/trajectory_execution.launch.xml">
+    <include if="$(arg allow_trajectory_execution)" ns="move_group" file="$(find roman_moveit_config)/config/trajectory_execution.launch.xml">
         <arg name="fake_execution" value="$(arg fake_execution)"/>
     </include>
 
     <!-- Sensors Functionality -->
-    <include ns="move_group" file="$(find rcta)/config/robots/roman/moveit/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
+    <include ns="move_group" file="$(find roman_moveit_config)/config/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
         <arg name="moveit_sensor_manager" value="rcta_roman"/>
     </include>
 

@@ -1,5 +1,5 @@
 <launch>
-    <rosparam command="load" file="$(find rcta)/config/perception/roman_sensors.yaml"/>
+    <rosparam command="load" file="$(find roman_moveit_config)/config/roman_sensors.yaml"/>
 
     <param name="octomap_frame" type="string" value="map"/>
     <param name="octomap_resolution" type="double" value="0.05"/>

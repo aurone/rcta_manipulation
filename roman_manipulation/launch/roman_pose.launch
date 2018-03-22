@@ -19,7 +19,7 @@
         </group>
         <group unless="$(arg fake)">
             <node name="hector_mapping" pkg="hector_mapping" type="hector_mapping">
-                <rosparam command="load" file="$(find rcta)/config/localization/hector_mapping.yaml"/>
+                <rosparam command="load" file="$(find roman_manipulation)/config/hector_mapping.yaml"/>
                 <remap from="scan" to="base_scan"/>
             </node>
         </group>

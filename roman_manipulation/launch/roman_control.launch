@@ -24,9 +24,9 @@
 
     <!-- publish fake odometry in all modes except live/real -->
     <group if="$(arg live)">
-        <group if="$(arg fake)">
+        <!--group if="$(arg fake)">
             <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
-        </group>
+        </group-->
     </group>
     <group unless="$(arg live)">
         <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
@@ -35,7 +35,7 @@
     <group if="$(arg live)">
         <group if="$(arg fake)">
             <!-- fake "roman_state", "roman_joint_states", "roman_hand_open", and "roman_hand_close" -->
-            <node name="roman_simulator" pkg="rcta" type="roman_simulator"/>
+            <node name="roman_simulator" pkg="roman_control" type="roman_simulator"/>
         </group>
 
         <!-- joint state aggregator -->
@@ -44,12 +44,12 @@
         </node>
 
         <!-- action interfaces wrapping jpl controllers -->
-        <node name="right_limb_joint_trajectory_controller" pkg="rcta" type="right_limb_joint_trajectory_controller"/>
-        <node name="left_limb_joint_trajectory_controller" pkg="rcta" type="left_limb_joint_trajectory_controller"/>
+        <node name="right_limb_joint_trajectory_controller" pkg="roman_control" type="right_limb_joint_trajectory_controller"/>
+        <node name="left_limb_joint_trajectory_controller" pkg="roman_control" type="left_limb_joint_trajectory_controller"/>
     </group>
     <group unless="$(arg live)">
         <!-- run the roman_simulator to fake gripper control state; ignore roman_joint_states -->
-        <node name="roman_simulator" pkg="rcta" type="roman_simulator"/>
+        <node name="roman_simulator" pkg="roman_control" type="roman_simulator"/>
 
         <group if="$(arg fake)">
             <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
@@ -65,7 +65,7 @@
                         -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
 
             <!-- spawn simulated controllers -->
-            <rosparam command="load" file="$(find rcta)/config/robots/roman/control/roman_control.yaml"/>
+            <rosparam command="load" file="$(find roman_simulation)/config/roman_control.yaml"/>
             <node name="controller_spawner" pkg="controller_manager" type="spawner"
                     args="joint_state_controller right_limb left_limb torso_joint1_controller right_gripper left_gripper"/>
         </group>

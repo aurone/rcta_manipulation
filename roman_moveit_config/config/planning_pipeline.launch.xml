@@ -5,5 +5,5 @@
 
     <arg name="pipeline" default="ompl"/>
 
-    <include file="$(find rcta)/config/robots/roman/moveit/$(arg pipeline)_planning_pipeline.launch.xml"/>
+    <include file="$(find roman_moveit_config)/config/$(arg pipeline)_planning_pipeline.launch.xml"/>
 </launch>

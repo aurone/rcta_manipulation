@@ -1,8 +1,0 @@
-add_subdirectory(move_arm_node)
-add_subdirectory(costmap_object_detection)
-add_subdirectory(grasping)
-add_subdirectory(grasp_object_executor)
-add_subdirectory(spline_grasp_generator)
-add_subdirectory(stow_arm)
-add_subdirectory(reposition_planning)
-add_subdirectory(workspace_analysis)

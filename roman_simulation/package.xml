@@ -1,18 +1,13 @@
 <?xml version="1.0"?>
 <package format="2">
-    <name>roman_control</name>
+    <name>roman_simulation</name>
     <version>0.0.0</version>
-    <description>The roman_control package</description>
+    <description>The roman_simulation package</description>
     <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
     <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
     <license>TODO</license>
 
     <buildtool_depend>catkin</buildtool_depend>
 
-    <depend>actionlib</depend>
-    <depend>control_msgs</depend>
-    <depend>robotiq_controllers</depend>
-    <depend>roman_client_ros_utils</depend>
-    <depend>roscpp</depend>
-    <depend>sensor_msgs</depend>
+    <exec_depend>gazebo_ros</exec_depend>
 </package>
