@@ -4,7 +4,7 @@
     <arg name="standalone" default="false"/>
 
     <!-- UPLOAD URDF -->
-    <include file="$(find rcta)/launch/urdf/upload_andalite.launch">
+    <include file="$(find hdt_description)/robots/upload_andalite.launch">
         <arg name="sim" value="$(arg sim)"/>
         <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
     </include>
@@ -12,7 +12,7 @@
     <!-- LAUNCH OPENNI IN LIVE MODE -->
     <group if="$(arg standalone)">
         <group unless="$(arg sim)">
-            <include file="$(find rcta)/launch/perception/openni.launch">
+            <include file="$(find hdt_description)/launch/openni.launch">
                 <arg name="kinect_sensor" value="$(arg kinect_sensor)"/>
             </include>
         </group>

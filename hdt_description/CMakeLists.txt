@@ -1,15 +1,10 @@
-add_library(hdt_robot_model RobotModel.cpp)
-target_link_libraries(
-    hdt_robot_model
-    ${leatherman_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${smpl_LIBRARIES}
-    ${sbpl_geometry_utils_LIBRARIES}
-    ${urdf_LIBRARIES}
-    ${urdf_parser_LIBRARIES}
-    hdt_kinematics)
+cmake_minimum_required(VERSION 2.8.12)
+project(hdt_description)
 
-install(TARGETS hdt_robot_model
-        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+find_package(catkin REQUIRED)
+
+catkin_package()
+
+install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY robots DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
