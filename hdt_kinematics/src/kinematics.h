@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 
 #define IKFAST_HAS_LIBRARY
-#include <hdt_kinematics/hdt_arm_transform6d.h>
+#include "hdt_arm_transform6d.h"
 
 namespace hdt
 {

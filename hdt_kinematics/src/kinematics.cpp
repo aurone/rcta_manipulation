@@ -1,4 +1,4 @@
-#include <hdt_kinematics/kinematics.h>
+#include "kinematics.h"
 
 #include <array>
 #include <iostream>

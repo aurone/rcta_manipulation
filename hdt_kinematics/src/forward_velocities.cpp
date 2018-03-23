@@ -11,7 +11,7 @@
 #include <urdf_parser/urdf_parser.h>
 
 // project includes
-#include <rcta/common/hdt_description/RobotModel.h>
+#include <hdt_kinematics/RobotModel.h>
 
 typedef boost::shared_ptr<urdf::Link> LinkPtr;
 typedef boost::shared_ptr<const urdf::Link> LinkConstPtr;

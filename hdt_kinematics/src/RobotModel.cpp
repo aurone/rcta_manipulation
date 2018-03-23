@@ -1,4 +1,4 @@
-#include <hdt_description/RobotModel.h>
+#include <hdt_kinematics/RobotModel.h>
 
 // standard includes
 #include <cassert>
@@ -11,8 +11,8 @@
 #include <smpl/angles.h>
 #include <urdf_parser/urdf_parser.h>
 
-// project includes
-#include <rcta/common/hdt_kinematics/kinematics.h>
+// module includes
+#include "kinematics.h"
 
 #define RM_DEBUG 0
 #if RM_DEBUG

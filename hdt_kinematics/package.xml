@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>hdt_kinematics</name>
+    <version>0.0.0</version>
+    <description>The hdt_kinematics package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>eigen3</build_depend>
+
+    <build_export_depend>eigen3</build_export_depend>
+
+    <depend>liburdfdom-headers-dev</depend>
+    <depend>liburdfdom-dev</depend>
+    <depend>leatherman</depend>
+    <depend>roscpp</depend>
+    <depend>sbpl_geometry_utils</depend>
+    <depend>smpl</depend>
+    <depend>urdf_parser</depend>
+    <depend>orocos_kdl</depend>
+    <depend>boost</depend>
+</package>
