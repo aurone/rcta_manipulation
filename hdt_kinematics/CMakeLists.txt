@@ -64,6 +64,10 @@ target_link_libraries(
     hdt_robot_model)
 
 install(
+    DIRECTORY include/hdt_kinematics/ 
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+
+install(
     TARGETS hdt_robot_model hdt_forward_velocities
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
