@@ -9,8 +9,8 @@
 #include <smpl/angles.h>
 
 // project includes
-#include <rcta/ClearEmergencyStop.h>
-#include <rcta/EmergencyStop.h>
+#include <hdt_control_msgs/ClearEmergencyStop.h>
+#include <hdt_control_msgs/EmergencyStop.h>
 
 #include "ui_controller_status_panel_widget.h"
 
@@ -55,7 +55,7 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
     rospack_.crawl(search_path, false);
 
     std::string path;
-    const std::string package_name = "hdt";
+    const std::string package_name = "hdt_control";
     ROS_INFO("Searching for '%s' package", package_name.c_str());
     if (!rospack_.find(package_name, path)) {
         ROS_ERROR("Failed to find package '%s'", package_name.c_str());
@@ -75,13 +75,13 @@ ControllerStatusPanelWidget::ControllerStatusPanelWidget(QWidget *parent) :
         }
     }
 
-    hdt_diagnostics_sub_ = nh_.subscribe<rcta::ControllerDiagnosticStatus>("hdt_diagnostics", 5, &ControllerStatusPanelWidget::diagnostics_callback, this);
+    hdt_diagnostics_sub_ = nh_.subscribe<hdt_control_msgs::ControllerDiagnosticStatus>("hdt_diagnostics", 5, &ControllerStatusPanelWidget::diagnostics_callback, this);
     raw_joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("joint_states_raw", 1, &ControllerStatusPanelWidget::raw_joint_states_callback, this);
     joint_states_sub_ = nh_.subscribe<sensor_msgs::JointState>("joint_states", 1, &ControllerStatusPanelWidget::joint_states_callback, this);
 
     staleness_pub_ = nh_.advertise<std_msgs::Empty>("controller_staleness", 1);
-    estop_pub_ = nh_.advertise<rcta::EmergencyStop>("hdt_estop", 1);
-    clear_estop_pub_ = nh_.advertise<rcta::ClearEmergencyStop>("clear_hdt_estop", 1);
+    estop_pub_ = nh_.advertise<hdt_control_msgs::EmergencyStop>("hdt_estop", 1);
+    clear_estop_pub_ = nh_.advertise<hdt_control_msgs::ClearEmergencyStop>("clear_hdt_estop", 1);
     staleness_sub_ = nh_.subscribe<std_msgs::Empty>("controller_staleness", 1, &ControllerStatusPanelWidget::staleness_callback, this);
 
     ui->setupUi(this);
@@ -107,7 +107,7 @@ bool ControllerStatusPanelWidget::load_resources()
     return false;
 }
 
-void ControllerStatusPanelWidget::diagnostics_callback(const rcta::ControllerDiagnosticStatus::ConstPtr& msg)
+void ControllerStatusPanelWidget::diagnostics_callback(const hdt_control_msgs::ControllerDiagnosticStatus::ConstPtr& msg)
 {
     std::unique_lock<std::mutex> lock(msg_mutex_);
 
@@ -272,7 +272,7 @@ QPushButton* ControllerStatusPanelWidget::find_button(const std::string& button_
     return button;
 }
 
-void ControllerStatusPanelWidget::refresh_icons(const rcta::ControllerDiagnosticStatus& msg)
+void ControllerStatusPanelWidget::refresh_icons(const hdt_control_msgs::ControllerDiagnosticStatus& msg)
 {
     // NOTE: reset_occured boolean condition has different semantics from the other status flags
     if (msg.reset_occurred) {
@@ -346,14 +346,14 @@ PLUGINLIB_EXPORT_CLASS(hdt::ControllerStatusPanelWidget, rviz::Panel)
 void hdt::ControllerStatusPanelWidget::on_emergency_stop_button_clicked()
 {
     ROS_INFO("Sending Emergency Stop command!");
-    rcta::EmergencyStop estop_msg;
+    hdt_control_msgs::EmergencyStop estop_msg;
     estop_pub_.publish(estop_msg);
 }
 
 void hdt::ControllerStatusPanelWidget::on_clear_emergency_stop_button_clicked()
 {
     ROS_INFO("Clearing Emergency Stop");
-    rcta::ClearEmergencyStop clear_estop_msg;
+    hdt_control_msgs::ClearEmergencyStop clear_estop_msg;
     clear_estop_pub_.publish(clear_estop_msg);
 }
 

@@ -2,12 +2,10 @@
 
 // system includes
 #include <eigen_conversions/eigen_msg.h>
+#include <rcta_manipulation_common/comms/actionlib.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
-
-// project includes
-#include <rcta/common/comms/actionlib.h>
 
 namespace rcta {
 
@@ -58,7 +56,7 @@ void ViservoCommandPanel::send_viservo_command()
 
     // construct the goal wrist pose in the camera frame; the goal pose should
     // be the same pose as whatever pose we think we're currently at.
-    rcta::ViservoCommandGoal viservo_goal;
+    hdt_control_msgs::ViservoCommandGoal viservo_goal;
     tf::poseEigenToMsg(T_camera_wrist, viservo_goal.goal_pose);
     auto result_callback = boost::bind(&ViservoCommandPanel::viservo_command_result_cb, this, _1, _2);
     viservo_command_client_->sendGoal(viservo_goal, result_callback);
@@ -71,13 +69,14 @@ void ViservoCommandPanel::viservo_command_active_cb()
 {
 }
 
-void ViservoCommandPanel::viservo_command_feedback_cb(const rcta::ViservoCommandFeedback::ConstPtr& feedback)
+void ViservoCommandPanel::viservo_command_feedback_cb(
+    const hdt_control_msgs::ViservoCommandFeedback::ConstPtr& feedback)
 {
 }
 
 void ViservoCommandPanel::viservo_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::ViservoCommandResult::ConstPtr& result)
+    const hdt_control_msgs::ViservoCommandResult::ConstPtr& result)
 {
     ROS_INFO("Received Result from Viservo Command Action");
     pending_viservo_command_ = false;

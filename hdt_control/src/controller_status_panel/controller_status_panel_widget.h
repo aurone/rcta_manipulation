@@ -1,23 +1,26 @@
 #ifndef hdt_ControllerStatusPanelWidget_h
 #define hdt_ControllerStatusPanelWidget_h
 
+// standard includes
 #include <map>
 #include <mutex>
 #include <string>
 #include <thread>
+
+// system includes
 #include <QLabel>
 #include <QPushButton>
 #include <QWidget>
 #include <boost/circular_buffer.hpp>
-#include <qwt_plot.h>
-#include <qwt_plot_curve.h>
+#include <hdt_control_msgs/ControllerDiagnosticStatus.h>
+#include <hdt_kinematics/RobotModel.h>
+#include <qwt/qwt_plot.h>
+#include <qwt/qwt_plot_curve.h>
 #include <ros/ros.h>
 #include <rospack/rospack.h>
 #include <rviz/panel.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Empty.h>
-#include <rcta/ControllerDiagnosticStatus.h>
-#include <hdt_description/RobotModel.h>
 
 namespace Ui {
 class ControllerStatusPanelWidget;
@@ -56,7 +59,7 @@ private:
     mutable hdt::RobotModelPtr robot_model_;
 
     std::mutex msg_mutex_;
-    rcta::ControllerDiagnosticStatus::ConstPtr last_msg_;
+    hdt_control_msgs::ControllerDiagnosticStatus::ConstPtr last_msg_;
 
     bool shutdown_watchdog_;
     std::thread watchdog_;
@@ -80,7 +83,7 @@ private:
 
     bool load_resources();
 
-    void diagnostics_callback(const rcta::ControllerDiagnosticStatus::ConstPtr& msg);
+    void diagnostics_callback(const hdt_control_msgs::ControllerDiagnosticStatus::ConstPtr& msg);
     void staleness_callback(const std_msgs::Empty::ConstPtr& msg);
     void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
     void raw_joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
@@ -98,7 +101,7 @@ private:
 
     QPushButton* find_button(const std::string& button_name);
 
-    void refresh_icons(const rcta::ControllerDiagnosticStatus& msg);
+    void refresh_icons(const hdt_control_msgs::ControllerDiagnosticStatus& msg);
 
     void watchdog_thread();
 

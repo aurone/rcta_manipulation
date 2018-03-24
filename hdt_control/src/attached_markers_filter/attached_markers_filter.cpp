@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <hdt_kinematics/RobotModel.h>
 #include <ros/ros.h>
 #include <smpl/angles.h>
 #include <sensor_msgs/JointState.h>
@@ -13,9 +14,6 @@
 #include <spellbook/stringifier/stringifier.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-
-// project includes
-#include <rcta/common/hdt_description/RobotModel.h>
 
 /// This node listens to all incoming messages on /ar_pose_marker and publishes
 /// only the messages for markers that are currently attached to the robot

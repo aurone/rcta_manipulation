@@ -6,7 +6,7 @@
 #include <rviz/panel.h>
 
 // project includes
-#include <rcta/ControllerDiagnosticStatus.h>
+#include <hdt_control_msgs/ControllerDiagnosticStatus.h>
 
 namespace Ui
 {
@@ -29,7 +29,7 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber controller_diagnostics_sub_;
 
-    void controller_diagnostics_callback(const rcta::ControllerDiagnosticStatus::ConstPtr &msg);
+    void controller_diagnostics_callback(const hdt_control_msgs::ControllerDiagnosticStatus::ConstPtr &msg);
 };
 
 #endif

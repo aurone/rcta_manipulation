@@ -21,7 +21,7 @@ find_package(urdfdom_headers REQUIRED)
 
 catkin_package(
     INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIR}
-    LIBRARIES hdt_robot_model hdt_kinematics
+    LIBRARIES hdt_robot_model
     DEPENDS Boost urdfdom_headers)
 
 set(CMAKE_CXX_FLAGS "-std=c++11")

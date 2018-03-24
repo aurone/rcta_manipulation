@@ -1,19 +1,48 @@
-#include "FakeMarkerPublisher.h"
-
 #include <Eigen/Dense>
 #include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <ros/ros.h>
+#include <ros/ros.h>
 #include <smpl/angles.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
+
+class FakeMarkerPublisher
+{
+public:
+
+	FakeMarkerPublisher();
+
+	bool initialize();
+
+	enum RunResult
+	{
+	    SUCCESS = 0,
+	    FAILED_TO_INITIALIZE
+	};
+	int run();
+
+private:
+
+	ros::NodeHandle nh_;
+	ros::NodeHandle ph_;
+	ros::Publisher markers_pub_;
+	tf::TransformListener listener_;
+	tf::TransformBroadcaster broadcaster_;
+
+	std::string camera_frame_;
+	std::string wrist_frame_;
+};
 
 FakeMarkerPublisher::FakeMarkerPublisher() :
-        nh_(),
-        ph_("~"),
-        markers_pub_(),
-        listener_(),
-        broadcaster_(),
-        camera_frame_(),
-        wrist_frame_("arm_7_gripper_lift_link") {
-
+    nh_(),
+    ph_("~"),
+    markers_pub_(),
+    listener_(),
+    broadcaster_(),
+    camera_frame_(),
+    wrist_frame_("arm_7_gripper_lift_link")
+{
 }
 
 bool FakeMarkerPublisher::initialize()
@@ -104,4 +133,17 @@ int FakeMarkerPublisher::run()
     }
 
     return SUCCESS;
+}
+
+int main(int argc, char *argv[])
+{
+	ros::init(argc, argv, "fake_marker_pub");
+
+	FakeMarkerPublisher fmp;
+	if (!fmp.initialize()) {
+		ROS_ERROR("Failed to initialize Fake Marker Publisher");
+		return 1;
+	}
+
+	return fmp.run();
 }

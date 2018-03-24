@@ -2,14 +2,12 @@
 #include <string>
 
 // system includes
+#include <hdt_kinematics/RobotModel.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <trajectory_msgs/JointTrajectory.h>
-
-// project includes
-#include <rcta/common/hdt_description/RobotModel.h>
 
 sensor_msgs::JointState::ConstPtr last_msg;
 hdt::RobotModelPtr robot_model;

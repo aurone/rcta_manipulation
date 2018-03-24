@@ -48,7 +48,7 @@
   <customwidget>
    <class>QwtThermo</class>
    <extends>QWidget</extends>
-   <header>qwt_thermo.h</header>
+   <header>qwt/qwt_thermo.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

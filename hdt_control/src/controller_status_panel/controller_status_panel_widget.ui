@@ -155,7 +155,7 @@
   <customwidget>
    <class>QwtPlot</class>
    <extends>QFrame</extends>
-   <header>qwt_plot.h</header>
+   <header>qwt/qwt_plot.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

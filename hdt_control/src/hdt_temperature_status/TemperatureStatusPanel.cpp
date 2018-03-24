@@ -1,7 +1,7 @@
 #include "TemperatureStatusPanel.h"
 
 // system includes
-#include <qwt_thermo.h>
+#include <qwt/qwt_thermo.h>
 
 // module includes
 #include "ui_TemperatureStatusPanelWidget.h"
@@ -40,7 +40,7 @@ TemperatureStatusPanel::~TemperatureStatusPanel()
     delete ui_;
 }
 
-void TemperatureStatusPanel::controller_diagnostics_callback(const rcta::ControllerDiagnosticStatus::ConstPtr &msg)
+void TemperatureStatusPanel::controller_diagnostics_callback(const hdt_control_msgs::ControllerDiagnosticStatus::ConstPtr &msg)
 {
     if (msg->joint_status.size() < 7) {
         ROS_WARN("Insufficient number of joints from Controller Diagnostic Status message");

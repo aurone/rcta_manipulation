@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>rcta_manipulation_common</name>
+    <version>0.0.0</version>
+    <description>The rcta_manipulation_common package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+</package>

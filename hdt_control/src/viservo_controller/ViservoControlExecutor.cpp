@@ -1,20 +1,31 @@
-#include "ViservoControlExecutor.h"
-
 // standard includes
 #include <cassert>
 #include <cmath>
+#include <memory>
 #include <sstream>
 
 // system includes
+#include <Eigen/Dense>
+#include <actionlib/server/simple_action_server.h>
+#include <ar_track_alvar_msgs/AlvarMarkers.h>
 #include <boost/date_time.hpp>
 #include <eigen_conversions/eigen_msg.h>
+#include <hdt_control_msgs/ViservoCommandAction.h>
+#include <hdt_kinematics/RobotModel.h>
+#include <kdl/chain.hpp>
+#include <kdl/chainfksolvervel_recursive.hpp>
+#include <kdl/kdl.hpp>
 #include <sbpl_geometry_utils/angles.h>
+#include <sbpl_kdl_robot_model/kdl_robot_model.h>
+#include <sensor_msgs/JointState.h>
 #include <smpl/angles.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/RunUponDestruction.h>
 #include <spellbook/utils/utils.h>
+#include <tf/transform_listener.h>
+#include <trajectory_msgs/JointTrajectory.h>
 #include <urdf_parser/urdf_parser.h>
 #include <visualization_msgs/Marker.h>
 
@@ -22,6 +33,137 @@ typedef boost::shared_ptr<urdf::Link> LinkPtr;
 typedef boost::shared_ptr<const urdf::Link> LinkConstPtr;
 typedef boost::shared_ptr<urdf::Joint> JointPtr;
 typedef boost::shared_ptr<const urdf::Joint> JointConstPtr;
+
+class ViservoControlExecutor
+{
+public:
+
+    ViservoControlExecutor();
+
+    bool initialize();
+
+    enum RunResult
+    {
+        SUCCESS = 0,
+        FAILED_TO_INITIALIZE
+    };
+    int run();
+
+private:
+
+    ros::NodeHandle nh_;
+    ros::NodeHandle ph_;
+
+    hdt::RobotModelPtr robot_model_;
+
+    typedef std::unique_ptr<sbpl::motion::KDLRobotModel> KDLRobotModelPtr;
+    KDLRobotModelPtr kdl_robot_model_;
+
+    std::string action_name_;
+    typedef actionlib::SimpleActionServer<hdt_control_msgs::ViservoCommandAction> ViservoCommandActionServer;
+    std::unique_ptr<ViservoCommandActionServer> as_;
+
+    ros::Publisher joint_command_pub_;
+    ros::Publisher corrected_wrist_goal_pub_;
+
+    ros::Subscriber joint_states_sub_;
+    ros::Subscriber ar_marker_sub_;
+
+    hdt_control_msgs::ViservoCommandGoal::ConstPtr current_goal_;
+
+    sensor_msgs::JointState::ConstPtr curr_joint_state_;
+    ar_track_alvar_msgs::AlvarMarkers::ConstPtr last_ar_markers_msg_;
+
+    double marker_validity_timeout_;
+
+    Eigen::Affine3d wrist_transform_estimate_;
+    Eigen::Affine3d eef_transform_from_joint_state_;
+
+    /// maximum velocities in workspace and in joint space
+    double max_translational_velocity_mps_;
+    double max_rotational_velocity_rps_;
+    std::vector<double> deadband_joint_velocities_rps_; // velocities at which and below velocities will be truncated to 0
+    std::vector<double> minimum_joint_velocities_rps_; // velocities between the deadband and this will be clamped to these values
+    std::vector<double> max_joint_velocities_rps_; // velocities greater than these will be clamped to these values
+
+    tf::TransformListener listener_;
+
+    std::string camera_frame_;
+    std::string wrist_frame_;
+    std::string mount_frame_;
+
+    struct AttachedMarker
+    {
+        int marker_id;
+        std::string attached_link;
+        Eigen::Affine3d link_to_marker;
+    };
+
+    AttachedMarker attached_marker_;
+
+    Eigen::Vector3d goal_pos_tolerance_;
+    double goal_rot_tolerance_;
+
+    std::vector<double> last_curr_;
+    std::vector<double> last_diff_;
+    trajectory_msgs::JointTrajectoryPoint prev_cmd_;
+
+    int cmd_seqno_;
+
+    std::vector<int> misbehaved_joints_histogram_;
+
+    KDL::Chain kdl_chain_;
+    std::unique_ptr<KDL::ChainFkSolverVel_recursive> fv_solver_;
+
+    double KI_, KP_, KD_;
+    Eigen::Vector3d accum_ee_vel_error;
+
+    ros::Time goal_start_time_;
+
+    void goal_callback();
+    void preempt_callback();
+    void joint_states_cb(const sensor_msgs::JointState::ConstPtr& msg);
+    void ar_markers_cb(const ar_track_alvar_msgs::AlvarMarkers::ConstPtr& msg);
+
+    bool lost_marker();
+    bool reached_goal() const;
+    bool moved_too_far() const;
+
+    // incorporate the most recent joint state and ar marker data to come up with the best estimate for
+    // the actual wrist frame in the frame of the camera, using the ar marker with hardcoded offsets to an
+    // attached link and joint data for the remaining links between the attached link and the end effector
+    bool update_wrist_pose_estimate();
+
+    bool download_marker_params();
+
+    bool get_tracked_marker_pose(Eigen::Affine3d& marker_pose);
+
+    bool safe_joint_delta(const std::vector<double>& from, const std::vector<double>& to) const;
+
+    void correct_joint_trajectory_cmd(
+            const sensor_msgs::JointState& from,
+            const trajectory_msgs::JointTrajectoryPoint& prev_cmd,
+            trajectory_msgs::JointTrajectoryPoint& curr_cmd,
+            double dt);
+
+    bool is_valid_command(const trajectory_msgs::JointTrajectoryPoint& cmd);
+
+    void stop_arm(int seqno);
+
+    void update_histogram();
+
+    KDL::FrameVel compute_ee_velocity(const sensor_msgs::JointState& joint_state);
+
+    void publish_triad_marker(const std::string& ns, const Eigen::Affine3d& transform, const std::string& frame);
+
+    bool lookup_transform(const std::string& from, const std::string& to, const ros::Time& time, Eigen::Affine3d& out);
+
+    bool choose_best_ik_solution(
+            const Eigen::Affine3d& ee_transform,
+            const std::vector<double>& from,
+            std::vector<double>& to,
+            std::string& why);
+};
 
 std::string to_string(const KDL::Vector& v)
 {
@@ -247,7 +389,7 @@ int ViservoControlExecutor::run()
 
         update_histogram();
 
-        rcta::ViservoCommandResult result;
+        hdt_control_msgs::ViservoCommandResult result;
 
         ////////////////////////////////////////////////////////////////////////////////
         // Incorporate latest measurements from joint states and AR markers
@@ -268,7 +410,7 @@ int ViservoControlExecutor::run()
         if (!robot_model_->compute_fk(curr_joint_state_->position, manip_to_ee)) {
             std::string error = "Failed to compute end effector transform from joint state";
             ROS_ERROR("%s", error.c_str());
-            result.result = rcta::ViservoCommandResult::STUCK;
+            result.result = hdt_control_msgs::ViservoCommandResult::STUCK;
             as_->setAborted(result, error);
             stop_arm(cmd_seqno_++);
             continue;
@@ -305,7 +447,7 @@ int ViservoControlExecutor::run()
         	const ros::Duration initial_marker_estimate_timeout(5.0);
         	if (now > goal_start_time_ + initial_marker_estimate_timeout) {
         		ROS_ERROR("Have not seen the AR marker and it's been %0.3f seconds since we received the goal", initial_marker_estimate_timeout.toSec());
-        		result.result = rcta::ViservoCommandResult::LOST_MARKER;
+        		result.result = hdt_control_msgs::ViservoCommandResult::LOST_MARKER;
         		as_->setAborted(result);
         		stop_arm(cmd_seqno_++);
         		continue;
@@ -325,7 +467,7 @@ int ViservoControlExecutor::run()
         // 1. check whether the estimated wrist pose has reached the goal within the specified tolerance
         if (reached_goal()) {
             ROS_INFO("Wrist has reached goal. Completing action...");
-            result.result = rcta::ViservoCommandResult::SUCCESS;
+            result.result = hdt_control_msgs::ViservoCommandResult::SUCCESS;
             as_->setSucceeded(result);
             stop_arm(cmd_seqno_++);
             continue;
@@ -335,7 +477,7 @@ int ViservoControlExecutor::run()
         if (lost_marker()) {
             std::string error = "Marker has been lost. Aborting Viservo action...";
             ROS_WARN("%s", error.c_str());
-            result.result = rcta::ViservoCommandResult::LOST_MARKER;
+            result.result = hdt_control_msgs::ViservoCommandResult::LOST_MARKER;
             as_->setAborted(result, error);
             stop_arm(cmd_seqno_++);
             continue;
@@ -345,7 +487,7 @@ int ViservoControlExecutor::run()
         if (moved_too_far()) {
             std::string error = "Arm has moved too far from the goal. Aborting Viservo action...";
             ROS_INFO("%s", error.c_str());
-            result.result = rcta::ViservoCommandResult::MOVED_TOO_FAR;
+            result.result = hdt_control_msgs::ViservoCommandResult::MOVED_TOO_FAR;
             as_->setAborted(result, error);
             stop_arm(cmd_seqno_++);
             continue;
@@ -478,7 +620,7 @@ int ViservoControlExecutor::run()
             std::stringstream ss;
             ss << "Failed to find target joint state (" << why << "). Aborting Viservo action...";
             ROS_WARN("%s", ss.str().c_str());
-            result.result = rcta::ViservoCommandResult::STUCK;
+            result.result = hdt_control_msgs::ViservoCommandResult::STUCK;
             as_->setAborted(result, ss.str());
             stop_arm(cmd_seqno_++);
             continue;

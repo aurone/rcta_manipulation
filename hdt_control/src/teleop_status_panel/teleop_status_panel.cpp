@@ -38,7 +38,7 @@ QLabel* TeleopStatusPanel::find_label(const std::string& label_name)
     return label;
 }
 
-void TeleopStatusPanel::teleop_diagnostic_callback(const rcta::TeleopDiagnosticStatus::ConstPtr& msg)
+void TeleopStatusPanel::teleop_diagnostic_callback(const hdt_control_msgs::TeleopDiagnosticStatus::ConstPtr& msg)
 {
     for (size_t i = 0; i < msg->name.size(); ++i) {
         const std::string& joint_name = msg->name[i];

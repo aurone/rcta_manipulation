@@ -7,11 +7,9 @@
 // system includes
 #include <QLabel>
 #include <QWidget>
+#include <hdt_control_msgs/TeleopDiagnosticStatus.h>
 #include <rviz/panel.h>
 #include <ros/ros.h>
-
-// project includes
-#include <rcta/TeleopDiagnosticStatus.h>
 
 namespace Ui
 {
@@ -46,12 +44,12 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber teleop_diagnostic_sub_;
 
-    rcta::TeleopDiagnosticStatus::ConstPtr last_diagnostic_status_;
+    hdt_control_msgs::TeleopDiagnosticStatus::ConstPtr last_diagnostic_status_;
 
     std::map<std::string, JointLabelGroup> joint_name_to_label_names_;
 
     QLabel* find_label(const std::string& label_name);
-    void teleop_diagnostic_callback(const rcta::TeleopDiagnosticStatus::ConstPtr& msg);
+    void teleop_diagnostic_callback(const hdt_control_msgs::TeleopDiagnosticStatus::ConstPtr& msg);
 };
 
 } // namespace hdt
