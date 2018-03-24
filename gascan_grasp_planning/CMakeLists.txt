@@ -63,7 +63,7 @@ target_link_libraries(
     ${spellbook_ros_LIBRARIES}
     matplotpp)
 
-#install(DIRECTORY include/gascan_grasp_planning/ DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+install(DIRECTORY include/gascan_grasp_planning/ DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 
 install(
     TARGETS gascan_grasp_planner matplotpp spline_grasp_generator
