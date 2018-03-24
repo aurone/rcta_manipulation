@@ -1,4 +1,4 @@
-#include "gascan_grasp_planner.h"
+#include <gascan_grasp_planning/gascan_grasp_planner.h>
 
 #include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/Pose.h>

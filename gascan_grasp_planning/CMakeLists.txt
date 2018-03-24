@@ -13,12 +13,18 @@ find_package(
     REQUIRED 
     COMPONENTS 
         eigen_conversions 
+        eigen_stl_containers
+        geometry_msgs
         roscpp 
         rospack
+        smpl
         spellbook_ros
-        smpl)
+        visualization_msgs)
 
-catkin_package(INCLUDE_DIRS include LIBRARIES gascan_grasp_planner)
+catkin_package(
+    INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIR}
+    LIBRARIES gascan_grasp_planner
+    CATKIN_DEPENDS eigen_stl_containers roscpp spellbook_ros visualization_msgs)
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 

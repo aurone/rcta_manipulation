@@ -9,11 +9,15 @@
 
     <buildtool_depend>catkin</buildtool_depend>
 
+    <depend>eigen</depend>
     <depend>eigen_conversions</depend>
+    <depend>eigen_stl_containers</depend>
+    <depend>geometry_msgs</depend>
     <depend>glut</depend>
     <depend>opengl</depend>
     <depend>roscpp</depend>
     <depend>rospack</depend>
     <depend>smpl</depend>
     <depend>spellbook_ros</depend>
+    <depend>visualization_msgs</depend>
 </package>
