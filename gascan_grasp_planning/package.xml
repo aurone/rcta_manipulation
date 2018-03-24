@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>gascan_grasp_planning</name>
+    <version>0.0.0</version>
+    <description>The gascan_grasp_planning package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>eigen_conversions</depend>
+    <depend>glut</depend>
+    <depend>opengl</depend>
+    <depend>roscpp</depend>
+    <depend>rospack</depend>
+    <depend>smpl</depend>
+    <depend>spellbook_ros</depend>
+</package>

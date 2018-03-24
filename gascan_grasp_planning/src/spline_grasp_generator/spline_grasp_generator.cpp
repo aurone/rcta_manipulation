@@ -1,24 +1,89 @@
-#include "SplineVisualizer.h"
-
 // standard includes
 #include <cmath>
+#include <cstdio>
 #include <limits>
+#include <memory>
 #include <string>
+#include <vector>
 
 // system includes
 #include <Eigen/Dense>
 #include <GL/freeglut.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <geometry_msgs/Point.h>
+#include <ros/ros.h>
 #include <rospack/rospack.h>
-#include <visualization_msgs/Marker.h>
 #include <smpl/angles.h>
-#include <spellbook/stringifier/stringifier.h>
+#include <spellbook/geometry/nurb/NURB.h>
 #include <spellbook/msg_utils/msg_utils.h>
+#include <spellbook/stringifier/stringifier.h>
+#include <visualization_msgs/Marker.h>
 
 // project includes
-#include <rcta/common/matplotpp/matplotpp.h>
+#include <matplotpp/matplotpp.h>
 
 using namespace Eigen;
+
+class SplineVisualizer
+{
+public:
+
+    SplineVisualizer();
+    virtual ~SplineVisualizer();
+
+    enum MainResult
+    {
+        SUCCESS = 0,
+        FAILED_TO_INITIALIZE,
+        FAILED_TO_VISUALIZE_GAS_CANISTER,
+        FAILED_TO_VISUALIZE_GRASP_SPLINE
+    };
+
+    int run();
+
+    void display();
+    void reshape(int w, int h);
+
+private:
+
+    ros::NodeHandle nh_;
+    ros::NodeHandle ph_;
+
+    Nurb<Eigen::Vector3d> nurb_;
+    std::unique_ptr<Nurb<Eigen::Vector3d>> grasp_spline_;
+
+    ros::Publisher marker_pub_;
+    ros::Publisher control_vertices_marker_pub_;
+    ros::Publisher spline_marker_pub_;
+
+    std::vector<Eigen::Vector3d> grasp_spline_control_points_;
+
+    Eigen::Affine3d gas_canister_to_base_footprint_;
+    Eigen::Affine3d base_footprint_to_gas_canister_;
+
+    visualization_msgs::Marker canister_marker_;
+    visualization_msgs::Marker control_vertices_marker_;
+    visualization_msgs::Marker spline_marker_;
+
+    double gas_can_scale_;
+
+    bool load_curve();
+
+    void plot(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& z);
+
+    void plot_arrows(
+            const std::vector<double>& x,
+            const std::vector<double>& y,
+            const std::vector<double>& z,
+            const std::vector<double>& dx,
+            const std::vector<double>& dy,
+            const std::vector<double>& dz,
+            const std::string& color = "red");
+
+    bool init_canister_marker();
+    bool init_control_vertex_marker();
+    bool init_spline_marker();
+};
 
 SplineVisualizer::SplineVisualizer() :
     nh_(),
@@ -335,4 +400,10 @@ bool SplineVisualizer::init_spline_marker()
     spline_marker_.lifetime = ros::Duration(0);
     spline_marker_.frame_locked = false;
     return true;
+}
+
+int main(int argc, char* argv[])
+{
+    ros::init(argc, argv, "spline_grasp_generator");
+    return SplineVisualizer().run();
 }

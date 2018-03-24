@@ -60,6 +60,6 @@ if __name__ == '__main__':
     print 'Relocating {0} to the \'hdt\' package'.format(cpp_file)
 
     # move the sources into the hdt_kinematics package
-    proc = subprocess.Popen('rospack find rcta'.split(), stdout=subprocess.PIPE)
+    proc = subprocess.Popen('rospack find hdt_kinematics'.split(), stdout=subprocess.PIPE)
     dst_dir = '.' #proc.stdout.readlines()[0].rstrip() + '/src'
     shutil.copyfile(cpp_file, dst_dir + '/hdt_arm_transform6d.cpp')

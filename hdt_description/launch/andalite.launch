@@ -1,4 +1,8 @@
 <launch>
+    <!-- TODO: this file deserves to be somewhere higher up than hdt_description
+         and some of the included files have been moved to other packages that
+         may be inappropriate. Correct all of this. -->
+
     <arg name="sim" default="false"/>
     <arg name="kinect_sensor" default="false"/> <!-- false = asus, true = kinect -->
     <arg name="standalone" default="false"/>
@@ -20,18 +24,18 @@
 
     <!-- LAUNCH ARM DRIVER UNDER SIM, LAUNCH SEPARATELY AS ROOT IN LIVE MODE -->
     <group if="$(arg sim)">
-        <include file="$(find rcta)/launch/hdt_arm_driver.launch">
+        <include file="$(find hdt_control)/launch/hdt_arm_driver.launch">
             <arg name="sim" value="$(arg sim)"/>
         </include>
     </group>
 
     <!-- LAUNCH ARM STATE FILTER -->
     <node name="joint_states_filter" pkg="hdt" type="joint_states_filter">
-        <rosparam command="load" file="$(find rcta)/config/joint_states_filter.yaml"/>
+        <rosparam command="load" file="$(hdt_control rcta)/config/joint_states_filter.yaml"/>
     </node>
 
     <!-- LAUNCH GRIPPER DRIVER -->
-    <include file="$(find rcta)/launch/robotiq_gripper.launch">
+    <include file="$(find robotiq_controllers)/launch/robotiq_gripper.launch">
         <arg name="sim" value="$(arg sim)"/>
     </include>
 

@@ -3,20 +3,20 @@
 
     <group unless="$(arg sim)">
         <!-- include marker tracking -->
-        <include file="$(find rcta)/launch/perception/track_wrist_marker.launch"/>
+        <include file="$(find hdt_control)/launch/perception/track_wrist_marker.launch"/>
     </group>
 
     <group if="$(arg sim)">
         <node name="fake_ar_marker_pub" pkg="hdt" type="fake_marker_pub" output="screen">
-            <rosparam command="load" file="$(find rcta)/config/fake_ar_marker_pub.yaml"/>
-	    <rosparam command="load" file="$(find rcta)/config/attached_markers.yaml"/>
+            <rosparam command="load" file="$(find hdt_control)/config/fake_ar_marker_pub.yaml"/>
+	    <rosparam command="load" file="$(find hdt_control)/config/attached_markers.yaml"/>
             <!-- TODO: load in the attached marker config from config/attached_markers.yaml" -->
         </node>
     </group>
 
     <!-- marker filter to filter markers we don't care about and correct the orientations of those we do -->
     <node name="attached_markers_filter" pkg="hdt" type="attached_markers_filter" output="screen">
-        <rosparam command="load" file="$(find rcta)/config/attached_markers.yaml"/>
+        <rosparam command="load" file="$(find hdt_control)/config/attached_markers.yaml"/>
     </node>
 </launch>
 

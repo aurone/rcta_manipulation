@@ -1,5 +1,5 @@
 <launch>
-    <include file="$(find rcta)/launch/track_marker_in_gripper.launch">
+    <include file="$(find hdt_control)/launch/track_marker_in_gripper.launch">
         <arg name="marker_size" value="4.416"/>
         <arg name="cam_image_topic" value="/asus/depth/points_xyzrgb"/>
         <arg name="cam_info_topic" value="/asus/depth/camera_info"/>
@@ -7,7 +7,7 @@
     </include>
 
     <node name="repeatability_measure" pkg="hdt" type="repeatability_measure" output="screen">
-        <rosparam command="load" file="$(find rcta)/config/repeatability_measure.yaml"/>
+        <rosparam command="load" file="$(find hdt_control)/config/repeatability_measure.yaml"/>
     </node>
 </launch>
 
