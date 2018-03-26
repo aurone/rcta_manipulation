@@ -26,9 +26,8 @@ target_link_libraries(
     ${pr2_vfh_database_LIBRARIES})
 
 add_executable(
-    hdt_pick_and_place
-    src/pick_and_place_node/hdt_pick_and_place.cpp
-    src/pick_and_place_node/PickAndPlaceNode.cpp)
+    hdt_pick_and_place 
+    src/pick_and_place_node/hdt_pick_and_place.cpp)
 target_link_libraries(
     hdt_pick_and_place
     ${actionlib_LIBRARIES}

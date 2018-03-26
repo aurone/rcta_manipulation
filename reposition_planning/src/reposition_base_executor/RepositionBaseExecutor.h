@@ -12,10 +12,13 @@
 #include <Eigen/StdVector>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
+#include <gascan_grasp_planning/gascan_grasp_planner.h>
+#include <grasping_executive/MoveArmAction.h>
+#include <hdt_kinematics/RobotModel.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
-#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <rcta_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <smpl/debug/visualizer_ros.h>
@@ -26,11 +29,6 @@
 #include <urdf_model/model.h>
 #include <urdf_parser/urdf_parser.h>
 #include <visualization_msgs/Marker.h>
-
-// project includes
-#include <rcta/MoveArmAction.h>
-#include <rcta/common/hdt_description/RobotModel.h>
-#include <rcta/planning/grasping/gascan_grasp_planner.h>
 
 //xytheta collision checking!
 #include "xytheta_collision_checker.h"
@@ -229,11 +227,11 @@ private:
 
     /// \name Arm Planning Constraints
     /// @{
-    typedef actionlib::SimpleActionClient<rcta::MoveArmAction> MoveArmActionClient;
+    typedef actionlib::SimpleActionClient<grasping_executive::MoveArmAction> MoveArmActionClient;
     std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
     std::string move_arm_command_action_name_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
-    rcta::MoveArmResult::ConstPtr move_arm_command_result_;
+    grasping_executive::MoveArmResult::ConstPtr move_arm_command_result_;
     ///@}
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
@@ -454,7 +452,7 @@ private:
 
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
-        const rcta::MoveArmResult::ConstPtr& result);
+        const grasping_executive::MoveArmResult::ConstPtr& result);
 };
 
 #endif

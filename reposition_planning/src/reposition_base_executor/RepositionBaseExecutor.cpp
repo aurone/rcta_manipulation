@@ -7,6 +7,7 @@
 #include <angles/angles.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <leatherman/utils.h>
+#include <rcta_manipulation_common/comms/actionlib.h>
 #include <sbpl/headers.h>
 #include <smpl/angles.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
@@ -15,8 +16,6 @@
 #include <spellbook/utils/RunUponDestruction.h>
 #include <spellbook/utils/utils.h>
 #include <tf_conversions/tf_eigen.h>
-
-#include <rcta/common/comms/actionlib.h>
 
 namespace RepositionBaseExecutionStatus {
 std::string to_string(Status status)
@@ -1600,8 +1599,8 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
         const rcta::GraspCandidate& grasp = grasp_candidates[gidx];
 
-        rcta::MoveArmGoal pregrasp_goal;
-        pregrasp_goal.type = rcta::MoveArmGoal::EndEffectorGoal;
+        grasping_executive::MoveArmGoal pregrasp_goal;
+        pregrasp_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
         tf::poseEigenToMsg(grasp.pose, pregrasp_goal.goal_pose);
 
         // set the pose of the robot
@@ -1712,7 +1711,7 @@ bool RepositionBaseExecutor::checkIK(
 
 void RepositionBaseExecutor::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::MoveArmResult::ConstPtr& result)
+    const grasping_executive::MoveArmResult::ConstPtr& result)
 {
     move_arm_command_goal_state_ = state;
     move_arm_command_result_ = result;
