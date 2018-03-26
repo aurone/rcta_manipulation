@@ -14,6 +14,8 @@
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
+#include <hdt_control_msgs/TeleportAndaliteCommandAction.h>
+#include <hdt_control_msgs/TeleportHDTCommandAction.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_model/robot_model.h>
@@ -26,10 +28,6 @@
 #include <tf/transform_listener.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
-
-// project includes
-#include <rcta/TeleportAndaliteCommandAction.h>
-#include <rcta/TeleportHDTCommandAction.h>
 
 namespace rcta {
 
@@ -81,7 +79,7 @@ private:
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool pending_reposition_base_command_;
 
-    typedef actionlib::SimpleActionClient<rcta::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
+    typedef actionlib::SimpleActionClient<hdt_control_msgs::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
     std::unique_ptr<TeleportAndaliteCommandActionClient> teleport_andalite_command_client_;
     bool pending_teleport_andalite_command_;
 
@@ -173,10 +171,10 @@ private:
             const rcta_msgs::RepositionBaseCommandResult::ConstPtr& result);
 
     void teleport_andalite_command_active_cb();
-    void teleport_andalite_command_feedback_cb(const rcta::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
+    void teleport_andalite_command_feedback_cb(const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
     void teleport_andalite_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta::TeleportAndaliteCommandResult::ConstPtr& result);
+            const hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr& result);
 
     void update_object_marker_pose();
     void update_base_pose_spinboxes();

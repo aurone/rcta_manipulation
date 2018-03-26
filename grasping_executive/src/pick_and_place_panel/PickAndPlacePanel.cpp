@@ -6,10 +6,8 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/ros.h>
 #include <pcl_ros/transforms.h>
+#include <robotiq_controllers/gripper_model.h>
 #include <tf/transform_broadcaster.h>
-
-// project includes
-#include <rcta/control/robotiq_controllers/gripper_model.h>
 
 // module includes
 #include "PickAndPlacePanel.h"

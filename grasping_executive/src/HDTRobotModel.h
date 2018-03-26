@@ -9,7 +9,7 @@
 #include <urdf/model.h>
 
 // project includes
-#include <hdt_description/RobotModel.h>
+#include <hdt_kinematics/RobotModel.h>
 
 namespace hdt {
 

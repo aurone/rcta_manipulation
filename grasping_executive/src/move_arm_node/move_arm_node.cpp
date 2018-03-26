@@ -1,13 +1,136 @@
-#include "MoveArmNode.h"
+// standard includes
+#include <memory>
+#include <string>
 
 // system includes
+#include <actionlib/client/simple_action_client.h>
+#include <actionlib/server/simple_action_server.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <moveit/move_group_interface/move_group.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit_msgs/Constraints.h>
+#include <moveit_msgs/MoveGroupAction.h>
+#include <moveit_msgs/RobotState.h>
+#include <octomap_msgs/Octomap.h>
+#include <ros/ros.h>
 #include <smpl/angles.h>
-#include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
+#include <spellbook/msg_utils/msg_utils.h>
+#include <trajectory_msgs/JointTrajectory.h>
+
+// project includes
+#include <grasping_executive/MoveArmAction.h>
 
 namespace rcta {
+
+/// @brief Implements a ROS node to provide planning and execution of paths
+///
+/// The ROS node maintains the state of the robot and the world to plan and
+/// and execute paths that avoid obstacles in the environment and self
+/// collisions with the robot itself.
+class MoveArmNode
+{
+public:
+
+    MoveArmNode();
+
+    bool init();
+
+    int run();
+
+private:
+
+    ros::NodeHandle m_nh;
+    ros::NodeHandle m_ph;
+
+    std::unique_ptr<move_group_interface::MoveGroup> m_move_group;
+
+    std::string m_model_frame;
+
+    ros::Subscriber m_octomap_sub;
+
+    typedef actionlib::SimpleActionServer<grasping_executive::MoveArmAction> MoveArmActionServer;
+    std::string m_server_name;
+    std::unique_ptr<MoveArmActionServer> m_move_arm_server;
+
+    typedef actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction> MoveGroupActionClient;
+    std::unique_ptr<MoveGroupActionClient> m_move_group_client;
+
+    std::string m_tip_link;
+    double m_pos_tolerance;
+    double m_rot_tolerance;
+    double m_joint_tolerance;
+
+    std::string m_pose_goal_planner_id;
+    std::string m_joint_goal_planner_id;
+
+    // Goal shared between plan/execute requests so that parameters inherited
+    // from config don't have to be set every time.
+    moveit_msgs::MoveGroupGoal m_goal;
+
+    moveit_msgs::MoveGroupResult m_result;
+
+    ros::AsyncSpinner m_spinner;
+
+    octomap_msgs::Octomap::ConstPtr m_octomap;
+
+    void moveArm(const grasping_executive::MoveArmGoal::ConstPtr& goal);
+
+    bool planToGoalEE(
+        const grasping_executive::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool planToGoalJoints(
+        const grasping_executive::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool planToGoalCartesian(
+        const grasping_executive::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool moveToGoalEE(
+        const grasping_executive::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool moveToGoalJoints(
+        const grasping_executive::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    bool moveToGoalCartesian(
+        const grasping_executive::MoveArmGoal& goal,
+        trajectory_msgs::JointTrajectory& traj);
+
+    // setup planning options for the current request, including slerping over
+    // the most recent octomap
+    void fillPlanOnlyOptions(
+        const grasping_executive::MoveArmGoal& goal,
+        moveit_msgs::PlanningOptions& ops) const;
+
+    void fillPlanAndExecuteOptions(
+        const grasping_executive::MoveArmGoal& goal,
+        moveit_msgs::PlanningOptions& ops) const;
+
+    void fillCommonOptions(
+        const grasping_executive::MoveArmGoal& goal,
+        moveit_msgs::PlanningOptions& ops) const;
+
+    bool sendMoveGroupPoseGoal(
+        const moveit_msgs::PlanningOptions& ops,
+        const grasping_executive::MoveArmGoal& goal);
+
+    bool sendMoveGroupConfigGoal(
+        const moveit_msgs::PlanningOptions& ops,
+        const grasping_executive::MoveArmGoal& goal);
+
+    void moveGroupResultCallback(
+        const actionlib::SimpleClientGoalState& state,
+        const moveit_msgs::MoveGroupResult::ConstPtr& result);
+
+    void octomapCallback(const octomap_msgs::Octomap::ConstPtr& msg);
+
+    moveit_msgs::CollisionObject createGroundPlaneObject() const;
+};
 
 MoveArmNode::MoveArmNode() :
     m_nh(),
@@ -141,27 +264,27 @@ int MoveArmNode::run()
     return 0;
 }
 
-void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
+void MoveArmNode::moveArm(const grasping_executive::MoveArmGoal::ConstPtr& request)
 {
     bool success = false;
     trajectory_msgs::JointTrajectory result_traj;
     const bool execute = request->execute_path;
 
-    if (request->type == rcta::MoveArmGoal::JointGoal) {
+    if (request->type == grasping_executive::MoveArmGoal::JointGoal) {
         m_goal.request.planner_id = m_joint_goal_planner_id;
         if (execute) {
             success = moveToGoalJoints(*request, result_traj);
         } else {
             success = planToGoalJoints(*request, result_traj);
         }
-    } else if (request->type == rcta::MoveArmGoal::EndEffectorGoal) {
+    } else if (request->type == grasping_executive::MoveArmGoal::EndEffectorGoal) {
         m_goal.request.planner_id = m_pose_goal_planner_id;
         if (execute) {
             success = moveToGoalEE(*request, result_traj);
         } else {
             success = planToGoalEE(*request, result_traj);
         }
-    } else if (request->type == rcta::MoveArmGoal::CartesianGoal) {
+    } else if (request->type == grasping_executive::MoveArmGoal::CartesianGoal) {
         if (execute) {
             success = moveToGoalCartesian(*request, result_traj);
         } else {
@@ -169,31 +292,31 @@ void MoveArmNode::moveArm(const rcta::MoveArmGoal::ConstPtr& request)
         }
     } else {
         ROS_ERROR("Unrecognized goal type");
-        rcta::MoveArmResult result;
+        grasping_executive::MoveArmResult result;
         result.success = false;
         m_move_arm_server->setAborted(result, "Unrecognized goal type");
         return;
     }
 
     if (!success) {
-        rcta::MoveArmResult result;
+        grasping_executive::MoveArmResult result;
         result.success = false;
         result.trajectory;
         m_move_arm_server->setAborted(result, "Failed to plan path");
         return;
     }
 
-    rcta::MoveArmResult result;
+    grasping_executive::MoveArmResult result;
     result.success = true;
     result.trajectory = result_traj;
     m_move_arm_server->setSucceeded(result);
 }
 
 bool MoveArmNode::planToGoalEE(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    assert(!goal.execute_path && goal.type == rcta::MoveArmGoal::EndEffectorGoal);
+    assert(!goal.execute_path && goal.type == grasping_executive::MoveArmGoal::EndEffectorGoal);
     ROS_INFO("Plan to goal pose");
 
     moveit_msgs::PlanningOptions ops;
@@ -212,10 +335,10 @@ bool MoveArmNode::planToGoalEE(
 }
 
 bool MoveArmNode::planToGoalJoints(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    assert(!goal.execute_path && goal.type == rcta::MoveArmGoal::EndEffectorGoal);
+    assert(!goal.execute_path && goal.type == grasping_executive::MoveArmGoal::EndEffectorGoal);
     ROS_INFO("Plan to goal pose");
 
     moveit_msgs::PlanningOptions ops;
@@ -235,10 +358,10 @@ bool MoveArmNode::planToGoalJoints(
 }
 
 bool MoveArmNode::planToGoalCartesian(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    assert(!goal.execute_path && goal.type == rcta::MoveArmGoal::CartesianGoal);
+    assert(!goal.execute_path && goal.type == grasping_executive::MoveArmGoal::CartesianGoal);
     ROS_INFO("Move Along Cartesian Path");
     std::vector<geometry_msgs::Pose> waypoints;
     waypoints.push_back(m_move_group->getCurrentPose().pose);
@@ -256,10 +379,10 @@ bool MoveArmNode::planToGoalCartesian(
 }
 
 bool MoveArmNode::moveToGoalEE(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    assert(goal.execute_path && goal.type == rcta::MoveArmGoal::EndEffectorGoal);
+    assert(goal.execute_path && goal.type == grasping_executive::MoveArmGoal::EndEffectorGoal);
     ROS_INFO("Move to goal pose");
 
     moveit_msgs::PlanningOptions ops;
@@ -278,10 +401,10 @@ bool MoveArmNode::moveToGoalEE(
 }
 
 bool MoveArmNode::moveToGoalJoints(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    assert(goal.execute_path && goal.type == rcta::MoveArmGoal::JointGoal);
+    assert(goal.execute_path && goal.type == grasping_executive::MoveArmGoal::JointGoal);
     ROS_INFO("Move to goal configuration");
 
     moveit_msgs::PlanningOptions ops;
@@ -300,10 +423,10 @@ bool MoveArmNode::moveToGoalJoints(
 }
 
 bool MoveArmNode::moveToGoalCartesian(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     trajectory_msgs::JointTrajectory& traj)
 {
-    assert(goal.execute_path && goal.type == rcta::MoveArmGoal::CartesianGoal);
+    assert(goal.execute_path && goal.type == grasping_executive::MoveArmGoal::CartesianGoal);
     ROS_INFO("Move Along Cartesian Path");
     std::vector<geometry_msgs::Pose> waypoints;
     waypoints.push_back(m_move_group->getCurrentPose().pose);
@@ -329,7 +452,7 @@ bool MoveArmNode::moveToGoalCartesian(
 }
 
 void MoveArmNode::fillPlanOnlyOptions(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     moveit_msgs::PlanningOptions& ops) const
 {
     fillCommonOptions(goal, ops);
@@ -337,7 +460,7 @@ void MoveArmNode::fillPlanOnlyOptions(
 }
 
 void MoveArmNode::fillPlanAndExecuteOptions(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     moveit_msgs::PlanningOptions& ops) const
 {
     fillCommonOptions(goal, ops);
@@ -345,7 +468,7 @@ void MoveArmNode::fillPlanAndExecuteOptions(
 }
 
 void MoveArmNode::fillCommonOptions(
-    const rcta::MoveArmGoal& goal,
+    const grasping_executive::MoveArmGoal& goal,
     moveit_msgs::PlanningOptions& ops) const
 {
     ops.planning_scene_diff.robot_state.is_diff = true;
@@ -381,7 +504,7 @@ void MoveArmNode::fillCommonOptions(
 /// \return true if the goal was sent to the server; false otherwise
 bool MoveArmNode::sendMoveGroupPoseGoal(
     const moveit_msgs::PlanningOptions& ops,
-    const rcta::MoveArmGoal& goal)
+    const grasping_executive::MoveArmGoal& goal)
 {
     if (!m_move_group_client->isServerConnected()) {
         ROS_ERROR("Server is not connected");
@@ -446,7 +569,7 @@ bool MoveArmNode::sendMoveGroupPoseGoal(
 
 bool MoveArmNode::sendMoveGroupConfigGoal(
     const moveit_msgs::PlanningOptions& ops,
-    const rcta::MoveArmGoal& goal)
+    const grasping_executive::MoveArmGoal& goal)
 {
     if (!m_move_group_client->isServerConnected()) {
         ROS_ERROR("Server is not connected");
@@ -525,4 +648,29 @@ moveit_msgs::CollisionObject MoveArmNode::createGroundPlaneObject() const
     return gpo;
 }
 
-} //namespace rcta
+} // namespace rcta
+
+enum MainResult
+{
+    SUCCESSFUL_TERMINATION = 0,
+    FAILED_TO_INITIALIZE_NODE,
+    UNSUCCESSFUL_TERMINATION
+};
+
+int main(int argc, char* argv[])
+{
+    ros::init(argc, argv, "hdt_arm_planning_node");
+
+    rcta::MoveArmNode node;
+
+    if (!node.init()) {
+        return FAILED_TO_INITIALIZE_NODE;
+    }
+
+    if (0 != node.run()) {
+        return UNSUCCESSFUL_TERMINATION;
+    }
+    else {
+        return SUCCESSFUL_TERMINATION;
+    }
+}

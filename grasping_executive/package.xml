@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>grasping_executive</name>
+    <version>0.0.0</version>
+    <description>The grasping_executive package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>message_generation</build_depend>
+    <build_export_depend>message_runtime</build_export_depend>
+    <exec_depend>message_runtime</exec_depend>
+
+    <depend>actionlib</depend>
+    <depend>actionlib_msgs</depend>
+    <depend>eigen_conversions</depend>
+    <depend>gascan_grasp_planning</depend>
+    <depend>geometric_shapes</depend>
+    <depend>geometry_msgs</depend>
+    <depend>hdt_control_msgs</depend>
+    <depend>hdt_kinematics</depend>
+    <depend>interactive_markers</depend>
+    <depend>leatherman</depend>
+    <depend>liburdfdom-dev</depend>
+    <depend>liburdfdom-headers-dev</depend>
+    <depend>moveit_core</depend>
+    <depend>moveit_msgs</depend>
+    <depend>moveit_ros_move_group</depend>
+    <depend>moveit_ros_planning</depend>
+    <depend>moveit_ros_planning_interface</depend>
+    <depend>octomap_msgs</depend>
+    <depend>pcl_ros</depend>
+    <depend>pluginlib</depend>
+    <depend>rcta_manipulation_common</depend>
+    <depend>robotiq_controllers</depend>
+    <depend>roscpp</depend>
+    <depend>rviz</depend>
+    <depend>sensor_msgs</depend>
+    <depend>smpl</depend>
+    <depend>spellbook_ros</depend>
+    <depend>tf</depend>
+    <depend>tf_conversions</depend>
+    <depend>trajectory_msgs</depend>
+
+    <export>
+        <rviz plugin="${prefix}/plugins/plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/grasping_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/controller_status_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/pick_and_place_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/temperature_status_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/move_group_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/gripper_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/viservo_command_panel_plugin_description.xml"/>
+    </export>
+</package>

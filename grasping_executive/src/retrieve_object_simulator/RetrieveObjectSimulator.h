@@ -17,9 +17,9 @@
 #include <spellbook/utils/RunUponDestruction.h>
 
 // project includes
-#include <rcta/TeleportAndaliteCommandAction.h>
-#include <rcta/TeleportHDTCommandAction.h>
-#include <rcta/common/hdt_description/RobotModel.h>
+#include <hdt_control_msgs/TeleportAndaliteCommandAction.h>
+#include <hdt_control_msgs/TeleportHDTCommandAction.h>
+#include <hdt_kinematics/RobotModel.h>
 
 // module includes
 #include "CollisionModel2.h"
@@ -123,21 +123,21 @@ private:
     actionlib::SimpleClientGoalState last_reposition_base_goal_state_;
     rcta_msgs::RepositionBaseCommandResult::ConstPtr last_reposition_base_result_;
 
-    typedef actionlib::SimpleActionClient<rcta::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
+    typedef actionlib::SimpleActionClient<hdt_control_msgs::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
     std::unique_ptr<TeleportAndaliteCommandActionClient> teleport_andalite_command_client_;
     bool sent_teleport_andalite_command_;
     bool pending_teleport_andalite_command_;
 
     actionlib::SimpleClientGoalState last_teleport_andalite_goal_state_;
-    rcta::TeleportAndaliteCommandResult::ConstPtr last_teleport_andalite_result_;
+    hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr last_teleport_andalite_result_;
 
-    typedef actionlib::SimpleActionClient<rcta::TeleportHDTCommandAction> TeleportHDTCommandActionClient;
+    typedef actionlib::SimpleActionClient<hdt_control_msgs::TeleportHDTCommandAction> TeleportHDTCommandActionClient;
     std::unique_ptr<TeleportHDTCommandActionClient> teleport_hdt_command_client_;
     bool sent_teleport_hdt_command_;
     bool pending_teleport_hdt_command_;
 
     actionlib::SimpleClientGoalState last_teleport_hdt_goal_state_;
-    rcta::TeleportHDTCommandResult::ConstPtr last_teleport_hdt_result_;
+    hdt_control_msgs::TeleportHDTCommandResult::ConstPtr last_teleport_hdt_result_;
 
     typedef actionlib::SimpleActionClient<rcta_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
@@ -163,16 +163,16 @@ private:
             const rcta_msgs::RepositionBaseCommandResult::ConstPtr& result);
 
     void teleport_andalite_active_cb();
-    void teleport_andalite_feedback_cb(const rcta::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
+    void teleport_andalite_feedback_cb(const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
     void teleport_andalite_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta::TeleportAndaliteCommandResult::ConstPtr& result);
+            const hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr& result);
 
     void teleport_hdt_active_cb();
-    void teleport_hdt_feedback_cb(const rcta::TeleportHDTCommandFeedback::ConstPtr& feedback);
+    void teleport_hdt_feedback_cb(const hdt_control_msgs::TeleportHDTCommandFeedback::ConstPtr& feedback);
     void teleport_hdt_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta::TeleportHDTCommandResult::ConstPtr& result);
+            const hdt_control_msgs::TeleportHDTCommandResult::ConstPtr& result);
 
     void grasp_object_active_cb();
     void grasp_object_feedback_cb(const rcta_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);

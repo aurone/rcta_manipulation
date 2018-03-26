@@ -1,16 +1,16 @@
 #include "RetrieveObjectSimulator.h"
 
 // system includes
+#include <hdt_kinematics/RobotModel.h>
 #include <sbpl/utils/utils.h>
 #include <smpl/angles.h>
-#include <visualization_msgs/MarkerArray.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/std_msgs/std_msgs.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/utils.h>
+#include <visualization_msgs/MarkerArray.h>
 
 // project includes
-#include <rcta/common/hdt_description/RobotModel.h>
 
 RetrieveObjectSimulator::RetrieveObjectSimulator() :
     nh_(),
@@ -334,7 +334,7 @@ int RetrieveObjectSimulator::run()
 
                 // TODO: get the current base pose from tf instead of the ideal pose here (not that it's hardly any different)
                 static int teleport_andalite_goal_id = 0;
-                rcta::TeleportAndaliteCommandGoal goal;
+                hdt_control_msgs::TeleportAndaliteCommandGoal goal;
                 goal.global_pose.header.seq = teleport_andalite_goal_id++;
                 goal.global_pose.header.stamp = now;
                 goal.global_pose.header.frame_id = world_frame_;
@@ -363,7 +363,7 @@ int RetrieveObjectSimulator::run()
                 ////////////////////////////////////////////////////////////////////////////////
 
                 static int teleport_hdt_goal_id = 0;
-                rcta::TeleportHDTCommandGoal hdt_goal;
+                hdt_control_msgs::TeleportHDTCommandGoal hdt_goal;
                 hdt_goal.joint_state.name = robot_model_->joint_names();
                 hdt_goal.joint_state.position = initial_robot_joint_values_;
                 hdt_goal.joint_state.velocity = std::vector<double>(robot_model_->joint_names().size(), 0.0);
@@ -495,7 +495,8 @@ void RetrieveObjectSimulator::reposition_base_active_cb()
     ROS_INFO("Reposition Base Command Active!");
 }
 
-void RetrieveObjectSimulator::reposition_base_feedback_cb(const rcta_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
+void RetrieveObjectSimulator::reposition_base_feedback_cb(
+    const rcta_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
 {
     ROS_INFO("Reposition Base Command Feedback!");
 }
@@ -515,14 +516,15 @@ void RetrieveObjectSimulator::teleport_andalite_active_cb()
     ROS_INFO("Teleport Andalite Command Active!");
 }
 
-void RetrieveObjectSimulator::teleport_andalite_feedback_cb(const rcta::TeleportAndaliteCommandFeedback::ConstPtr& feedback)
+void RetrieveObjectSimulator::teleport_andalite_feedback_cb(
+    const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback)
 {
     ROS_INFO("Teleport Andalite Command Feedback!");
 }
 
 void RetrieveObjectSimulator::teleport_andalite_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::TeleportAndaliteCommandResult::ConstPtr& result)
+    const hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr& result)
 {
     ROS_INFO("  Teleport Andalite Command Result!");
     last_teleport_andalite_goal_state_ = state;
@@ -535,14 +537,15 @@ void RetrieveObjectSimulator::teleport_hdt_active_cb()
     ROS_INFO("Teleport HDT Command Active!");
 }
 
-void RetrieveObjectSimulator::teleport_hdt_feedback_cb(const rcta::TeleportHDTCommandFeedback::ConstPtr& feedback)
+void RetrieveObjectSimulator::teleport_hdt_feedback_cb(
+    const hdt_control_msgs::TeleportHDTCommandFeedback::ConstPtr& feedback)
 {
     ROS_INFO("Teleport HDT Command Feedback");
 }
 
 void RetrieveObjectSimulator::teleport_hdt_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::TeleportHDTCommandResult::ConstPtr& result)
+    const hdt_control_msgs::TeleportHDTCommandResult::ConstPtr& result)
 {
     ROS_INFO("  Teleport HDT Command Result!");
     last_teleport_hdt_goal_state_ = state;

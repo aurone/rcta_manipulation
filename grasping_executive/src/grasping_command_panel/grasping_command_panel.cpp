@@ -13,6 +13,8 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <geometric_shapes/shape_operations.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <rcta_manipulation_common/comms/actionlib.h>
+#include <robotiq_controllers/gripper_model.h>
 #include <smpl/angles.h>
 #include <sensor_msgs/JointState.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
@@ -24,10 +26,6 @@
 #include <tf_conversions/tf_eigen.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/MarkerArray.h>
-
-// project includes
-#include <rcta/common/comms/actionlib.h>
-#include <rcta/control/robotiq_controllers/gripper_model.h>
 
 namespace rcta {
 
@@ -265,7 +263,7 @@ void GraspingCommandPanel::send_teleport_andalite_command()
         return;
     }
 
-    rcta::TeleportAndaliteCommandGoal teleport_andalite_goal;
+    hdt_control_msgs::TeleportAndaliteCommandGoal teleport_andalite_goal;
     teleport_andalite_goal.global_pose.header.seq = 0;
     teleport_andalite_goal.global_pose.header.stamp = ros::Time::now();
     teleport_andalite_goal.global_pose.header.frame_id = global_frame_;
@@ -802,6 +800,8 @@ bool GraspingCommandPanel::reinit_object_interactive_marker()
     mesh_marker.color = std_msgs::WhiteColorRGBA(0.5f);
     mesh_marker.lifetime = ros::Duration(0);
     mesh_marker.frame_locked = false;
+
+    // TODO: where will this file be
     mesh_marker.mesh_resource = "package://rcta/resource/meshes/gastank/rcta_gastank.ply";
     mesh_marker.mesh_use_embedded_materials = false;
     gas_can_mesh_control.markers.push_back(mesh_marker);
@@ -871,14 +871,14 @@ void GraspingCommandPanel::teleport_andalite_command_active_cb()
 
 }
 
-void GraspingCommandPanel::teleport_andalite_command_feedback_cb(const rcta::TeleportAndaliteCommandFeedback::ConstPtr& feedback)
+void GraspingCommandPanel::teleport_andalite_command_feedback_cb(const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback)
 {
 
 }
 
 void GraspingCommandPanel::teleport_andalite_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta::TeleportAndaliteCommandResult::ConstPtr& result)
+    const hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr& result)
 {
     ROS_INFO("Received Result from Teleport Andalite Command Action Client");
     if (state != actionlib::SimpleClientGoalState::SUCCEEDED) {

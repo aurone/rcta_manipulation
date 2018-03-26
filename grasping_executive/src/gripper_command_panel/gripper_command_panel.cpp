@@ -1,7 +1,7 @@
 #include "gripper_command_panel.h"
 
 // system includes
-#include <rcta/common/comms/actionlib.h>
+#include <rcta_manipulation_common/comms/actionlib.h>
 
 // project includes
 #include <robotiq_controllers/gripper_model.h>
