@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>object_detection</name>
+    <version>0.0.0</version>
+    <description>The object_detection package</description>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>actionlib</depend>
+    <depend>message_filters</depend>
+    <depend>tf</depend>
+    <depend>roscpp</depend>
+    <depend>pr2_vfh_database</depend>
+</package>
