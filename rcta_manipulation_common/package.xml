@@ -5,7 +5,7 @@
     <description>The rcta_manipulation_common package</description>
     <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
     <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
-    <license>TODO</license>
+    <license>BSD</license>
 
     <buildtool_depend>catkin</buildtool_depend>
 </package>
