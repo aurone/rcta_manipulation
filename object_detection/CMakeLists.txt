@@ -6,19 +6,19 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(
-    catkin 
-    REQUIRED 
-    COMPONENTS 
-        actionlib 
-        message_filters 
-        tf 
-        roscpp 
+    catkin
+    REQUIRED
+    COMPONENTS
+        actionlib
+        message_filters
+        tf
+        roscpp
         pr2_vfh_database)
 
 catkin_package()
 
 add_executable(
-    hdt_train_object_pose_estimation 
+    hdt_train_object_pose_estimation
     src/object_pose_estimation_training/hdt_train_object_pose_estimation.cpp)
 target_link_libraries(
     hdt_train_object_pose_estimation
@@ -26,7 +26,7 @@ target_link_libraries(
     ${pr2_vfh_database_LIBRARIES})
 
 add_executable(
-    hdt_pick_and_place 
+    hdt_pick_and_place
     src/pick_and_place_node/hdt_pick_and_place.cpp)
 target_link_libraries(
     hdt_pick_and_place
