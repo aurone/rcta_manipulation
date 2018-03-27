@@ -6,7 +6,7 @@
         <arg name="output_frame" value="/base_link"/>
     </include>
 
-    <node name="repeatability_measure" pkg="hdt" type="repeatability_measure" output="screen">
+    <node name="repeatability_measure" pkg="hdt_control" type="repeatability_measure" output="screen">
         <rosparam command="load" file="$(find hdt_control)/config/repeatability_measure.yaml"/>
     </node>
 </launch>

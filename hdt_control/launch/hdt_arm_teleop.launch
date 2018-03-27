@@ -1,5 +1,5 @@
 <launch>
-    <node name="hdt_arm_teleop" pkg="hdt" type="hdt_arm_teleop" output="screen">
+    <node name="hdt_arm_teleop" pkg="hdt_control" type="hdt_arm_teleop" output="screen">
         <rosparam command="load" file="$(find hdt_control)/config/hdt_arm_teleop.yaml"/>
         <param name="mappings_fname" value="$(find hdt_control)/config/mappings.lua"/>
     </node>

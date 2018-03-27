@@ -6,7 +6,7 @@
     </include>
 
     <group if="$(arg sim)">
-        <node name="robotiq_simulator" pkg="hdt" type="robotiq_simulator"/>
+        <node name="robotiq_simulator" pkg="robotiq_controllers" type="robotiq_simulator"/>
     </group>
 </launch>
 

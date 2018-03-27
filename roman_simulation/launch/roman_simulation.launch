@@ -5,5 +5,5 @@
         <arg name="ns" value="$(arg ns)"/>
     </include>
 
-    <include file="$(find rcta)/launch/control/roman_control.launch"/>
+    <include file="$(find roman_manipulation)/launch/roman_control.launch"/>
 </launch>

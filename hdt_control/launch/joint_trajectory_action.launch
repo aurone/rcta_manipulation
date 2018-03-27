@@ -5,7 +5,7 @@
         <rosparam command="load" file="$(find hdt_control)/config/joint_trajectory_action.yaml"/>
     </node>
     -->
-    <node pkg="hdt" name="trajectory_follower" type="trajectory_follower" output="screen">
+    <node pkg="hdt_control" name="trajectory_follower" type="trajectory_follower" output="screen">
         <remap from="joint_path_command" to="command"/>
         <rosparam command="load" file="$(find hdt_control)/config/joint_trajectory_action.yaml"/>
     </node>

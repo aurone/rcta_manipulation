@@ -1,7 +1,7 @@
 <launch>
     <arg name="sim" default="false"/>
 
-    <node name="hdt_arm_driver" pkg="hdt" type="hdt_arm_driver" output="screen" respawn="true">
+    <node name="hdt_arm_driver" pkg="hdt_control" type="hdt_arm_driver" output="screen" respawn="true">
         <param name="sim" value="$(arg sim)"/>
         <param name="hdt_manipulator_params" value="$(find hdt_control)/config/HDTManipulatorParameters_20140703.txt"/>
         <param name="hdt_manipulator_config" value="$(find hdt_control)/config/HDTManipulatorParameters.lua"/>

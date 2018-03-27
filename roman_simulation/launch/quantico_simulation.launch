@@ -4,7 +4,7 @@
 
     <node if="$(arg gui)" name="gzclient" pkg="gazebo_ros" type="gzclient"/>
 
-    <include file="$(find rcta)/launch/empty_world.launch">
+    <include file="$(find roman_simulation)/launch/empty_world.launch">
         <arg name="world_name" value="$(arg world_name)"/>
         <arg name="gui" value="false"/>
     </include>

@@ -25,8 +25,10 @@
     </group>
 
     <!-- Upload SRDF -->
+    <!-- TODO: these uploads should be moved to hdt_moveit_config -->
     <param name="robot_description_semantic" textfile="$(find rcta)/config/robots/husky_roboto/moveit/husky_roboto.srdf"/>
 
     <!-- Upload MoveIt! kinematics plugin parameters -->
+    <!-- TODO: see above note -->
     <rosparam command="load" file="$(find hdt_moveit_config)/config/kinematics.yaml"/>
 </launch>

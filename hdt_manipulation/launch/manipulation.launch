@@ -1,10 +1,12 @@
 <launch>
     <arg name="sim" default="false"/>
 
+    <!-- TODO: include move_group.launch here instead? -->
     <include file="$(find rcta)/launch/manipulation/hdt_arm_planner.launch"/>
-    <include file="$(find rcta)/launch/manipulation/joint_trajectory_action.launch"/>
-    <include file="$(find rcta)/launch/manipulation/viservo_control_executor.launch"/>
-    <include file="$(find rcta)/launch/manipulation/grasp_object_executor.launch">
+    <include file="$(find hdt_control)/launch/manipulation/joint_trajectory_action.launch"/>
+    <include file="$(find hdt_control)/launch/manipulation/viservo_control_executor.launch"/>
+    <!-- TODO: we should have our own grasp_object_executor.launch or a common one should be part of grasping_executive -->
+    <include file="$(find roman_manipulation)/launch/manipulation/grasp_object_executor.launch">
         <arg name="sim" value="$(arg sim)"/>
     </include>
 </launch>

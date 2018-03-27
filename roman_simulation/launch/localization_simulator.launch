@@ -1,8 +1,8 @@
 <launch>
-    <node name="localization_simulator" pkg="hdt" type="localization_simulator">
-        <rosparam command="load" file="$(find rcta)/config/localization_simulator.yaml"/>
-        <param name="costmap_bagfile" value="$(find rcta)/data/only-global-costmap.bag"/>
+    <node name="localization_simulator" pkg="roman_simulation" type="localization_simulator">
+        <rosparam command="load" file="$(find roman_manipulation)/config/localization_simulator.yaml"/>
+        <param name="costmap_bagfile" value="$(find grasping_executive)/data/only-global-costmap.bag"/>
     </node>
 
-    <include file="$(find rcta)/launch/costmap_extruder.launch"/>
+    <include file="$(find roman_manipulation)/launch/costmap_extruder.launch"/>
 </launch>

@@ -30,7 +30,7 @@
     </group>
 
     <!-- LAUNCH ARM STATE FILTER -->
-    <node name="joint_states_filter" pkg="hdt" type="joint_states_filter">
+    <node name="joint_states_filter" pkg="hdt_control" type="joint_states_filter">
         <rosparam command="load" file="$(hdt_control rcta)/config/joint_states_filter.yaml"/>
     </node>
 
@@ -40,11 +40,14 @@
     </include>
 
     <!-- SURROGATE PROVIDERS OF /joint_states -->
+    <!-- TODO: this launch file no longer exists... -->
     <include file="$(find rcta)/launch/sim/husky_simulator.launch"/>
-    <include file="$(find rcta)/launch/sim/tilt_mount_simulator.launch"/>
+
+    <include file="$(find roman_simulation)/launch/sim/tilt_mount_simulator.launch"/>
 
     <group if="$(arg kinect_sensor)">
-        <node name="kinect_simulator" pkg="hdt" type="kinect_simulator" args="--mode=static 0"/>
+        <!-- TODO: this was moved to roman_simulation, but should be in a common simulation package or deprecated -->
+        <node name="kinect_simulator" pkg="roman_simulation" type="kinect_simulator" args="--mode=static 0"/>
     </group>
 
     <!-- Global Frame Functionality -->

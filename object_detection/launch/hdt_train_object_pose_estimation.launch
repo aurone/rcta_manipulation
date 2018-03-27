@@ -1,6 +1,7 @@
 <launch>
-    <node pkg="hdt" name="hdt_train_object_pose_estimation" type="hdt_train_object_pose_estimation"
+    <node pkg="object_detection" name="hdt_train_object_pose_estimation" type="hdt_train_object_pose_estimation"
           output="screen">
+        <!-- TODO: who knows what this package was -->
         <param name="database_filename" value="$(find rcta_pick_and_place)/pr2_graspDB.db"/>
     </node>
 </launch>

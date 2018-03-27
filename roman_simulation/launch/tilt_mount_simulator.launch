@@ -1,5 +1,5 @@
 <launch>
-    <node name="tilt_mount_simulator" pkg="hdt" type="tilt_mount_simulator">
+    <node name="tilt_mount_simulator" pkg="roman_simulation" type="tilt_mount_simulator">
         <param name="fixed_tilt_angle_deg" value="-20.0"/>
     </node>
 </launch>

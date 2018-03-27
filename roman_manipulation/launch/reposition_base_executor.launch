@@ -1,12 +1,12 @@
 <launch>
-    <include file="$(find rcta)/launch/moveit/roman/planning_context.launch">
+    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="true"/>
     </include>
 
-    <node name="reposition_planner_node" pkg="rcta" type="reposition_planner_node" output="screen">
-        <rosparam command="load" file="$(find rcta)/config/perception/attached_markers.yaml"/>
-        <rosparam command="load" file="$(find rcta)/config/planning/gascan_grasping.yaml"/>
-        <rosparam command="load" file="$(find rcta)/config/planning/reposition_planner_node.yaml"/>
+    <node name="reposition_planner_node" pkg="reposition_planning" type="reposition_planner_node" output="screen">
+        <rosparam command="load" file="$(find hdt_control)/config/perception/attached_markers.yaml"/>
+        <rosparam command="load" file="$(find gascan_grasp_planner)/config/planning/gascan_grasping.yaml"/>
+        <rosparam command="load" file="$(find reposition_planning)/config/planning/reposition_planner_node.yaml"/>
 
         <rosparam param="disabled_namespaces">
             - base_probable_candidates

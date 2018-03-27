@@ -1,5 +1,5 @@
 <launch>
-    <node name="spline_visualizer" pkg="hdt" type="spline_grasp_generator">
+    <node name="spline_visualizer" pkg="gascan_grasp_planning" type="spline_grasp_generator">
         <rosparam command="load" file="$(find gascan_grasp_planning)/config/gas_canister.yaml"/>
     </node>
 </launch>

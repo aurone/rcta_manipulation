@@ -2,12 +2,12 @@
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
 
-    <include file="$(find rcta)/launch/moveit/roman/roman_move_group.launch">
+    <include file="$(find roman_moveit_config)/launch/roman_move_group.launch">
         <arg name="live" value="$(arg live)"/>
         <arg name="fake" value="$(arg fake)"/>
     </include>
 
-    <node name="move_arm_node" pkg="rcta" type="move_arm_node" output="screen">
-        <rosparam command="load" file="$(find rcta)/config/planning/move_arm_node.yaml"/>
+    <node name="move_arm_node" pkg="grasping_executive" type="move_arm_node" output="screen">
+        <rosparam command="load" file="$(find grasping_executive)/config/planning/move_arm_node.yaml"/>
     </node>
 </launch>
