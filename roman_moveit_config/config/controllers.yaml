@@ -4,6 +4,7 @@ controller_list:
       type: FollowJointTrajectory
       default: true
       joints:
+        - torso_joint1
         - limb_right_joint1
         - limb_right_joint2
         - limb_right_joint3
@@ -11,7 +12,6 @@ controller_list:
         - limb_right_joint5
         - limb_right_joint6
         - limb_right_joint7
-        - torso_joint1
     - name: left_limb
       action_ns: follow_joint_trajectory
       type: FollowJointTrajectory

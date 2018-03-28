@@ -1,9 +1,107 @@
 <launch>
-    <arg name="ns" default="false"/>
+    <include file="$(find roman_model)/robots/upload_rcta_roman.launch"/>
 
-    <include file="$(find roman_model)/robots/upload_rcta_roman.launch">
-        <arg name="ns" value="$(arg ns)"/>
-    </include>
+    <node name="spawn_roman" pkg="gazebo_ros" type="spawn_model"
+            args="$(optenv ROBOT_INITIAL_POSE) -urdf -param robot_description -model rcta_roman -ros_namespace /gazebo" respawn="false"/>
 
-    <include file="$(find roman_manipulation)/launch/roman_control.launch"/>
+    <!-- Controller Manager -->
+    <!--
+    <include file="$(find pr2_controller_manager)/controller_manager.launch"/>
+    -->
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="50.0" />
+        <param name="tf_prefix" type="string" value="" />
+    </node>
+
+    <rosparam command="load" file="$(find roman_simulation)/config/roman_control.yaml"/>
+
+    <!--
+    <node name="controller_spawner"
+            pkg="controller_manager" type="spawner"
+            args="joint_state_controller track_left_joint_controller track_right_joint_controller torso_joint1_controller left_limb right_limb right_gripper left_gripper"/>
+    -->
+
+    <node name="controller_spawner"
+            pkg="controller_manager"
+            type="spawner"
+            args="joint_state_controller left_limb right_limb left_gripper right_gripper"/>
+
+    <!-- Stereo image processing -->
+    <!--
+    <include file="$(find pr2_gazebo)/config/dualstereo_camera.launch"/>
+    -->
+
+    <!-- Start image_proc inside camera namespace-->
+    <!--
+    <include file="$(find pr2_gazebo)/config/r_forearm_cam.launch" />
+    <include file="$(find pr2_gazebo)/config/l_forearm_cam.launch" />
+    -->
+
+    <!-- diagnostics aggregator -->
+    <!--
+    <node pkg="diagnostic_aggregator" type="aggregator_node" name="diag_agg" args="Robot"/>
+    <group ns="diag_agg">
+        <include file="$(find pr2_gazebo)/config/pr2_analyzers_simple.launch"/>
+    </group>
+    -->
+        <!--
+        <include file="$(find pr2_gazebo)/config/pr2_analyzers.launch"/>
+        -->
+
+    <!-- Dashboard aggregation -->
+    <!--
+    <node pkg="pr2_dashboard_aggregator" type="dashboard_aggregator.py" name="pr2_dashboard_aggregator"/>
+    -->
+
+    <!-- Robot pose ekf -->
+    <!--
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+        <param name="freq" value="30.0"/>
+        <param name="sensor_timeout" value="1.0"/>
+        <param name="publish_tf" value="true"/>
+        <param name="odom_used" value="true"/>
+        <param name="imu_used" value="true"/>
+        <param name="vo_used" value="false"/>
+        <remap from="odom" to="base_odometry/odom" />
+        <remap from="imu_data" to="torso_lift_imu/data" />
+    </node>
+    -->
+
+    <!-- Base Laser dynamic_reconfigure -->
+    <!--
+    <node pkg="gazebo_plugins" type="hokuyo_node" name="base_hokuyo_node">
+        <param name="port" type="string" value="/etc/ros/sensors/base_hokuyo"/>
+        <param name="frame_id" type="string" value="base_laser_link"/>
+        <param name="min_ang" type="double" value="-2.2689"/>
+        <param name="max_ang" type="double" value="2.2689"/>
+        <param name="skip" type="int" value="1"/>
+        <param name="intensity" value="false"/>
+    </node>
+    -->
+
+    <!-- Tilt Laser dynamic_reconfigure -->
+    <!--
+    <node pkg="gazebo_plugins" type="hokuyo_node" name="tilt_hokuyo_node">
+        <param name="port" type="string" value="/etc/ros/sensors/tilt_hokuyo"/>
+        <param name="frame_id" type="string" value="laser_tilt_link"/>
+        <param name="min_ang" type="double" value="-0.829"/>
+        <param name="max_ang" type="double" value="0.829"/>
+        <param name="skip" type="int" value="1"/>
+        <param name="intensity" value="true"/>
+    </node>
+    -->
+
+    <!-- Buffer Server -->
+    <node pkg="tf2_ros" type="buffer_server" name="tf2_buffer_server">
+        <param name="buffer_size" value="120.0"/>
+    </node>
+
+    <!-- Spawns the synchronizer -->
+    <!--
+    <node type="camera_synchronizer" name="camera_synchronizer_node" pkg="gazebo_plugins"/>
+    -->
+
+    <!-- testing only: simulate torso counter weight spring to reduce load on the torso joint
+    <node name="simulate_torso_spring" pkg="pr2_gazebo" type="pr2_simulate_torso_spring.py" respawn="false"/>
+    -->
 </launch>

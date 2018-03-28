@@ -19,9 +19,148 @@ track_right_joint_controller:
 torso_joint1_controller:
     type: effort_controllers/JointPositionController
     joint: torso_joint1
-    pid: { p: 2000.0, d: 0.0, i: 0.0, i_clamp: 1.0 }
+    pid: { p: 4000.0, d: 0.0, i: 0.0, i_clamp: 1.0 }
+
+#torso_joint1_controller:
+#    type: effort_controllers/JointPositionController
+#    joint: torso_joint1
+#    pid: { p: 10000000.0, d: 1000000.0, i: 0.0, i_clamp: 1.0 }
 
 # left limb
+#left_limb:
+#    type: effort_controllers/JointTrajectoryController
+#    joints:
+#        - limb_left_joint1
+#        - limb_left_joint2
+#        - limb_left_joint3
+#        - limb_left_joint4
+#        - limb_left_joint5
+#        - limb_left_joint6
+#        - limb_left_joint7
+#    gains:
+#        limb_left_joint1: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+#        limb_left_joint2: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+#        limb_left_joint3: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+#        limb_left_joint4: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+#        limb_left_joint5: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+#        limb_left_joint6: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+#        limb_left_joint7: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
+
+# right limb
+#right_limb:
+#    type: effort_controllers/JointTrajectoryController
+#    joints:
+#        - limb_right_joint1
+#        - limb_right_joint2
+#        - limb_right_joint3
+#        - limb_right_joint4
+#        - limb_right_joint5
+#        - limb_right_joint6
+#        - limb_right_joint7
+#    gains:
+#        limb_right_joint1: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#        limb_right_joint2: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#        limb_right_joint3: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#        limb_right_joint4: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#        limb_right_joint5: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#        limb_right_joint6: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#        limb_right_joint7: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
+#    constraints:
+#        goal_time: 10.0
+
+#right_limb:
+#    type: effort_controllers/JointTrajectoryController
+#    joints:
+#        - limb_right_joint1
+#        - limb_right_joint2
+#        - limb_right_joint3
+#        - limb_right_joint4
+#        - limb_right_joint5
+#        - limb_right_joint6
+#        - limb_right_joint7
+#    gains:
+#        limb_right_joint1: { p: 2400.0, d: 18.0, i: 800.0, i_clamp: 4.0 }
+#        limb_right_joint2: { p: 1200.0, d: 10.0, i: 700.0, i_clamp: 4.0 }
+#        limb_right_joint3: { p: 1000.0, d: 6.0,  i: 600.0, i_clamp: 4.0 }
+#        limb_right_joint4: { p: 700.0,  d: 4.0,  i: 450.0, i_clamp: 4.0 }
+#        limb_right_joint5: { p: 300.0,  d: 6.0,  i: 300.0, i_clamp: 2.0 }
+#        limb_right_joint6: { p: 300.0,  d: 4.0,  i: 300.0, i_clamp: 2.0 }
+#        limb_right_joint7: { p: 300.0,  d: 4.0,  i: 300.0, i_clamp: 2.0 }
+#    joint_trajectory_action_node:
+#        joints:
+#            - limb_right_joint1
+#            - limb_right_joint2
+#            - limb_right_joint3
+#            - limb_right_joint4
+#            - limb_right_joint5
+#            - limb_right_joint6
+#            - limb_right_joint7
+#        constraints:
+#            goal_time: 0.6
+#            limb_right_joint1:
+#                goal: 0.02
+#            limb_right_joint2:
+#                goal: 0.02
+#            limb_right_joint3:
+#                goal: 0.02
+#            limb_right_joint4:
+#                goal: 0.02
+#            limb_right_joint5:
+#                goal: 0.02
+#            limb_right_joint6:
+#                goal: 0.02
+#            limb_right_joint7:
+#                goal: 0.02
+
+right_limb:
+    type: effort_controllers/JointTrajectoryController
+    joints:
+        - torso_joint1
+        - limb_right_joint1
+        - limb_right_joint2
+        - limb_right_joint3
+        - limb_right_joint4
+        - limb_right_joint5
+        - limb_right_joint6
+        - limb_right_joint7
+    gains:
+        torso_joint1:      { p: 4000.0, d:  0.0, i:   0.0, i_clamp: 1.0 }
+        limb_right_joint1: { p: 2400.0, d: 18.0, i: 800.0, i_clamp: 4.0 }
+        limb_right_joint2: { p: 1200.0, d: 10.0, i: 700.0, i_clamp: 4.0 }
+        limb_right_joint3: { p: 1000.0, d:  6.0, i: 600.0, i_clamp: 4.0 }
+        limb_right_joint4: { p:  700.0, d:  4.0, i: 450.0, i_clamp: 4.0 }
+        limb_right_joint5: { p:  300.0, d:  6.0, i: 300.0, i_clamp: 2.0 }
+        limb_right_joint6: { p:  300.0, d:  4.0, i: 300.0, i_clamp: 2.0 }
+        limb_right_joint7: { p:  300.0, d:  4.0, i: 300.0, i_clamp: 2.0 }
+    joint_trajectory_action_node:
+        joints:
+            - torso_joint1
+            - limb_right_joint1
+            - limb_right_joint2
+            - limb_right_joint3
+            - limb_right_joint4
+            - limb_right_joint5
+            - limb_right_joint6
+            - limb_right_joint7
+        constraints:
+            goal_time: 0.6
+            torso_joint1:
+                goal: 0.02
+            limb_right_joint1:
+                goal: 0.02
+            limb_right_joint2:
+                goal: 0.02
+            limb_right_joint3:
+                goal: 0.02
+            limb_right_joint4:
+                goal: 0.02
+            limb_right_joint5:
+                goal: 0.02
+            limb_right_joint6:
+                goal: 0.02
+            limb_right_joint7:
+                goal: 0.02
+
 left_limb:
     type: effort_controllers/JointTrajectoryController
     joints:
@@ -33,35 +172,38 @@ left_limb:
         - limb_left_joint6
         - limb_left_joint7
     gains:
-        limb_left_joint1: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint2: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint3: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint4: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint5: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint6: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-        limb_left_joint7: { p: 2000.0, i: 0.0, d: 0.0, i_clamp: 1.0 }
-
-# right limb
-right_limb:
-    type: effort_controllers/JointTrajectoryController
-    joints:
-        - limb_right_joint1
-        - limb_right_joint2
-        - limb_right_joint3
-        - limb_right_joint4
-        - limb_right_joint5
-        - limb_right_joint6
-        - limb_right_joint7
-    gains:
-        limb_right_joint1: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-        limb_right_joint2: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-        limb_right_joint3: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-        limb_right_joint4: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-        limb_right_joint5: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-        limb_right_joint6: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-        limb_right_joint7: { p: 2000.0, i: 0.0, d: 1.0, i_clamp: 1.0 }
-    constraints:
-        goal_time: 10.0
+        limb_left_joint1: { p: 2400.0, d: 18.0, i: 800.0, i_clamp: 4.0 }
+        limb_left_joint2: { p: 1200.0, d: 10.0, i: 700.0, i_clamp: 4.0 }
+        limb_left_joint3: { p: 1000.0, d: 6.0,  i: 600.0, i_clamp: 4.0 }
+        limb_left_joint4: { p: 700.0,  d: 4.0,  i: 450.0, i_clamp: 4.0 }
+        limb_left_joint5: { p: 300.0,  d: 6.0,  i: 300.0, i_clamp: 2.0 }
+        limb_left_joint6: { p: 300.0,  d: 4.0,  i: 300.0, i_clamp: 2.0 }
+        limb_left_joint7: { p: 300.0,  d: 4.0,  i: 300.0, i_clamp: 2.0 }
+    joint_trajectory_action_node:
+        joints:
+            - limb_left_joint1
+            - limb_left_joint2
+            - limb_left_joint3
+            - limb_left_joint4
+            - limb_left_joint5
+            - limb_left_joint6
+            - limb_left_joint7
+        constraints:
+            goal_time: 0.6
+            limb_left_joint1:
+                goal: 0.02
+            limb_left_joint2:
+                goal: 0.02
+            limb_left_joint3:
+                goal: 0.02
+            limb_left_joint4:
+                goal: 0.02
+            limb_left_joint5:
+                goal: 0.02
+            limb_left_joint6:
+                goal: 0.02
+            limb_left_joint7:
+                goal: 0.02
 
 right_gripper:
     type: effort_controllers/JointTrajectoryController
