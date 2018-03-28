@@ -26,6 +26,7 @@ find_package(
         roscpp
         tf
         rcta_manipulation_common
+        rviz
         spellbook_ros
         sbpl_kdl_robot_model
         sbpl_geometry_utils

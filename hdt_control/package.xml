@@ -25,9 +25,17 @@
     <depend>orocos_kdl</depend>
     <depend>rcta_manipulation_common</depend>
     <depend>roscpp</depend>
+    <depend>rviz</depend>
     <depend>sbpl_geometry_utils</depend>
     <depend>sbpl_kdl_robot_model</depend>
     <depend>smpl</depend>
     <depend>spellbook_ros</depend>
     <depend>tf</depend>
+
+    <export>
+        <rviz plugin="${prefix}/plugins/controller_status_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/temperature_status_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/viservo_command_panel_plugin_description.xml"/>
+    </export>
 </package>

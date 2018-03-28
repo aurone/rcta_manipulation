@@ -45,13 +45,8 @@
     <depend>trajectory_msgs</depend>
 
     <export>
-        <rviz plugin="${prefix}/plugins/plugin_description.xml"/>
         <rviz plugin="${prefix}/plugins/grasping_command_panel_plugin_description.xml"/>
-        <rviz plugin="${prefix}/plugins/controller_status_panel_plugin_description.xml"/>
-        <rviz plugin="${prefix}/plugins/pick_and_place_plugin_description.xml"/>
-        <rviz plugin="${prefix}/plugins/temperature_status_plugin_description.xml"/>
-        <rviz plugin="${prefix}/plugins/move_group_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/plugins/gripper_command_panel_plugin_description.xml"/>
-        <rviz plugin="${prefix}/plugins/viservo_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/pick_and_place_plugin_description.xml"/>
     </export>
 </package>
