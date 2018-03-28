@@ -21,6 +21,9 @@
     <group ns="graph_configs/RightArmManipLatticeConfigDefault">
         <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm.mprim"/>
     </group>
+    <group ns="graph_configs/LeftArmManipLatticeConfigDefault">
+        <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm.mprim"/>
+    </group>
     <group ns="graph_configs/RightArmManipLatticeEgraphConfigDefault">
         <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm.mprim"/>
     </group>
