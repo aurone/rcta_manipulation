@@ -34,6 +34,7 @@ find_package(
         rviz
         sensor_msgs 
         smpl
+        smpl_ros
         spellbook_ros
         tf
         tf_conversions
@@ -142,6 +143,7 @@ target_link_libraries(
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
+    ${smpl_ros_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${tf_LIBRARIES}
     ${gascan_grasp_planning_LIBRARIES}

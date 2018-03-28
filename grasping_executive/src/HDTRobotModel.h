@@ -51,25 +51,25 @@ public:
     bool computeFK(
         const std::vector<double>& angles,
         const std::string& name,
-        std::vector<double>& pose) override;
+        std::vector<double>& pose);
 
     bool computePlanningLinkFK(
         const std::vector<double>& angles,
-        std::vector<double>& pose) override;
+        std::vector<double>& pose);
 
     bool computeIK(
         const std::vector<double>& pose,
         const std::vector<double>& start,
         std::vector<double>& solution,
         sbpl::motion::ik_option::IkOption option =
-                sbpl::motion::ik_option::UNRESTRICTED) override;
+                sbpl::motion::ik_option::UNRESTRICTED);
 
     bool computeIK(
         const std::vector<double>& pose,
         const std::vector<double>& start,
         std::vector<std::vector<double>>& solutions,
         sbpl::motion::ik_option::IkOption option =
-                sbpl::motion::ik_option::UNRESTRICTED) override;
+                sbpl::motion::ik_option::UNRESTRICTED);
     ///@}
 
 private:

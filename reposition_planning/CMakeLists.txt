@@ -21,6 +21,7 @@ find_package(
         robotiq_controllers
         roscpp 
         smpl 
+        smpl_ros
         spellbook_ros
         tf 
         tf_conversions)
@@ -56,6 +57,7 @@ target_link_libraries(
     ${robotiq_controllers_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
+    ${smpl_ros_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_LIBRARIES}
     ${tf_conversions_LIBRARIES}
