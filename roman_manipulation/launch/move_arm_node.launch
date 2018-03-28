@@ -2,7 +2,7 @@
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
 
-    <include file="$(find roman_moveit_config)/launch/roman_move_group.launch">
+    <include file="$(find roman_moveit_config)/launch/move_group.launch">
         <arg name="live" value="$(arg live)"/>
         <arg name="fake" value="$(arg fake)"/>
     </include>
