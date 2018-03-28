@@ -2,6 +2,8 @@
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
 
+    <arg name="load_robot_description" default="false"/>
+
     <!-- move_group parameters -->
     <arg name="allow_trajectory_execution"          default="true"/>
     <arg name="max_safe_path_cost"                  default="1"/>
@@ -13,7 +15,7 @@
     <!-- Load the URDF, SRDF and other .yaml configuration files on the -->
     <!-- param server -->
     <include file="$(find roman_moveit_config)/launch/planning_context.launch">
-        <arg name="load_robot_description" value="true"/>
+        <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     </include>
 
     <param name="collision_detector" value="collision_detection/CollisionPluginSBPL"/>
