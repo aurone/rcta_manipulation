@@ -5,9 +5,9 @@
 
     <node name="grasp_object_executor" pkg="grasping_executive" type="grasp_object_executor" output="screen">
         <remap from="map" to="global_costmap/costmap/costmap"/>
-        <rosparam command="load" file="$(find hdt_control)/config/perception/attached_markers.yaml"/>
-        <rosparam command="load" file="$(find gascan_grasp_planning)/config/planning/gascan_grasping.yaml"/>
-        <rosparam command="load" file="$(find grasping_executive)/config/planning/grasp_object_executor.yaml"/>
+        <rosparam command="load" file="$(find hdt_control)/config/attached_markers.yaml"/>
+        <rosparam command="load" file="$(find gascan_grasp_planning)/config/gascan_grasping.yaml"/>
+        <rosparam command="load" file="$(find grasping_executive)/config/grasp_object_executor.yaml"/>
     </node>
 </launch>
 
