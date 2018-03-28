@@ -801,8 +801,7 @@ bool GraspingCommandPanel::reinit_object_interactive_marker()
     mesh_marker.lifetime = ros::Duration(0);
     mesh_marker.frame_locked = false;
 
-    // TODO: where will this file be
-    mesh_marker.mesh_resource = "package://rcta/resource/meshes/gastank/rcta_gastank.ply";
+    mesh_marker.mesh_resource = "package://gascan_description/meshes/rcta_gastank.ply";
     mesh_marker.mesh_use_embedded_materials = false;
     gas_can_mesh_control.markers.push_back(mesh_marker);
 
