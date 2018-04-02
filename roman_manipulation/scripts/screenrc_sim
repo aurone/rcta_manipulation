@@ -7,22 +7,22 @@ screen -t rviz
 stuff "rosrun rviz rviz -d `rospack find roman_manipulation`/config/rcta.rviz"
 
 screen -t sim
-stuff "roslaunch roman_manipulation quantico_simulation.launch"
-
-screen -t gaze
-stuff "rosrun gazebo_ros gzclient"
+stuff "roslaunch gazebo_ros empty_world.launch paused:=true"
 
 screen -t ctrl
-stuff "roslaunch roman_manipulation roman_control.launch live:=false --screen"
+stuff "roslaunch roman_simulation roman_simulation.launch --screen"
 
 screen -t pose
-stuff "roslaunch roman_manipulation roman_pose.launch live:=false --screen"
+stuff "rosrun tf static_transform_publisher 0 0 0 0 0 0 map base_footprint 13"
+
+screen -t move
+stuff "roslaunch roman_moveit_config move_group.launch --screen"
 
 screen -t repo
 stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
 
-screen -t move
-stuff "roslaunch roman_manipulation move_arm_node.launch live:=false fake:=false --screen"
-
 screen -t grasp
 stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
+
+screen -t bash
+screen -t bash
