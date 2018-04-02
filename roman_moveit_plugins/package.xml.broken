@@ -1,0 +1,19 @@
+<package format="2">
+    <name>roman_moveit_plugins</name>
+    <version>0.0.0</version>
+    <description>The roman_moveit_plugins package</description>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+
+    <license>BSD</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>pluginlib</depend>
+    <depend>moveit_core</depend>
+    <depend>roman_client_ros_utils</depend>
+
+    <export>
+        <moveit_core plugin="${prefix}/plugin.xml"/>
+    </export>
+</package>

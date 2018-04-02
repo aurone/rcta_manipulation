@@ -1,0 +1,8 @@
+<library path="libadd_jpl_time_parameterization">
+    <class name="roman_moveit_plugins/AddJPLTimeParameterization"
+            type="rcta::JPLTimeParameterizationAdapter" 
+            base_class_type="planning_request_adapter::PlanningRequestAdapter">
+        <description>
+        </description>
+    </class> 
+</library>
