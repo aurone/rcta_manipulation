@@ -13,8 +13,6 @@
 #include <roman_client_ros_utils/RomanState.h>
 #include <ros/ros.h>
 
-#define BUILD_LIVE_JPL 1
-
 class RomanJointTrajectoryController
 {
 public:

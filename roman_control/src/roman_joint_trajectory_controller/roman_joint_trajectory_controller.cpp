@@ -1,14 +1,11 @@
 #include "roman_joint_trajectory_controller.h"
 
 // system includes
-#if BUILD_LIVE_JPL
 #include <robot/robot_pub_types.h>
 #include <plan/plan_types.h>
 #include <plan/plan_utils.h>
-#endif
 #include <roman_client_ros_utils/RomanSpec.h>
 
-#if BUILD_LIVE_JPL
 // translate roman_spec_t to RomanSpec
 void translate_jplspec_to_rosspec(
     roman_spec_t& spec,
@@ -26,8 +23,7 @@ void translate_jplspec_to_rosspec(
     spec_rosmsg.waypoints.resize(spec_rosmsg.num_waypoints);
 
     const int64_t min_wp_time = 80000; // 46000
-    for(int w=0; w<spec_rosmsg.num_waypoints; w++)
-    {
+    for (int w = 0; w<spec_rosmsg.num_waypoints; w++) {
         roman_client_ros_utils::RomanWaypoint& wpt = spec_rosmsg.waypoints[w];
         wpt.utime = (int64_t)spec.waypoints[w].timestamp;
         if (w > 0) {
@@ -63,8 +59,7 @@ void translate_jplspec_to_rosspec(
 //        spec_rosmsg.waypoints.push_back(wpt);
     }
 
-    for(int w=0; w<spec_rosmsg.num_waypoints; w++)
-    {
+    for (int w = 0; w<spec_rosmsg.num_waypoints; w++) {
         if (w % 10 == 0) {
             ROS_INFO("Waypoint Time (%d): %ld", w, spec_rosmsg.waypoints[w].utime);
         }
@@ -106,7 +101,6 @@ void spec_update_times(roman_client_ros_utils::RomanSpec& spec_rosmsg)
   plan_utils_update_times_roman(&spec, max_vel, accel);
   translate_jplspec_to_rosspec(spec, spec_rosmsg);
 }
-#endif
 
 RomanJointTrajectoryController::RomanJointTrajectoryController(
     const std::string& ns)
