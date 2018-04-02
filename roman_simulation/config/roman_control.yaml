@@ -133,13 +133,13 @@ right_limb:
 #        limb_right_joint6: { p:  300.0, d:  4.0, i: 300.0, i_clamp: 2.0 }
 #        limb_right_joint7: { p:  300.0, d:  4.0, i: 300.0, i_clamp: 2.0 }
         torso_joint1:      { p: 20000.0, d:  0.0, i:   0.0, i_clamp: 0.0 }
-        limb_left_joint1: { p: 30000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
-        limb_left_joint2: { p: 30000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
-        limb_left_joint3: { p: 30000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
-        limb_left_joint4: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 4.0 }
-        limb_left_joint5: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
-        limb_left_joint6: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
-        limb_left_joint7: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
+        limb_right_joint1: { p: 30000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
+        limb_right_joint2: { p: 30000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
+        limb_right_joint3: { p: 30000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
+        limb_right_joint4: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 4.0 }
+        limb_right_joint5: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
+        limb_right_joint6: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
+        limb_right_joint7: { p: 20000.0, d: 0.0, i: 0.0, i_clamp: 0.0 }
     constraints:
         goal_time: 10.0 #0.06
         stopped_velocity_tolerance: 0.01 # default 0.01
