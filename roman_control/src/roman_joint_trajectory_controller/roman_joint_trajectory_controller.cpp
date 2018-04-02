@@ -112,8 +112,10 @@ RomanJointTrajectoryController::RomanJointTrajectoryController(
     const std::string& ns)
 :
     m_nh(),
+    m_ah(ns),
     m_server(
         ros::NodeHandle(ns), "follow_joint_trajectory", false),
+    m_client(m_ah, "child_follow_joint_trajectory"),
     m_roman_spec_pub(),
     m_roman_spec_reply_sub()
 {
@@ -126,25 +128,30 @@ RomanJointTrajectoryController::RomanJointTrajectoryController(
     m_server.registerGoalCallback(boost::bind(&RomanJointTrajectoryController::goalCallback, this));
     m_server.registerPreemptCallback(boost::bind(&RomanJointTrajectoryController::preemptCallback, this));
 
-    m_joint_name_to_spec_index = {
-        { "limb_right_joint1", 0 },
-        { "limb_right_joint2", 1 },
-        { "limb_right_joint3", 2 },
-        { "limb_right_joint4", 3 },
-        { "limb_right_joint5", 4 },
-        { "limb_right_joint6", 5 },
-        { "limb_right_joint7", 6 },
-        { "limb_left_joint1", 7 },
-        { "limb_left_joint2", 8 },
-        { "limb_left_joint3", 9 },
-        { "limb_left_joint4", 10 },
-        { "limb_left_joint5", 11 },
-        { "limb_left_joint6", 12 },
-        { "limb_left_joint7", 13 },
-        { "torso_joint1", 14 },
-        { "track_left_joint ", 15 },
-        { "track_right_joint", 16 }
+    this->spec_index_to_joint_name =
+    {
+        { "limb_right_joint1" },
+        { "limb_right_joint2" },
+        { "limb_right_joint3" },
+        { "limb_right_joint4" },
+        { "limb_right_joint5" },
+        { "limb_right_joint6" },
+        { "limb_right_joint7" },
+        { "limb_left_joint1" },
+        { "limb_left_joint2" },
+        { "limb_left_joint3" },
+        { "limb_left_joint4", },
+        { "limb_left_joint5", },
+        { "limb_left_joint6", },
+        { "limb_left_joint7", },
+        { "torso_joint1", },
+        { "track_left_joint ", },
+        { "track_right_joint" },
     };
+
+    for (size_t i = 0; i < this->spec_index_to_joint_name.size(); ++i) {
+        this->m_joint_name_to_spec_index[this->spec_index_to_joint_name[i]] = i;
+    }
 }
 
 RomanJointTrajectoryController::~RomanJointTrajectoryController()
@@ -168,6 +175,29 @@ void RomanJointTrajectoryController::romanStateCallback(
     m_state = msg;
 }
 
+static
+void ConvertRomanSpecToFollowJointTrajectory(
+    RomanJointTrajectoryController* ctrl,
+    const roman_client_ros_utils::RomanSpec* spec,
+    control_msgs::FollowJointTrajectoryGoal* goal)
+{
+    goal->trajectory.joint_names = ctrl->spec_index_to_joint_name;
+
+    goal->trajectory.points.resize(spec->num_waypoints);
+    for (size_t i = 0; i < spec->waypoints.size(); ++i) {
+        auto& wp_src = spec->waypoints[i];
+        auto& wp_dst = goal->trajectory.points[i];
+
+        // copy joint positions
+        wp_dst.positions.resize(wp_src.num_joints);
+        for (size_t j = 0; j < wp_src.num_joints; ++j) {
+            wp_dst.positions[j] = wp_src.positions[j];
+        }
+
+        wp_dst.time_from_start = ros::Duration((double)wp_src.utime / 1e3);
+    }
+}
+
 void RomanJointTrajectoryController::goalCallback()
 {
     ROS_INFO("This is probably where i would publish the spec");
@@ -189,7 +219,10 @@ void RomanJointTrajectoryController::goalCallback()
         return;
     }
 
-#if BUILD_LIVE_JPL
+    ////////////////////////////////////////////////
+    // Convert FollowJointTrajectory to RomanSpec //
+    ////////////////////////////////////////////////
+
     roman_client_ros_utils::RomanSpec path_msg;
     path_msg.utime = ros::Time::now().toNSec() / 1e3;
     path_msg.num_mechanisms = ROBOT_NUM_MECHS;
@@ -219,20 +252,37 @@ void RomanJointTrajectoryController::goalCallback()
         path_msg.waypoints.push_back(waypoint);
     }
 //        ROS_INFO_STREAM(path_msg);
-    spec_update_times(path_msg);
-    m_roman_spec_pub.publish(path_msg);
 
-    if (!path_msg.waypoints.empty()) {
-        int duration_us = path_msg.waypoints.back().utime;
-        double duration_s = 3.0 * (double)duration_us / 1e6; // 2 inflation
-        ROS_INFO("Sleep for %d us (%0.3f seconds)", duration_us, duration_s);
-        ros::Duration(duration_s).sleep();
-        ROS_INFO("Done sleeping");
+    //////////////////////
+    // Do the profiling //
+    //////////////////////
+
+    spec_update_times(path_msg);
+
+    ///////////////////////////////
+    // Send to someone who cares //
+    ///////////////////////////////
+
+    const bool publish_spec = true;
+    if (publish_spec) {
+        m_roman_spec_pub.publish(path_msg);
+
+        if (!path_msg.waypoints.empty()) {
+            int duration_us = path_msg.waypoints.back().utime;
+            double duration_s = 3.0 * (double)duration_us / 1e6; // 2 inflation
+            ROS_INFO("Sleep for %d us (%0.3f seconds)", duration_us, duration_s);
+            ros::Duration(duration_s).sleep();
+            ROS_INFO("Done sleeping");
+        }
+    } else {
+        control_msgs::FollowJointTrajectoryGoal traj_stamped;
+        ConvertRomanSpecToFollowJointTrajectory(this, &path_msg, &traj_stamped);
+        auto state = m_client.sendGoalAndWait(traj_stamped);
+        ROS_INFO("Action client returned state %s", state.toString().c_str());
     }
 
     m_result.error_code = FollowJointTrajectoryActionServer::Result::SUCCESSFUL;
     m_server.setSucceeded(m_result);
-#endif
 }
 
 void RomanJointTrajectoryController::preemptCallback()

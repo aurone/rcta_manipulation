@@ -7,6 +7,7 @@
 
 // system includes
 #include <actionlib/server/simple_action_server.h>
+#include <actionlib/client/simple_action_client.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <roman_client_ros_utils/RomanSpecReply.h>
 #include <roman_client_ros_utils/RomanState.h>
@@ -18,20 +19,17 @@ class RomanJointTrajectoryController
 {
 public:
 
-    RomanJointTrajectoryController(const std::string& ns);
+    using FollowJointTrajectoryActionServer =
+            actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction>;
 
-    ~RomanJointTrajectoryController();
-
-    int run();
-
-private:
-
-    typedef actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction>
-    FollowJointTrajectoryActionServer;
+    using FollowJointTrajectoryActionClient =
+            actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
     ros::NodeHandle m_nh;
+    ros::NodeHandle m_ah;
 
     FollowJointTrajectoryActionServer m_server;
+    FollowJointTrajectoryActionClient m_client;
 
     ros::Publisher m_roman_spec_pub;
     ros::Subscriber m_roman_spec_reply_sub;
@@ -46,6 +44,7 @@ private:
 
     RomanState::ConstPtr m_state;
 
+    std::vector<std::string> spec_index_to_joint_name;
     std::map<std::string, int> m_joint_name_to_spec_index;
 
     void romanStateCallback(const RomanState::ConstPtr& msg);
@@ -55,6 +54,10 @@ private:
     void preemptCallback();
 
     void romanSpecReplyCallback(const RomanSpecReply::ConstPtr& msg);
+
+    RomanJointTrajectoryController(const std::string& ns);
+    ~RomanJointTrajectoryController();
+    int run();
 };
 
 #endif
