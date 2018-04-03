@@ -6,3 +6,5 @@ sensors:
     padding_offset: 0.1
     padding_scale: 1.0
     filtered_cloud_topic: filtered_cloud
+  - sensor_plugin: roman_moveit_plugins/OctomapOccupancyMapUpdater
+    octomap_topic: octomap_binary

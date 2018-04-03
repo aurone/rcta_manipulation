@@ -15,4 +15,5 @@
     <exec_depend>moveit_ros_visualization</exec_depend>
     <exec_depend>roman_model</exec_depend>
     <exec_depend>kdl_kinematics_plugin</exec_depend>
+    <exec_depend>roman_moveit_plugins</exec_depend>
 </package>
