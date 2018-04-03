@@ -1,0 +1,7 @@
+<library path="liboctomap_occupancy_map_updater">
+    <class name="roman_moveit_plugins/OctomapOccupancyMapUpdater" type="OctomapOccupancyMapUpdater" base_class_type="occupancy_map_monitor::OccupancyMapUpdater">
+        <description>
+        </description>
+    </class>
+</library>
+

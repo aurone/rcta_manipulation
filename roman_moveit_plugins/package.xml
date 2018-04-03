@@ -9,11 +9,17 @@
 
     <buildtool_depend>catkin</buildtool_depend>
 
-    <depend>pluginlib</depend>
+    <depend>message_filters</depend>
     <depend>moveit_core</depend>
+    <depend>octomap_msgs</depend>
+    <depend>pluginlib</depend>
     <depend>roman_client_ros_utils</depend>
+    <depend>roscpp</depend>
+    <depend>tf</depend>
+    <depend>moveit_ros_perception</depend>
 
     <export>
-        <moveit_core plugin="${prefix}/plugin.xml"/>
+        <!--moveit_core plugin="${prefix}/plugin.xml"/-->
+        <moveit_ros_perception plugin="${prefix}/octomap_occupancy_map_updater_plugin.xml"/>
     </export>
 </package>
