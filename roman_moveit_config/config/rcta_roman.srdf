@@ -18,6 +18,9 @@
     <group name="right_arm_and_torso">
         <chain base_link="torso_link0" tip_link="limb_right_link7"/>
     </group>
+    <group name="left_arm_and_torso">
+        <chain base_link="torso_link0" tip_link="limb_left_link7"/>
+    </group>
     <group name="left_gripper">
         <link name="limb_left_link7"/>
     </group>
