@@ -43,58 +43,52 @@ robot_collision_model:
         - { name: h01, x: 0.20, y:  0.03, z: -0.13, radius: 0.08 }
         - { name: h02, x: 0.20, y:  0.03, z:  0.00, radius: 0.08 }
         - { name: a01, x: 0.05, y: -0.16, z:  0.04, radius: 0.11 }
-    - link_name: limb_left_link0
-      auto: false
-      radius: 0.02
-      spheres:
-        - { name: ll0s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
     - link_name: limb_left_link1
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll1s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll1s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link2
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll2s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll2s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
+        - { name: ll2s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll2s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll2s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll2s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll2s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link3
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll3s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll3s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.055 }
+        - { name: ll3s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link4
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll4s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll4s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
+        - { name: ll4s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll4s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll4s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll4s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll4s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link5
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll5s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll5s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.055 }
+        - { name: ll5s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link6
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll6s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll6s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
+        - { name: ll6s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll6s2, x: 0.045, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll6s3, x: 0.090, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll6s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
+        - { name: ll6s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link7
-      auto: false
-      radius: 0.02
       spheres:
-        - { name: ll7s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
+        - { name: ll7s0, x: 0.165, y: 0.0, z: 0.0, radius: 0.13 }
 #    - link_name: limb_right_link0
 #      spheres:
 #        - { name: lr0s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
     - link_name: limb_right_link1
-      auto: false
-      radius: 0.02
       spheres:
 #        - { name: lr1s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
         - { name: lr1s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link2
-      auto: false
-      radius: 0.02
       spheres:
         - { name: lr2s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
         - { name: lr2s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
@@ -103,14 +97,10 @@ robot_collision_model:
         - { name: lr2s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
         - { name: lr2s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link3
-      auto: false
-      radius: 0.02
       spheres:
         - { name: lr3s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.055 }
         - { name: lr3s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link4
-      auto: false
-      radius: 0.02
       spheres:
         - { name: lr4s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
         - { name: lr4s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
@@ -119,14 +109,10 @@ robot_collision_model:
         - { name: lr4s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
         - { name: lr4s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link5
-      auto: false
-      radius: 0.02
       spheres:
         - { name: lr5s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.055 }
         - { name: lr5s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link6
-      auto: false
-      radius: 0.02
       spheres:
         - { name: lr6s0, x: 0.000, y: -0.06, z: 0.0, radius: 0.055 }
         - { name: lr6s1, x: 0.000, y: -0.12, z: 0.0, radius: 0.055 }
@@ -135,40 +121,26 @@ robot_collision_model:
         - { name: lr6s4, x: 0.135, y: -0.12, z: 0.0, radius: 0.055 }
         - { name: lr6s5, x: 0.180, y: -0.12, z: 0.0, radius: 0.055 }
     - link_name: limb_right_link7
-      auto: false
-      radius: 0.02
       spheres:
         - { name: lr7s0, x: 0.165, y: 0.0, z: 0.0, radius: 0.13 }
   collision_groups:
     - name: left_arm
-      links:
-        - name: limb_left_link0
-        - name: limb_left_link1
-        - name: limb_left_link2
-        - name: limb_left_link3
-        - name: limb_left_link4
-        - name: limb_left_link5
-        - name: limb_left_link6
-        - name: limb_left_link7
+      chains:
+        - { base: limb_left_link0, tip: limb_left_link7 }
     - name: right_arm
+      chains:
+        - { base: limb_right_link0, tip: limb_right_link7 }
+    - name: torso
       links:
-        - name: limb_right_link0
-        - name: limb_right_link1
-        - name: limb_right_link2
-        - name: limb_right_link3
-        - name: limb_right_link4
-        - name: limb_right_link5
-        - name: limb_right_link6
-        - name: limb_right_link7
-    - name: right_arm_and_torso
-      links:
-        - name: limb_right_link0
-        - name: limb_right_link1
-        - name: limb_right_link2
-        - name: limb_right_link3
-        - name: limb_right_link4
-        - name: limb_right_link5
-        - name: limb_right_link6
-        - name: limb_right_link7
         - name: torso_link0
         - name: chest
+    - name: right_arm_and_torso
+      groups:
+        - right_arm
+        - torso
+    - name: body
+      groups:
+        - right_arm
+        - left_arm
+        - torso
+
