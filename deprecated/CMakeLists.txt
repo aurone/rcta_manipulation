@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
     geometric_shapes
     geometry_msgs
     #genmsg # The actionlib tutorial says this is required for building messages, but everything seems to be OK?
-    rcta_msgs
+    cmu_manipulation_msgs
     interactive_markers
     leatherman
     message_generation

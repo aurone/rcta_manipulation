@@ -1,7 +1,7 @@
 src/*
 !src/andalite_description
 !src/roman_model
-!src/rcta_msgs
+!src/cmu_manipulation_msgs
 !src/rcta
 devel/*
 build/*

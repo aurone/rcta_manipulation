@@ -26,7 +26,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
-#include <rcta_msgs/GraspObjectCommandAction.h>
+#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
 #include <robotiq_controllers/gripper_model.h>
 #include <ros/ros.h>
 #include <smpl/angles.h>
@@ -103,7 +103,7 @@ private:
     using OctomapPtr = octomap_msgs::Octomap::Ptr;
     using OctomapConstPtr = octomap_msgs::Octomap::ConstPtr;
 
-    using GraspObjectCommandActionServer = actionlib::SimpleActionServer<rcta_msgs::GraspObjectCommandAction>;
+    using GraspObjectCommandActionServer = actionlib::SimpleActionServer<cmu_manipulation_msgs::GraspObjectCommandAction>;
     using MoveArmActionClient = actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction>;
     using ViservoCommandActionClient = actionlib::SimpleActionClient<hdt_control_msgs::ViservoCommandAction>;
     using GripperCommandActionClient = actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
@@ -185,7 +185,7 @@ private:
     /// \name Goal Context
     ///@{
 
-    rcta_msgs::GraspObjectCommandGoal::ConstPtr m_current_goal;
+    cmu_manipulation_msgs::GraspObjectCommandGoal::ConstPtr m_current_goal;
 
     /// copy of most recent OccupancyGrid message when the goal was received
     OccupancyGridPtr m_current_occupancy_grid;
@@ -989,7 +989,7 @@ int GraspObjectExecutor::run()
 
         // publish feedback status for active goals
         if (m_as->isActive()) {
-            rcta_msgs::GraspObjectCommandFeedback feedback;
+            cmu_manipulation_msgs::GraspObjectCommandFeedback feedback;
             feedback.status = executionStatusToFeedbackStatus(status);
             if (feedback.status != 255) {
                 m_as->publishFeedback(feedback);
@@ -1192,8 +1192,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onIdle()
         if (m_use_extrusion_octomap &&
             (!m_current_occupancy_grid || !m_current_octomap))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             std::string msg = (bool)m_current_occupancy_grid ?
                     "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
             ROS_WARN("%s", msg.c_str());
@@ -1223,8 +1223,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onFault()
         if (m_use_extrusion_octomap &&
             (!m_current_occupancy_grid || !m_current_octomap))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             std::string msg = (bool)m_current_occupancy_grid ?
                     "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
             ROS_WARN("%s", msg.c_str());
@@ -1280,8 +1280,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onGeneratingGrasps()
 
     if (m_reachable_grasp_candidates.empty()) {
         ROS_WARN("No reachable grasp candidates available");
-        rcta_msgs::GraspObjectCommandResult result;
-        result.result = rcta_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
         m_as->setAborted(result, "No reachable grasp candidates available");
         return GraspObjectExecutionStatus::FAULT;
     }
@@ -1314,8 +1314,8 @@ auto GraspObjectExecutor::onMovingArmToPregrasp()
     if (!m_sent_move_arm_goal) {
         if (m_reachable_grasp_candidates.empty()) {
             ROS_WARN("Failed to plan to all reachable grasps");
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             m_as->setAborted(result, "Failed on all reachable grasps");
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1329,8 +1329,8 @@ auto GraspObjectExecutor::onMovingArmToPregrasp()
         {
             std::stringstream ss; ss << "Failed to connect to '" << m_move_arm_command_action_name << "' action server";
             ROS_ERROR("%s", ss.str().c_str());
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             m_as->setAborted(result, ss.str());
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1424,8 +1424,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToGrasp()
             std::stringstream ss; ss << "Failed to connect to '" <<
                     m_move_arm_command_action_name << "' action server";
             ROS_ERROR("%s", ss.str().c_str());
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             m_as->setAborted(result, ss.str());
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1503,8 +1503,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onOpeningGripper()
                 ros::Rate(10.0),
                 ros::Duration(5.0)))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_gripper_command_action_name << "' action server";
             m_as->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
@@ -1575,8 +1575,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToPr
                 ros::Rate(10.0),
                 ros::Duration(5.0)))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_viservo_command_action_name << "' action server";
             m_as->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
@@ -1591,8 +1591,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToPr
             m_listener.lookupTransform(camera_frame, kinematics_frame, ros::Time(0), tf_transform);
         }
         catch (const tf::TransformException& ex) {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss;
             ss << "Failed to lookup transform " << kinematics_frame << " -> " << camera_frame << "; Unable to determine viservo goal";
             m_as->setAborted(result, ss.str());
@@ -1662,8 +1662,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToGr
                 ros::Rate(10.0),
                 ros::Duration(5.0)))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_viservo_command_action_name << "' action server";
             m_as->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
@@ -1730,8 +1730,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onGraspingObject()
                 ros::Rate(10.0),
                 ros::Duration(5.0)))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_gripper_command_action_name << "' action server";
             m_as->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
@@ -1805,8 +1805,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onRetractingGripper()
                 ros::Rate(10.0),
                 ros::Duration(5.0)))
         {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_gripper_command_action_name << "' action server";
             m_as->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
@@ -1905,10 +1905,10 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
 {
     // transition to fault if we exhausted stow sequences
     if (m_next_stow_sequence >= m_stow_sequences.size()) {
-        rcta_msgs::GraspObjectCommandResult result;
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
         std::string error = "Ran out of stow positions to attempt";
         ROS_ERROR("%s", error.c_str());
-        result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
         m_as->setAborted(result, error);
         m_next_stow_sequence = 0;
         return GraspObjectExecutionStatus::FAULT;
@@ -1931,8 +1931,8 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
         {
             std::stringstream ss; ss << "Failed to connect to '" << m_move_arm_command_action_name << "' action server";
             ROS_ERROR("%s", ss.str().c_str());
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
             m_as->setAborted(result, ss.str());
             m_next_stow_sequence = 0;
             return GraspObjectExecutionStatus::FAULT;
@@ -2084,15 +2084,15 @@ GraspObjectExecutionStatus GraspObjectExecutor::onCompletingGoal()
         }
 
         if (success_pct > m_gas_can_detection_threshold) {
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::SUCCESS;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::SUCCESS;
             m_as->setSucceeded(result);
             return GraspObjectExecutionStatus::IDLE;
         } else {
             std::string message = "It appears that we have likely not grasped the object";
             ROS_WARN("%s", message.c_str());
-            rcta_msgs::GraspObjectCommandResult result;
-            result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             m_as->setAborted(result, message);
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -2155,18 +2155,18 @@ uint8_t GraspObjectExecutor::executionStatusToFeedbackStatus(
         return -1;
     case GraspObjectExecutionStatus::GENERATING_GRASPS:
     case GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP:
-        return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
+        return cmu_manipulation_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_PREGRASP;
     case GraspObjectExecutionStatus::OPENING_GRIPPER:
     case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP:
-        return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
+        return cmu_manipulation_msgs::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP;
     case GraspObjectExecutionStatus::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP:
-        return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP;
+        return cmu_manipulation_msgs::GraspObjectCommandFeedback::EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP;
     case GraspObjectExecutionStatus::GRASPING_OBJECT:
     case GraspObjectExecutionStatus::RETRACTING_GRIPPER:
-        return rcta_msgs::GraspObjectCommandFeedback::GRASPING_OBJECT;
+        return cmu_manipulation_msgs::GraspObjectCommandFeedback::GRASPING_OBJECT;
     case GraspObjectExecutionStatus::MOVING_ARM_TO_STOW:
         // same fall-through reasonining from above
-        return rcta_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_STOW;
+        return cmu_manipulation_msgs::GraspObjectCommandFeedback::EXECUTING_ARM_MOTION_TO_STOW;
     case GraspObjectExecutionStatus::COMPLETING_GOAL:
         return -1;
     default:

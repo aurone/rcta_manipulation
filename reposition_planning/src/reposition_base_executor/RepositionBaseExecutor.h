@@ -19,7 +19,7 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
-#include <rcta_msgs/RepositionBaseCommandAction.h>
+#include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <smpl/debug/visualizer_ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
@@ -173,7 +173,7 @@ private:
     sbpl::VisualizerROS viz_;
 
     std::string action_name_;
-    typedef actionlib::SimpleActionServer<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+    typedef actionlib::SimpleActionServer<cmu_manipulation_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
     std::unique_ptr<RepositionBaseCommandActionServer> as_;
 
     robot_model_loader::RobotModelLoaderPtr rml_;
@@ -236,7 +236,7 @@ private:
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
 
-    rcta_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
+    cmu_manipulation_msgs::RepositionBaseCommandGoal::ConstPtr current_goal_;
     RepositionBaseExecutionStatus::Status status_;
     RepositionBaseExecutionStatus::Status last_status_;
     Eigen::Affine3d m_rob_pose;

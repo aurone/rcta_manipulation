@@ -289,7 +289,7 @@ void GraspingCommandPanel::send_grasp_object_command()
         return;
     }
 
-    rcta_msgs::GraspObjectCommandGoal grasp_object_goal;
+    cmu_manipulation_msgs::GraspObjectCommandGoal grasp_object_goal;
 
     static int grasp_object_goal_id = 0;
     grasp_object_goal.id = grasp_object_goal_id++;
@@ -331,7 +331,7 @@ void GraspingCommandPanel::send_reposition_base_command()
         return;
     }
 
-    rcta_msgs::RepositionBaseCommandGoal reposition_base_goal;
+    cmu_manipulation_msgs::RepositionBaseCommandGoal reposition_base_goal;
 
     static int reposition_base_goal_id = 0;
     reposition_base_goal.id = reposition_base_goal_id++;
@@ -824,14 +824,14 @@ void GraspingCommandPanel::grasp_object_command_active_cb()
 
 }
 
-void GraspingCommandPanel::grasp_object_command_feeback_cb(const rcta_msgs::GraspObjectCommandFeedback::ConstPtr& feedback)
+void GraspingCommandPanel::grasp_object_command_feeback_cb(const cmu_manipulation_msgs::GraspObjectCommandFeedback::ConstPtr& feedback)
 {
 
 }
 
 void GraspingCommandPanel::grasp_object_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta_msgs::GraspObjectCommandResult::ConstPtr& result)
+    const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result)
 {
     ROS_INFO("Received Result from Grasp Object Command Action");
     pending_grasp_object_command_ = false;
@@ -844,20 +844,20 @@ void GraspingCommandPanel::reposition_base_command_active_cb()
 
 }
 
-void GraspingCommandPanel::reposition_base_command_feedback_cb(const rcta_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
+void GraspingCommandPanel::reposition_base_command_feedback_cb(const cmu_manipulation_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
 {
 
 }
 
 void GraspingCommandPanel::reposition_base_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
-        const rcta_msgs::RepositionBaseCommandResult::ConstPtr& result)
+        const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result)
 {
 
     ROS_INFO("Received Result from Reposition Base Command Action");
     pending_reposition_base_command_ = false;
 
-    if (result && result->result == rcta_msgs::RepositionBaseCommandResult::SUCCESS) {
+    if (result && result->result == cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS) {
         candidate_base_poses_ = result->candidate_base_poses;
         ROS_INFO("Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
     }

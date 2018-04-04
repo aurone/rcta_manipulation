@@ -47,7 +47,7 @@
     <depend>octomap_msgs</depend>
     <depend>pkg-config</depend>
     <depend>pluginlib</depend>
-    <depend>rcta_msgs</depend>
+    <depend>cmu_manipulation_msgs</depend>
     <depend>roman_client_ros_utils</depend>
     <depend>rosbag</depend>
     <depend>roscpp</depend>
