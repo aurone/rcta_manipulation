@@ -16,7 +16,7 @@ screen -t repo
 stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
 
 screen -t move
-stuff "roslaunch roman_manipulation move_arm_node.launch live:=false fake:=true --screen"
+stuff "roslaunch roman_moveit_config move_group.launch fake:=true --screen"
 
 screen -t grasp
 stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
