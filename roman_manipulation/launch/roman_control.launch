@@ -4,7 +4,7 @@
 
     <arg name="ns" default="false"/>
 
-    <!-- start pose for the robot in gazebo -->
+    <!-- start pose for the robot in gazebo, used with roman_control_sim_real.launch -->
     <arg name="start_x" default="-3.55"/>
     <arg name="start_y" default="-3.5"/>
     <arg name="start_z" default="0.0"/>
@@ -12,65 +12,24 @@
     <arg name="start_P" default="0.0"/>
     <arg name="start_Y" default="3.1415"/>
 
-    <include file="$(find roman_model)/robots/upload_rcta_roman.launch">
-        <arg name="ns" value="$(arg ns)"/>
-    </include>
-
-    <!-- run the roman gripper controller regardless of mode
-    * in live/real this will function correctly in tandem with the jpl/ros translators
-    * in all other modes this will function against the roman_simulator (no gazebo simulation of the gripper yet)
-     -->
-    <node name="roman_gripper_controller" pkg="roman_control" type="roman_gripper_controller"/>
-
-    <!-- publish fake odometry in all modes except live/real -->
-    <group if="$(arg live)">
-        <!--group if="$(arg fake)">
-            <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
-        </group-->
-    </group>
-    <group unless="$(arg live)">
-        <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
-    </group>
-
     <group if="$(arg live)">
         <group if="$(arg fake)">
-            <!-- fake "roman_state", "roman_joint_states", "roman_hand_open", and "roman_hand_close" -->
-            <node name="roman_simulator" pkg="roman_control" type="roman_simulator"/>
-        </group>
-
-        <!-- joint state aggregator -->
-        <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
-            <rosparam param="source_list">[/roman_joint_states]</rosparam>
-        </node>
-
-        <!-- action interfaces wrapping jpl controllers -->
-        <node name="right_limb_joint_trajectory_controller" pkg="roman_control" type="right_limb_joint_trajectory_controller"/>
-        <node name="left_limb_joint_trajectory_controller" pkg="roman_control" type="left_limb_joint_trajectory_controller"/>
-    </group>
-    <group unless="$(arg live)">
-        <!-- run the roman_simulator to fake gripper control state; ignore roman_joint_states -->
-        <node name="roman_simulator" pkg="roman_control" type="roman_simulator"/>
-
-        <group if="$(arg fake)">
-            <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
-                <param name="use_gui" value="false"/>
-                <rosparam param="source_list">[/move_group/fake_controller_joint_states]</rosparam>
-            </node>
+            <!-- LIVE/FAKE -->
+            <include file="$(find roman_manipulation)/launch/roman_control_live_fake.launch"/>
         </group>
         <group unless="$(arg fake)">
-            <!-- spawn the robot in gazebo -->
-            <node name="spawn_roman" pkg="gazebo_ros" type="spawn_model"
-                    args="-param robot_description -urdf -model rcta_roman
-                        -x $(arg start_x) -y $(arg start_y) -z $(arg start_z)
-                        -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
-
-            <!-- spawn simulated controllers -->
-            <rosparam command="load" file="$(find roman_simulation)/config/roman_control.yaml"/>
-            <node name="controller_spawner" pkg="controller_manager" type="spawner"
-                    args="joint_state_controller right_limb left_limb torso_joint1_controller right_gripper left_gripper"/>
+            <!-- LIVE/REAL -->
+            <include file="$(find roman_manipulation)/launch/roman_control_live_real.launch"/>
         </group>
     </group>
-
-    <!-- everyone loves a robot state publisher -->
-    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+    <group unless="$(arg live)">
+        <group if="$(arg fake)">
+            <!-- SIM/FAKE -->
+            <include file="$(find roman_manipulation)/launch/roman_control_sim_fake.launch"/>
+        </group>
+        <group unless="$(arg fake)">
+            <!-- SIM/REAL -->
+            <include file="$(find roman_manipulation)/launch/roman_control_sim_real.launch"/>
+        </group>
+    </group>
 </launch>

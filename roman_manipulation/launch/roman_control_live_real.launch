@@ -1,0 +1,24 @@
+<launch>
+    <arg name="ns" default="false"/>
+
+    <include file="$(find roman_model)/robots/upload_rcta_roman.launch">
+        <arg name="ns" value="$(arg ns)"/>
+    </include>
+
+    <node name="roman_gripper_controller" pkg="roman_control" type="roman_gripper_controller"/>
+        <!--group if="$(arg fake)">
+            <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
+        </group-->
+
+        <!-- joint state aggregator -->
+        <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+            <rosparam param="source_list">[/roman_joint_states]</rosparam>
+        </node>
+
+        <!-- action interfaces wrapping jpl controllers -->
+        <node name="right_limb_joint_trajectory_controller" pkg="roman_control" type="right_limb_joint_trajectory_controller"/>
+        <node name="left_limb_joint_trajectory_controller" pkg="roman_control" type="left_limb_joint_trajectory_controller"/>
+
+    <!-- everyone loves a robot state publisher -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+</launch>

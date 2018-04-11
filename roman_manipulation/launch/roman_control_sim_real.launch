@@ -1,0 +1,40 @@
+<launch>
+    <arg name="ns" default="false"/>
+
+    <include file="$(find roman_model)/robots/upload_rcta_roman.launch">
+        <arg name="ns" value="$(arg ns)"/>
+    </include>
+
+    <!-- start pose for the robot in gazebo -->
+    <arg name="start_x" default="-3.55"/>
+    <arg name="start_y" default="-3.5"/>
+    <arg name="start_z" default="0.0"/>
+    <arg name="start_R" default="0.0"/>
+    <arg name="start_P" default="0.0"/>
+    <arg name="start_Y" default="3.1415"/>
+
+    <!-- spawn the robot in gazebo -->
+    <node name="spawn_roman" pkg="gazebo_ros" type="spawn_model"
+            args="-param robot_description -urdf -model rcta_roman
+                -x $(arg start_x) -y $(arg start_y) -z $(arg start_z)
+                -R $(arg start_R) -P $(arg start_P) -Y $(arg start_Y)"/>
+
+    <!-- spawn simulated controllers -->
+    <rosparam command="load" file="$(find roman_simulation)/config/roman_control.yaml"/>
+
+    <node name="controller_spawner" pkg="controller_manager" type="spawner"
+            args="joint_state_controller right_limb left_limb torso_joint1_controller right_gripper left_gripper"/>
+
+    <!-- provide fake odometry -->
+    <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
+
+    <!-- roman simulator for fake gripper control, /roman_joint_states ignored -->
+    <node name="roman_simulator" pkg="roman_control" type="roman_simulator"/>
+
+    <!-- NOTE: joint_state_publisher not required since gazebo provides
+         aggregate /joint_states -->
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+    <node name="roman_gripper_controller" pkg="roman_control" type="roman_gripper_controller"/>
+</launch>
