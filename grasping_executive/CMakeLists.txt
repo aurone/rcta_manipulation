@@ -11,28 +11,28 @@ find_package(
     REQUIRED
     COMPONENTS
         actionlib
-        actionlib_msgs 
+        actionlib_msgs
         eigen_conversions
         gascan_grasp_planning
         geometric_shapes
-        geometry_msgs 
+        geometry_msgs
         hdt_control_msgs
         hdt_kinematics
         interactive_markers
         leatherman
         moveit_core
-        moveit_msgs 
+        moveit_msgs
         moveit_ros_move_group
         moveit_ros_planning
         moveit_ros_planning_interface
-        octomap_msgs 
+        octomap_msgs
         pcl_ros
         pluginlib
         rcta_manipulation_common
         robotiq_controllers
         roscpp
         rviz
-        sensor_msgs 
+        sensor_msgs
         smpl
         smpl_ros
         spellbook_ros
@@ -48,11 +48,11 @@ add_action_files(DIRECTORY action FILES MoveArm.action ObjectDetection.action)
 
 generate_messages(
     DEPENDENCIES
-        actionlib_msgs 
-        geometry_msgs 
-        sensor_msgs 
-        octomap_msgs 
-        moveit_msgs 
+        actionlib_msgs
+        geometry_msgs
+        sensor_msgs
+        octomap_msgs
+        moveit_msgs
         trajectory_msgs)
 
 catkin_package(CATKIN_DEPENDS actionlib_msgs geometry_msgs sensor_msgs octomap_msgs moveit_msgs trajectory_msgs)
@@ -80,62 +80,68 @@ target_link_libraries(
 
 add_executable(move_arm_node src/move_arm_node/move_arm_node.cpp)
 target_link_libraries(
-    move_arm_node 
-    hdt_arm_planning 
-    ${actionlib_LIBRARIES} 
-    ${eigen_conversions_LIBRARIES} 
-    ${leatherman_LIBRARIES} 
-    ${moveit_core_LIBRARIES} 
-    ${moveit_ros_move_group_LIBRARIES} 
-    ${moveit_ros_planning_LIBRARIES} 
-    ${moveit_ros_planning_interface_LIBRARIES} 
-    ${roscpp_LIBRARIES} 
-    ${smpl_LIBRARIES} 
-    ${sbpl_collision_checking_LIBRARIES} 
-    ${sbpl_kdl_robot_model_LIBRARIES} 
-    ${spellbook_ros_LIBRARIES} 
-    ${tf_LIBRARIES} 
-    ${urdf_model_LIBRARIES} 
-    ${urdf_parser_LIBRARIES} 
+    move_arm_node
+    hdt_arm_planning
+    ${actionlib_LIBRARIES}
+    ${eigen_conversions_LIBRARIES}
+    ${leatherman_LIBRARIES}
+    ${moveit_core_LIBRARIES}
+    ${moveit_ros_move_group_LIBRARIES}
+    ${moveit_ros_planning_LIBRARIES}
+    ${moveit_ros_planning_interface_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${smpl_LIBRARIES}
+    ${sbpl_collision_checking_LIBRARIES}
+    ${sbpl_kdl_robot_model_LIBRARIES}
+    ${spellbook_ros_LIBRARIES}
+    ${tf_LIBRARIES}
+    ${urdf_model_LIBRARIES}
+    ${urdf_parser_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
 add_executable(
-    costmap_object_detection 
+    costmap_object_detection
     src/costmap_object_detection/costmap_object_detection.cpp)
 target_link_libraries(
-    costmap_object_detection 
-    ${leatherman_LIBRARIES} 
-    ${roscpp_LIBRARIES} 
+    costmap_object_detection
+    ${leatherman_LIBRARIES}
+    ${roscpp_LIBRARIES}
     ${spellbook_ros_LIBRARIES})
 
 add_executable(
-    retrieve_object_simulator 
-    src/retrieve_object_simulator/CollisionModel2.cpp 
-    src/retrieve_object_simulator/RetrieveObjectSimulator.cpp 
+    retrieve_object_simulator
+    src/retrieve_object_simulator/CollisionModel2.cpp
+    src/retrieve_object_simulator/RetrieveObjectSimulator.cpp
     src/retrieve_object_simulator/retrieve_object_simulator.cpp)
 target_link_libraries(
-    retrieve_object_simulator 
-    ${SBPL_LIBRARIES} 
-    ${actionlib_LIBRARIES} 
-    ${eigen_conversions_LIBRARIES} 
-    ${roscpp_LIBRARIES} 
-    ${spellbook_ros_LIBRARIES} 
+    retrieve_object_simulator
+    ${SBPL_LIBRARIES}
+    ${actionlib_LIBRARIES}
+    ${eigen_conversions_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${spellbook_ros_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
 add_executable(stow_arm src/stow_arm/stow_arm.cpp)
 target_link_libraries(
-    stow_arm 
-    ${actionlib_LIBRARIES} 
-    ${roscpp_LIBRARIES} 
-    ${hdt_kinematics_LIBRARIES} 
+    stow_arm
+    ${actionlib_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${hdt_kinematics_LIBRARIES}
     ${spellbook_ros_LIBRARIES})
 add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
 
+add_library(
+    grasp_planner_plugin
+    src/grasp_object_executor/grasp_planner_plugin.cpp)
+target_link_libraries(grasp_planner_plugin ${roscpp_LIBRARIES})
+
 add_executable(
-    grasp_object_executor 
+    grasp_object_executor
     src/grasp_object_executor/grasp_object_executor.cpp)
 target_link_libraries(
     grasp_object_executor
+    grasp_planner_plugin
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${leatherman_LIBRARIES}
@@ -151,12 +157,21 @@ target_link_libraries(
     ${robotiq_controllers_LIBRARIES})
 add_dependencies(grasp_object_executor ${PROJECT_NAME}_generate_messages_cpp)
 
+add_library(
+    gascan_grasp_planner_plugin
+    src/grasp_object_executor/gascan_grasp_planner_plugin.cpp)
+target_link_libraries(
+    gascan_grasp_planner_plugin
+    grasp_planner_plugin
+    ${gascan_grasp_planning_LIBRARIES}
+    ${pluginlib_LIBRARIES})
+
 qt4_wrap_cpp(
-    HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES 
+    HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES
     src/grasping_command_panel/grasping_command_panel.h)
 add_library(
-    grasping_command_panel_plugin 
-    ${HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES} 
+    grasping_command_panel_plugin
+    ${HDT_COMMAND_PLUGIN_MOC_HEADER_SOURCES}
     src/grasping_command_panel/grasping_command_panel.cpp)
 target_link_libraries(
     grasping_command_panel_plugin
@@ -196,15 +211,15 @@ target_link_libraries(
 #    ${robotiq_controllers_LIBRARIES})
 
 qt4_wrap_cpp(
-    RCTA_GRIPPER_COMMAND_PANEL_MOC_HEADER_SOURCES 
+    RCTA_GRIPPER_COMMAND_PANEL_MOC_HEADER_SOURCES
     src/gripper_command_panel/gripper_command_panel.h)
 add_library(
-    gripper_command_panel_plugin 
+    gripper_command_panel_plugin
     ${RCTA_GRIPPER_COMMAND_PANEL_MOC_HEADER_SOURCES}
     src/gripper_command_panel/gripper_command_panel.cpp)
 target_link_libraries(
-    gripper_command_panel_plugin 
-    ${QT_LIBRARIES} 
+    gripper_command_panel_plugin
+    ${QT_LIBRARIES}
     ${actionlib_LIBRARIES}
     ${pluginlib_LIBRARIES}
     ${robotiq_controllers_LIBRARIES}
@@ -216,13 +231,15 @@ install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY plugins DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(
     TARGETS
-        hdt_arm_planning 
-        move_arm_node 
+        hdt_arm_planning
+        move_arm_node
         costmap_object_detection
         retrieve_object_simulator
         stow_arm
         grasp_object_executor
-        grasping_command_panel_plugin 
+        grasping_command_panel_plugin
+        grasp_planner_plugin
+        gascan_grasp_planner_plugin
 #        hdt_pick_and_place_plugin
         gripper_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

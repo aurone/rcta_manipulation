@@ -49,5 +49,6 @@
         <rviz plugin="${prefix}/plugins/grasping_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/plugins/gripper_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/plugins/pick_and_place_plugin_description.xml"/>
+        <grasping_executive plugin="${prefix}/plugins/gascan_grasp_planner_plugin.xml"/>
     </export>
 </package>

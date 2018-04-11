@@ -1,0 +1,7 @@
+<library path="lib/libgascan_grasp_planner_plugin">
+    <class name="rcta/GascanGraspPlannerPlugin" type="rcta::GascanGraspPlannerPlugin" base_class_type="rcta::GraspPlannerPlugin">
+           <description>
+               A panel widget for sending out grasping pipeline commands
+           </description>
+     </class>
+</library>

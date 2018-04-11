@@ -8,6 +8,7 @@
 
 namespace rcta {
 
+// Create a marker array consisting of frame triad markers for each grasp pose
 visualization_msgs::MarkerArray
 GetGraspCandidatesVisualization(
     const std::vector<rcta::GraspCandidate>& grasps,
@@ -19,7 +20,7 @@ GetGraspCandidatesVisualization(
     // create triad markers to be reused for each grasp candidate
     auto triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
 
-    for (visualization_msgs::Marker& marker : triad_markers.markers) {
+    for (auto& marker : triad_markers.markers) {
         marker.header.frame_id = frame_id;
         marker.ns = ns;
     }
@@ -30,7 +31,7 @@ GetGraspCandidatesVisualization(
     // save the relative transform of each marker in the triad's frame
     EigenSTL::vector_Affine3d marker_transforms;
     marker_transforms.reserve(triad_markers.markers.size());
-    for (const auto& marker : triad_markers.markers) {
+    for (auto& marker : triad_markers.markers) {
         Eigen::Affine3d marker_transform;
         tf::poseMsgToEigen(marker.pose, marker_transform);
         marker_transforms.push_back(marker_transform);
@@ -38,7 +39,7 @@ GetGraspCandidatesVisualization(
 
     // transform each marker into the world frame
     for (size_t gidx = 0; gidx < grasps.size(); ++gidx) {
-        const rcta::GraspCandidate& candidate = grasps[gidx];
+        auto& candidate = grasps[gidx];
         for (size_t midx = 0; midx < triad_markers.markers.size(); ++midx) {
             size_t idx = triad_markers.markers.size() * gidx + midx;
 
@@ -113,17 +114,12 @@ void PruneGraspsByVisibility(
     grasps.resize(ridx);
 }
 
-// Sort grasp poses so that grasps in the middle of the spline are at the front
 void RankGrasps(std::vector<rcta::GraspCandidate>& grasps)
 {
-    const double min_u = 0.0;
-    const double max_u = 1.0;
-
-    std::sort(grasps.begin(), grasps.end(),
-            [&](const rcta::GraspCandidate& a, const rcta::GraspCandidate& b) -> bool
+    std::sort(begin(grasps), end(grasps),
+            [&](const rcta::GraspCandidate& a, const rcta::GraspCandidate& b)
             {
-                double mid_u = 0.5 * (min_u + max_u);
-                return fabs(a.u - mid_u) < fabs(b.u - mid_u);
+                return a.u > b.u;
             });
 }
 
@@ -134,7 +130,6 @@ GascanGraspPlanner::GascanGraspPlanner() :
     m_grasp_spline(),
     m_gascan_scale(1.0),
     m_T_wrist_tool(Eigen::Affine3d::Identity()),
-    m_T_grasp_pregrasp(Eigen::Affine3d::Identity()),
     m_T_pregrasp_grasp(Eigen::Affine3d::Identity())
 {
 }
@@ -186,7 +181,7 @@ bool GascanGraspPlanner::init(ros::NodeHandle& nh)
     }
 
     ROS_INFO("Control Points:");
-    for (const auto& cp : spline().control_points()) {
+    for (auto& cp : spline().control_points()) {
         ROS_INFO("    %s", to_string(cp).c_str());
     }
 
@@ -377,9 +372,7 @@ bool GascanGraspPlanner::sampleGrasps(
         // wrist (grasp) -> wrist (pregrasp) =
         // model -> wrist (pregrasp)
         Eigen::Affine3d candidate_wrist_transform =
-                grasp_candidate_rotation *
-                m_T_wrist_tool.inverse() *
-                m_T_grasp_pregrasp;
+                grasp_candidate_rotation * m_T_wrist_tool.inverse();
 
         ROS_DEBUG_NAMED("grasping", "    Pregrasp Pose [robot frame]: %s", to_string(candidate_wrist_transform).c_str());
 
@@ -388,7 +381,7 @@ bool GascanGraspPlanner::sampleGrasps(
                 object_pose.inverse() * candidate_wrist_transform,
                 u);
 
-        const GraspCandidate& added = candidates.back();
+        auto& added = candidates.back();
         Eigen::Affine3d flipped_candidate_transform =
                 added.pose *
                 Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
@@ -396,6 +389,13 @@ bool GascanGraspPlanner::sampleGrasps(
                 flipped_candidate_transform,
                 object_pose.inverse() * flipped_candidate_transform,
                 added.u);
+    }
+
+    double mid_u = 0.5 * (min_u + max_u);
+    double u_span = max_u - min_u;
+    for (auto& grasp : candidates) {
+        // 1 in the middle, 0 at the endpoints
+        grasp.u = 1.0 - std::fabs(mid_u - grasp.u) / (0.5 * u_span);
     }
 
     return true;

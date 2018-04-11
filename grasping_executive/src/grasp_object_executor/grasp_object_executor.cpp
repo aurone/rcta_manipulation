@@ -25,6 +25,7 @@
 #include <moveit_msgs/MoveGroupAction.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
+#include <pluginlib/class_loader.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
 #include <rcta_msgs/GraspObjectCommandAction.h>
 #include <robotiq_controllers/gripper_model.h>
@@ -44,6 +45,33 @@
 
 // project includes
 #include <grasping_executive/MoveArmAction.h>
+#include "grasp_planner_plugin.h"
+
+namespace Eigen {
+
+std::string to_string(const Eigen::Affine3d& transform)
+{
+    return ::to_string(transform);
+}
+
+std::string to_string(const Eigen::Vector2d& v)
+{
+    return ::to_string(v);
+}
+
+std::string to_string(const Eigen::Vector3d& v)
+{
+    return ::to_string(v);
+}
+
+std::string to_string(const Eigen::AngleAxisd& aa)
+{
+    return ::to_string(aa);
+}
+
+} // namespace Eigen
+
+namespace rcta {
 
 enum GraspObjectExecutionStatus
 {
@@ -73,91 +101,88 @@ struct StowPosition
 
 bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position);
 
-class GraspObjectExecutor
+enum MainResult
 {
-public:
+    SUCCESS = 0,
+    FAILED_TO_INITIALIZE
+};
+
+struct AttachedMarker
+{
+    int marker_id;
+    std::string attached_link;
+    Eigen::Affine3d link_to_marker;
+};
+
+struct GraspObjectExecutor
+{
+    using GraspObjectCommandActionServer
+            = actionlib::SimpleActionServer<rcta_msgs::GraspObjectCommandAction>;
+
+    using MoveArmActionClient
+            = actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction>;
+    using ViservoCommandActionClient
+            = actionlib::SimpleActionClient<hdt_control_msgs::ViservoCommandAction>;
+    using GripperCommandActionClient
+            = actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
+
+    using GraspPlannerPluginPtr = class_loader::ClassLoader::UniquePtr<GraspPlannerPlugin>;
 
     GraspObjectExecutor();
     ~GraspObjectExecutor();
 
-    bool initialize();
-
-    enum MainResult
-    {
-        SUCCESS = 0,
-        FAILED_TO_INITIALIZE
-    };
-    int run();
-
-private:
-
-    struct AttachedMarker
-    {
-        int marker_id;
-        std::string attached_link;
-        Eigen::Affine3d link_to_marker;
-    };
-
-    using OccupancyGridConstPtr = nav_msgs::OccupancyGrid::ConstPtr;
-    using OccupancyGridPtr = nav_msgs::OccupancyGrid::Ptr;
-    using OctomapPtr = octomap_msgs::Octomap::Ptr;
-    using OctomapConstPtr = octomap_msgs::Octomap::ConstPtr;
-
-    using GraspObjectCommandActionServer = actionlib::SimpleActionServer<rcta_msgs::GraspObjectCommandAction>;
-    using MoveArmActionClient = actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction>;
-    using ViservoCommandActionClient = actionlib::SimpleActionClient<hdt_control_msgs::ViservoCommandAction>;
-    using GripperCommandActionClient = actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
-
     /// \name ROS stuff
     ///@{
     ros::NodeHandle m_nh;
-    ros::NodeHandle m_ph;
+    ros::NodeHandle m_ph = ros::NodeHandle("~");
 
-    ros::Publisher m_filtered_costmap_pub;
-    ros::Publisher m_extrusion_octomap_pub;
-    ros::Publisher m_attach_obj_pub;
+    ros::Publisher  m_filtered_costmap_pub;
+    ros::Publisher  m_extrusion_octomap_pub;
+    ros::Publisher  m_attach_obj_pub;
     ros::Subscriber m_costmap_sub;
     ros::Subscriber m_octomap_sub;
 
     tf::TransformListener m_listener;
 
-    std::unique_ptr<GraspObjectCommandActionServer> m_as;
-    std::unique_ptr<MoveArmActionClient> m_move_arm_command_client;
-    std::unique_ptr<ViservoCommandActionClient> m_viservo_command_client;
-    std::unique_ptr<GripperCommandActionClient> m_gripper_command_client;
-    std::string m_action_name;
-    std::string m_move_arm_command_action_name;
-    std::string m_viservo_command_action_name;
-    std::string m_gripper_command_action_name;
+    std::unique_ptr<GraspObjectCommandActionServer> m_server;
+    std::unique_ptr<MoveArmActionClient>            m_move_arm_command_client;
+    std::unique_ptr<ViservoCommandActionClient>     m_viservo_command_client;
+    std::unique_ptr<GripperCommandActionClient>     m_gripper_command_client;
+
+    std::string m_action_name                   = "grasp_object_command";
+    std::string m_move_arm_command_action_name  = "move_group";
+    std::string m_viservo_command_action_name   = "viservo_command";
+    std::string m_gripper_command_action_name   = "right_gripper/gripper_action";
 
     std::unique_ptr<ros::ServiceClient> m_check_state_validity_client;
 
     sbpl::VisualizerROS m_viz;
     ///@}
 
-    robot_model_loader::RobotModelLoaderPtr m_rml;
-    moveit::core::RobotModelPtr m_robot_model;
-    CostmapExtruder m_extruder;
-    rcta::GascanGraspPlanner m_grasp_planner;
+    robot_model_loader::RobotModelLoaderPtr         m_rml;
+    moveit::core::RobotModelPtr                     m_robot_model;
+    CostmapExtruder m_extruder = CostmapExtruder(100, false);
+    pluginlib::ClassLoader<GraspPlannerPlugin>      m_grasp_planner_loader;
+    GraspPlannerPluginPtr                           m_grasp_planner;
     planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
-    std::vector<std::string> m_gripper_links;
+    std::vector<std::string>                        m_gripper_links;
 
     /// \name Global Parameters
     ///@{
 
-    std::string m_camera_view_frame;
+    std::string m_camera_view_frame = "asus_rgb_optical_frame";
     std::string m_manip_name;
-    moveit::core::JointModelGroup* m_manip_group;
+    moveit::core::JointModelGroup* m_manip_group = NULL;
 
     /// Circumscribed radius of the object, used to remove object cells from
     /// the occupancy grid and extruded octomap
     double m_object_filter_radius;
 
     /// Whether to override incoming octomaps with an extruded costmap variant
-    bool m_use_extrusion_octomap;
+    bool m_use_extrusion_octomap = false;
 
-    bool m_skip_viservo;
-    bool m_attach_object;
+    bool m_skip_viservo = false;
+    bool m_attach_object = false;
 
     ///@}
 
@@ -168,7 +193,7 @@ private:
 
     /// \name MoveArmToPregrasp Parameters
     ///@{
-    int m_max_grasp_candidates;
+    int m_max_grasp_candidates = 0;
     ///@}
 
     /// \name MoveArmToStow Parameters
@@ -179,7 +204,7 @@ private:
 
     /// \name CompleteGoal Parameters
     ///@{
-    double m_gas_can_detection_threshold;
+    double m_gas_can_detection_threshold = 0.0;
     ///@}
 
     /// \name Goal Context
@@ -188,10 +213,10 @@ private:
     rcta_msgs::GraspObjectCommandGoal::ConstPtr m_current_goal;
 
     /// copy of most recent OccupancyGrid message when the goal was received
-    OccupancyGridPtr m_current_occupancy_grid;
+    nav_msgs::OccupancyGridPtr m_current_occupancy_grid;
 
     /// extruded current occupancy grid
-    OctomapPtr m_current_octomap;
+    octomap_msgs::OctomapPtr m_current_octomap;
 
     Eigen::Affine3d m_obj_pose;
     Eigen::Affine3d m_T_grid_model;
@@ -201,37 +226,40 @@ private:
 
     /// \name Internal state machine for move arm goal stages
     ///@{
-    bool m_sent_move_arm_goal;
-    bool m_pending_move_arm_command;
-    actionlib::SimpleClientGoalState m_move_arm_command_goal_state;
+    bool m_sent_move_arm_goal = false;
+    bool m_pending_move_arm_command = false;
+    actionlib::SimpleClientGoalState m_move_arm_command_goal_state =
+            actionlib::SimpleClientGoalState::SUCCEEDED;
     moveit_msgs::MoveGroupResult::ConstPtr m_move_group_result;
     ///@}
 
     /// \name Internal state machine for viservo goal stages
     ///@{
-    bool m_sent_viservo_command;
-    bool m_pending_viservo_command;
-    actionlib::SimpleClientGoalState m_viservo_command_goal_state;
+    bool m_sent_viservo_command = false;
+    bool m_pending_viservo_command = false;
+    actionlib::SimpleClientGoalState m_viservo_command_goal_state =
+            actionlib::SimpleClientGoalState::SUCCEEDED;
     hdt_control_msgs::ViservoCommandResult::ConstPtr m_viservo_command_result;
     ///@}
 
     /// \name Internal state machine for gripper goal stages
     ///@{
-    bool m_sent_gripper_command;
-    bool m_pending_gripper_command;
-    actionlib::SimpleClientGoalState m_gripper_command_goal_state;
+    bool m_sent_gripper_command = false;
+    bool m_pending_gripper_command = false;
+    actionlib::SimpleClientGoalState m_gripper_command_goal_state =
+            actionlib::SimpleClientGoalState::SUCCEEDED;
     control_msgs::GripperCommandResult::ConstPtr m_gripper_command_result;
     ///@}
 
-    OccupancyGridConstPtr m_last_occupancy_grid; ///< most recent OccupancyGrid message
-    OctomapConstPtr m_octomap;
+    nav_msgs::OccupancyGridConstPtr m_last_occupancy_grid; ///< most recent OccupancyGrid message
+    octomap_msgs::OctomapConstPtr m_octomap;
 
     /// \name Shared State
     ///@{
 
     // shared(GenerateGrasps, MoveArmToPregrasp)
     // -> to plan to a number of different grasps, ranked by graspability
-    std::vector<rcta::GraspCandidate> m_reachable_grasp_candidates;
+    std::vector<Grasp> m_reachable_grasp_candidates;
 
     // shared(MoveArmToPregrasp, ExecuteVisualServoMotionToPregrasp)
     // shared(MoveArmToPregrasp, MoveArmToGrasp)
@@ -240,7 +268,7 @@ private:
 
     // shared(MoveArmToPregrasp, MoveArmToStow)
     // -> to know how to attach the object to the arm
-    rcta::GraspCandidate m_last_successful_grasp;
+    Grasp m_last_successful_grasp;
 
     // shared(ExecuteVisualServoMotionToPregrasp, ExecuteVisualServoMotionToGrasp)
     // -> propagate wrist goal originating from MoveArmToPregrasp
@@ -250,7 +278,7 @@ private:
 
     /// \name MoveArmToStowPosition State
     ///@{
-    int m_next_stow_sequence;
+    int m_next_stow_sequence = -1;
     int m_next_stow_position;
     ros::Time m_attach_obj_req_time;
     ///@}
@@ -259,6 +287,10 @@ private:
     ///@{
     ros::Time m_wait_for_grid_start_time;
     ///@}
+
+    bool initialize();
+
+    int run();
 
     bool downloadMarkerParams();
 
@@ -334,23 +366,23 @@ private:
 
     uint8_t executionStatusToFeedbackStatus(GraspObjectExecutionStatus status);
 
-    void pruneGraspCandidates(
-        std::vector<rcta::GraspCandidate>& candidates,
+    void pruneGrasps(
+        std::vector<Grasp>& candidates,
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& camera_pose,
         double marker_incident_angle_threshold_rad) const;
 
-    void pruneGraspCandidatesIK(
-        std::vector<rcta::GraspCandidate>& candidates,
+    void pruneGraspsIK(
+        std::vector<Grasp>& candidates,
         const Eigen::Affine3d& T_grasp_robot) const;
 
-    void limitGraspCandidates(
-        std::vector<rcta::GraspCandidate>& candidates,
+    void limitGrasps(
+        std::vector<Grasp>& candidates,
         int max_candidates) const;
 
     visualization_msgs::MarkerArray
-    getGraspCandidatesVisualization(
-        const std::vector<rcta::GraspCandidate>& grasps,
+    getGraspsVisualization(
+        const std::vector<Grasp>& grasps,
         const std::string& ns) const;
 
     void clearCircleFromGrid(
@@ -489,7 +521,7 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
         moveit_msgs::Constraints goal_constraints;
         goal_constraints.name = "goal_constraints";
         for (size_t jidx = 0; jidx < goal.goal_joint_state.name.size(); ++jidx) {
-            const std::string& joint_name = goal.goal_joint_state.name[jidx];
+            auto& joint_name = goal.goal_joint_state.name[jidx];
             double joint_pos = goal.goal_joint_state.position[jidx];
 
             moveit_msgs::JointConstraint joint_constraint;
@@ -682,63 +714,7 @@ bool extract_xml_value(XmlRpc::XmlRpcValue& value, StowPosition& stow_position)
 }
 
 GraspObjectExecutor::GraspObjectExecutor() :
-    m_nh(),
-    m_ph("~"),
-    m_filtered_costmap_pub(),
-    m_extrusion_octomap_pub(),
-    m_attach_obj_pub(),
-    m_costmap_sub(),
-    m_listener(),
-    m_as(),
-    m_move_arm_command_client(),
-    m_viservo_command_client(),
-    m_gripper_command_client(),
-    m_action_name("grasp_object_command"),
-    m_move_arm_command_action_name("move_group"),
-    m_viservo_command_action_name("viservo_command"),
-    m_gripper_command_action_name("right_gripper/gripper_action"),
-    m_viz(),
-    m_rml(),
-    m_robot_model(),
-    m_extruder(100, false),
-    m_grasp_planner(),
-    m_scene_monitor(),
-    m_gripper_links(),
-    m_camera_view_frame("asus_rgb_optical_frame"),
-    m_manip_name(),
-    m_manip_group(nullptr),
-    m_object_filter_radius(),
-    m_use_extrusion_octomap(false),
-    m_skip_viservo(false),
-    m_attach_object(false),
-    m_attached_markers(),
-    m_max_grasp_candidates(0),
-    m_stow_sequences(),
-    m_attach_obj_req_wait(),
-    m_gas_can_detection_threshold(0.0),
-    m_current_goal(),
-    m_current_occupancy_grid(),
-    m_current_octomap(),
-    m_sent_move_arm_goal(false),
-    m_pending_move_arm_command(false),
-    m_move_arm_command_goal_state(actionlib::SimpleClientGoalState::SUCCEEDED),
-    m_move_group_result(),
-    m_sent_viservo_command(false),
-    m_pending_viservo_command(false),
-    m_viservo_command_goal_state(actionlib::SimpleClientGoalState::SUCCEEDED),
-    m_viservo_command_result(),
-    m_sent_gripper_command(false),
-    m_pending_gripper_command(false),
-    m_gripper_command_goal_state(actionlib::SimpleClientGoalState::SUCCEEDED),
-    m_gripper_command_result(),
-    m_last_occupancy_grid(),
-    m_reachable_grasp_candidates(),
-    m_last_move_arm_pregrasp_goal(),
-    m_last_successful_grasp(),
-    m_last_viservo_pregrasp_goal(),
-    m_next_stow_sequence(-1),
-    m_attach_obj_req_time(),
-    m_wait_for_grid_start_time()
+    m_grasp_planner_loader("grasping_executive", "rcta::GraspPlannerPlugin")
 {
     sbpl::viz::set_visualizer(&m_viz);
 }
@@ -756,6 +732,8 @@ bool GraspObjectExecutor::initialize()
     // Copied from RepositionBaseExecutor to set up state monitoring and //
     // some other interesting stuff                                      //
     ///////////////////////////////////////////////////////////////////////
+
+    ROS_INFO("Initialize Grasp Object Executor");
 
     m_rml.reset(new robot_model_loader::RobotModelLoader);
     m_robot_model = m_rml->getModel();
@@ -791,8 +769,19 @@ bool GraspObjectExecutor::initialize()
         ROS_INFO("  %s", tip_frame.c_str());
     }
 
+    std::string grasp_planner_plugin;
+    if (!m_ph.getParam("grasp_planner_plugin", grasp_planner_plugin)) {
+        ROS_ERROR("Failed to retrieve 'grasp_planner_plugin' from the param server");
+        return false;
+    }
+
+    ROS_INFO("Load grasp planner plugin '%s'", grasp_planner_plugin.c_str());
+    m_grasp_planner =
+            m_grasp_planner_loader.createUniqueInstance(grasp_planner_plugin);
+
+    ROS_INFO("Initialize grasp planner plugin");
     ros::NodeHandle grasp_nh(m_ph, "grasping");
-    if (!m_grasp_planner.init(grasp_nh)) {
+    if (!m_grasp_planner->init(m_nh, grasp_nh)) {
         ROS_ERROR("Failed to initialize Grasp Planner");
         return false;
     }
@@ -911,17 +900,17 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
-    m_as.reset(new GraspObjectCommandActionServer(m_action_name, false));
-    if (!m_as) {
+    m_server.reset(new GraspObjectCommandActionServer(m_action_name, false));
+    if (!m_server) {
         ROS_ERROR("Failed to instantiate Grasp Object Action Server");
         return false;
     }
 
-    m_as->registerGoalCallback(boost::bind(&GraspObjectExecutor::goalCallback, this));
-    m_as->registerPreemptCallback(boost::bind(&GraspObjectExecutor::preemptCallback, this));
+    m_server->registerGoalCallback(boost::bind(&GraspObjectExecutor::goalCallback, this));
+    m_server->registerPreemptCallback(boost::bind(&GraspObjectExecutor::preemptCallback, this));
 
     ROS_INFO("Starting action server '%s'...", m_action_name.c_str());
-    m_as->start();
+    m_server->start();
     ROS_INFO("Action server started");
 
     return true;
@@ -929,13 +918,9 @@ bool GraspObjectExecutor::initialize()
 
 int GraspObjectExecutor::run()
 {
-    if (!initialize()) {
-        return FAILED_TO_INITIALIZE;
-    }
-
-    GraspObjectExecutionStatus prev_status = GraspObjectExecutionStatus::IDLE;
-    GraspObjectExecutionStatus status = GraspObjectExecutionStatus::IDLE;
-    GraspObjectExecutionStatus next_status = GraspObjectExecutionStatus::IDLE;
+    auto prev_status = GraspObjectExecutionStatus::IDLE;
+    auto status = GraspObjectExecutionStatus::IDLE;
+    auto next_status = GraspObjectExecutionStatus::IDLE;
 
     ros::Rate loop_rate(10.0);
     while (ros::ok()) {
@@ -988,11 +973,11 @@ int GraspObjectExecutor::run()
         }
 
         // publish feedback status for active goals
-        if (m_as->isActive()) {
+        if (m_server->isActive()) {
             rcta_msgs::GraspObjectCommandFeedback feedback;
             feedback.status = executionStatusToFeedbackStatus(status);
             if (feedback.status != 255) {
-                m_as->publishFeedback(feedback);
+                m_server->publishFeedback(feedback);
             }
         }
 
@@ -1090,13 +1075,13 @@ int GraspObjectExecutor::run()
 
 void GraspObjectExecutor::goalCallback()
 {
-    if (m_as->isActive()) {
+    if (m_server->isActive()) {
         ROS_WARN("I'm busy!");
         return;
     }
 
     ROS_INFO("Received a new goal");
-    m_current_goal = m_as->acceptNewGoal();
+    m_current_goal = m_server->acceptNewGoal();
     ROS_INFO("  Goal ID: %u", m_current_goal->id);
     ROS_INFO("  Retry Count: %d", m_current_goal->retry_count);
     ROS_INFO("  Gas Can Pose [world frame: %s]: %s", m_current_goal->gas_can_in_map.header.frame_id.c_str(), to_string(m_current_goal->gas_can_in_map.pose).c_str());
@@ -1105,7 +1090,7 @@ void GraspObjectExecutor::goalCallback()
 
     m_next_stow_sequence = 0;
 
-    const geometry_msgs::PoseStamped& obj_pose_in = m_current_goal->gas_can_in_map;
+    auto& obj_pose_in = m_current_goal->gas_can_in_map;
     if (obj_pose_in.header.frame_id != m_robot_model->getModelFrame()) {
         ROS_INFO("Transform object pose into model frame");
         geometry_msgs::PoseStamped obj_pose_in_model;
@@ -1117,7 +1102,7 @@ void GraspObjectExecutor::goalCallback()
             tf::poseMsgToEigen(obj_pose_in_model.pose, m_obj_pose);
         } catch (const tf::TransformException& ex) {
             ROS_ERROR("Failed to transform from '%s' to '%s' (%s)", obj_pose_in.header.frame_id.c_str(), m_robot_model->getModelFrame().c_str(), ex.what());
-            m_as->setAborted();
+            m_server->setAborted();
             return;
         }
     } else {
@@ -1132,8 +1117,8 @@ void GraspObjectExecutor::goalCallback()
 
     // get the gas can pose in the frame of the occupancy grid
     if (m_current_occupancy_grid) {
-        const std::string& grid_frame = m_current_occupancy_grid->header.frame_id;
-        const std::string& model_frame = m_robot_model->getModelFrame();
+        auto& grid_frame = m_current_occupancy_grid->header.frame_id;
+        auto& model_frame = m_robot_model->getModelFrame();
 
         if (grid_frame != m_robot_model->getModelFrame()) {
             ROS_INFO("Lookup transform from model frame to grid frame");
@@ -1145,7 +1130,7 @@ void GraspObjectExecutor::goalCallback()
                 m_T_grid_model = m_T_model_grid.inverse();
             } catch (const tf::TransformException& ex) {
                 ROS_ERROR("Failed to lookup transform from '%s' to '%s' (%s)", m_robot_model->getModelFrame().c_str(), grid_frame.c_str(), ex.what());
-                m_as->setAborted();
+                m_server->setAborted();
                 return;
             }
         } else {
@@ -1188,7 +1173,7 @@ void GraspObjectExecutor::onIdleEnter(GraspObjectExecutionStatus from)
 
 GraspObjectExecutionStatus GraspObjectExecutor::onIdle()
 {
-    if (m_as->isActive()) {
+    if (m_server->isActive()) {
         if (m_use_extrusion_octomap &&
             (!m_current_occupancy_grid || !m_current_octomap))
         {
@@ -1197,7 +1182,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onIdle()
             std::string msg = (bool)m_current_occupancy_grid ?
                     "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
             ROS_WARN("%s", msg.c_str());
-            m_as->setAborted(result, msg.c_str());
+            m_server->setAborted(result, msg.c_str());
             return GraspObjectExecutionStatus::FAULT;
         } else {
             return GraspObjectExecutionStatus::GENERATING_GRASPS;
@@ -1219,7 +1204,7 @@ void GraspObjectExecutor::onFaultEnter(GraspObjectExecutionStatus from)
 
 GraspObjectExecutionStatus GraspObjectExecutor::onFault()
 {
-    if (m_as->isActive()) {
+    if (m_server->isActive()) {
         if (m_use_extrusion_octomap &&
             (!m_current_occupancy_grid || !m_current_octomap))
         {
@@ -1228,7 +1213,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onFault()
             std::string msg = (bool)m_current_occupancy_grid ?
                     "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
             ROS_WARN("%s", msg.c_str());
-            m_as->setAborted(result, msg.c_str());
+            m_server->setAborted(result, msg.c_str());
             return GraspObjectExecutionStatus::FAULT;
         } else {
             return GraspObjectExecutionStatus::GENERATING_GRASPS;
@@ -1249,46 +1234,73 @@ void GraspObjectExecutor::onGeneratingGraspsEnter(
 
 }
 
+void TransformWristPosesToPregraspPoses(
+    GraspObjectExecutor* executor,
+    std::vector<Grasp>& grasps)
+{
+    for (auto& grasp : grasps) {
+        // model -> pregrasp[wrist] = model -> grasp[wrist] * grasp -> pregrasp
+        grasp.pose = grasp.pose * executor->m_grasp_planner->graspToPregrasp();
+    }
+}
+
 GraspObjectExecutionStatus GraspObjectExecutor::onGeneratingGrasps()
 {
-    std::vector<rcta::GraspCandidate> candidates;
+    std::vector<Grasp> candidates;
 
-    // 1. generate grasp candidates (poses of the wrist in the robot frame) from the object pose
+    // 1. Generate grasp candidates (poses of the tool in the robot frame) from
+    // the object pose. We ask the grasp planner to produce more grasps than the
+    // amount we will actually use so that we have a larger set to apply our own
+    // reachability/graspability analysis to.
     int max_samples = 100;
-    if (!m_grasp_planner.sampleGrasps(m_obj_pose, max_samples, candidates)) {
+    if (!m_grasp_planner->planGrasps(
+            "gascan", m_obj_pose, NULL, max_samples, candidates))
+    {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;
     }
 
     ROS_INFO("Sampled %zd grasp poses", candidates.size());
-    SV_SHOW_INFO(getGraspCandidatesVisualization(candidates, "candidate_grasp"));
 
-    moveit::core::RobotState robot_state = currentRobotState();
-    const Eigen::Affine3d& camera_pose =
-            robot_state.getGlobalLinkTransform(m_camera_view_frame);
+    // 2. Get poses for the wrist from poses for the tool
+    TransformWristPosesToPregraspPoses(this, candidates);
 
-    ROS_INFO("world -> camera: %s", to_string(camera_pose).c_str());
+    SV_SHOW_INFO(getGraspsVisualization(candidates, "candidate_grasp"));
 
-    const double vis_angle_thresh = sbpl::angles::to_radians(45.0);
-    pruneGraspCandidates(candidates, robot_state.getGlobalLinkTransform(m_robot_model->getRootLink()), camera_pose, vis_angle_thresh);
+    // 3. Prune grasps by reachability/IK/etc
+    auto robot_state = currentRobotState();
+
+    auto& T_world_robot = robot_state.getGlobalLinkTransform(m_robot_model->getRootLink());
+    ROS_INFO("world -> robot: %s", to_string(T_world_robot).c_str());
+
+    auto& T_world_camera = robot_state.getGlobalLinkTransform(m_camera_view_frame);
+    ROS_INFO("world -> camera: %s", to_string(T_world_camera).c_str());
+
+    double vis_angle_thresh = sbpl::angles::to_radians(45.0);
+    pruneGrasps(candidates, T_world_robot, T_world_camera, vis_angle_thresh);
 
     ROS_INFO("Produced %zd reachable grasp poses", candidates.size());
 
-    rcta::RankGrasps(candidates);
+    // 4. Order grasp candidates by their graspability/reachability.
+    std::sort(begin(candidates), end(candidates),
+            [&](const rcta::Grasp& a, const rcta::Grasp& b)
+            {
+                return a.u > b.u;
+            });
 
-    std::swap(candidates, m_reachable_grasp_candidates);
+    m_reachable_grasp_candidates = std::move(candidates);
 
     if (m_reachable_grasp_candidates.empty()) {
         ROS_WARN("No reachable grasp candidates available");
         rcta_msgs::GraspObjectCommandResult result;
         result.result = rcta_msgs::GraspObjectCommandResult::OBJECT_OUT_OF_REACH;
-        m_as->setAborted(result, "No reachable grasp candidates available");
+        m_server->setAborted(result, "No reachable grasp candidates available");
         return GraspObjectExecutionStatus::FAULT;
     }
 
 
     ROS_INFO("Attempting %zd grasps", m_reachable_grasp_candidates.size());
-    SV_SHOW_INFO(getGraspCandidatesVisualization(m_reachable_grasp_candidates, "reachable_candidates"));
+    SV_SHOW_INFO(getGraspsVisualization(m_reachable_grasp_candidates, "reachable_candidates"));
 
     return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
 }
@@ -1302,8 +1314,7 @@ void GraspObjectExecutor::onGeneratingGraspsExit(
 void GraspObjectExecutor::onMovingArmToPregraspEnter(
     GraspObjectExecutionStatus from)
 {
-    // limit the number of grasp attempts by the configured amount
-    limitGraspCandidates(m_reachable_grasp_candidates, m_max_grasp_candidates);
+    limitGrasps(m_reachable_grasp_candidates, m_max_grasp_candidates);
     m_sent_move_arm_goal = false;
     m_pending_move_arm_command = false;
 }
@@ -1316,12 +1327,12 @@ auto GraspObjectExecutor::onMovingArmToPregrasp()
             ROS_WARN("Failed to plan to all reachable grasps");
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            m_as->setAborted(result, "Failed on all reachable grasps");
+            m_server->setAborted(result, "Failed on all reachable grasps");
             return GraspObjectExecutionStatus::FAULT;
         }
 
         ROS_WARN("Sending Move Arm Goal to pregrasp pose");
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_move_arm_command_client,
                 m_move_arm_command_action_name,
                 ros::Rate(10.0),
@@ -1331,7 +1342,7 @@ auto GraspObjectExecutor::onMovingArmToPregrasp()
             ROS_ERROR("%s", ss.str().c_str());
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             return GraspObjectExecutionStatus::FAULT;
         }
 
@@ -1415,7 +1426,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToGrasp()
 {
     if (!m_sent_move_arm_goal) {
         ROS_WARN("Sending Move Arm Goal to grasp pose");
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_move_arm_command_client,
                 m_move_arm_command_action_name,
                 ros::Rate(10.0),
@@ -1426,7 +1437,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToGrasp()
             ROS_ERROR("%s", ss.str().c_str());
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             return GraspObjectExecutionStatus::FAULT;
         }
 
@@ -1438,7 +1449,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToGrasp()
         Eigen::Affine3d pregrasp_pose; // model -> wrist (pregrasp)
         tf::poseMsgToEigen(m_last_move_arm_pregrasp_goal.goal_pose, pregrasp_pose);
         Eigen::Affine3d grasp_pose; // model -> wrist (grasp)
-        grasp_pose = pregrasp_pose * m_grasp_planner.graspToPregrasp().inverse();
+        grasp_pose = pregrasp_pose * m_grasp_planner->pregraspToGrasp();;
         tf::poseEigenToMsg(grasp_pose, grasp_goal.goal_pose);
 
         // TODO: use monitored octomap
@@ -1497,7 +1508,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onOpeningGripper()
     // send gripper command upon entering
     if (!m_sent_gripper_command) {
         ROS_WARN("Sending Gripper Goal to open gripper");
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_gripper_command_client,
                 m_gripper_command_action_name,
                 ros::Rate(10.0),
@@ -1506,7 +1517,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onOpeningGripper()
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_gripper_command_action_name << "' action server";
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1569,7 +1580,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToPr
     if (!m_sent_viservo_command) {
         ROS_WARN("Sending Viservo Goal to pregrasp pose");
 
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_viservo_command_client,
                 m_viservo_command_action_name,
                 ros::Rate(10.0),
@@ -1578,13 +1589,13 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToPr
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_viservo_command_action_name << "' action server";
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
             return GraspObjectExecutionStatus::FAULT;
         }
 
-        const std::string kinematics_frame = "arm_mount_panel_dummy";
-        const std::string camera_frame = "camera_rgb_frame";
+        std::string kinematics_frame = "arm_mount_panel_dummy";
+        std::string camera_frame = "camera_rgb_frame";
 
         tf::StampedTransform tf_transform;
         try {
@@ -1595,7 +1606,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToPr
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss;
             ss << "Failed to lookup transform " << kinematics_frame << " -> " << camera_frame << "; Unable to determine viservo goal";
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             return GraspObjectExecutionStatus::FAULT;
         }
 
@@ -1656,7 +1667,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToGr
     if (!m_sent_viservo_command) {
         ROS_WARN("Sending Viservo Goal to grasp pose");
 
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_viservo_command_client,
                 m_viservo_command_action_name,
                 ros::Rate(10.0),
@@ -1665,7 +1676,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToGr
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_viservo_command_action_name << "' action server";
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1673,7 +1684,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onExecutingVisualServoMotionToGr
         Eigen::Affine3d viservo_grasp_goal_transform;
         tf::poseMsgToEigen(m_last_viservo_pregrasp_goal.goal_pose, viservo_grasp_goal_transform);
         // camera -> pregrasp * pregrasp -> grasp = camera -> grasp
-        viservo_grasp_goal_transform = viservo_grasp_goal_transform * m_grasp_planner.graspToPregrasp().inverse();
+        viservo_grasp_goal_transform = viservo_grasp_goal_transform * m_grasp_planner->graspToPregrasp();
 
         hdt_control_msgs::ViservoCommandGoal last_viservo_grasp_goal;
 
@@ -1724,7 +1735,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onGraspingObject()
     // send the gripper command to close the gripper
     if (!m_sent_gripper_command) {
         ROS_WARN("Sending Gripper Goal to close gripper");
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_gripper_command_client,
                 m_gripper_command_action_name,
                 ros::Rate(10.0),
@@ -1733,7 +1744,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onGraspingObject()
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_gripper_command_action_name << "' action server";
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1799,7 +1810,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onRetractingGripper()
     // with the OpeningGripper state
     if (!m_sent_gripper_command) {
         ROS_WARN("Sending Gripper Goal to retract gripper");
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_gripper_command_client,
                 m_gripper_command_action_name,
                 ros::Rate(10.0),
@@ -1808,7 +1819,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onRetractingGripper()
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
             std::stringstream ss; ss << "Failed to connect to '" << m_gripper_command_action_name << "' action server";
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             ROS_ERROR("%s", ss.str().c_str());
             return GraspObjectExecutionStatus::FAULT;
         }
@@ -1852,44 +1863,38 @@ void GraspObjectExecutor::onRetractingGripperExit(
 void GraspObjectExecutor::onMovingArmToStowEnter(
     GraspObjectExecutionStatus from)
 {
-    auto solver = m_manip_group->getSolverInstance();
-    const std::string& tip_link = solver->getTipFrames().front();
-
-    moveit_msgs::AttachedCollisionObject aco;
-
-    // aco.link_name
-    aco.link_name = tip_link;
-
-    // aco.object
-    aco.object = CreateGascanCollisionObject();
-
-    ROS_INFO("Create attached object with %zu shapes and %zu poses", aco.object.primitives.size(), aco.object.primitive_poses.size());
-
-    // transform the object to the grasp frame
-
-    // T_grasp_object = T_grasp_pregrasp * T_pregrasp_object;
-    const Eigen::Affine3d& T_grasp_object =
-            m_grasp_planner.graspToPregrasp() *
-            m_last_successful_grasp.pose_in_object.inverse();
-
-    ROS_INFO("Attaching gascan at offset %s from the wrist", to_string(T_grasp_object).c_str());
-
-    transformCollisionObject(aco.object, T_grasp_object);
-
-    aco.object.header.frame_id = tip_link;
-    aco.object.id = "gascan";
-    aco.object.operation = moveit_msgs::CollisionObject::ADD;
-
-    // aco.touch_links
-    aco.touch_links = m_gripper_links;
-
-//    aco.detach_posture;
-
-    aco.weight = 1.0; //arbitrary (not used anyways)
-
-    // this would be ideal, but i really hate moveits start-in-collision-fixer
-    // which currently causes large jerks
     if (m_attach_object) {
+        moveit_msgs::AttachedCollisionObject aco;
+
+        auto solver = m_manip_group->getSolverInstance();
+        auto& tip_link = solver->getTipFrames().front();
+        aco.link_name = tip_link;
+
+        aco.object = CreateGascanCollisionObject();
+
+        ROS_INFO("Created attached object with %zu shapes and %zu poses", aco.object.primitives.size(), aco.object.primitive_poses.size());
+
+        // transform the object to the grasp frame
+
+        // T_grasp_object = T_grasp_pregrasp * T_pregrasp_object;
+        // grasp -> object = (world -> object * world -> grasp[wrist])^1
+        auto& T_world_grasp = m_last_successful_grasp.pose;
+        Eigen::Affine3d T_grasp_object = (m_obj_pose * T_world_grasp).inverse();
+
+        ROS_INFO("Attaching gascan at offset %s from the wrist", to_string(T_grasp_object).c_str());
+
+        transformCollisionObject(aco.object, T_grasp_object);
+
+        aco.object.header.frame_id = tip_link;
+        aco.object.id = "gascan";
+        aco.object.operation = moveit_msgs::CollisionObject::ADD;
+
+        aco.touch_links = m_gripper_links;
+
+//        aco.detach_posture;
+
+        aco.weight = 1.0; //arbitrary (not used anyways)
+
         m_attach_obj_pub.publish(aco);
     }
 
@@ -1909,7 +1914,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
         std::string error = "Ran out of stow positions to attempt";
         ROS_ERROR("%s", error.c_str());
         result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-        m_as->setAborted(result, error);
+        m_server->setAborted(result, error);
         m_next_stow_sequence = 0;
         return GraspObjectExecutionStatus::FAULT;
     }
@@ -1923,7 +1928,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
     // pump the stow sequence state machine
     if (!m_sent_move_arm_goal) {
         ROS_INFO("Sending Move Arm Goal to stow position");
-        if (!rcta::ReconnectActionClient(
+        if (!ReconnectActionClient(
                 m_move_arm_command_client,
                 m_move_arm_command_action_name,
                 ros::Rate(10.0),
@@ -1933,13 +1938,13 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
             ROS_ERROR("%s", ss.str().c_str());
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            m_as->setAborted(result, ss.str());
+            m_server->setAborted(result, ss.str());
             m_next_stow_sequence = 0;
             return GraspObjectExecutionStatus::FAULT;
         }
 
-        const std::vector<StowPosition>& stow_sequence = m_stow_sequences[m_next_stow_sequence];
-        const StowPosition& stow_position = stow_sequence[m_next_stow_position];
+        auto& stow_sequence = m_stow_sequences[m_next_stow_sequence];
+        auto& stow_position = stow_sequence[m_next_stow_position];
 
         grasping_executive::MoveArmGoal move_arm_stow_goal;
 
@@ -1947,26 +1952,26 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
         if (stow_position.type == "pose") {
             move_arm_stow_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
             auto rs = currentRobotState();
-            for (const auto& entry : stow_position.joint_positions) {
+            for (auto& entry : stow_position.joint_positions) {
                 rs.setVariablePosition(entry.first, entry.second);
             }
             rs.updateLinkTransforms();
-            const Eigen::Affine3d tip_pose =
+            Eigen::Affine3d tip_pose =
                     rs.getGlobalLinkTransform(m_manip_group->getOnlyOneEndEffectorTip());
             tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
         } else if (stow_position.type == "cart") {
             move_arm_stow_goal.type = grasping_executive::MoveArmGoal::CartesianGoal;
             move_arm_stow_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
             auto rs = currentRobotState();
-            for (const auto& entry : stow_position.joint_positions) {
+            for (auto& entry : stow_position.joint_positions) {
                 rs.setVariablePosition(entry.first, entry.second);
             }
             rs.updateLinkTransforms();
-            const Eigen::Affine3d tip_pose =
+            Eigen::Affine3d tip_pose =
                     rs.getGlobalLinkTransform(m_manip_group->getOnlyOneEndEffectorTip());
             tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
         } else {
-            const auto& rs = currentRobotState();
+            auto& rs = currentRobotState();
 
             // NOTE: this bit assumes all single-dof joint
             std::vector<double> vars(m_manip_group->getVariableCount());
@@ -1975,7 +1980,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
             move_arm_stow_goal.type = grasping_executive::MoveArmGoal::JointGoal;
             move_arm_stow_goal.goal_joint_state.name = m_manip_group->getVariableNames();
             move_arm_stow_goal.goal_joint_state.position = vars;
-            for (const auto& entry : stow_position.joint_positions) {
+            for (auto& entry : stow_position.joint_positions) {
                 auto jit = std::find(
                         m_manip_group->getVariableNames().begin(),
                         m_manip_group->getVariableNames().end(),
@@ -2064,7 +2069,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onCompletingGoal()
     {
         ROS_INFO("Received a fresh costmap");
         // get here once we've received a newer costmap to evaluate for the object's position
-        OccupancyGridConstPtr occupancy_grid_after_grasp = m_last_occupancy_grid;
+        nav_msgs::OccupancyGridConstPtr occupancy_grid_after_grasp = m_last_occupancy_grid;
 
         Eigen::Affine3d T_grid_obj = m_T_grid_model * m_obj_pose;
 
@@ -2086,14 +2091,14 @@ GraspObjectExecutionStatus GraspObjectExecutor::onCompletingGoal()
         if (success_pct > m_gas_can_detection_threshold) {
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::SUCCESS;
-            m_as->setSucceeded(result);
+            m_server->setSucceeded(result);
             return GraspObjectExecutionStatus::IDLE;
         } else {
             std::string message = "It appears that we have likely not grasped the object";
             ROS_WARN("%s", message.c_str());
             rcta_msgs::GraspObjectCommandResult result;
             result.result = rcta_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
-            m_as->setAborted(result, message);
+            m_server->setAborted(result, message);
             return GraspObjectExecutionStatus::FAULT;
         }
     }
@@ -2174,8 +2179,107 @@ uint8_t GraspObjectExecutor::executionStatusToFeedbackStatus(
     }
 }
 
-void GraspObjectExecutor::pruneGraspCandidates(
-    std::vector<rcta::GraspCandidate>& candidates,
+// Create a marker array consisting of frame triad markers for each grasp pose
+visualization_msgs::MarkerArray
+GetGraspCandidatesVisualization(
+    const std::vector<Grasp>& grasps,
+    const std::string& frame_id,
+    const std::string& ns)
+{
+    auto triad_scale = geometry_msgs::CreateVector3(0.1, 0.01, 0.01);
+
+    // create triad markers to be reused for each grasp candidate
+    auto triad_markers = msg_utils::create_triad_marker_arr(triad_scale);
+
+    for (auto& marker : triad_markers.markers) {
+        marker.header.frame_id = frame_id;
+        marker.ns = ns;
+    }
+
+    visualization_msgs::MarkerArray all_markers;
+    all_markers.markers.resize(grasps.size() * triad_markers.markers.size());
+
+    // save the relative transform of each marker in the triad's frame
+    EigenSTL::vector_Affine3d marker_transforms;
+    marker_transforms.reserve(triad_markers.markers.size());
+    for (auto& marker : triad_markers.markers) {
+        Eigen::Affine3d marker_transform;
+        tf::poseMsgToEigen(marker.pose, marker_transform);
+        marker_transforms.push_back(marker_transform);
+    }
+
+    // transform each marker into the world frame
+    for (size_t gidx = 0; gidx < grasps.size(); ++gidx) {
+        auto& candidate = grasps[gidx];
+        for (size_t midx = 0; midx < triad_markers.markers.size(); ++midx) {
+            size_t idx = triad_markers.markers.size() * gidx + midx;
+
+            // make a copy of the marker copy transformed into the world frame
+            visualization_msgs::Marker m = triad_markers.markers[midx];
+            Eigen::Affine3d T_world_marker =
+                    candidate.pose *
+                    marker_transforms[midx];
+            tf::poseEigenToMsg(T_world_marker, m.pose);
+
+            m.id = idx;
+            all_markers.markers[idx] = std::move(m);
+        }
+    }
+
+    return all_markers;
+}
+
+void PruneGraspsByVisibility(
+    std::vector<Grasp>& grasps,
+    const EigenSTL::vector_Affine3d& marker_poses,
+    const Eigen::Affine3d& camera_pose,
+    double ang_thresh)
+{
+    ROS_INFO("Filter %zu grasps via visibility", grasps.size());
+
+    // test if any marker is visible with the wrist at the grasp pose
+    auto marker_visible = [&](const Grasp& grasp)
+    {
+        return !std::any_of(marker_poses.begin(), marker_poses.end(),
+                [&](const Eigen::Affine3d& T_wrist_marker)
+                {
+                    Eigen::Affine3d T_camera_fid =
+                            camera_pose.inverse() *
+                            grasp.pose *
+                            T_wrist_marker;
+
+                    ROS_DEBUG_NAMED("grasping", "  Camera -> Marker: %s", to_string(T_camera_fid).c_str());
+                    Eigen::Vector3d camera_view_axis = -Eigen::Vector3d::UnitZ();
+                    Eigen::Vector3d marker_plane_normal;
+                    marker_plane_normal.x() = T_camera_fid(0, 2);
+                    marker_plane_normal.y() = T_camera_fid(1, 2);
+                    marker_plane_normal.z() = T_camera_fid(2, 2);
+
+                    ROS_DEBUG_NAMED("grasping", "  Marker Plane Normal [camera view frame]: %s", to_string(marker_plane_normal).c_str());
+
+                    double dp = marker_plane_normal.dot(camera_view_axis);
+                    ROS_DEBUG_NAMED("grasping", "  Marker Normal * Camera View Axis: %0.3f", dp);
+
+                    // the optimal situation is when the camera is facing the
+                    // marker directly and this angle is 0
+                    double angle = acos(dp);
+                    ROS_DEBUG_NAMED("grasping", "  Angle: %0.3f", angle);
+
+                    return angle < ang_thresh;
+                });
+    };
+
+    auto it = std::remove_if(grasps.begin(), grasps.end(),
+            [&](const Grasp& g) { return !marker_visible(g); });
+
+    size_t ridx = std::distance(grasps.begin(), it);
+
+    ROS_INFO("%zu/%zu visible grasps", ridx, grasps.size());
+    grasps.resize(ridx);
+}
+
+void GraspObjectExecutor::pruneGrasps(
+    std::vector<Grasp>& candidates,
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& camera_pose,
     double marker_incident_angle_threshold_rad) const
@@ -2184,64 +2288,61 @@ void GraspObjectExecutor::pruneGraspCandidates(
 
     EigenSTL::vector_Affine3d marker_poses;
     marker_poses.reserve(m_attached_markers.size());
-    for (const auto& marker : m_attached_markers) {
+    for (auto& marker : m_attached_markers) {
         marker_poses.push_back(marker.link_to_marker);
     }
 
     // run this first since this is significantly less expensive than IK
-    rcta::PruneGraspsByVisibility(
+    PruneGraspsByVisibility(
             candidates,
             marker_poses,
             camera_pose,
             marker_incident_angle_threshold_rad);
 
-    pruneGraspCandidatesIK(candidates, robot_pose);
+    pruneGraspsIK(candidates, robot_pose);
 }
 
-void GraspObjectExecutor::pruneGraspCandidatesIK(
-    std::vector<rcta::GraspCandidate>& candidates,
-    const Eigen::Affine3d& T_grasp_robot) const
+void GraspObjectExecutor::pruneGraspsIK(
+    std::vector<Grasp>& grasps,
+    const Eigen::Affine3d& robot_pose) const
 {
     // TODO: shamefully copied from RepositionBaseExecutor...it's probably about
     // time to make a minimal API for grasp filtering and create a shareable
     // module for this
 
-    ROS_INFO("Filter %zu grasp candidate via IK", candidates.size());
-    std::vector<rcta::GraspCandidate> filtered_candidates;
-    filtered_candidates.reserve(candidates.size());
+    ROS_INFO("Filter %zu grasp candidate via IK", grasps.size());
+    std::vector<Grasp> filtered_candidates;
+    filtered_candidates.reserve(grasps.size());
 
     int pregrasp_ik_filter_count = 0;
     int grasp_ik_filter_count = 0;
     int collision_filter_count = 0;
 
-    for (const rcta::GraspCandidate& grasp_candidate : candidates) {
+    for (auto& grasp : grasps) {
         // TODO: use current state here instead?
         moveit::core::RobotState robot_state(m_robot_model);
         robot_state.setToDefaultValues();
-        // place the robot in the grasp frame
-        const moveit::core::JointModel* root_joint = m_robot_model->getRootJoint();
-        robot_state.setJointPositions(root_joint, T_grasp_robot);
-        robot_state.update();
+        auto* root_joint = m_robot_model->getRootJoint();
+        robot_state.setJointPositions(root_joint, robot_pose);
 
-        ROS_DEBUG("test grasp candidate %s for ik solution", to_string(grasp_candidate.pose).c_str());
+        ROS_DEBUG("test grasp candidate %s for ik solution", to_string(grasp.pose).c_str());
 
         // check for an ik solution to the pre-grasp pose
-        if (!robot_state.setFromIK(m_manip_group, grasp_candidate.pose)) {
+        if (!robot_state.setFromIK(m_manip_group, grasp.pose)) {
             ++pregrasp_ik_filter_count;
             continue;
         }
 
         // check for an ik solution to the grasp pose
         if (!robot_state.setFromIK(
-            m_manip_group,
-            grasp_candidate.pose * m_grasp_planner.pregraspToGrasp()))
+                m_manip_group, grasp.pose * m_grasp_planner->pregraspToGrasp()))
         {
             ++grasp_ik_filter_count;
             continue;
         }
 
+        // check for arm collisions at the IK solution
         moveit_msgs::GetStateValidityRequest req;
-
         req.group_name = m_manip_group->getName();
         moveit::core::robotStateToRobotStateMsg(robot_state, req.robot_state);
         moveit_msgs::GetStateValidityResponse res;
@@ -2250,13 +2351,8 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
             continue;
         }
 
-        // push back this grasp pose
-        rcta::GraspCandidate reachable_grasp_candidate(
-                grasp_candidate.pose,
-                grasp_candidate.pose_in_object,
-                grasp_candidate.u);
-        filtered_candidates.push_back(reachable_grasp_candidate);
-        ROS_INFO("Pregrasp pose: %s", to_string(grasp_candidate.pose).c_str());
+        ROS_INFO("Pregrasp pose: %s", to_string(grasp.pose).c_str());
+        filtered_candidates.push_back(grasp);
 
         // log the ik solution to the grasp pose
         std::vector<double> sol;
@@ -2264,28 +2360,30 @@ void GraspObjectExecutor::pruneGraspCandidatesIK(
         ROS_INFO("IK sol: %s", to_string(sol).c_str());
     }
 
-    ROS_INFO("%zu/%zu reachable candidates", filtered_candidates.size(), candidates.size());
+    ROS_INFO("%zu/%zu reachable grasps", filtered_candidates.size(), grasps.size());
     ROS_INFO("  %d pregrasp ik failures", pregrasp_ik_filter_count);
     ROS_INFO("  %d grasp ik failures", grasp_ik_filter_count);
     ROS_INFO("  %d grasp collision failures", collision_filter_count);
-    candidates = std::move(filtered_candidates);
+    grasps = std::move(filtered_candidates);
 }
 
-void GraspObjectExecutor::limitGraspCandidates(
-    std::vector<rcta::GraspCandidate>& candidates,
+// Limit a set of ordered grasps to the $max_candidates best and reverse the
+// set so that the best grasps appear last
+void GraspObjectExecutor::limitGrasps(
+    std::vector<Grasp>& candidates,
     int max_candidates) const
 {
     candidates.resize(max_candidates);
-	std::reverse(candidates.begin(), candidates.end());
+	std::reverse(begin(candidates), end(candidates));
 }
 
 visualization_msgs::MarkerArray
-GraspObjectExecutor::getGraspCandidatesVisualization(
-    const std::vector<rcta::GraspCandidate>& grasps,
+GraspObjectExecutor::getGraspsVisualization(
+    const std::vector<Grasp>& grasps,
     const std::string& ns) const
 {
-    const std::string& frame_id = m_robot_model->getModelFrame();
-    return rcta::GetGraspCandidatesVisualization(grasps, frame_id, ns);
+    auto& frame_id = m_robot_model->getModelFrame();
+    return GetGraspCandidatesVisualization(grasps, frame_id, ns);
 }
 
 void GraspObjectExecutor::clearCircleFromGrid(
@@ -2528,14 +2626,14 @@ void GraspObjectExecutor::transformCollisionObject(
     moveit_msgs::CollisionObject& o,
     const Eigen::Affine3d& t) const
 {
-    for (geometry_msgs::Pose& pose : o.primitive_poses) {
+    for (auto& pose : o.primitive_poses) {
         Eigen::Affine3d T_object_part;
         tf::poseMsgToEigen(pose, T_object_part);
         Eigen::Affine3d T_grasp_part = t * T_object_part;
         tf::poseEigenToMsg(T_grasp_part, pose);
     }
 
-    for (geometry_msgs::Pose& pose : o.mesh_poses) {
+    for (auto& pose : o.mesh_poses) {
         Eigen::Affine3d T_object_part;
         tf::poseMsgToEigen(pose, T_object_part);
         Eigen::Affine3d T_grasp_part = t * T_object_part;
@@ -2543,8 +2641,16 @@ void GraspObjectExecutor::transformCollisionObject(
     }
 }
 
+} // namespace rcta
+
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "object_pickup_executor");
-    return GraspObjectExecutor().run();
+    rcta::GraspObjectExecutor executor;
+    if (!executor.initialize()) {
+        ROS_ERROR("Failed to initialize Grasp Object Executor");
+        return 1;
+    }
+
+    return executor.run();
 }

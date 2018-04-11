@@ -82,12 +82,16 @@ public:
     const Eigen::Affine3d& graspToPregrasp() const { return m_T_grasp_pregrasp; }
     const Eigen::Affine3d& pregraspToGrasp() const { return m_T_pregrasp_grasp; }
 
+    bool transformToPreGrasp() const { return m_transform_to_pregrasp; }
+    void setTransformToPreGrasp(bool on) { m_transform_to_pregrasp = on; }
+
 private:
 
     bool m_initialized;
     Nurb<Eigen::Vector3d> m_grasp_spline;
     double m_gascan_scale;
 
+    bool m_transform_to_pregrasp = false;
     Eigen::Affine3d m_T_wrist_tool;
     Eigen::Affine3d m_T_grasp_pregrasp;
     Eigen::Affine3d m_T_pregrasp_grasp;
