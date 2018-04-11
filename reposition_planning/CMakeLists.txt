@@ -6,24 +6,24 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(
-    catkin 
-    REQUIRED 
-    COMPONENTS 
-        actionlib 
-        eigen_conversions 
+    catkin
+    REQUIRED
+    COMPONENTS
+        actionlib
+        eigen_conversions
         gascan_grasp_planning
         grasping_executive
         hdt_kinematics
-        leatherman 
-        moveit_core 
-        moveit_ros_planning 
+        leatherman
+        moveit_core
+        moveit_ros_planning
         rcta_manipulation_common
         robotiq_controllers
-        roscpp 
-        smpl 
+        roscpp
+        smpl
         smpl_ros
         spellbook_ros
-        tf 
+        tf
         tf_conversions)
 find_package(sbpl REQUIRED)
 find_package(urdfdom REQUIRED)
@@ -40,7 +40,6 @@ include_directories(${urdfdom_headers_INCLUDE_DIRS})
 
 add_executable(
     reposition_planner_node
-    src/reposition_base_executor/hdt_base_planning.cpp
     src/reposition_base_executor/RepositionBaseExecutor.cpp
     src/reposition_base_executor/xytheta_collision_checker.cpp)
 
@@ -65,7 +64,7 @@ target_link_libraries(
     ${urdf_parser_LIBRARIES})
 
 add_executable(
-    reposition_base_simulator 
+    reposition_base_simulator
     src/reposition_base_simulator/reposition_base_simulator.cpp)
 target_link_libraries(
     reposition_base_simulator
