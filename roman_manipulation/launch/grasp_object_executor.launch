@@ -3,7 +3,7 @@
         <arg name="load_robot_description" value="true"/>
     </include>
 
-    <node name="grasp_object_executor" pkg="grasping_executive" type="grasp_object_executor" output="screen">
+    <node name="grasp_object_executor" pkg="grasping_executive" type="grasp_object_executor">
         <remap from="map" to="global_costmap/costmap/costmap"/>
         <rosparam command="load" file="$(find hdt_control)/config/attached_markers.yaml"/>
         <rosparam command="load" file="$(find gascan_grasp_planning)/config/gascan_grasping.yaml"/>

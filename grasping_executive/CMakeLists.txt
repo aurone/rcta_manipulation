@@ -152,8 +152,6 @@ target_link_libraries(
     ${smpl_ros_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${tf_LIBRARIES}
-    ${gascan_grasp_planning_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES}
     ${robotiq_controllers_LIBRARIES})
 add_dependencies(grasp_object_executor ${PROJECT_NAME}_generate_messages_cpp)
 

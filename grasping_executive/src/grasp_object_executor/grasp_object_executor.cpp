@@ -10,13 +10,12 @@
 #include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
+#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <eigen_conversions/eigen_msg.h>
-#include <gascan_grasp_planning/gascan_grasp_planner.h>
 #include <hdt_control_msgs/ViservoCommandAction.h>
-#include <hdt_kinematics/RobotModel.h>
 #include <leatherman/print.h>
-#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
+#include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
@@ -27,7 +26,6 @@
 #include <octomap_msgs/Octomap.h>
 #include <pluginlib/class_loader.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
-#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
 #include <robotiq_controllers/gripper_model.h>
 #include <ros/ros.h>
 #include <smpl/angles.h>
@@ -164,7 +162,7 @@ struct GraspObjectExecutor
     CostmapExtruder m_extruder = CostmapExtruder(100, false);
     pluginlib::ClassLoader<GraspPlannerPlugin>      m_grasp_planner_loader;
     GraspPlannerPluginPtr                           m_grasp_planner;
-    planning_scene_monitor::PlanningSceneMonitorPtr m_scene_monitor;
+    planning_scene_monitor::CurrentStateMonitorPtr  m_state_monitor;
     std::vector<std::string>                        m_gripper_links;
 
     /// \name Global Parameters
@@ -294,9 +292,7 @@ struct GraspObjectExecutor
 
     bool downloadMarkerParams();
 
-    const moveit::core::RobotState& currentRobotState() const;
-    void processSceneUpdate(
-        planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType type);
+    auto currentRobotState() const -> moveit::core::RobotState;
 
     void goalCallback();
     void preemptCallback();
@@ -748,10 +744,8 @@ bool GraspObjectExecutor::initialize()
     }
 
     auto transformer = boost::shared_ptr<tf::Transformer>(new tf::TransformListener);
-    m_scene_monitor = boost::make_shared<planning_scene_monitor::PlanningSceneMonitor>(m_rml, transformer);
-    auto update_fn = boost::bind(&GraspObjectExecutor::processSceneUpdate, this, _1);
-    m_scene_monitor->addUpdateCallback(update_fn);
-    m_scene_monitor->startStateMonitor();
+    m_state_monitor = boost::make_shared<planning_scene_monitor::CurrentStateMonitor>(m_robot_model, transformer);
+    m_state_monitor->startStateMonitor("joint_states");
 
     if (!msg_utils::download_param(m_ph, "manipulator_group_name", m_manip_name)) {
         return false;
@@ -1971,7 +1965,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
                     rs.getGlobalLinkTransform(m_manip_group->getOnlyOneEndEffectorTip());
             tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
         } else {
-            auto& rs = currentRobotState();
+            auto rs = currentRobotState();
 
             // NOTE: this bit assumes all single-dof joint
             std::vector<double> vars(m_manip_group->getVariableCount());
@@ -2567,22 +2561,17 @@ double GraspObjectExecutor::calcProbSuccessfulGrasp(
     return probability;
 }
 
-const moveit::core::RobotState& GraspObjectExecutor::currentRobotState() const
+auto GraspObjectExecutor::currentRobotState() const -> moveit::core::RobotState
 {
-    assert(m_scene_monitor && m_scene_monitor->getPlanningScene());
-    return m_scene_monitor->getPlanningScene()->getCurrentState();
-}
-
-void GraspObjectExecutor::processSceneUpdate(
-    planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType type)
-{
-    switch (type) {
-    case planning_scene_monitor::PlanningSceneMonitor::UPDATE_STATE: {
-
-    }   break;
-    case planning_scene_monitor::PlanningSceneMonitor::UPDATE_TRANSFORMS: {
-
-    }   break;
+    assert(m_state_monitor && m_state_monitor->getPlanningScene());
+    auto current_state = m_state_monitor->getCurrentState();
+    if (!current_state) {
+        ROS_WARN("FAILED TO GET CURRENT STATE");
+        moveit::core::RobotState zero_state(m_robot_model);
+        zero_state.setToDefaultValues();
+        return zero_state;
+    } else {
+        return *current_state;
     }
 }
 
