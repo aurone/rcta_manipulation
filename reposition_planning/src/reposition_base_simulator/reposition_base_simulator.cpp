@@ -6,7 +6,7 @@
 #include <Eigen/Dense>
 #include <actionlib/server/simple_action_server.h>
 #include <eigen_conversions/eigen_msg.h>
-#include <rcta_msgs/RepositionBaseCommandAction.h>
+#include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <smpl/angles.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -35,7 +35,7 @@ private:
 
     std::string world_frame_name_;
 
-    typedef actionlib::SimpleActionServer<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
+    typedef actionlib::SimpleActionServer<cmu_manipulation_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
     std::unique_ptr<RepositionBaseCommandActionServer> as_;
     std::string action_name_;
 
@@ -178,8 +178,8 @@ void RepositionBaseSimulator::goal_callback()
         candidate_base_poses.pop_back();
     }
 
-    rcta_msgs::RepositionBaseCommandResult result;
-    result.result = rcta_msgs::RepositionBaseCommandResult::SUCCESS;
+    cmu_manipulation_msgs::RepositionBaseCommandResult result;
+    result.result = cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS;
     result.candidate_base_poses = std::move(candidate_base_poses);
     as_->setSucceeded(result);
 }

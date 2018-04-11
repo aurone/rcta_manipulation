@@ -369,8 +369,8 @@ int RepositionBaseExecutor::run()
                     visualizeRobot(m_rob_pose, 0, "base_checkIKPLAN_fail", v_id);
                 } else {
                     // you can grasp it now!
-                    rcta_msgs::RepositionBaseCommandResult result;
-                    result.result = rcta_msgs::RepositionBaseCommandResult::SUCCESS;
+                    cmu_manipulation_msgs::RepositionBaseCommandResult result;
+                    result.result = cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS;
 
                     geometry_msgs::PoseStamped p;
                     transformToOutputFrame(m_rob_pose, p);
@@ -391,8 +391,8 @@ int RepositionBaseExecutor::run()
                     gascan_pose,
                     candidate_base_poses))
             {
-                rcta_msgs::RepositionBaseCommandResult result;
-                result.result = rcta_msgs::RepositionBaseCommandResult::SUCCESS;
+                cmu_manipulation_msgs::RepositionBaseCommandResult result;
+                result.result = cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS;
                 result.candidate_base_poses = candidate_base_poses;
                 as_->setSucceeded(result);
                 status_ = RepositionBaseExecutionStatus::IDLE;
@@ -402,14 +402,14 @@ int RepositionBaseExecutor::run()
                     m_obj_pose,
                     candidate_base_poses))
             {
-                rcta_msgs::RepositionBaseCommandResult result;
-                result.result = rcta_msgs::RepositionBaseCommandResult::SUCCESS;
+                cmu_manipulation_msgs::RepositionBaseCommandResult result;
+                result.result = cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS;
                 result.candidate_base_poses = candidate_base_poses;
                 as_->setSucceeded(result);
                 status_ = RepositionBaseExecutionStatus::IDLE;
             } else {
-                rcta_msgs::RepositionBaseCommandResult result;
-                result.result = rcta_msgs::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
+                cmu_manipulation_msgs::RepositionBaseCommandResult result;
+                result.result = cmu_manipulation_msgs::RepositionBaseCommandResult::PLANNING_FAILURE_OBJECT_UNREACHABLE;
                 // this pose is same with the initial base pose
                 result.candidate_base_poses = candidate_base_poses;
                 as_->setSucceeded(result);

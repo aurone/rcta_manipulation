@@ -10,8 +10,8 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap_msgs/Octomap.h>
-#include <rcta_msgs/GraspObjectCommandAction.h>
-#include <rcta_msgs/RepositionBaseCommandAction.h>
+#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
+#include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
 #include <ros/ros.h>
 #include <spellbook/msg_utils/msg_utils.h>
 #include <spellbook/utils/RunUponDestruction.h>
@@ -115,13 +115,13 @@ private:
     octomap_msgs::Octomap::ConstPtr last_octomap_;
 
     /// @{ Action Clients and State
-    typedef actionlib::SimpleActionClient<rcta_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
+    typedef actionlib::SimpleActionClient<cmu_manipulation_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool sent_reposition_base_command_;
     bool pending_reposition_base_command_;
 
     actionlib::SimpleClientGoalState last_reposition_base_goal_state_;
-    rcta_msgs::RepositionBaseCommandResult::ConstPtr last_reposition_base_result_;
+    cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr last_reposition_base_result_;
 
     typedef actionlib::SimpleActionClient<hdt_control_msgs::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
     std::unique_ptr<TeleportAndaliteCommandActionClient> teleport_andalite_command_client_;
@@ -139,13 +139,13 @@ private:
     actionlib::SimpleClientGoalState last_teleport_hdt_goal_state_;
     hdt_control_msgs::TeleportHDTCommandResult::ConstPtr last_teleport_hdt_result_;
 
-    typedef actionlib::SimpleActionClient<rcta_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
+    typedef actionlib::SimpleActionClient<cmu_manipulation_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
     bool sent_grasp_object_command_;
     bool pending_grasp_object_command_;
 
     actionlib::SimpleClientGoalState last_grasp_object_goal_state_;
-    rcta_msgs::GraspObjectCommandResult::ConstPtr last_grasp_object_result_;
+    cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr last_grasp_object_result_;
     /// @}
 
     /// @{ Currently-being-processed samples/candidates
@@ -157,10 +157,10 @@ private:
     /// @}
 
     void reposition_base_active_cb();
-    void reposition_base_feedback_cb(const rcta_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback);
+    void reposition_base_feedback_cb(const cmu_manipulation_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback);
     void reposition_base_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta_msgs::RepositionBaseCommandResult::ConstPtr& result);
+            const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
 
     void teleport_andalite_active_cb();
     void teleport_andalite_feedback_cb(const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
@@ -175,10 +175,10 @@ private:
             const hdt_control_msgs::TeleportHDTCommandResult::ConstPtr& result);
 
     void grasp_object_active_cb();
-    void grasp_object_feedback_cb(const rcta_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
+    void grasp_object_feedback_cb(const cmu_manipulation_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
     void grasp_object_result_cb(
             const actionlib::SimpleClientGoalState& state,
-            const rcta_msgs::GraspObjectCommandResult::ConstPtr& result);
+            const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result);
 
     std::vector<geometry_msgs::PoseStamped> create_sample_object_poses() const;
 

@@ -259,7 +259,7 @@ int RetrieveObjectSimulator::run()
 
                 static int reposition_base_goal_id = 0;
 
-                rcta_msgs::RepositionBaseCommandGoal goal;
+                cmu_manipulation_msgs::RepositionBaseCommandGoal goal;
                 goal.id = reposition_base_goal_id++;
                 goal.gas_can_in_map.header.seq = 0;
                 goal.gas_can_in_map.header.stamp = now;
@@ -293,7 +293,7 @@ int RetrieveObjectSimulator::run()
                 // command finished
                 if (last_reposition_base_goal_state_ != actionlib::SimpleClientGoalState::SUCCEEDED ||
                     !last_reposition_base_result_ ||
-                    last_reposition_base_result_->result != rcta_msgs::RepositionBaseCommandResult::SUCCESS ||
+                    last_reposition_base_result_->result != cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS ||
                     last_reposition_base_result_->candidate_base_poses.empty())
                 {
                     // candidate generation for this object pose was not successful, attempt the next object pose
@@ -301,7 +301,7 @@ int RetrieveObjectSimulator::run()
                     ROS_WARN("     -> Goal State: %s", last_reposition_base_goal_state_.toString().c_str());
                     ROS_WARN("     -> Last Result Ptr: %p", last_reposition_base_result_.get());
                     ROS_WARN("     -> Last Result Success: %s",
-                            boolstr(last_reposition_base_result_ && last_reposition_base_result_->result == rcta_msgs::RepositionBaseCommandResult::SUCCESS));
+                            boolstr(last_reposition_base_result_ && last_reposition_base_result_->result == cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS));
                     ROS_WARN("     -> Last Result Candidates: %zd",
                             last_reposition_base_result_ ? last_reposition_base_result_->candidate_base_poses.size() : 0);
                     sent_reposition_base_command_ = false;
@@ -410,7 +410,7 @@ int RetrieveObjectSimulator::run()
             if (!sent_grasp_object_command_) {
                 static int grasp_object_command_goal_id = 0;
 
-                rcta_msgs::GraspObjectCommandGoal goal;
+                cmu_manipulation_msgs::GraspObjectCommandGoal goal;
                 goal.id = grasp_object_command_goal_id++;
                 goal.retry_count = 0;
 
@@ -459,7 +459,7 @@ int RetrieveObjectSimulator::run()
             if (!pending_grasp_object_command_) {
                 if (last_grasp_object_goal_state_ != actionlib::SimpleClientGoalState::SUCCEEDED ||
                     !last_grasp_object_result_ ||
-                    last_grasp_object_result_->result != rcta_msgs::GraspObjectCommandResult::SUCCESS)
+                    last_grasp_object_result_->result != cmu_manipulation_msgs::GraspObjectCommandResult::SUCCESS)
                 {
                     // log failure
                     ROS_WARN("    Grasp Object Command failed");
@@ -496,14 +496,14 @@ void RetrieveObjectSimulator::reposition_base_active_cb()
 }
 
 void RetrieveObjectSimulator::reposition_base_feedback_cb(
-    const rcta_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
+    const cmu_manipulation_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback)
 {
     ROS_INFO("Reposition Base Command Feedback!");
 }
 
 void RetrieveObjectSimulator::reposition_base_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta_msgs::RepositionBaseCommandResult::ConstPtr& result)
+    const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result)
 {
     ROS_INFO("  Reposition Base Command Result!");
     last_reposition_base_goal_state_ = state;
@@ -558,14 +558,14 @@ void RetrieveObjectSimulator::grasp_object_active_cb()
     ROS_INFO("Grasp Object Command Active!");
 }
 
-void RetrieveObjectSimulator::grasp_object_feedback_cb(const rcta_msgs::GraspObjectCommandFeedback::ConstPtr& feedback)
+void RetrieveObjectSimulator::grasp_object_feedback_cb(const cmu_manipulation_msgs::GraspObjectCommandFeedback::ConstPtr& feedback)
 {
     ROS_INFO("Grasp Object Command Feedback!");
 }
 
 void RetrieveObjectSimulator::grasp_object_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const rcta_msgs::GraspObjectCommandResult::ConstPtr& result)
+    const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result)
 {
     ROS_INFO("  Grasp Object Command Result!");
     last_grasp_object_goal_state_ = state;
