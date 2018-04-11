@@ -717,7 +717,14 @@ bool RepositionBaseExecutor::initialize()
 
 bool RepositionBaseExecutor::initGraspPlanner(ros::NodeHandle& nh)
 {
+    std::string grasp_planner_plugin;
+    if (!nh.getParam("grasp_planner_plugin", grasp_planner_plugin)) {
+        ROS_ERROR("Failed to retrieve 'grasp_planner_plugin' from the param server");
+        return false;
+    }
+
     ros::NodeHandle grasping_nh(nh, "grasping");
+
     if (!m_grasp_planner.init(grasping_nh)) {
         return false;
     }
