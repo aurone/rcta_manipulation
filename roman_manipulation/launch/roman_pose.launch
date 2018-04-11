@@ -4,24 +4,34 @@
     <arg name="ns" default="false"/>
 
     <group if="$(arg live)">
-        <node name="abs_nwu_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 abs_nwu map 10"/>
         <group if="$(arg fake)">
-            <node name="map_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 abs_nwu base_footprint 10"/>
+            <!-- LIVE/FAKE -->
+            <node name="abs_nwu_broadcaster" pkg="tf" type="static_transform_publisher"
+                    args="0 0 0 0 0 0 abs_nwu map 10"/>
+            <node name="map_broadcaster" pkg="tf" type="static_transform_publisher"
+                    args="0 0 0 0 0 0 abs_nwu base_footprint 10"/>
+        </group>
+        <group unless="$(arg fake)">
+            <!-- LIVE/REAL -->
+            <node name="abs_nwu_broadcaster" pkg="tf" type="static_transform_publisher"
+                    args="0 0 0 0 0 0 abs_nwu map 10"/>
         </group>
     </group>
     <group unless="$(arg live)">
-        <!-- to be removed: here solely to be able to use bag files with data stamped with the abs_nwu frame -->
-        <node name="abs_nwu_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 abs_nwu map 10"/>
-
         <group if="$(arg fake)">
-            <!-- fake localization -->
-            <node name="map_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 abs_nwu odom_combined 10"/>
+            <!-- SIM/FAKE -->
+            <node name="fake_localization" pkg="tf" type="static_transform_publisher"
+                    args="0 0 0 0 0 0 map odom_combined 10"/>
         </group>
         <group unless="$(arg fake)">
-            <node name="hector_mapping" pkg="hector_mapping" type="hector_mapping">
+            <!-- SIM/REAL -->
+            <node name="fake_localization" pkg="tf" type="static_transform_publisher"
+                    args="0 0 0 0 0 0 map odom_combined 10"/>
+            <!--node name="hector_mapping" pkg="hector_mapping" type="hector_mapping">
                 <rosparam command="load" file="$(find roman_manipulation)/config/hector_mapping.yaml"/>
                 <remap from="scan" to="base_scan"/>
-            </node>
+            </node-->
         </group>
     </group>
 </launch>
+
