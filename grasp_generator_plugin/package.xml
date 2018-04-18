@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>grasp_generator_plugin</name>
+    <version>0.0.0</version>
+    <description>The grasp_generator_plugin package</description>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <license>BSD</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>pluginlib</depend>
+    <depend>grasp_generator_msgs</depend>
+    <depend>grasp_planner_interface</depend>
+    <depend>actionlib</depend>
+
+    <export>
+        <grasp_planner_interface plugin="$prefix/pluginlib/grasp_generator_plugin.xml"/>
+    </export>
+</package>
