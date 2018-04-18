@@ -136,17 +136,6 @@ bool HDTRobotModel::computePlanningLinkFK(
     return true;
 }
 
-std::string to_string(const Eigen::Affine3d& transform)
-{
-    const Eigen::Vector3d translation(transform.translation());
-    const Eigen::Quaterniond rotation(transform.rotation());
-    std::stringstream ss;
-    ss << "translation(x, y, z): (" << translation.x() << ", " << translation.y() << ", " << translation.z() << ")";
-    ss << " ";
-    ss << "rotation(w, x, y, z): (" << rotation.w() << ", " << rotation.x() << ", " << rotation.y() << ", " << rotation.z() << ")";
-    return ss.str();
-}
-
 bool HDTRobotModel::computeIK(
     const std::vector<double>& pose,
     const std::vector<double>& start,
@@ -257,10 +246,10 @@ bool HDTRobotModel::computeIK(
     }
 
     for (const auto& solution : solutions) {
-        ROS_WARN("    %s", ::to_string(solution).c_str());
+        ROS_WARN("    %s", to_string(solution).c_str());
         Eigen::Affine3d fk_sol;
         robot_model_->compute_fk(solution, fk_sol);
-        ROS_WARN("    fk: %s", ::to_string(fk_sol).c_str());
+        ROS_WARN("    fk: %s", to_string(fk_sol).c_str());
     }
     if(solutions.size() > 10){
       ROS_WARN("Generated %zd IK solutions!", solutions.size());

@@ -1,5 +1,5 @@
-#ifndef RCTA_GRASP_PLANNER_PLUGIN_H
-#define RCTA_GRASP_PLANNER_PLUGIN_H
+#ifndef GRASP_PLANNER_INTERFACE_GRASP_PLANNER_PLUGIN_H
+#define GRASP_PLANNER_INTERFACE_GRASP_PLANNER_PLUGIN_H
 
 #include <string>
 #include <vector>
@@ -7,6 +7,8 @@
 #include <Eigen/Dense>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+
+#include <grasp_planner_interface/grasp.h>
 
 // gascan:
 //  inputs:
@@ -29,14 +31,6 @@
 //
 
 namespace rcta {
-
-struct Grasp
-{
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    Eigen::Affine3d pose;
-    double u;
-};
 
 class GraspPlannerPlugin
 {

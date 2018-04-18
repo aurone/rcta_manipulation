@@ -11,12 +11,13 @@ find_package(
     COMPONENTS
         actionlib
         eigen_conversions
-        gascan_grasp_planning
+        grasp_planner_interface
         grasping_executive
         hdt_kinematics
         leatherman
         moveit_core
         moveit_ros_planning
+        pluginlib
         rcta_manipulation_common
         robotiq_controllers
         roscpp
@@ -48,11 +49,12 @@ target_link_libraries(
     ${SBPL_LIBRARIES}
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
-    ${gascan_grasp_planning_LIBRARIES}
+    ${grasp_planner_interface_LIBRARIES}
     ${hdt_kinematics_LIBRARIES}
     ${leatherman_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
+    ${pluginlib_LIBRARIES}
     ${robotiq_controllers_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}

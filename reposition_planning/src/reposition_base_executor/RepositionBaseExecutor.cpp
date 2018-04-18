@@ -13,7 +13,8 @@
 #include <actionlib/server/simple_action_server.h>
 #include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
 #include <eigen_conversions/eigen_msg.h>
-#include <gascan_grasp_planning/gascan_grasp_planner.h>
+#include <grasp_planner_interface/grasp_planner_plugin.h>
+#include <grasp_planner_interface/grasp_utils.h>
 #include <grasping_executive/MoveArmAction.h>
 #include <hdt_kinematics/RobotModel.h>
 #include <leatherman/utils.h>
@@ -21,6 +22,7 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
+#include <pluginlib/class_loader.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
 #include <ros/ros.h>
 #include <smpl/debug/visualizer_ros.h>
@@ -40,6 +42,8 @@
 
 //xytheta collision checking!
 #include "xytheta_collision_checker.h"
+
+namespace rcta {
 
 enum struct RepositionBaseExecutionStatus
 {
@@ -205,12 +209,12 @@ private:
     ///@{
     std::unique_ptr<XYThetaCollisionChecker> cc_;
 
-    double m_arm_front_offset_x;
-    double m_arm_front_offset_y;
-    double m_arm_length;
-    double m_arm_length_core;
-    double m_body_length;
-    double m_body_length_core;
+    double m_arm_front_offset_x = 0.0;
+    double m_arm_front_offset_y = 0.0;
+    double m_arm_length = 0.0;
+    double m_arm_length_core = 0.0;
+    double m_body_length = 0.0;
+    double m_body_length_core = 0.0;
     ///@}
 
     /// \name Visibility Constraints
@@ -222,11 +226,13 @@ private:
     ///@{
     // the hand-generated grasping spline is done in model coordinates
     // and requires at least the scale to be brought into world coordinates
-    rcta::GascanGraspPlanner m_grasp_planner;
-    int m_max_grasp_samples;
+    pluginlib::ClassLoader<GraspPlannerPlugin> m_grasp_planner_loader;
+    using GraspPlannerPluginPtr = class_loader::ClassLoader::UniquePtr<GraspPlannerPlugin>;
+    GraspPlannerPluginPtr m_grasp_planner;
+    int m_max_grasp_samples = 0;
     ///@}
 
-    bool m_check_reach;
+    bool m_check_reach = true;
     au::grid<3, bool> m_reachable_table;
 
     /// \name Arm Planning Constraints
@@ -249,7 +255,7 @@ private:
     Eigen::Affine3d m_T_grid_model;
 
     // 0 -> model frame, 1 -> object frame, 2 -> grid frame
-    int m_cand_frame_option;
+    int m_cand_frame_option = 0;
 
     /// \name Initialization
     ///@{
@@ -290,16 +296,16 @@ private:
     bool generateFilteredGraspCandidates(
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& object_pose,
-        std::vector<rcta::GraspCandidate>& candidates);
+        std::vector<Grasp>& candidates);
 
     void pruneGraspCandidates(
-        std::vector<rcta::GraspCandidate>& candidates,
+        std::vector<Grasp>& candidates,
         const Eigen::Affine3d& robot_pose,
         const Eigen::Affine3d& camera_pose,
         double marker_incident_angle_threshold_rad) const;
 
     void pruneGraspCandidatesIK(
-        std::vector<rcta::GraspCandidate>& candidates,
+        std::vector<Grasp>& candidates,
         const Eigen::Affine3d& T_grasp_robot) const;
     ///@}
 
@@ -415,7 +421,7 @@ private:
 
     visualization_msgs::MarkerArray
     getGraspCandidatesVisualization(
-        const std::vector<rcta::GraspCandidate>& grasp,
+        const std::vector<Grasp>& grasp,
         const std::string& ns) const;
 
     void visualizeRobot(
@@ -484,42 +490,15 @@ double quad(double best, double value, double max_best_dist, double scale)
 }
 
 RepositionBaseExecutor::RepositionBaseExecutor() :
-    nh_(),
     ph_("~"),
-    pgrasp_map_pub_(),
-    pobs_map_pub_(),
-    pgrasp_exhaustive_map_pub_(),
-    listener_(),
     viz_(ph_),
     action_name_("reposition_base_command"),
-    as_(),
-    rml_(),
-    robot_model_(),
     manip_group_(nullptr),
-    manip_name_(),
-    m_state_monitor(),
-    camera_view_frame_(),
-    T_mount_robot_(),
-    cc_(),
-    m_arm_front_offset_x(0.0),
-    m_arm_front_offset_y(0.0),
-    m_arm_length(0.0),
-    m_arm_length_core(0.0),
-    m_body_length(0.0),
-    m_body_length_core(0.0),
-    attached_markers_(),
-    m_max_grasp_samples(0),
-    m_check_reach(true),
-    m_reachable_table(),
-    move_arm_command_client_(),
     move_arm_command_action_name_("move_arm"),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
-    move_arm_command_result_(),
-    robot_pose_world_frame_(),
-    current_goal_(),
     status_(RepositionBaseExecutionStatus::INVALID),
     last_status_(RepositionBaseExecutionStatus::INVALID),
-    m_cand_frame_option(0)
+    m_grasp_planner_loader("grasp_planner_interface", "rcta::GraspPlannerPlugin")
 {
     sbpl::viz::set_visualizer(&viz_);
 }
@@ -723,9 +702,19 @@ bool RepositionBaseExecutor::initGraspPlanner(ros::NodeHandle& nh)
         return false;
     }
 
-    ros::NodeHandle grasping_nh(nh, "grasping");
+    ROS_INFO("Load grasp planner plugin '%s'", grasp_planner_plugin.c_str());
 
-    if (!m_grasp_planner.init(grasping_nh)) {
+    m_grasp_planner =
+            m_grasp_planner_loader.createUniqueInstance(grasp_planner_plugin);
+    if (!m_grasp_planner) {
+        ROS_ERROR("Failed to create grasp planner");
+        return false;
+    }
+
+    ROS_INFO("Initialize grasp planner plugin");
+    ros::NodeHandle grasp_nh(nh, "grasping");
+    if (!m_grasp_planner->init(nh_, grasp_nh)) {
+        ROS_ERROR("Failed to initialize grasp planner");
         return false;
     }
 
@@ -1740,7 +1729,7 @@ bool RepositionBaseExecutor::computeRobPoseExhaustive(
 
 /// \brief Filter grasp candidates by kinematics and visibility
 void RepositionBaseExecutor::pruneGraspCandidates(
-    std::vector<rcta::GraspCandidate>& candidates,
+    std::vector<Grasp>& candidates,
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& camera_pose,
     double marker_incident_angle_threshold_rad) const
@@ -1754,7 +1743,7 @@ void RepositionBaseExecutor::pruneGraspCandidates(
     }
 
     // run this first since this is significantly less expensive than IK
-    rcta::PruneGraspsByVisibility(
+    PruneGraspsByVisibility(
             candidates,
             marker_poses,
             camera_pose,
@@ -1765,17 +1754,17 @@ void RepositionBaseExecutor::pruneGraspCandidates(
 
 /// \brief Filter grasp candidates by kinematic feasibility (inverse kinematics)
 void RepositionBaseExecutor::pruneGraspCandidatesIK(
-    std::vector<rcta::GraspCandidate>& candidates,
+    std::vector<Grasp>& candidates,
     const Eigen::Affine3d& T_grasp_robot) const
 {
     ROS_INFO("Filter %zu grasp candidate via IK", candidates.size());
-    std::vector<rcta::GraspCandidate> filtered_candidates;
+    std::vector<Grasp> filtered_candidates;
     filtered_candidates.reserve(candidates.size());
 
     int pregrasp_ik_filter_count = 0;
     int grasp_ik_filter_count = 0;
 
-    for (const rcta::GraspCandidate& grasp_candidate : candidates) {
+    for (const Grasp& grasp_candidate : candidates) {
         moveit::core::RobotState robot_state(robot_model_);
         robot_state.setToDefaultValues();
         // place the robot in the grasp frame
@@ -1794,18 +1783,14 @@ void RepositionBaseExecutor::pruneGraspCandidatesIK(
         // check for an ik solution to the grasp pose
         if (!robot_state.setFromIK(
             manip_group_,
-            grasp_candidate.pose * m_grasp_planner.pregraspToGrasp()))
+            grasp_candidate.pose * m_grasp_planner->pregraspToGrasp()))
         {
             ++grasp_ik_filter_count;
             continue;
         }
 
         // push back this grasp pose
-        rcta::GraspCandidate reachable_grasp_candidate(
-                grasp_candidate.pose,
-                grasp_candidate.pose_in_object,
-                grasp_candidate.u);
-        filtered_candidates.push_back(reachable_grasp_candidate);
+        filtered_candidates.push_back(grasp_candidate);
         ROS_DEBUG("Pregrasp pose: %s", to_string(grasp_candidate.pose).c_str());
 
         // log the ik solution to the grasp pose
@@ -1828,14 +1813,18 @@ void RepositionBaseExecutor::pruneGraspCandidatesIK(
 bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose,
-    std::vector<rcta::GraspCandidate>& candidates)
+    std::vector<Grasp>& candidates)
 {
     // generate grasps in the world frame
     int max_samples = m_max_grasp_samples; //100;
-    if (!m_grasp_planner.sampleGrasps(object_pose, max_samples, candidates)) {
+    if (!m_grasp_planner->planGrasps(
+            "gascan", object_pose, NULL, max_samples, candidates))
+    {
         ROS_ERROR("Failed to sample grasps");
         return false;
     }
+
+    // TODO: transform to pregrasp as in grasp object executor?
 
     ROS_INFO("Sampled %zd grasp poses", candidates.size());
     SV_SHOW_INFO(getGraspCandidatesVisualization(candidates, "grasp_candidates_checkIKPLAN"));
@@ -1853,7 +1842,13 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
 
     ROS_INFO("Produced %zd feasible grasp poses", candidates.size());
 
-    rcta::RankGrasps(candidates);
+    sort(begin(candidates), end(candidates),
+            [](const Grasp& a, const Grasp& b)
+            {
+                return a.u < b.u;
+            });
+
+//    RankGrasps(candidates);
 
     SV_SHOW_INFO(getGraspCandidatesVisualization(candidates, "grasp_candidates_checkIKPLAN_filtered"));
 
@@ -2007,7 +2002,7 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 {
     ROS_INFO("check for feasible arm trajectory!");
 
-    std::vector<rcta::GraspCandidate> grasp_candidates;
+    std::vector<Grasp> grasp_candidates;
     if (!generateFilteredGraspCandidates(robot_pose, object_pose, grasp_candidates)) {
         return 1;
     }
@@ -2019,7 +2014,7 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
 
     // wait for move arm action to come up
     ROS_WARN("wait for action '%s' to come up", move_arm_command_action_name_.c_str());
-    if (!rcta::ReconnectActionClient(
+    if (!ReconnectActionClient(
             move_arm_command_client_,
             move_arm_command_action_name_,
             ros::Rate(10),
@@ -2034,7 +2029,7 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
     // a new service that can plan simultaneously for all grasp poses
     for (size_t gidx = 0; gidx < grasp_candidates.size(); ++gidx) {
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
-        const rcta::GraspCandidate& grasp = grasp_candidates[gidx];
+        const Grasp& grasp = grasp_candidates[gidx];
 
         grasping_executive::MoveArmGoal pregrasp_goal;
         pregrasp_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
@@ -2139,7 +2134,7 @@ bool RepositionBaseExecutor::checkIK(
     const Eigen::Affine3d& robot_pose,
     const Eigen::Affine3d& object_pose)
 {
-    std::vector<rcta::GraspCandidate> candidates;
+    std::vector<Grasp> candidates;
     if (!generateFilteredGraspCandidates(robot_pose, object_pose, candidates)) {
         return 0;
     }
@@ -2285,10 +2280,10 @@ void RepositionBaseExecutor::visualizeBaseCandidates(
 /// \brief Visualize world-frame grasp candidates
 visualization_msgs::MarkerArray
 RepositionBaseExecutor::getGraspCandidatesVisualization(
-    const std::vector<rcta::GraspCandidate>& grasps,
+    const std::vector<Grasp>& grasps,
     const std::string& ns) const
 {
-    return rcta::GetGraspCandidatesVisualization(grasps, robot_model_->getModelFrame(), ns);
+    return GetGraspCandidatesVisualization(grasps, robot_model_->getModelFrame(), ns);
 }
 
 void RepositionBaseExecutor::visualizeRobot(
@@ -2358,8 +2353,10 @@ std_msgs::ColorRGBA RepositionBaseExecutor::rainbow(double d) const
 // farthest from the origin of object
 #undef METRICS_DEPRECATED
 
+} // namespace rcta
+
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "hdt_base_planning");
-    return RepositionBaseExecutor().run();
+    return rcta::RepositionBaseExecutor().run();
 }

@@ -11,6 +11,8 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <hdt_kinematics/RobotModel.h>
 
+std::string to_string(const trajectory_msgs::JointTrajectoryPoint& traj_point);
+
 namespace hdt {
 
 class JointTrajectoryExecutor
@@ -97,7 +99,6 @@ private:
     trajectory_msgs::JointTrajectory create_empty_command() const;
 
     /// @brief Return the index of a joint or -1 if it is not found
-    std::string to_string(const trajectory_msgs::JointTrajectoryPoint& traj_point) const;
     int find_joint_index(const std::string& joint_name, const trajectory_msgs::JointTrajectory& joint_traj) const;
 };
 
@@ -271,10 +272,10 @@ bool JointTrajectoryExecutor::within_goal_constraints(
     }
     ROS_INFO("    End Effector Status: %s", ee_outside ? "OUTSIDE" : "WITHIN");
 
-    ROS_INFO("    Actual Joint Positions: %s", ::to_string(ToDegrees(msg->actual.positions)).c_str());
-    ROS_INFO("    Target Joint Positions: %s", ::to_string(ToDegrees(traj.points[last].positions)).c_str());
-    ROS_INFO("    Actual EE Pose: %s", ::to_string(actual_ee_pose).c_str());
-    ROS_INFO("    Target EE Pose: %s", ::to_string(target_ee_pose).c_str());
+    ROS_INFO("    Actual Joint Positions: %s", to_string(ToDegrees(msg->actual.positions)).c_str());
+    ROS_INFO("    Target Joint Positions: %s", to_string(ToDegrees(traj.points[last].positions)).c_str());
+    ROS_INFO("    Actual EE Pose: %s", to_string(actual_ee_pose).c_str());
+    ROS_INFO("    Target EE Pose: %s", to_string(target_ee_pose).c_str());
 
     return !(joints_outside || ee_outside);
 }
@@ -531,7 +532,23 @@ int JointTrajectoryExecutor::find_joint_index(const std::string& joint_name, con
     return -1;
 }
 
-std::string JointTrajectoryExecutor::to_string(const trajectory_msgs::JointTrajectoryPoint& traj_point) const
+trajectory_msgs::JointTrajectory JointTrajectoryExecutor::create_empty_command() const
+{
+    trajectory_msgs::JointTrajectory empty;
+    empty.joint_names = joint_names_;
+    return empty;
+}
+
+void JointTrajectoryExecutor::clear_active_goal()
+{
+    has_active_goal_ = false;
+    current_traj_.points.clear();
+    current_segment_ = -1;
+}
+
+} // namespace hdt
+
+std::string to_string(const trajectory_msgs::JointTrajectoryPoint& traj_point)
 {
     std::stringstream ss;
     ss << "(";
@@ -551,22 +568,6 @@ std::string JointTrajectoryExecutor::to_string(const trajectory_msgs::JointTraje
     ss << ")";
     return ss.str();
 }
-
-trajectory_msgs::JointTrajectory JointTrajectoryExecutor::create_empty_command() const
-{
-    trajectory_msgs::JointTrajectory empty;
-    empty.joint_names = joint_names_;
-    return empty;
-}
-
-void JointTrajectoryExecutor::clear_active_goal()
-{
-    has_active_goal_ = false;
-    current_traj_.points.clear();
-    current_segment_ = -1;
-}
-
-} // namespace hdt
 
 int main(int argc, char** argv)
 {

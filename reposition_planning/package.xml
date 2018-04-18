@@ -12,6 +12,7 @@
     <depend>actionlib</depend>
     <depend>eigen_conversions</depend>
     <depend>gascan_grasp_planning</depend>
+    <depend>grasp_planner_interface</depend>
     <depend>grasping_executive</depend>
     <depend>hdt_kinematics</depend>
     <depend>leatherman</depend>
@@ -19,6 +20,7 @@
     <depend>liburdfdom-headers-dev</depend>
     <depend>moveit_core</depend>
     <depend>moveit_ros_planning</depend>
+    <depend>pluginlib</depend>
     <depend>rcta_manipulation_common</depend>
     <depend>robotiq_controllers</depend>
     <depend>roscpp</depend>
