@@ -16,6 +16,7 @@ find_package(
         gascan_grasp_planning
         geometric_shapes
         geometry_msgs
+        grasp_planner_interface
         hdt_control_msgs
         hdt_kinematics
         interactive_markers
@@ -131,19 +132,14 @@ target_link_libraries(
     ${spellbook_ros_LIBRARIES})
 add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
 
-add_library(
-    grasp_planner_plugin
-    src/grasp_object_executor/grasp_planner_plugin.cpp)
-target_link_libraries(grasp_planner_plugin ${roscpp_LIBRARIES})
-
 add_executable(
     grasp_object_executor
     src/grasp_object_executor/grasp_object_executor.cpp)
 target_link_libraries(
     grasp_object_executor
-    grasp_planner_plugin
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
+    ${grasp_planner_interface_LIBRARIES}
     ${leatherman_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
@@ -160,8 +156,8 @@ add_library(
     src/grasp_object_executor/gascan_grasp_planner_plugin.cpp)
 target_link_libraries(
     gascan_grasp_planner_plugin
-    grasp_planner_plugin
     ${gascan_grasp_planning_LIBRARIES}
+    ${grasp_planner_interface_LIBRARIES}
     ${pluginlib_LIBRARIES})
 
 qt4_wrap_cpp(
@@ -236,8 +232,6 @@ install(
         stow_arm
         grasp_object_executor
         grasping_command_panel_plugin
-        grasp_planner_plugin
-        gascan_grasp_planner_plugin
 #        hdt_pick_and_place_plugin
         gripper_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

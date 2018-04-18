@@ -13,6 +13,7 @@
 #include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <grasp_planner_interface/grasp_planner_plugin.h>
 #include <hdt_control_msgs/ViservoCommandAction.h>
 #include <leatherman/print.h>
 #include <moveit/planning_scene_monitor/current_state_monitor.h>
@@ -43,7 +44,6 @@
 
 // project includes
 #include <grasping_executive/MoveArmAction.h>
-#include "grasp_planner_plugin.h"
 
 namespace Eigen {
 

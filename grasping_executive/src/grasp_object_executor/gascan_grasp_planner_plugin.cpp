@@ -1,4 +1,4 @@
-#include "grasp_planner_plugin.h"
+#include <grasp_planner_interface/grasp_planner_plugin.h>
 
 #include <gascan_grasp_planning/gascan_grasp_planner.h>
 
