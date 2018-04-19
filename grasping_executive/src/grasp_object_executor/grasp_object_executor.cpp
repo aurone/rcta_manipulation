@@ -32,7 +32,6 @@
 #include <ros/ros.h>
 #include <smpl/angles.h>
 #include <smpl/debug/visualizer_ros.h>
-#include <spellbook/costmap_extruder/CostmapExtruder.h>
 #include <spellbook/geometry/nurb/NURB.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
 #include <spellbook/msg_utils/msg_utils.h>
@@ -112,7 +111,6 @@ struct GraspObjectExecutor
     ros::NodeHandle m_ph = ros::NodeHandle("~");
 
     ros::Publisher  m_filtered_costmap_pub;
-    ros::Publisher  m_extrusion_octomap_pub;
     ros::Publisher  m_attach_obj_pub;
     ros::Subscriber m_costmap_sub;
     ros::Subscriber m_octomap_sub;
@@ -136,7 +134,6 @@ struct GraspObjectExecutor
 
     robot_model_loader::RobotModelLoaderPtr         m_rml;
     moveit::core::RobotModelPtr                     m_robot_model;
-    CostmapExtruder m_extruder = CostmapExtruder(100, false);
     pluginlib::ClassLoader<GraspPlannerPlugin>      m_grasp_planner_loader;
     GraspPlannerPluginPtr                           m_grasp_planner;
     planning_scene_monitor::CurrentStateMonitorPtr  m_state_monitor;
@@ -150,11 +147,8 @@ struct GraspObjectExecutor
     moveit::core::JointModelGroup* m_manip_group = NULL;
 
     /// Circumscribed radius of the object, used to remove object cells from
-    /// the occupancy grid and extruded octomap
+    /// the occupancy grid
     double m_object_filter_radius;
-
-    /// Whether to override incoming octomaps with an extruded costmap variant
-    bool m_use_extrusion_octomap = false;
 
     bool m_skip_viservo = false;
     bool m_attach_object = false;
@@ -189,9 +183,6 @@ struct GraspObjectExecutor
 
     /// copy of most recent OccupancyGrid message when the goal was received
     nav_msgs::OccupancyGridPtr m_current_occupancy_grid;
-
-    /// extruded current occupancy grid
-    octomap_msgs::OctomapPtr m_current_octomap;
 
     Eigen::Affine3d m_obj_pose;
     Eigen::Affine3d m_T_grid_model;
@@ -818,11 +809,6 @@ bool GraspObjectExecutor::initialize()
         }
     }
 
-    if (!msg_utils::download_param(m_ph, "use_extrusion_octomap", m_use_extrusion_octomap)) {
-        ROS_ERROR("Failed to retrieve 'use_extrusion_octomap' from the param server");
-        return false;
-    }
-
     if (!msg_utils::download_param(m_ph, "skip_viservo", m_skip_viservo)) {
         ROS_ERROR("Failed to retrieve 'skip_viservo' from the param server");
         return false;
@@ -849,7 +835,6 @@ bool GraspObjectExecutor::initialize()
 
     // publishers
     m_filtered_costmap_pub = m_nh.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
-    m_extrusion_octomap_pub = m_nh.advertise<octomap_msgs::Octomap>("extrusion_octomap", 1);
     m_attach_obj_pub = m_nh.advertise<moveit_msgs::AttachedCollisionObject>(
             "attached_collision_object", 1);
 
@@ -1122,14 +1107,6 @@ void GraspObjectExecutor::goalCallback()
 
         m_filtered_costmap_pub.publish(m_current_occupancy_grid);
     }
-
-    if (m_use_extrusion_octomap && m_current_occupancy_grid) {
-        const double HARDCODED_EXTRUSION = 2.0; // Extrude the occupancy grid from 0m to 2m
-        m_extruder.extrude(*m_current_occupancy_grid, HARDCODED_EXTRUSION, *m_current_octomap);
-        if (m_current_octomap) {
-            m_extrusion_octomap_pub.publish(m_current_octomap);
-        }
-    }
 }
 
 void GraspObjectExecutor::preemptCallback()
@@ -1145,19 +1122,7 @@ void GraspObjectExecutor::onIdleEnter(GraspObjectExecutionStatus from)
 GraspObjectExecutionStatus GraspObjectExecutor::onIdle()
 {
     if (m_server->isActive()) {
-        if (m_use_extrusion_octomap &&
-            (!m_current_occupancy_grid || !m_current_octomap))
-        {
-            cmu_manipulation_msgs::GraspObjectCommandResult result;
-            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            std::string msg = (bool)m_current_occupancy_grid ?
-                    "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
-            ROS_WARN("%s", msg.c_str());
-            m_server->setAborted(result, msg.c_str());
-            return GraspObjectExecutionStatus::FAULT;
-        } else {
-            return GraspObjectExecutionStatus::GENERATING_GRASPS;
-        }
+        return GraspObjectExecutionStatus::GENERATING_GRASPS;
     }
 
     return GraspObjectExecutionStatus::IDLE;
@@ -1176,19 +1141,7 @@ void GraspObjectExecutor::onFaultEnter(GraspObjectExecutionStatus from)
 GraspObjectExecutionStatus GraspObjectExecutor::onFault()
 {
     if (m_server->isActive()) {
-        if (m_use_extrusion_octomap &&
-            (!m_current_occupancy_grid || !m_current_octomap))
-        {
-            cmu_manipulation_msgs::GraspObjectCommandResult result;
-            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
-            std::string msg = (bool)m_current_occupancy_grid ?
-                    "Failed to extrude Occupancy Grid" : "Have yet to receive Occupancy Grid";
-            ROS_WARN("%s", msg.c_str());
-            m_server->setAborted(result, msg.c_str());
-            return GraspObjectExecutionStatus::FAULT;
-        } else {
-            return GraspObjectExecutionStatus::GENERATING_GRASPS;
-        }
+        return GraspObjectExecutionStatus::GENERATING_GRASPS;
     }
 
     return GraspObjectExecutionStatus::FAULT;
@@ -1324,9 +1277,7 @@ auto GraspObjectExecutor::onMovingArmToPregrasp()
 
         tf::poseEigenToMsg(next_best_grasp.pose, m_last_move_arm_pregrasp_goal.goal_pose);
 
-        if (m_use_extrusion_octomap) {
-            m_last_move_arm_pregrasp_goal.octomap = *m_current_octomap;
-        } else if (!m_current_goal->octomap.data.empty()) {
+        if (!m_current_goal->octomap.data.empty()) {
             m_last_move_arm_pregrasp_goal.octomap = m_current_goal->octomap;
         } else if (m_octomap) {
             m_last_move_arm_pregrasp_goal.octomap = *m_octomap;
@@ -1424,9 +1375,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToGrasp()
         tf::poseEigenToMsg(grasp_pose, grasp_goal.goal_pose);
 
         // TODO: use monitored octomap
-        if (m_use_extrusion_octomap) {
-            grasp_goal.octomap = *m_current_octomap;
-        } else if(!m_current_goal->octomap.data.empty()) {
+        if (!m_current_goal->octomap.data.empty()) {
             grasp_goal.octomap = m_current_goal->octomap;
         } else if (m_octomap) {
             grasp_goal.octomap = *m_octomap;
@@ -1967,9 +1916,7 @@ GraspObjectExecutionStatus GraspObjectExecutor::onMovingArmToStow()
         }
 
         // TODO: use monitored
-        if (m_use_extrusion_octomap) {
-            move_arm_stow_goal.octomap = *m_current_octomap;
-        } else if (!m_current_goal->octomap.data.empty()) {
+        if (!m_current_goal->octomap.data.empty()) {
             move_arm_stow_goal.octomap = m_current_goal->octomap;
         } else if (m_octomap) {
             move_arm_stow_goal.octomap = *m_octomap;

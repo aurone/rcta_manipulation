@@ -72,10 +72,6 @@ stow_sequences:
           limb_right_joint7: 180.0
           torso_joint1: 0.0
 
-# whether to extrude the current costmap and use as the octomap for queries to
-# the arm executor
-use_extrusion_octomap: false
-
 # circumscribed radius of the gascan to filter out of the costmap and to use
 # for detection of the gascan
 object_filter_radius_m: 0.3
