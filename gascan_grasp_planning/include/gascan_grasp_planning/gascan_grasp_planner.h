@@ -34,20 +34,6 @@ struct GraspCandidate
     }
 };
 
-visualization_msgs::MarkerArray
-GetGraspCandidatesVisualization(
-    const std::vector<rcta::GraspCandidate>& grasps,
-    const std::string& frame_id,
-    const std::string& ns);
-
-void PruneGraspsByVisibility(
-    std::vector<rcta::GraspCandidate>& grasps,
-    const EigenSTL::vector_Affine3d& marker_poses,
-    const Eigen::Affine3d& camera_pose,
-    double ang_thresh);
-
-void RankGrasps(std::vector<rcta::GraspCandidate>& grasps);
-
 class GascanGraspPlanner
 {
 public:
