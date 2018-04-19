@@ -1676,7 +1676,7 @@ void DoCompleteGoalEnter(
     GraspObjectExecutor* ex,
     GraspObjectExecutionStatus from)
 {
-    if (m_check_for_gascan) {
+    if (ex->m_check_for_gascan) {
         ros::Time now = ros::Time::now();
         ex->m_wait_for_grid_start_time = now;
         ROS_INFO("Waiting for a costmap more recent than %0.3f", now.toSec());
