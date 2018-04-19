@@ -1,5 +1,5 @@
 <launch>
-  <node name="stow_arm_node" pkg="grasping_executive" type="stow_arm" output="screen">
+  <node name="stow_arm_node" pkg="hdt_manipulation" type="stow_arm">
     <!-- load tuck configurations -->
     <rosparam command="load" file="$(find grasping_executive)/config/grasp_object_executor.yaml"/>
   </node>

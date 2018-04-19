@@ -659,7 +659,7 @@ enum MainResult
 
 int main(int argc, char* argv[])
 {
-    ros::init(argc, argv, "hdt_arm_planning_node");
+    ros::init(argc, argv, "move_arm_node");
 
     rcta::MoveArmNode node;
 

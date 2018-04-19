@@ -10,10 +10,13 @@
     <buildtool_depend>catkin</buildtool_depend>
 
     <depend>eigen_conversions</depend>
+    <depend>grasping_executive</depend>
     <depend>leatherman</depend>
     <depend>roscpp</depend>
     <depend>smpl</depend>
     <depend>tf</depend>
     <depend>hdt_kinematics</depend>
     <depend>spellbook_ros</depend>
+
+    <exec_depend>gascan_grasp_planning</exec_depend>
 </package>

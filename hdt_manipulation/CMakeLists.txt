@@ -9,23 +9,28 @@ find_package(Boost REQUIRED)
 
 find_package(Eigen3 REQUIRED)
 
+find_package(SBPL REQUIRED)
+
 find_package(
     catkin
     REQUIRED
     COMPONENTS
+        actionlib
         eigen_conversions
+        grasping_executive
+        hdt_kinematics
         leatherman
         roscpp
         smpl
         spellbook_ros
-        tf
-        hdt_kinematics)
+        tf)
 
 catkin_package()
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
 include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${SBPL_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 
@@ -40,10 +45,36 @@ target_link_libraries(
     ${tf_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
+add_executable(
+    retrieve_object_simulator
+    src/retrieve_object_simulator/CollisionModel2.cpp
+    src/retrieve_object_simulator/RetrieveObjectSimulator.cpp
+    src/retrieve_object_simulator/retrieve_object_simulator.cpp)
+target_link_libraries(
+    retrieve_object_simulator
+    ${SBPL_LIBRARIES}
+    ${actionlib_LIBRARIES}
+    ${eigen_conversions_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${spellbook_ros_LIBRARIES}
+    ${hdt_kinematics_LIBRARIES})
+
+add_executable(stow_arm src/stow_arm/stow_arm.cpp)
+target_link_libraries(
+    stow_arm
+    ${actionlib_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${hdt_kinematics_LIBRARIES}
+    ${spellbook_ros_LIBRARIES})
+#add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
+
 install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 install(
-    TARGETS hdt_arm_planning
+    TARGETS
+        hdt_arm_planning
+        retrieve_object_simulator
+        stow_arm
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})

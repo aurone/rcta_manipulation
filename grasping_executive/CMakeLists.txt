@@ -56,14 +56,7 @@ generate_messages(
         moveit_msgs
         trajectory_msgs)
 
-catkin_package(
-    CATKIN_DEPENDS
-        actionlib_msgs
-        geometry_msgs
-        sensor_msgs
-        octomap_msgs
-        moveit_msgs
-        trajectory_msgs)
+catkin_package()
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
@@ -91,8 +84,7 @@ target_link_libraries(
     ${spellbook_ros_LIBRARIES}
     ${tf_LIBRARIES}
     ${urdf_model_LIBRARIES}
-    ${urdf_parser_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES})
+    ${urdf_parser_LIBRARIES})
 add_dependencies(move_arm_node ${PROJECT_NAME}_generate_messages_cpp)
 
 add_executable(
@@ -103,29 +95,6 @@ target_link_libraries(
     ${leatherman_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${spellbook_ros_LIBRARIES})
-
-add_executable(
-    retrieve_object_simulator
-    src/retrieve_object_simulator/CollisionModel2.cpp
-    src/retrieve_object_simulator/RetrieveObjectSimulator.cpp
-    src/retrieve_object_simulator/retrieve_object_simulator.cpp)
-target_link_libraries(
-    retrieve_object_simulator
-    ${SBPL_LIBRARIES}
-    ${actionlib_LIBRARIES}
-    ${eigen_conversions_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES})
-
-add_executable(stow_arm src/stow_arm/stow_arm.cpp)
-target_link_libraries(
-    stow_arm
-    ${actionlib_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
-add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
 
 add_executable(
     grasp_object_executor
@@ -222,8 +191,6 @@ install(
     TARGETS
         move_arm_node
         costmap_object_detection
-        retrieve_object_simulator
-        stow_arm
         grasp_object_executor
         grasping_command_panel_plugin
 #        hdt_pick_and_place_plugin
