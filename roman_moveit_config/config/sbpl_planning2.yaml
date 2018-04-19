@@ -55,7 +55,7 @@ search_configs:
   ARAConfigDefault:
     search: arastar
     epsilon: 100.0
-    improve_path: false
+    improve_solution: false
     bound_expansions: true
   MHAConfigDefault:
     search: mhastar
