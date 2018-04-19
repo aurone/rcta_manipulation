@@ -80,4 +80,3 @@ object_filter_radius_m: 0.3
 # picked up
 gas_can_detection_threshold: 0.8
 
-skip_viservo: true
