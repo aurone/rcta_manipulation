@@ -570,10 +570,6 @@ struct GraspObjectExecutor
     std::string m_manip_name;
     moveit::core::JointModelGroup* m_manip_group = NULL;
 
-    /// Circumscribed radius of the object, used to remove object cells from
-    /// the occupancy grid
-    double m_object_filter_radius;
-
     bool m_attach_object = false;
 
     ///@}
@@ -595,6 +591,8 @@ struct GraspObjectExecutor
 
     /// \name CompleteGoal Parameters
     ///@{
+    bool m_check_for_gascan = false;
+    double m_object_filter_radius;
     double m_gas_can_detection_threshold = 0.0;
     ///@}
 
@@ -892,12 +890,10 @@ bool GraspObjectExecutor::initialize()
         }
     }
 
-    if (!msg_utils::download_param(m_ph, "object_filter_radius_m", m_object_filter_radius)) {
-        ROS_ERROR("Failed to retrieve 'object_filter_radius_m' from the param server");
-        return false;
-    }
-
-    if (!msg_utils::download_param(m_ph, "gas_can_detection_threshold", m_gas_can_detection_threshold)) {
+    if (!msg_utils::download_param(m_ph, "check_for_gascan", m_check_for_gascan) ||
+        !msg_utils::download_param(m_ph, "object_filter_radius_m", m_object_filter_radius) ||
+        !msg_utils::download_param(m_ph, "gas_can_detection_threshold", m_gas_can_detection_threshold))
+    {
         return false;
     }
 
@@ -1680,14 +1676,23 @@ void DoCompleteGoalEnter(
     GraspObjectExecutor* ex,
     GraspObjectExecutionStatus from)
 {
-    ros::Time now = ros::Time::now();
-    ex->m_wait_for_grid_start_time = now;
-    ROS_INFO("Waiting for a costmap more recent than %0.3f", now.toSec());
+    if (m_check_for_gascan) {
+        ros::Time now = ros::Time::now();
+        ex->m_wait_for_grid_start_time = now;
+        ROS_INFO("Waiting for a costmap more recent than %0.3f", now.toSec());
+    }
 }
 
 auto DoCompleteGoal(GraspObjectExecutor* ex)
     -> GraspObjectExecutionStatus
 {
+    if (!ex->m_check_for_gascan) {
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::SUCCESS;
+        ex->m_server->setSucceeded(result);
+        return GraspObjectExecutionStatus::IDLE;
+    }
+
     ////////////////////////////////////
     // wait for a fresh occupancy map //
     ////////////////////////////////////

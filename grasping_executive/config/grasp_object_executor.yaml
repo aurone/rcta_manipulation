@@ -1,6 +1,7 @@
 manipulator_group_name: right_arm_and_torso
 max_grasp_candidates: 4
 grasp_planner_plugin: rcta/GascanGraspPlannerPlugin
+check_for_gascan: false
 
 stow_sequences:
 #    -
