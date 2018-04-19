@@ -8,4 +8,12 @@
     <license>BSD</license>
 
     <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>eigen_conversions</depend>
+    <depend>leatherman</depend>
+    <depend>roscpp</depend>
+    <depend>smpl</depend>
+    <depend>tf</depend>
+    <depend>hdt_kinematics</depend>
+    <depend>spellbook_ros</depend>
 </package>

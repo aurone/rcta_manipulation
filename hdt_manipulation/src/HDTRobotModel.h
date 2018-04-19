@@ -4,12 +4,10 @@
 // system includes
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
+#include <hdt_kinematics/RobotModel.h>
 #include <ros/ros.h>
 #include <smpl/robot_model.h>
 #include <urdf/model.h>
-
-// project includes
-#include <hdt_kinematics/RobotModel.h>
 
 namespace hdt {
 

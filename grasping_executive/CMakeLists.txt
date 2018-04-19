@@ -56,7 +56,14 @@ generate_messages(
         moveit_msgs
         trajectory_msgs)
 
-catkin_package(CATKIN_DEPENDS actionlib_msgs geometry_msgs sensor_msgs octomap_msgs moveit_msgs trajectory_msgs)
+catkin_package(
+    CATKIN_DEPENDS
+        actionlib_msgs
+        geometry_msgs
+        sensor_msgs
+        octomap_msgs
+        moveit_msgs
+        trajectory_msgs)
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
@@ -67,22 +74,9 @@ include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${urdfdom_INCLUDE_DIRS})
 include_directories(${urdfdom_headers_INCLUDE_DIRS})
 
-add_library(hdt_arm_planning src/HDTRobotModel.cpp)
-target_link_libraries(
-    hdt_arm_planning
-    ${eigen_conversions_LIBRARIES}
-    ${leatherman_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${smpl_LIBRARIES}
-    ${tf_LIBRARIES}
-    ${urdf_LIBRARIES}
-    ${urdf_parser_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES})
-
 add_executable(move_arm_node src/move_arm_node/move_arm_node.cpp)
 target_link_libraries(
     move_arm_node
-    hdt_arm_planning
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${leatherman_LIBRARIES}
@@ -99,6 +93,7 @@ target_link_libraries(
     ${urdf_model_LIBRARIES}
     ${urdf_parser_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
+add_dependencies(move_arm_node ${PROJECT_NAME}_generate_messages_cpp)
 
 add_executable(
     costmap_object_detection
@@ -225,7 +220,6 @@ install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY plugins DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(
     TARGETS
-        hdt_arm_planning
         move_arm_node
         costmap_object_detection
         retrieve_object_simulator

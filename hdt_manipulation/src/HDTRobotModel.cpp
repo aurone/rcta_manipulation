@@ -12,11 +12,8 @@
 #include <spellbook/stringifier/stringifier.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <tf/LinearMath/Quaternion.h>
-#include <urdf/model.h>
-#include <urdf_parser/urdf_parser.h>
 
-namespace hdt
-{
+namespace hdt {
 
 HDTRobotModel::HDTRobotModel() :
     RobotModel(),
