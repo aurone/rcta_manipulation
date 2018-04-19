@@ -856,7 +856,7 @@ void RepositionBaseExecutor::goalCallback()
 {
     ROS_INFO("Received a new goal");
     current_goal_ = as_->acceptNewGoal();
-    const auto& map = current_goal_->map;
+    auto& map = current_goal_->map;
     ROS_INFO("  Goal ID: %u", current_goal_->id);
     ROS_INFO("  Retry Count: %d", current_goal_->retry_count);
     ROS_INFO("  Gas Can Pose: %s", to_string(current_goal_->gas_can_in_map).c_str());
@@ -884,9 +884,9 @@ void RepositionBaseExecutor::goalCallback()
     //     "map" -> "base_footprint" = "map" -> "abs_nwu" * "abs_nwu" -> "base_footprint
     //     "map" -> "object" = "map" -> "abs_nwu" * "abs_nwu" -> "object"
 
-    const geometry_msgs::PoseStamped& rob_pose_in = current_goal_->base_link_in_map;
-    const geometry_msgs::PoseStamped& obj_pose_in = current_goal_->gas_can_in_map;
-    const std::string& map_frame = map.header.frame_id;
+    auto& rob_pose_in = current_goal_->base_link_in_map;
+    auto& obj_pose_in = current_goal_->gas_can_in_map;
+    auto& map_frame = map.header.frame_id;
 
     if (rob_pose_in.header.frame_id != robot_model_->getModelFrame()) {
         ROS_INFO("Transform robot pose into model frame");
