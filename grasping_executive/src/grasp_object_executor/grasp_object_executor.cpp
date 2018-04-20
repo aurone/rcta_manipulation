@@ -27,6 +27,7 @@
 #include <rcta_manipulation_common/comms/actionlib.h>
 #include <robotiq_controllers/gripper_model.h>
 #include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <smpl/angles.h>
 #include <smpl/debug/visualizer_ros.h>
 #include <spellbook/geometry_msgs/geometry_msgs.h>
@@ -540,6 +541,7 @@ struct GraspObjectExecutor
     ros::Publisher  m_filtered_costmap_pub;
     ros::Publisher  m_attach_obj_pub;
     ros::Subscriber m_costmap_sub;
+    ros::Subscriber m_point_cloud_sub;
 
     tf::TransformListener m_listener;
 
@@ -608,6 +610,9 @@ struct GraspObjectExecutor
     std::mutex m_last_occupancy_grid_mutex;
     nav_msgs::OccupancyGridConstPtr m_last_occupancy_grid; ///< most recent OccupancyGrid message
 
+    std::mutex m_last_point_cloud_mutex;
+    sensor_msgs::PointCloud2::ConstPtr m_last_point_cloud;
+
     /// \name Shared State
     ///@{
 
@@ -644,6 +649,7 @@ struct GraspObjectExecutor
     void preemptCallback();
 
     void occupancyGridCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+    void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& msg);
 
     void pruneGrasps(
         std::vector<Grasp>& candidates,
@@ -904,6 +910,8 @@ bool GraspObjectExecutor::initialize()
     // subscribers
     m_costmap_sub = m_nh.subscribe<nav_msgs::OccupancyGrid>(
             "map", 1, &GraspObjectExecutor::occupancyGridCallback, this);
+    m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>(
+            "cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
 
     // publishers
     m_filtered_costmap_pub = m_nh.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
@@ -983,6 +991,13 @@ void GraspObjectExecutor::occupancyGridCallback(
 {
     std::unique_lock<std::mutex> lock(m_last_occupancy_grid_mutex);
     m_last_occupancy_grid = msg;
+}
+
+void GraspObjectExecutor::pointCloudCallback(
+    const sensor_msgs::PointCloud2::ConstPtr& msg)
+{
+    std::unique_lock<std::mutex> lock(m_last_point_cloud_mutex);
+    m_last_point_cloud = msg;
 }
 
 void GraspObjectExecutor::pruneGrasps(
@@ -1169,13 +1184,19 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
 {
     std::vector<Grasp> candidates;
 
+    sensor_msgs::PointCloud2::ConstPtr point_cloud;
+    {
+        std::unique_lock<std::mutex> lock(ex->m_last_point_cloud_mutex);
+        point_cloud = ex->m_last_point_cloud;
+    }
+
     // 1. Generate grasp candidates (poses of the tool in the robot frame) from
     // the object pose. We ask the grasp planner to produce more grasps than the
     // amount we will actually use so that we have a larger set to apply our own
     // reachability/graspability analysis to.
     int max_samples = 100;
     if (!ex->m_grasp_planner->planGrasps(
-            "gascan", ex->m_obj_pose, NULL, max_samples, candidates))
+            "gascan", ex->m_obj_pose, point_cloud.get(), max_samples, candidates))
     {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;
