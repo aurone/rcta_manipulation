@@ -16,8 +16,10 @@ find_package(
     REQUIRED
     COMPONENTS
         actionlib
+        cmu_manipulation_msgs
         eigen_conversions
         grasping_executive
+        hdt_control_msgs
         hdt_kinematics
         leatherman
         roscpp

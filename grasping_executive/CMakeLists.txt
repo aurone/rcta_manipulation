@@ -12,6 +12,7 @@ find_package(
     COMPONENTS
         actionlib
         actionlib_msgs
+        cmu_manipulation_msgs
         eigen_conversions
         gascan_grasp_planning
         geometric_shapes
