@@ -10,6 +10,7 @@ find_package(
     REQUIRED
     COMPONENTS
         actionlib
+        cmu_manipulation_msgs
         eigen_conversions
         grasp_planner_interface
         grasping_executive

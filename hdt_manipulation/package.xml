@@ -9,8 +9,10 @@
 
     <buildtool_depend>catkin</buildtool_depend>
 
+    <depend>cmu_manipulation_msgs</depend>
     <depend>eigen_conversions</depend>
     <depend>grasping_executive</depend>
+    <depend>hdt_control_msgs</depend>
     <depend>leatherman</depend>
     <depend>roscpp</depend>
     <depend>smpl</depend>
