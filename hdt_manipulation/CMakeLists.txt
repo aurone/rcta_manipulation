@@ -6,11 +6,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(Boost REQUIRED)
-
 find_package(Eigen3 REQUIRED)
-
+find_package(Qt4 REQUIRED)
 find_package(SBPL REQUIRED)
-
 find_package(
     catkin
     REQUIRED
@@ -21,13 +19,19 @@ find_package(
         grasping_executive
         hdt_control_msgs
         hdt_kinematics
+        interactive_markers
         leatherman
+        pcl_ros
+        robotiq_controllers
         roscpp
+        rviz
         smpl
         spellbook_ros
         tf)
 
 catkin_package()
+
+include(${QT_USE_FILE})
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
@@ -70,6 +74,27 @@ target_link_libraries(
     ${spellbook_ros_LIBRARIES})
 #add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
 
+#qt4_wrap_cpp(MOC_HEADER_SOURCES src/pick_and_place_panel/PickAndPlacePanel.h)
+#add_library(
+#    hdt_pick_and_place_plugin
+#    ${MOC_HEADER_SOURCES}
+#    src/pick_and_place_panel/PickAndPlacePanel.cpp
+#    src/pick_and_place_panel/SimpleInteractiveMarker.cpp
+#    src/pick_and_place_panel/SimpleInteractiveMarkerServer.cpp
+#    src/pick_and_place_panel/GraspMarkerSelectionMarker.cpp)
+#target_link_libraries(
+#    hdt_pick_and_place_plugin
+#    ${QT_LIBRARIES}
+#    ${actionlib_LIBRARIES}
+#    ${eigen_conversions_LIBRARIES}
+#    ${interactive_markers_LIBRARIES}
+#    ${pcl_ros_LIBRARIES}
+#    ${pr2_vfh_LIBRARIES}
+#    ${roscpp_LIBRARIES}
+#    ${rviz_LIBRARIES}
+#    ${tf_LIBRARIES}
+#    ${robotiq_controllers_LIBRARIES})
+
 install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 install(
@@ -77,6 +102,7 @@ install(
         hdt_arm_planning
         retrieve_object_simulator
         stow_arm
+#        hdt_pick_and_place_plugin
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})

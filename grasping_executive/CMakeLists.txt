@@ -18,8 +18,6 @@ find_package(
         geometric_shapes
         geometry_msgs
         grasp_planner_interface
-        hdt_control_msgs
-        hdt_kinematics
         interactive_markers
         leatherman
         moveit_core
@@ -144,30 +142,8 @@ target_link_libraries(
     ${rviz_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${tf_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES}
     ${robotiq_controllers_LIBRARIES}
     qwt)
-
-#qt4_wrap_cpp(MOC_HEADER_SOURCES src/pick_and_place_panel/PickAndPlacePanel.h)
-#add_library(
-#    hdt_pick_and_place_plugin
-#    ${MOC_HEADER_SOURCES}
-#    src/pick_and_place_panel/PickAndPlacePanel.cpp
-#    src/pick_and_place_panel/SimpleInteractiveMarker.cpp
-#    src/pick_and_place_panel/SimpleInteractiveMarkerServer.cpp
-#    src/pick_and_place_panel/GraspMarkerSelectionMarker.cpp)
-#target_link_libraries(
-#    hdt_pick_and_place_plugin
-#    ${QT_LIBRARIES}
-#    ${actionlib_LIBRARIES}
-#    ${eigen_conversions_LIBRARIES}
-#    ${interactive_markers_LIBRARIES}
-#    ${pcl_ros_LIBRARIES}
-#    ${pr2_vfh_LIBRARIES}
-#    ${roscpp_LIBRARIES}
-#    ${rviz_LIBRARIES}
-#    ${tf_LIBRARIES}
-#    ${robotiq_controllers_LIBRARIES})
 
 qt4_wrap_cpp(
     RCTA_GRIPPER_COMMAND_PANEL_MOC_HEADER_SOURCES
@@ -194,7 +170,6 @@ install(
         costmap_object_detection
         grasp_object_executor
         grasping_command_panel_plugin
-#        hdt_pick_and_place_plugin
         gripper_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

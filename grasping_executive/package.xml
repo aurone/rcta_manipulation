@@ -21,8 +21,6 @@
     <depend>geometric_shapes</depend>
     <depend>geometry_msgs</depend>
     <depend>grasp_planner_interface</depend>
-    <depend>hdt_control_msgs</depend>
-    <depend>hdt_kinematics</depend>
     <depend>interactive_markers</depend>
     <depend>leatherman</depend>
     <depend>liburdfdom-dev</depend>
@@ -50,7 +48,6 @@
     <export>
         <rviz plugin="${prefix}/plugins/grasping_command_panel_plugin_description.xml"/>
         <rviz plugin="${prefix}/plugins/gripper_command_panel_plugin_description.xml"/>
-        <rviz plugin="${prefix}/plugins/pick_and_place_plugin_description.xml"/>
         <grasp_planner_interface plugin="${prefix}/plugins/gascan_grasp_planner_plugin.xml"/>
     </export>
 </package>
