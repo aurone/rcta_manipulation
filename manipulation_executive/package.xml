@@ -8,4 +8,8 @@
     <license>BSD</license>
 
     <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>actionlib</depend>
+    <depend>cmu_manipulation_msgs</depend>
+    <depend>roscpp</depend>
 </package>

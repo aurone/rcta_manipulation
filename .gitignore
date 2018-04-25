@@ -8,3 +8,4 @@ build/*
 install/*
 !.gitignore
 .catkin_workspace
+.catkin_tools/*
