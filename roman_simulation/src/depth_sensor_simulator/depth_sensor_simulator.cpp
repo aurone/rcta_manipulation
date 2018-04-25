@@ -177,7 +177,7 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
     }
 
     rpack.crawl(package_search_path, false);
-    const std::string package_name = "hdt";
+    const std::string package_name = "roman_simulation";
     std::string package_path;
     rpack.find(package_name, package_path);
 
