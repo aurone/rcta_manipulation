@@ -17,6 +17,7 @@ find_package(
         hdt_kinematics
         leatherman
         moveit_core
+        moveit_msgs
         moveit_ros_planning
         pluginlib
         rcta_manipulation_common

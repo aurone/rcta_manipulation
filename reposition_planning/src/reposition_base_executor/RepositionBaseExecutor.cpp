@@ -22,6 +22,7 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
+#include <moveit_msgs/MoveGroupAction.h>
 #include <pluginlib/class_loader.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
 #include <ros/ros.h>
@@ -237,11 +238,11 @@ private:
 
     /// \name Arm Planning Constraints
     /// @{
-    typedef actionlib::SimpleActionClient<grasping_executive::MoveArmAction> MoveArmActionClient;
-    std::unique_ptr<MoveArmActionClient> move_arm_command_client_;
+    typedef actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction> MoveGroupActionClient;
+    std::unique_ptr<MoveGroupActionClient> move_arm_command_client_;
     std::string move_arm_command_action_name_;
     actionlib::SimpleClientGoalState move_arm_command_goal_state_;
-    grasping_executive::MoveArmResult::ConstPtr move_arm_command_result_;
+    moveit_msgs::MoveGroupResult::ConstPtr move_arm_command_result_;
     ///@}
 
     geometry_msgs::PoseStamped robot_pose_world_frame_;
@@ -459,8 +460,172 @@ private:
 
     void move_arm_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
-        const grasping_executive::MoveArmResult::ConstPtr& result);
+        const moveit_msgs::MoveGroupResult::ConstPtr& result);
 };
+
+moveit_msgs::CollisionObject CreateGroundPlaneObject()
+{
+    moveit_msgs::CollisionObject gpo;
+    gpo.header.frame_id = "map"; // TODO: model frame
+
+    shape_msgs::Plane ground_plane;
+    ground_plane.coef[0] = 0.0;
+    ground_plane.coef[1] = 0.0;
+    ground_plane.coef[2] = 1.0;
+
+    // TODO: derive this from the resolution set in the world collision model
+    // to be -0.5 * res, which should make one layer of voxels immediately
+    // beneath z = 0
+    ground_plane.coef[3] = 0.075;
+
+    gpo.planes.push_back(ground_plane);
+    gpo.plane_poses.push_back(geometry_msgs::IdentityPose());
+
+    gpo.operation = moveit_msgs::CollisionObject::ADD;
+    return gpo;
+}
+
+// TODO: copied from grasping_executive, find a home for this and configure
+// common options for the torso/arm planner somewhere
+auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
+    -> moveit_msgs::MoveGroupGoal
+{
+    double allowed_planning_time = 10.0;
+    const char* group_name = "right_arm_and_torso";
+    const char* workspace_frame = "base_footprint";
+    geometry_msgs::Vector3 workspace_min;
+    workspace_min.x = -0.5;
+    workspace_min.y = -1.5;
+    workspace_min.z =  0.0;
+    geometry_msgs::Vector3 workspace_max;
+    workspace_max.x =  1.5;
+    workspace_max.y =  0.5;
+    workspace_max.z =  1.9;
+
+    const char* pose_goal_planner_id = "right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]";
+    const char* joint_goal_planner_id = "right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]";
+
+    double joint_tolerance = sbpl::angles::to_radians(5.0);
+    double pos_tolerance = 0.01;
+    double rot_tolerance = sbpl::angles::to_radians(5.0);
+    std::string tip_link = "limb_right_link7";
+
+    moveit_msgs::MoveGroupGoal g;
+    g.request.allowed_planning_time = allowed_planning_time;
+    g.request.group_name = group_name;
+    g.request.max_acceleration_scaling_factor = 1.0;
+    g.request.max_velocity_scaling_factor = 1.0;
+    g.request.num_planning_attempts = 1;
+    g.request.path_constraints.joint_constraints.clear();
+    g.request.path_constraints.name = "";
+    g.request.path_constraints.orientation_constraints.clear();
+    g.request.path_constraints.position_constraints.clear();
+    g.request.path_constraints.visibility_constraints.clear();
+    g.request.trajectory_constraints.constraints.clear();
+    if (!goal.execute_path) {
+        g.request.start_state.is_diff = true;
+    }
+    g.request.workspace_parameters.header.frame_id = workspace_frame;
+    g.request.workspace_parameters.min_corner = workspace_min;
+    g.request.workspace_parameters.max_corner = workspace_max;
+
+    auto& request = g.request;
+    auto& ops = g.planning_options;
+
+    ops.planning_scene_diff.robot_state.is_diff = true;
+    ops.planning_scene_diff.world.octomap.origin.orientation.w = 1.0;
+    ops.planning_scene_diff.world.octomap.octomap = goal.octomap;
+    ops.planning_scene_diff.world.collision_objects = goal.planning_options.planning_scene_diff.world.collision_objects;
+    ops.planning_scene_diff.world.collision_objects.push_back(CreateGroundPlaneObject());
+    ops.planning_scene_diff.is_diff = true;
+
+    ops.plan_only = !goal.execute_path;
+
+    ops.look_around = false;
+
+    ops.look_around_attempts = 0;
+
+    ops.max_safe_execution_cost = 1.0;
+
+    ops.replan = false;
+
+    ops.replan_attempts = 0;
+
+    ops.replan_delay = 0.0;
+
+    request.start_state = goal.start_state;
+
+    request.goal_constraints.clear();
+    switch (goal.type) {
+    case grasping_executive::MoveArmGoal::JointGoal:
+    {
+        moveit_msgs::Constraints goal_constraints;
+        goal_constraints.name = "goal_constraints";
+        for (size_t jidx = 0; jidx < goal.goal_joint_state.name.size(); ++jidx) {
+            auto& joint_name = goal.goal_joint_state.name[jidx];
+            double joint_pos = goal.goal_joint_state.position[jidx];
+
+            moveit_msgs::JointConstraint joint_constraint;
+            joint_constraint.joint_name = joint_name;
+            joint_constraint.position = joint_pos;
+            joint_constraint.tolerance_above = joint_tolerance;
+            joint_constraint.tolerance_below = joint_tolerance;
+            joint_constraint.weight = 1.0;
+            goal_constraints.joint_constraints.push_back(joint_constraint);
+        }
+        request.goal_constraints.push_back(goal_constraints);
+
+        request.planner_id = joint_goal_planner_id;
+        break;
+    }
+    case grasping_executive::MoveArmGoal::CartesianGoal:
+    case grasping_executive::MoveArmGoal::EndEffectorGoal:
+    {
+        moveit_msgs::Constraints goal_constraints;
+        goal_constraints.name = "goal_constraints";
+
+        geometry_msgs::PoseStamped tip_goal;
+
+        // TODO: get this from the configured planning frame in moveit
+        tip_goal.header.frame_id = "map";
+        tip_goal.pose = goal.goal_pose;
+
+        // one position constraint
+        moveit_msgs::PositionConstraint goal_pos_constraint;
+        goal_pos_constraint.header.frame_id = tip_goal.header.frame_id;
+        goal_pos_constraint.link_name = tip_link;
+        goal_pos_constraint.target_point_offset = geometry_msgs::CreateVector3(0.0, 0.0, 0.0);
+        shape_msgs::SolidPrimitive tolerance_volume;
+        tolerance_volume.type = shape_msgs::SolidPrimitive::SPHERE;
+        tolerance_volume.dimensions = { pos_tolerance };
+        goal_pos_constraint.constraint_region.primitives.push_back(tolerance_volume);
+        goal_pos_constraint.constraint_region.primitive_poses.push_back(tip_goal.pose);
+        goal_pos_constraint.weight = 1.0;
+
+        // one orientation constraint
+        moveit_msgs::OrientationConstraint goal_rot_constraint;
+        goal_rot_constraint.header.frame_id = tip_goal.header.frame_id;
+        goal_rot_constraint.orientation = tip_goal.pose.orientation;
+        goal_rot_constraint.link_name = tip_link;
+        goal_rot_constraint.absolute_x_axis_tolerance = rot_tolerance;
+        goal_rot_constraint.absolute_y_axis_tolerance = rot_tolerance;
+        goal_rot_constraint.absolute_z_axis_tolerance = rot_tolerance;
+        goal_rot_constraint.weight = 1.0;
+
+        goal_constraints.position_constraints.push_back(goal_pos_constraint);
+        goal_constraints.orientation_constraints.push_back(goal_rot_constraint);
+        request.goal_constraints.push_back(goal_constraints);
+
+        request.planner_id = pose_goal_planner_id;
+        break;
+    }
+    default:
+        ROS_ERROR("Unrecognized MoveArmGoal type");
+        return g;
+    }
+
+    return g;
+}
 
 std::string to_string(RepositionBaseExecutionStatus status)
 {
@@ -494,7 +659,7 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     viz_(ph_),
     action_name_("reposition_base_command"),
     manip_group_(nullptr),
-    move_arm_command_action_name_("move_arm"),
+    move_arm_command_action_name_("move_group"),
     move_arm_command_goal_state_(actionlib::SimpleClientGoalState::SUCCEEDED),
     status_(RepositionBaseExecutionStatus::INVALID),
     last_status_(RepositionBaseExecutionStatus::INVALID),
@@ -563,7 +728,7 @@ bool RepositionBaseExecutor::initialize()
     pobs_map_pub_ = ph_.advertise<nav_msgs::OccupancyGrid>("pobs_map", 1);
     pgrasp_exhaustive_map_pub_ = ph_.advertise<nav_msgs::OccupancyGrid>("pgrasp_exhaustive_map", 1);
 
-    move_arm_command_client_.reset(new MoveArmActionClient(move_arm_command_action_name_, false));
+    move_arm_command_client_.reset(new MoveGroupActionClient(move_arm_command_action_name_, false));
     if (!move_arm_command_client_) {
         ROS_ERROR("Failed to instantiate Move Arm Command Client");
         return false;
@@ -2029,7 +2194,7 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
     // a new service that can plan simultaneously for all grasp poses
     for (size_t gidx = 0; gidx < grasp_candidates.size(); ++gidx) {
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
-        const Grasp& grasp = grasp_candidates[gidx];
+        auto& grasp = grasp_candidates[gidx];
 
         grasping_executive::MoveArmGoal pregrasp_goal;
         pregrasp_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
@@ -2048,8 +2213,10 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
             robot_pose_msg
         };
 
+        auto move_group_goal = BuildMoveGroupGoal(pregrasp_goal);
+
         auto result_cb = boost::bind(&RepositionBaseExecutor::move_arm_command_result_cb, this, _1, _2);
-        move_arm_command_client_->sendGoal(pregrasp_goal, result_cb);
+        move_arm_command_client_->sendGoal(move_group_goal, result_cb);
 
         int count = 0;
         while (!move_arm_command_client_->waitForResult(ros::Duration(0.5)) &&
@@ -2143,7 +2310,7 @@ bool RepositionBaseExecutor::checkIK(
 
 void RepositionBaseExecutor::move_arm_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
-    const grasping_executive::MoveArmResult::ConstPtr& result)
+    const moveit_msgs::MoveGroupResult::ConstPtr& result)
 {
     move_arm_command_goal_state_ = state;
     move_arm_command_result_ = result;
