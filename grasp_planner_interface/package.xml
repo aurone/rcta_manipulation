@@ -13,8 +13,12 @@
     <depend>eigen_stl_containers</depend>
 
     <depend>eigen_conversions</depend>
+
+    <!-- TODO: check out what features from pcl are required and narrow down
+         this dependency -->
+    <depend>>libpcl-all-dev</depend>
+
     <depend>roscpp</depend>
-    <depend>sensor_msgs</depend>
     <depend>spellbook_ros</depend>
     <depend>visualization_msgs</depend>
 </package>
