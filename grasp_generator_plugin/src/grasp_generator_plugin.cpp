@@ -6,6 +6,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <grasp_planner_interface/grasp_planner_plugin.h>
 #include <grasp_generator_msgs/GenerateGraspAction.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 namespace rcta {
 
@@ -28,14 +29,21 @@ public:
     bool planGrasps(
         const std::string& object_id,
         const Eigen::Affine3d& T_grasp_object,
-        const sensor_msgs::PointCloud2* cloud,
+        const pcl::PointCloud<pcl::PointXYZ>* cloud,
         int max_grasps,
         std::vector<Grasp>& grasps) override
     {
+        if (!cloud) {
+            ROS_WARN("NEED CLOUD FOR GRASP PLANNING");
+            return false;
+        }
+
         grasp_generator_msgs::GenerateGraspGoal req;
         req.task = "";
         req.type = grasp_generator_msgs::GenerateGraspGoal::POWER;
-        req.goal_pc = *cloud;
+
+        pcl::toROSMsg(*cloud, req.goal_pc);
+//        req.goal_pc = *cloud;
         req.selected_arms = grasp_generator_msgs::GenerateGraspGoal::RIGHT;
         ros::Duration timeout(10.0);
         auto state = m_generate_grasp_client->sendGoalAndWait(req, timeout);
