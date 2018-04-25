@@ -14,8 +14,6 @@
 #include <QtGui>
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
-#include <hdt_control_msgs/TeleportAndaliteCommandAction.h>
-#include <hdt_control_msgs/TeleportHDTCommandAction.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_model/robot_model.h>
@@ -54,7 +52,6 @@ public Q_SLOTS:
     void update_base_pose_z(double z);
     void update_base_pose_yaw(double yaw);
     void update_base_pose_candidate(int index);
-    void send_teleport_andalite_command();
 
     void send_grasp_object_command();
     void send_reposition_base_command();
@@ -79,10 +76,6 @@ private:
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool pending_reposition_base_command_;
 
-    typedef actionlib::SimpleActionClient<hdt_control_msgs::TeleportAndaliteCommandAction> TeleportAndaliteCommandActionClient;
-    std::unique_ptr<TeleportAndaliteCommandActionClient> teleport_andalite_command_client_;
-    bool pending_teleport_andalite_command_;
-
     interactive_markers::InteractiveMarkerServer server_;
 
     /// @}
@@ -101,7 +94,6 @@ private:
     QDoubleSpinBox* teleport_base_command_y_box_;
     QDoubleSpinBox* teleport_base_command_z_box_;
     QDoubleSpinBox* teleport_base_command_yaw_box_;
-    QPushButton* send_teleport_andalite_command_button_;
 
     // Object Interaction Command Widgets
     QPushButton* send_grasp_object_command_button_;
@@ -169,12 +161,6 @@ private:
     void reposition_base_command_result_cb(
             const actionlib::SimpleClientGoalState& state,
             const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
-
-    void teleport_andalite_command_active_cb();
-    void teleport_andalite_command_feedback_cb(const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback);
-    void teleport_andalite_command_result_cb(
-            const actionlib::SimpleClientGoalState& state,
-            const hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr& result);
 
     void update_object_marker_pose();
     void update_base_pose_spinboxes();

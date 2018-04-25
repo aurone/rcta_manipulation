@@ -39,8 +39,6 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     pending_grasp_object_command_(false),
     reposition_base_command_client_(),
     pending_reposition_base_command_(false),
-    teleport_andalite_command_client_(),
-    pending_teleport_andalite_command_(false),
     server_("grasping_commands"),
 
     robot_description_line_edit_(nullptr),
@@ -52,7 +50,6 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     teleport_base_command_y_box_(nullptr),
     teleport_base_command_z_box_(nullptr),
     teleport_base_command_yaw_box_(nullptr),
-    send_teleport_andalite_command_button_(nullptr),
     send_grasp_object_command_button_(nullptr),
     send_reposition_base_command_button_(nullptr),
 
@@ -256,25 +253,6 @@ void GraspingCommandPanel::update_base_pose_candidate(int index)
     }
 }
 
-void GraspingCommandPanel::send_teleport_andalite_command()
-{
-    if (!ReconnectActionClient(teleport_andalite_command_client_, "teleport_andalite_command")) {
-        QMessageBox::warning(this, tr("Connection Failure"), tr("Unable to send Teleport Andalite Command (server is not connected)"));
-        return;
-    }
-
-    hdt_control_msgs::TeleportAndaliteCommandGoal teleport_andalite_goal;
-    teleport_andalite_goal.global_pose.header.seq = 0;
-    teleport_andalite_goal.global_pose.header.stamp = ros::Time::now();
-    teleport_andalite_goal.global_pose.header.frame_id = global_frame_;
-    tf::poseEigenToMsg(T_world_robot_, teleport_andalite_goal.global_pose.pose);
-
-    auto result_cb = boost::bind(&GraspingCommandPanel::teleport_andalite_command_result_cb, this, _1, _2);
-    teleport_andalite_command_client_->sendGoal(teleport_andalite_goal, result_cb);
-
-    pending_teleport_andalite_command_ = true;
-}
-
 void GraspingCommandPanel::send_grasp_object_command()
 {
     if (!ReconnectActionClient(grasp_object_command_client_, "grasp_object_command")) {
@@ -407,10 +385,8 @@ void GraspingCommandPanel::setup_gui()
     base_pose_spinbox_layout->addWidget(teleport_base_command_y_box_);
     base_pose_spinbox_layout->addWidget(yaw_label);
     base_pose_spinbox_layout->addWidget(teleport_base_command_yaw_box_);
-    send_teleport_andalite_command_button_ = new QPushButton(tr("Teleport Andalite"));
     base_commands_layout->addWidget(copy_current_base_pose_button_);
     base_commands_layout->addLayout(base_pose_spinbox_layout);
-    base_commands_layout->addWidget(send_teleport_andalite_command_button_);
     base_commands_group->setLayout(base_commands_layout);
 
     // object interaction commands
@@ -444,7 +420,6 @@ void GraspingCommandPanel::setup_gui()
     connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
     connect(teleport_base_command_z_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_z(double)));
     connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
-    connect(send_teleport_andalite_command_button_, SIGNAL(clicked()), this, SLOT(send_teleport_andalite_command()));
 
     // object interaction commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
@@ -865,28 +840,6 @@ void GraspingCommandPanel::reposition_base_command_result_cb(
     update_gui();
 }
 
-void GraspingCommandPanel::teleport_andalite_command_active_cb()
-{
-
-}
-
-void GraspingCommandPanel::teleport_andalite_command_feedback_cb(const hdt_control_msgs::TeleportAndaliteCommandFeedback::ConstPtr& feedback)
-{
-
-}
-
-void GraspingCommandPanel::teleport_andalite_command_result_cb(
-    const actionlib::SimpleClientGoalState& state,
-    const hdt_control_msgs::TeleportAndaliteCommandResult::ConstPtr& result)
-{
-    ROS_INFO("Received Result from Teleport Andalite Command Action Client");
-    if (state != actionlib::SimpleClientGoalState::SUCCEEDED) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Teleport Andalite Command goal was not successful"));
-    }
-
-    pending_teleport_andalite_command_ = false;
-}
-
 void GraspingCommandPanel::update_base_pose_spinboxes()
 {
     disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
@@ -906,12 +859,10 @@ void GraspingCommandPanel::update_gui()
 {
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
-    ROS_INFO("    Pending Teleport Andalite Command: %s", pending_teleport_andalite_command_ ? "TRUE" : "FALSE");
 
     bool pending_motion_command =
         pending_grasp_object_command_      ||
-        pending_reposition_base_command_   ||
-        pending_teleport_andalite_command_;
+        pending_reposition_base_command_;
 
     // because actionlib isn't always as friendly as you might think
     pending_motion_command = false;
@@ -923,7 +874,6 @@ void GraspingCommandPanel::update_gui()
     teleport_base_command_y_box_->setEnabled(initialized());
     teleport_base_command_z_box_->setEnabled(initialized());
     teleport_base_command_yaw_box_->setEnabled(initialized());
-    send_teleport_andalite_command_button_->setEnabled(initialized() && !pending_motion_command);
 
     send_grasp_object_command_button_->setEnabled(initialized() && !pending_motion_command);
     send_reposition_base_command_button_->setEnabled(initialized() && !pending_motion_command);
