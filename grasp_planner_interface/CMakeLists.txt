@@ -7,6 +7,8 @@ endif()
 
 find_package(Eigen3 REQUIRED)
 
+find_package(PCL 1.7 REQUIRED)
+
 find_package(
     catkin
     REQUIRED
@@ -15,19 +17,20 @@ find_package(
         eigen_stl_containers
         roscpp
         spellbook_ros
-        sensor_msgs
         visualization_msgs)
 
 catkin_package(
     LIBRARIES grasp_planner_interface
     INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIR}
-    CATKIN_DEPENDS eigen_stl_containers roscpp sensor_msgs visualization_msgs)
+    CATKIN_DEPENDS eigen_stl_containers roscpp visualization_msgs
+    DEPENDS PCL)
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
 include_directories(include)
 include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${PCL_INCLUDE_DIRS})
 
 add_library(
     grasp_planner_interface

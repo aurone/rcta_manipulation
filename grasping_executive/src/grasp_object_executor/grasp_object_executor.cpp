@@ -15,6 +15,7 @@
 #include <grasp_planner_interface/grasp_planner_plugin.h>
 #include <grasp_planner_interface/grasp_utils.h>
 #include <leatherman/print.h>
+#include <message_filters/subscriber.h>
 #include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
@@ -23,6 +24,8 @@
 #include <moveit_msgs/GetStateValidity.h>
 #include <moveit_msgs/MoveGroupAction.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/transforms.h>
 #include <pluginlib/class_loader.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
 #include <robotiq_controllers/gripper_model.h>
@@ -37,6 +40,7 @@
 #include <spellbook/utils/utils.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
+#include <tf/message_filter.h>
 
 // project includes
 #include <grasping_executive/MoveArmAction.h>
@@ -541,6 +545,10 @@ struct GraspObjectExecutor
     ros::Publisher  m_filtered_costmap_pub;
     ros::Publisher  m_attach_obj_pub;
     ros::Subscriber m_costmap_sub;
+
+    std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> point_cloud_sub;
+    std::unique_ptr<tf::MessageFilter<sensor_msgs::PointCloud2>> point_cloud_filter;
+
     ros::Subscriber m_point_cloud_sub;
 
     tf::TransformListener m_listener;
@@ -910,8 +918,19 @@ bool GraspObjectExecutor::initialize()
     // subscribers
     m_costmap_sub = m_nh.subscribe<nav_msgs::OccupancyGrid>(
             "map", 1, &GraspObjectExecutor::occupancyGridCallback, this);
-    m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>(
-            "cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
+//    m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
+
+    this->point_cloud_sub.reset(
+            new message_filters::Subscriber<sensor_msgs::PointCloud2>(
+                    m_nh, "cloud_in", 1));
+    assert(this->m_robot_model);
+    this->point_cloud_filter.reset(
+            new tf::MessageFilter<sensor_msgs::PointCloud2>(
+                *this->point_cloud_sub,
+                this->m_listener,
+                this->m_robot_model->getModelFrame(),
+                1));
+    this->point_cloud_filter->registerCallback(boost::bind(&GraspObjectExecutor::pointCloudCallback, this, _1));
 
     // publishers
     m_filtered_costmap_pub = m_nh.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
@@ -997,6 +1016,8 @@ void GraspObjectExecutor::pointCloudCallback(
     const sensor_msgs::PointCloud2::ConstPtr& msg)
 {
     std::unique_lock<std::mutex> lock(m_last_point_cloud_mutex);
+
+    ROS_DEBUG("Received point cloud message");
     m_last_point_cloud = msg;
 }
 
@@ -1190,13 +1211,63 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         point_cloud = ex->m_last_point_cloud;
     }
 
+    pcl::PointCloud<pcl::PointXYZ>* grasp_cloud = NULL;
+    if (point_cloud) {
+        ROS_INFO("Have point cloud for grasp planning!");
+        // sensor_msgs/PointCloud2 -> pcl::PointXYZ
+        ROS_INFO("Convert point cloud from ROS message");
+        pcl::PointCloud<pcl::PointXYZ> cloud;
+        pcl::fromROSMsg(*point_cloud, cloud);
+
+        // transform cloud to model frame
+        ROS_INFO("Wait for transform from '%s' to '%s'", point_cloud->header.frame_id.c_str(), ex->m_robot_model->getModelFrame().c_str());
+        std::string error;
+        if (!ex->m_listener.waitForTransform(
+                ex->m_robot_model->getModelFrame(),
+                point_cloud->header.frame_id,
+                point_cloud->header.stamp,
+                ros::Duration(10.0),
+                ros::Duration(0.01),
+                &error))
+        {
+            ROS_ERROR("Failed to wait for transform (%s)", error.c_str());
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            ex->m_server->setAborted(result, "Failed to transform point cloud into model frame for grasp planning");
+            return GraspObjectExecutionStatus::FAULT;
+        }
+
+        ROS_INFO("Lookup transform");
+        tf::StampedTransform transform;
+        try {
+            ex->m_listener.lookupTransform(
+                    ex->m_robot_model->getModelFrame(),
+                    point_cloud->header.frame_id,
+                    point_cloud->header.stamp,
+                    transform);
+        } catch (const tf::TransformException& e) {
+            ROS_ERROR("Failed to lookup transform (%s)", e.what());
+            cmu_manipulation_msgs::GraspObjectCommandResult result;
+            result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+            ex->m_server->setAborted(result, "Failed to transform point cloud into model frame for grasp planning");
+            return GraspObjectExecutionStatus::FAULT;
+        }
+
+        ROS_INFO("Transform point cloud");
+        // convert to pcl point cloud for transformation
+        pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
+        pcl_ros::transformPointCloud(cloud, cloud_transformed, transform);
+    } else {
+        ROS_WARN("No point cloud available for grasp planning");
+    }
+
     // 1. Generate grasp candidates (poses of the tool in the robot frame) from
     // the object pose. We ask the grasp planner to produce more grasps than the
     // amount we will actually use so that we have a larger set to apply our own
     // reachability/graspability analysis to.
     int max_samples = 100;
     if (!ex->m_grasp_planner->planGrasps(
-            "gascan", ex->m_obj_pose, point_cloud.get(), max_samples, candidates))
+            "gascan", ex->m_obj_pose, grasp_cloud, max_samples, candidates))
     {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;
@@ -1888,5 +1959,6 @@ int main(int argc, char* argv[])
         loop_rate.sleep();
     }
 
+    spinner.stop();
     return 0;
 }

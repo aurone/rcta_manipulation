@@ -6,7 +6,8 @@
 
 #include <Eigen/Dense>
 #include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 
 #include <grasp_planner_interface/grasp.h>
 
@@ -55,7 +56,7 @@ public:
     virtual bool planGrasps(
         const std::string& object_id,
         const Eigen::Affine3d& object_pose,
-        const sensor_msgs::PointCloud2* cloud,
+        const pcl::PointCloud<pcl::PointXYZ>* cloud,
         int max_grasps,
         std::vector<Grasp>& grasps) = 0;
 

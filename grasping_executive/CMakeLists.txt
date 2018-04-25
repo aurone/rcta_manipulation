@@ -26,6 +26,7 @@ find_package(
         moveit_ros_planning
         moveit_ros_planning_interface
         octomap_msgs
+        pcl_conversions
         pcl_ros
         pluginlib
         rcta_manipulation_common
@@ -106,6 +107,8 @@ target_link_libraries(
     ${leatherman_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
+    ${pcl_conversions_LIBRARIES}
+    ${pcl_ros_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${smpl_ros_LIBRARIES}
