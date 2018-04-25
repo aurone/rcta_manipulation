@@ -27,41 +27,14 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#define USE_MANIPULATE_ACTION 0
+
 namespace rcta {
 
 GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
-    nh_(),
-    robot_markers_pub_(),
-    occupancy_grid_sub_(),
-    listener_(),
-    grasp_object_command_client_(),
-    pending_grasp_object_command_(false),
-    reposition_base_command_client_(),
-    pending_reposition_base_command_(false),
     server_("grasping_commands"),
-
-    robot_description_line_edit_(nullptr),
-    refresh_robot_desc_button_(nullptr),
-    global_frame_line_edit_(nullptr),
-    refresh_global_frame_button_(nullptr),
-    copy_current_base_pose_button_(nullptr),
-    teleport_base_command_x_box_(nullptr),
-    teleport_base_command_y_box_(nullptr),
-    teleport_base_command_z_box_(nullptr),
-    teleport_base_command_yaw_box_(nullptr),
-    send_grasp_object_command_button_(nullptr),
-    send_reposition_base_command_button_(nullptr),
-
-    T_world_robot_(Eigen::Affine3d::Identity()),
-    T_world_object_(Eigen::Affine3d::Identity()),
-    robot_model_(),
-    robot_state_(),
-    occupancy_grid_(),
-    robot_description_(),
-    global_frame_(),
-    base_candidate_idx_(-1),
-    candidate_base_poses_()
+    base_candidate_idx_(-1)
 {
     setup_gui();
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
@@ -255,11 +228,6 @@ void GraspingCommandPanel::update_base_pose_candidate(int index)
 
 void GraspingCommandPanel::send_grasp_object_command()
 {
-    if (!ReconnectActionClient(grasp_object_command_client_, "grasp_object_command")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not connected)"));
-        return;
-    }
-
     const std::string gas_can_interactive_marker_name = "gas_canister_fixture";
     visualization_msgs::InteractiveMarker gas_can_interactive_marker;
     if (!server_.get(gas_can_interactive_marker_name, gas_can_interactive_marker)) {
@@ -267,20 +235,44 @@ void GraspingCommandPanel::send_grasp_object_command()
         return;
     }
 
-    cmu_manipulation_msgs::GraspObjectCommandGoal grasp_object_goal;
-
-    static int grasp_object_goal_id = 0;
-    grasp_object_goal.id = grasp_object_goal_id++;
-    grasp_object_goal.retry_count = 0;
-
     // robot -> object = robot -> world * world -> object
     Eigen::Affine3d robot_to_object = T_world_robot_.inverse() * T_world_object_;
-    grasp_object_goal.gas_can_in_base_link.header.frame_id = robot_model_->getModelFrame();
-    tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
 
     ROS_INFO("Robot -> Marker: %s", to_string(T_world_robot_.inverse()).c_str());
     ROS_INFO("Marker -> Object: %s", to_string(T_world_object_).c_str());
     ROS_INFO("Robot -> Object: %s", to_string(robot_to_object).c_str());
+
+#if USE_MANIPULATE_ACTION
+    if(!ReconnectActionClient(manipulate_client_, "manipulate")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate (server is not connected)"));
+        return;
+    }
+
+    cmu_manipulation_msgs::ManipulateGoal grasp_object_goal;
+    grasp_object_goal.task = "pickup";
+    grasp_object_goal.selected_arms |= cmu_manipulation_msgs::ManipulateGoal::RIGHT;
+
+    grasp_object_goal.goal_poses.resize(1);
+    grasp_object_goal.goal_poses[0].header.frame_id = robot_model_->getModelFrame();
+    tf::poseEigenToMsg(T_world_object_, grasp_object_goal.goal_poses[0].pose);
+
+    auto result_callback = boost::bind(&GraspingCommandPanel::manipulate_result_cb, this, _1, _2);
+    manipulate_client_->sendGoal(grasp_object_goal, result_callback);
+
+    pending_manipulate_command_ = true;
+#else
+    if (!ReconnectActionClient(grasp_object_command_client_, "grasp_object_command")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not connected)"));
+        return;
+    }
+
+    cmu_manipulation_msgs::GraspObjectCommandGoal grasp_object_goal;
+    grasp_object_goal.gas_can_in_base_link.header.frame_id = robot_model_->getModelFrame();
+    tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
+
+    static int grasp_object_goal_id = 0;
+    grasp_object_goal.id = grasp_object_goal_id++;
+    grasp_object_goal.retry_count = 0;
 
     grasp_object_goal.gas_can_in_map.header.frame_id = global_frame_;
     tf::poseEigenToMsg(T_world_object_, grasp_object_goal.gas_can_in_map.pose);
@@ -289,6 +281,8 @@ void GraspingCommandPanel::send_grasp_object_command()
     grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
 
     pending_grasp_object_command_ = true;
+#endif
+
     update_gui();
 }
 
@@ -794,6 +788,24 @@ bool GraspingCommandPanel::reinit_object_interactive_marker()
     return true;
 }
 
+void GraspingCommandPanel::manipulate_active_cb()
+{
+}
+
+void GraspingCommandPanel::manipulate_feedback_cb(
+    const cmu_manipulation_msgs::ManipulateFeedback::ConstPtr& feedback)
+{
+}
+
+void GraspingCommandPanel::manipulate_result_cb(
+    const actionlib::SimpleClientGoalState& state,
+    const cmu_manipulation_msgs::ManipulateResult::ConstPtr& result)
+{
+    ROS_INFO("Received Result from Grasp Object Command Action");
+    pending_manipulate_command_ = false;
+    update_gui();
+}
+
 void GraspingCommandPanel::grasp_object_command_active_cb()
 {
 
@@ -812,7 +824,6 @@ void GraspingCommandPanel::grasp_object_command_result_cb(
     pending_grasp_object_command_ = false;
     update_gui();
 }
-
 
 void GraspingCommandPanel::reposition_base_command_active_cb()
 {
@@ -859,10 +870,12 @@ void GraspingCommandPanel::update_gui()
 {
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
+    ROS_INFO("    Pending Manipulate: %s", pending_manipulate_command_ ? "TRUE" : "FALSE");
 
     bool pending_motion_command =
         pending_grasp_object_command_      ||
-        pending_reposition_base_command_;
+        pending_reposition_base_command_ ||
+        pending_manipulate_command_;
 
     // because actionlib isn't always as friendly as you might think
     pending_motion_command = false;

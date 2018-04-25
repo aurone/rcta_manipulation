@@ -18,8 +18,9 @@
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
-#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
 #include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
+#include <cmu_manipulation_msgs/ManipulateAction.h>
+#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
 #include <ros/ros.h>
 #include <rviz/panel.h>
 #include <tf/transform_broadcaster.h>
@@ -68,13 +69,17 @@ private:
 
     tf::TransformListener listener_;
 
+    using ManipulateActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateAction>;
+    std::unique_ptr<ManipulateActionClient> manipulate_client_;
+    bool pending_manipulate_command_ = false;
+
     typedef actionlib::SimpleActionClient<cmu_manipulation_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
-    bool pending_grasp_object_command_;
+    bool pending_grasp_object_command_ = false;
 
     typedef actionlib::SimpleActionClient<cmu_manipulation_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
-    bool pending_reposition_base_command_;
+    bool pending_reposition_base_command_ = false;
 
     interactive_markers::InteractiveMarkerServer server_;
 
@@ -89,25 +94,24 @@ private:
     QPushButton* refresh_global_frame_button_;
 
     // Base Command Widgets
-    QPushButton* copy_current_base_pose_button_;
-    QDoubleSpinBox* teleport_base_command_x_box_;
-    QDoubleSpinBox* teleport_base_command_y_box_;
-    QDoubleSpinBox* teleport_base_command_z_box_;
-    QDoubleSpinBox* teleport_base_command_yaw_box_;
+    QPushButton* copy_current_base_pose_button_ = nullptr;
+    QDoubleSpinBox* teleport_base_command_x_box_ = nullptr;
+    QDoubleSpinBox* teleport_base_command_y_box_ = nullptr;
+    QDoubleSpinBox* teleport_base_command_z_box_ = nullptr;
+    QDoubleSpinBox* teleport_base_command_yaw_box_ = nullptr;
 
     // Object Interaction Command Widgets
-    QPushButton* send_grasp_object_command_button_;
-    QPushButton* send_reposition_base_command_button_;
-    QSpinBox* update_candidate_spinbox_;
-    QLabel* num_candidates_label_;
+    QPushButton* send_grasp_object_command_button_ = nullptr;
+    QPushButton* send_reposition_base_command_button_ = nullptr;
+    QSpinBox* update_candidate_spinbox_ = nullptr;
+    QLabel* num_candidates_label_ = nullptr;
 
     /// @}
 
     // TODO: can this be maintained via the transform of the root joint or is
     // there a reason this is being maintained externally?
-    Eigen::Affine3d T_world_robot_;
-
-    Eigen::Affine3d T_world_object_;
+    Eigen::Affine3d T_world_robot_ = Eigen::Affine3d::Identity();
+    Eigen::Affine3d T_world_object_ = Eigen::Affine3d::Identity();
 
     robot_model_loader::RobotModelLoaderPtr rml_;
     robot_model::RobotModelPtr robot_model_;
@@ -118,7 +122,7 @@ private:
     std::string robot_description_;
     std::string global_frame_;
 
-    int base_candidate_idx_;
+    int base_candidate_idx_ = -1;
     std::vector<geometry_msgs::PoseStamped> candidate_base_poses_;
 
     void setup_gui();
@@ -150,17 +154,23 @@ private:
     void octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg);
     void occupancy_grid_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 
+    void manipulate_active_cb();
+    void manipulate_feedback_cb(const cmu_manipulation_msgs::ManipulateFeedback::ConstPtr& feedback);
+    void manipulate_result_cb(
+        const actionlib::SimpleClientGoalState& state,
+        const cmu_manipulation_msgs::ManipulateResult::ConstPtr& result);
+
     void grasp_object_command_active_cb();
     void grasp_object_command_feeback_cb(const cmu_manipulation_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
     void grasp_object_command_result_cb(
-            const actionlib::SimpleClientGoalState& state,
-            const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result);
+        const actionlib::SimpleClientGoalState& state,
+        const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result);
 
     void reposition_base_command_active_cb();
     void reposition_base_command_feedback_cb(const cmu_manipulation_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback);
     void reposition_base_command_result_cb(
-            const actionlib::SimpleClientGoalState& state,
-            const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
+        const actionlib::SimpleClientGoalState& state,
+        const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
 
     void update_object_marker_pose();
     void update_base_pose_spinboxes();
