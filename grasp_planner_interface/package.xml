@@ -16,7 +16,7 @@
 
     <!-- TODO: check out what features from pcl are required and narrow down
          this dependency -->
-    <depend>>libpcl-all-dev</depend>
+    <depend>libpcl-all-dev</depend>
 
     <depend>roscpp</depend>
     <depend>spellbook_ros</depend>
