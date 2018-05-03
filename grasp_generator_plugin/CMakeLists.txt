@@ -11,7 +11,8 @@ find_package(
     COMPONENTS
         actionlib
         pluginlib
-        grasp_generator_msgs
+        spellbook_ros
+        grasp_planner_msgs
         grasp_planner_interface)
 
 catkin_package()
@@ -24,6 +25,7 @@ add_library(grasp_generator_plugin src/grasp_generator_plugin.cpp)
 target_link_libraries(
     grasp_generator_plugin
     ${actionlib_LIBRARIES}
+    ${spellbook_ros_LIBRARIES}
     ${grasp_planner_interface_LIBRARIES})
 
 install(

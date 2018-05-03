@@ -5,7 +5,8 @@
 #include <actionlib/client/simple_action_client.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <grasp_planner_interface/grasp_planner_plugin.h>
-#include <grasp_generator_msgs/GenerateGraspAction.h>
+#include <grasp_planner_msgs/GraspPlannerAction.h>
+#include <spellbook/msg_utils/msg_utils.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 namespace rcta {
@@ -14,15 +15,37 @@ class GraspGeneratorPlugin : public GraspPlannerPlugin
 {
 public:
 
-    using GenerateGraspActionClient =
-            actionlib::SimpleActionClient<grasp_generator_msgs::GenerateGraspAction>;
+    using GraspPlannerActionClient =
+            actionlib::SimpleActionClient<grasp_planner_msgs::GraspPlannerAction>;
 
-    std::unique_ptr<GenerateGraspActionClient> m_generate_grasp_client;
+    std::unique_ptr<GraspPlannerActionClient> m_generate_grasp_client;
+
+    Eigen::Affine3d T_wrist_tool;
+    Eigen::Affine3d T_tool_wrist;
 
     bool init(ros::NodeHandle& nh, ros::NodeHandle& gh) override
     {
-        auto action_name = "generate_grasp";
-        m_generate_grasp_client.reset(new GenerateGraspActionClient(action_name, false));
+        if (!GraspPlannerPlugin::init(nh, gh)) {
+            return false;
+        }
+
+        auto action_name = "jpl_grasp_planner";
+        m_generate_grasp_client.reset(new GraspPlannerActionClient(action_name, false));
+
+        geometry_msgs::Pose tool_pose_wrist_frame;
+        if (!msg_utils::download_param(
+                gh, "wrist_to_tool_transform", tool_pose_wrist_frame))
+        {
+            ROS_ERROR("Failed to retrieve 'wrist_to_tool_transform' from the param server");
+            return false;
+        }
+
+        Eigen::Affine3d T_wrist_tool_;
+        tf::poseMsgToEigen(tool_pose_wrist_frame, T_wrist_tool_);
+//        ROS_INFO("Wrist-to-Tool Transform: %s", to_string(T_wrist_tool_).c_str());
+
+        this->T_wrist_tool = T_wrist_tool_;
+        T_tool_wrist = T_wrist_tool.inverse();
         return true;
     }
 
@@ -38,14 +61,14 @@ public:
             return false;
         }
 
-        grasp_generator_msgs::GenerateGraspGoal req;
+        grasp_planner_msgs::GraspPlannerGoal req;
         req.task = "";
-        req.type = grasp_generator_msgs::GenerateGraspGoal::POWER;
+        req.type = grasp_planner_msgs::GraspPlannerGoal::POWER;
 
-        pcl::toROSMsg(*cloud, req.goal_pc);
-//        req.goal_pc = *cloud;
-        req.selected_arms = grasp_generator_msgs::GenerateGraspGoal::RIGHT;
-        ros::Duration timeout(10.0);
+        pcl::toROSMsg(*cloud, req.point_cloud);
+        req.selected_arms = grasp_planner_msgs::GraspPlannerGoal::RIGHT;
+        ros::Duration timeout(30.0);
+        ROS_INFO("SEND GRASP GOAL AND WAIT FOR TIME");
         auto state = m_generate_grasp_client->sendGoalAndWait(req, timeout);
         if (state != actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_ERROR("Action returned %s", state.getText().c_str());
@@ -63,16 +86,64 @@ public:
             return false;
         }
 
+        grasps.reserve(res->result_grasps.poses.size());
+        for (size_t i = 0; i < res->result_grasps.poses.size(); ++i) {
+            auto& grasp_msg = res->result_grasps.poses[i];
+            ROS_INFO("Grasp %zu: { %f, %f, %f, %f, %f, %f, %f }",
+                    i,
+                    grasp_msg.position.x,
+                    grasp_msg.position.y,
+                    grasp_msg.position.z,
+                    grasp_msg.orientation.w,
+                    grasp_msg.orientation.x,
+                    grasp_msg.orientation.y,
+                    grasp_msg.orientation.z);
 
-        if (res->goal_poses.size() != 1) {
-            ROS_ERROR("Received %zu pose arrays. Why not 1?", res->goal_poses.size());
-            return false;
-        }
+            Eigen::Affine3d grasp_pose;
+            tf::poseMsgToEigen(res->result_grasps.poses[i], grasp_pose);
 
-        grasps.resize(res->goal_poses.size());
-        for (size_t i = 0; i < res->goal_poses[0].poses.size(); ++i) {
-            tf::poseMsgToEigen(res->goal_poses[0].poses[i], grasps[i].pose);
-            grasps[i].u = 1.0;
+            // Compute poses for the wrist from poses for the tool frame. The
+            // extra pi/2 rotation around +x is because the wrist-to-tool
+            // transform is currently configured incorrectly.
+            // T_planning_wrist = T_planning_tool * T_tool_wrist
+            grasp_pose =
+                    grasp_pose *
+                    T_tool_wrist *
+                    Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitX());
+
+            // T_map_wrist = T_map_basefootprint * T_basefootprint_wrist
+
+            // Remove grasp poses where the +x axis of the wrist frame is not
+            // pointed downwards within some cone.
+            Eigen::Quaterniond p(grasp_pose.rotation());
+
+            Eigen::Affine3d T_nominal_grasp(
+                    Eigen::AngleAxisd(M_PI / 2.0, Eigen::Vector3d::UnitY()));
+
+            // TODO: configurate me
+            double angle_thresh = 45.0 * M_PI / 180.0;
+            Eigen::Quaterniond q(T_nominal_grasp.rotation());
+
+            double angle = 2.0 * acos(std::fabs(p.dot(q)));
+
+            if (angle > angle_thresh) {
+                ROS_INFO(" -> Filtered (%f)", angle);
+                continue;
+            }
+
+            Grasp g;
+            g.pose = grasp_pose;
+            g.u = 1.0;
+            grasps.push_back(g);
+
+#if 0
+            {
+                Grasp g;
+                tf::poseMsgToEigen(res->result_grasps.poses[i], g.pose);
+                g.u = 1.0;
+                grasps.push_back(g);
+            }
+#endif
         }
 
         return true;
