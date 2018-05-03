@@ -78,11 +78,11 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
 {
     double allowed_planning_time = 10.0;
     const char* group_name = "right_arm_and_torso";
-    const char* workspace_frame = "base_footprint";
+    const char* workspace_frame = "base_link";
     geometry_msgs::Vector3 workspace_min;
     workspace_min.x = -0.5;
     workspace_min.y = -1.5;
-    workspace_min.z =  0.0;
+    workspace_min.z =  -0.2;
     geometry_msgs::Vector3 workspace_max;
     workspace_max.x =  1.5;
     workspace_max.y =  0.5;
