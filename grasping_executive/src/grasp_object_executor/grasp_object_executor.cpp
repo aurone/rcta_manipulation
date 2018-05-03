@@ -1919,7 +1919,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    ros::AsyncSpinner spinner(1);
+    ros::AsyncSpinner spinner(4);
     spinner.start();
 
     auto prev_status = GraspObjectExecutionStatus::IDLE;
