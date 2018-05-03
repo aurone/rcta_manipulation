@@ -1,5 +1,5 @@
 <library path="lib/libgrasp_generator_plugin">
-    <class name="rcta/GraspGeneratorPlugin" type="rcta::GascanGraspGeneratorPlugin" base_class_type="rcta::GraspPlannerPlugin">
+    <class name="rcta/GraspGeneratorPlugin" type="rcta::GraspGeneratorPlugin" base_class_type="rcta::GraspPlannerPlugin">
            <description>
                A wrapper plugin that generates grasps using an external grasp action
            </description>

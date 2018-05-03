@@ -15,6 +15,6 @@
     <depend>actionlib</depend>
 
     <export>
-        <grasp_planner_interface plugin="$prefix/pluginlib/grasp_generator_plugin.xml"/>
+        <grasp_planner_interface plugin="${prefix}/plugins/grasp_generator_plugin.xml"/>
     </export>
 </package>
