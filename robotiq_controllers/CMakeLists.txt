@@ -87,6 +87,13 @@ target_link_libraries(
 # TODO: install config and launch directories
 
 install(
+    DIRECTORY include/robotiq_controllers/
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+
+install(DIRECTORY config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
+install(
     TARGETS
         robotiq_c85_model 
         robotiq_c85_comms 
