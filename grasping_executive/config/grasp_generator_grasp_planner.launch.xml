@@ -1,0 +1,4 @@
+<launch>
+    <param name="grasp_planner_plugin" value="rcta/GraspGeneratorPlugin"/>
+    <rosparam ns="grasping" command="load" file="$(find grasp_generator_plugin)/config/grasp_generator.yaml"/>
+</launch>

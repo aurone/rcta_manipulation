@@ -1,0 +1,12 @@
+wrist_to_tool_transform:
+  position:
+    x: 0.18
+    y:  0.0
+    z:  0.0
+  orientation:
+    w: 0.707
+    x: 0.0
+    y: 0.707
+    z: 0.0
+  
+pregrasp_to_grasp_offset_m: 0.13
