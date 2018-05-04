@@ -1329,7 +1329,13 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     ROS_INFO("Produced %zd reachable grasp poses", candidates.size());
 
     // 4. Order grasp candidates by their graspability/reachability.
-    std::sort(begin(candidates), end(candidates),
+    // NOTE: stable_sort used here to guarantee that equivalent elements
+    // maintain their order in the array. This is useful, for instance, if the
+    // grasp planner plugin uses an underlying grasp planner that returns
+    // grasps in descending order of graspability, but does not provide the
+    // actual cost values (in such case, the planner plugin can assign an equal
+    // value to each grasp and the order will not be modified here)
+    std::stable_sort(begin(candidates), end(candidates),
             [&](const rcta::Grasp& a, const rcta::Grasp& b)
             {
                 return a.u > b.u;
