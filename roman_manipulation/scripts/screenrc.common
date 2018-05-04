@@ -11,3 +11,5 @@ altscreen on
 bindkey ^[[1;5D prev
 bindkey ^[[1;5C next
 
+term "screen-256color"
+

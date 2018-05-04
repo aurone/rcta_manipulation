@@ -1,0 +1,4 @@
+<launch>
+    <param name="grasp_planner_plugin" value="rcta/GascanGraspPlannerPlugin"/>
+    <rosparam ns="grasping" command="load" file="$(find gascan_grasp_planning)/config/gascan_grasping.yaml"/>
+</launch>

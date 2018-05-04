@@ -78,11 +78,11 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
 {
     double allowed_planning_time = 10.0;
     const char* group_name = "right_arm_and_torso";
-    const char* workspace_frame = "base_footprint";
+    const char* workspace_frame = "base_link";
     geometry_msgs::Vector3 workspace_min;
     workspace_min.x = -0.5;
     workspace_min.y = -1.5;
-    workspace_min.z =  0.0;
+    workspace_min.z =  -0.2;
     geometry_msgs::Vector3 workspace_max;
     workspace_max.x =  1.5;
     workspace_max.y =  0.5;
@@ -493,6 +493,7 @@ enum GraspObjectExecutionStatus
     IDLE = 0,
     FAULT,
     GENERATING_GRASPS,
+    PRESHAPE_HAND,
     MOVING_ARM_TO_PREGRASP,
     MOVING_ARM_TO_GRASP,
     OPENING_GRIPPER,
@@ -559,7 +560,7 @@ struct GraspObjectExecutor
 
     std::string m_action_name                   = "grasp_object_command";
     std::string m_move_arm_command_action_name  = "move_group";
-    std::string m_gripper_command_action_name   = "right_gripper/gripper_action";
+    std::string m_gripper_command_action_name;
 
     std::unique_ptr<ros::ServiceClient> m_check_state_validity_client;
 
@@ -581,6 +582,17 @@ struct GraspObjectExecutor
     moveit::core::JointModelGroup* m_manip_group = NULL;
 
     bool m_attach_object = false;
+    bool m_filter_visibility = false;
+
+    // Set to true if point clouds are received with a high amount of latency.
+    // When this happens, we often receive a point clouds after the transform
+    // from the sensor frame to the planning frame is out of date, causing
+    // us to be unable to transform the point cloud to the planning frame just
+    // before sending it to the grasp planner. While we could increase the size
+    // of the tf cache (greater than the default 10 seconds), here we just use
+    // the current transform under the assumption that the robot hasn't really
+    // moved since the point cloud was captured.
+    bool m_slow_clouds = true;
 
     ///@}
 
@@ -801,9 +813,11 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
-    if (!m_robot_model->hasLinkModel(m_camera_view_frame)) {
-        ROS_ERROR("No link '%s' found in the robot model", m_camera_view_frame.c_str());
-        return false;
+    if (m_filter_visibility) {
+        if (!m_robot_model->hasLinkModel(m_camera_view_frame)) {
+            ROS_ERROR("No link '%s' found in the robot model", m_camera_view_frame.c_str());
+            return false;
+        }
     }
 
     auto transformer = boost::shared_ptr<tf::Transformer>(new tf::TransformListener);
@@ -918,19 +932,22 @@ bool GraspObjectExecutor::initialize()
     // subscribers
     m_costmap_sub = m_nh.subscribe<nav_msgs::OccupancyGrid>(
             "map", 1, &GraspObjectExecutor::occupancyGridCallback, this);
-//    m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
 
-    this->point_cloud_sub.reset(
-            new message_filters::Subscriber<sensor_msgs::PointCloud2>(
-                    m_nh, "cloud_in", 1));
-    assert(this->m_robot_model);
-    this->point_cloud_filter.reset(
-            new tf::MessageFilter<sensor_msgs::PointCloud2>(
-                *this->point_cloud_sub,
-                this->m_listener,
-                this->m_robot_model->getModelFrame(),
-                1));
-    this->point_cloud_filter->registerCallback(boost::bind(&GraspObjectExecutor::pointCloudCallback, this, _1));
+    if (m_slow_clouds) {
+        m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
+    } else {
+        this->point_cloud_sub.reset(
+                new message_filters::Subscriber<sensor_msgs::PointCloud2>(
+                        m_nh, "cloud_in", 1));
+        assert(this->m_robot_model);
+        this->point_cloud_filter.reset(
+                new tf::MessageFilter<sensor_msgs::PointCloud2>(
+                    *this->point_cloud_sub,
+                    this->m_listener,
+                    this->m_robot_model->getModelFrame(),
+                    1));
+        this->point_cloud_filter->registerCallback(boost::bind(&GraspObjectExecutor::pointCloudCallback, this, _1));
+    }
 
     // publishers
     m_filtered_costmap_pub = m_nh.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
@@ -940,6 +957,14 @@ bool GraspObjectExecutor::initialize()
     m_move_arm_command_client.reset(new MoveArmActionClient(m_move_arm_command_action_name, false));
     if (!m_move_arm_command_client) {
         ROS_ERROR("Failed to instantiate Move Arm Command Client");
+        return false;
+    }
+
+    if (!msg_utils::download_param(
+            m_ph,
+            "gripper_command_action_name",
+            m_gripper_command_action_name))
+    {
         return false;
     }
 
@@ -1029,18 +1054,20 @@ void GraspObjectExecutor::pruneGrasps(
 {
     ROS_INFO("Filter %zu grasp candidates", candidates.size());
 
-    EigenSTL::vector_Affine3d marker_poses;
-    marker_poses.reserve(m_attached_markers.size());
-    for (auto& marker : m_attached_markers) {
-        marker_poses.push_back(marker.link_to_marker);
-    }
+    if (m_filter_visibility) {
+        EigenSTL::vector_Affine3d marker_poses;
+        marker_poses.reserve(m_attached_markers.size());
+        for (auto& marker : m_attached_markers) {
+            marker_poses.push_back(marker.link_to_marker);
+        }
 
-    // run this first since this is significantly less expensive than IK
-    PruneGraspsByVisibility(
-            candidates,
-            marker_poses,
-            camera_pose,
-            marker_incident_angle_threshold_rad);
+        // run this first since this is significantly less expensive than IK
+        PruneGraspsByVisibility(
+                candidates,
+                marker_poses,
+                camera_pose,
+                marker_incident_angle_threshold_rad);
+    }
 
     pruneGraspsIK(candidates, robot_pose);
 }
@@ -1211,7 +1238,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         point_cloud = ex->m_last_point_cloud;
     }
 
-    pcl::PointCloud<pcl::PointXYZ>* grasp_cloud = NULL;
+    std::unique_ptr<pcl::PointCloud<pcl::PointXYZ>> grasp_cloud;
     if (point_cloud) {
         ROS_INFO("Have point cloud for grasp planning!");
         // sensor_msgs/PointCloud2 -> pcl::PointXYZ
@@ -1222,10 +1249,16 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         // transform cloud to model frame
         ROS_INFO("Wait for transform from '%s' to '%s'", point_cloud->header.frame_id.c_str(), ex->m_robot_model->getModelFrame().c_str());
         std::string error;
+        ros::Time transform_time;
+        if (ex->m_slow_clouds) {
+            transform_time = ros::Time::now();
+        } else {
+            transform_time = point_cloud->header.stamp;
+        }
         if (!ex->m_listener.waitForTransform(
                 ex->m_robot_model->getModelFrame(),
                 point_cloud->header.frame_id,
-                point_cloud->header.stamp,
+                transform_time,
                 ros::Duration(10.0),
                 ros::Duration(0.01),
                 &error))
@@ -1243,7 +1276,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
             ex->m_listener.lookupTransform(
                     ex->m_robot_model->getModelFrame(),
                     point_cloud->header.frame_id,
-                    point_cloud->header.stamp,
+                    transform_time,
                     transform);
         } catch (const tf::TransformException& e) {
             ROS_ERROR("Failed to lookup transform (%s)", e.what());
@@ -1257,6 +1290,23 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         // convert to pcl point cloud for transformation
         pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
         pcl_ros::transformPointCloud(cloud, cloud_transformed, transform);
+
+        pcl::PointCloud<pcl::PointXYZ>* cloud_filtered = new pcl::PointCloud<pcl::PointXYZ>;
+        cloud_filtered->points.reserve(cloud_transformed.size());
+        cloud_filtered->header.frame_id = ex->m_robot_model->getModelFrame();
+
+        double dist_thresh = 0.5; // TODO: configurate me
+        for (int i = 0; i < cloud_transformed.points.size(); ++i) {
+            auto& point = cloud_transformed.points[i];
+            Eigen::Vector3d p(point.x, point.y, point.z);
+            auto dist_sq = (ex->m_obj_pose.translation() - p).squaredNorm();
+            if (dist_sq <= dist_thresh * dist_thresh) {
+                pcl::PointXYZ pp; pp.x = p.x(); pp.y = p.y(); pp.z = p.z();
+                cloud_filtered->points.push_back(pp);
+            }
+        }
+
+        grasp_cloud.reset(cloud_filtered);
     } else {
         ROS_WARN("No point cloud available for grasp planning");
     }
@@ -1267,7 +1317,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     // reachability/graspability analysis to.
     int max_samples = 100;
     if (!ex->m_grasp_planner->planGrasps(
-            "gascan", ex->m_obj_pose, grasp_cloud, max_samples, candidates))
+            "gascan", ex->m_obj_pose, grasp_cloud.get(), max_samples, candidates))
     {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;
@@ -1286,8 +1336,11 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     auto& T_world_robot = robot_state.getGlobalLinkTransform(ex->m_robot_model->getRootLink());
     ROS_INFO("world -> robot: %s", to_string(T_world_robot).c_str());
 
-    auto& T_world_camera = robot_state.getGlobalLinkTransform(ex->m_camera_view_frame);
-    ROS_INFO("world -> camera: %s", to_string(T_world_camera).c_str());
+    Eigen::Affine3d T_world_camera = Eigen::Affine3d::Identity();
+    if (ex->m_filter_visibility) {
+        T_world_camera = robot_state.getGlobalLinkTransform(ex->m_camera_view_frame);
+        ROS_INFO("world -> camera: %s", to_string(T_world_camera).c_str());
+    }
 
     double vis_angle_thresh = sbpl::angles::to_radians(45.0);
     ex->pruneGrasps(candidates, T_world_robot, T_world_camera, vis_angle_thresh);
@@ -1295,7 +1348,13 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     ROS_INFO("Produced %zd reachable grasp poses", candidates.size());
 
     // 4. Order grasp candidates by their graspability/reachability.
-    std::sort(begin(candidates), end(candidates),
+    // NOTE: stable_sort used here to guarantee that equivalent elements
+    // maintain their order in the array. This is useful, for instance, if the
+    // grasp planner plugin uses an underlying grasp planner that returns
+    // grasps in descending order of graspability, but does not provide the
+    // actual cost values (in such case, the planner plugin can assign an equal
+    // value to each grasp and the order will not be modified here)
+    std::stable_sort(begin(candidates), end(candidates),
             [&](const rcta::Grasp& a, const rcta::Grasp& b)
             {
                 return a.u > b.u;
@@ -1317,7 +1376,8 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     SV_SHOW_INFO(ex->getGraspsVisualization(candidates, "reachable_candidates"));
 
     ex->m_grasp_candidates = std::move(candidates);
-    return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
+
+    return GraspObjectExecutionStatus::PRESHAPE_HAND;
 }
 
 auto DoMoveArmToPreGrasp(GraspObjectExecutor* ex)
@@ -1395,6 +1455,54 @@ auto DoMoveArmToPreGrasp(GraspObjectExecutor* ex)
     result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
     ex->m_server->setAborted(result, "Failed on all reachable grasps");
     return GraspObjectExecutionStatus::FAULT;
+}
+
+auto DoPreshapeHand(GraspObjectExecutor* ex) -> GraspObjectExecutionStatus
+{
+    // send gripper command upon entering
+    ROS_WARN("Sending Gripper Goal to open gripper");
+    if (!ReconnectActionClient(
+            ex->m_gripper_command_client,
+            ex->m_gripper_command_action_name,
+            ros::Rate(10.0),
+            ros::Duration(5.0)))
+    {
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+        std::stringstream ss; ss << "Failed to connect to '" << ex->m_gripper_command_action_name << "' action server";
+        ex->m_server->setAborted(result, ss.str());
+        ROS_ERROR("%s", ss.str().c_str());
+        return GraspObjectExecutionStatus::FAULT;
+    }
+
+    control_msgs::GripperCommandGoal gripper_goal;
+    gripper_goal.command.position = GripperModel().maximum_width();
+    gripper_goal.command.max_effort = GripperModel().maximum_force();
+
+    auto state = ex->m_gripper_command_client->sendGoalAndWait(gripper_goal);
+    auto result = ex->m_gripper_command_client->getResult();
+
+    ROS_INFO("Gripper Goal to open gripper is no longer pending");
+
+    if (state == actionlib::SimpleClientGoalState::SUCCEEDED &&
+        result && (result->reached_goal || result->stalled))
+    {
+        ROS_INFO("Gripper Command Succeeded");
+        if (result->stalled) {
+            ROS_WARN("    Open Gripper Command Succeeded but Stalled During Execution");
+        }
+        return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
+    } else {
+        ROS_WARN("Open Gripper Command failed");
+        ROS_WARN("    Simple Client Goal State: %s", state.toString().c_str());
+        ROS_WARN("    Error Text: %s", state.getText().c_str());
+        ROS_WARN("    result.reached_goal = %s", result ? (result->reached_goal ? "TRUE" : "FALSE") : "null");
+        ROS_WARN("    result.stalled = %s", result ? (result->stalled ? "TRUE" : "FALSE") : "null");
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+        ex->m_server->setAborted(result, "Failed to preshape hand");
+        return GraspObjectExecutionStatus::FAULT;
+    }
 }
 
 auto DoOpenGripper(GraspObjectExecutor* ex)
@@ -1896,6 +2004,8 @@ int main(int argc, char* argv[])
 
     smach_states[GraspObjectExecutionStatus::GENERATING_GRASPS].do_fn = DoGenerateGrasps;
 
+    smach_states[GraspObjectExecutionStatus::PRESHAPE_HAND].do_fn = DoPreshapeHand;
+
     smach_states[GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP].do_fn = DoMoveArmToPreGrasp;
 
     smach_states[GraspObjectExecutionStatus::MOVING_ARM_TO_GRASP].do_fn = DoMoveArmToGrasp;
@@ -1919,7 +2029,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    ros::AsyncSpinner spinner(1);
+    ros::AsyncSpinner spinner(4);
     spinner.start();
 
     auto prev_status = GraspObjectExecutionStatus::IDLE;

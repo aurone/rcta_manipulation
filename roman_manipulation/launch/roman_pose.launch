@@ -21,7 +21,7 @@
         <group if="$(arg fake)">
             <!-- SIM/FAKE -->
             <node name="fake_localization" pkg="tf" type="static_transform_publisher"
-                    args="0 0 0 0 0 0 map odom_combined 10"/>
+                    args="0 0 0.13613 0 0 0 map odom_combined 10"/>
         </group>
         <group unless="$(arg fake)">
             <!-- SIM/REAL -->
