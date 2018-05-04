@@ -493,6 +493,7 @@ enum GraspObjectExecutionStatus
     IDLE = 0,
     FAULT,
     GENERATING_GRASPS,
+    PRESHAPE_HAND,
     MOVING_ARM_TO_PREGRASP,
     MOVING_ARM_TO_GRASP,
     OPENING_GRIPPER,
@@ -1342,7 +1343,8 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     SV_SHOW_INFO(ex->getGraspsVisualization(candidates, "reachable_candidates"));
 
     ex->m_grasp_candidates = std::move(candidates);
-    return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
+
+    return GraspObjectExecutionStatus::PRESHAPE_HAND;
 }
 
 auto DoMoveArmToPreGrasp(GraspObjectExecutor* ex)
@@ -1420,6 +1422,54 @@ auto DoMoveArmToPreGrasp(GraspObjectExecutor* ex)
     result.result = cmu_manipulation_msgs::GraspObjectCommandResult::PLANNING_FAILED;
     ex->m_server->setAborted(result, "Failed on all reachable grasps");
     return GraspObjectExecutionStatus::FAULT;
+}
+
+auto DoPreshapeHand(GraspObjectExecutor* ex) -> GraspObjectExecutionStatus
+{
+    // send gripper command upon entering
+    ROS_WARN("Sending Gripper Goal to open gripper");
+    if (!ReconnectActionClient(
+            ex->m_gripper_command_client,
+            ex->m_gripper_command_action_name,
+            ros::Rate(10.0),
+            ros::Duration(5.0)))
+    {
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+        std::stringstream ss; ss << "Failed to connect to '" << ex->m_gripper_command_action_name << "' action server";
+        ex->m_server->setAborted(result, ss.str());
+        ROS_ERROR("%s", ss.str().c_str());
+        return GraspObjectExecutionStatus::FAULT;
+    }
+
+    control_msgs::GripperCommandGoal gripper_goal;
+    gripper_goal.command.position = GripperModel().maximum_width();
+    gripper_goal.command.max_effort = GripperModel().maximum_force();
+
+    auto state = ex->m_gripper_command_client->sendGoalAndWait(gripper_goal);
+    auto result = ex->m_gripper_command_client->getResult();
+
+    ROS_INFO("Gripper Goal to open gripper is no longer pending");
+
+    if (state == actionlib::SimpleClientGoalState::SUCCEEDED &&
+        result && (result->reached_goal || result->stalled))
+    {
+        ROS_INFO("Gripper Command Succeeded");
+        if (result->stalled) {
+            ROS_WARN("    Open Gripper Command Succeeded but Stalled During Execution");
+        }
+        return GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP;
+    } else {
+        ROS_WARN("Open Gripper Command failed");
+        ROS_WARN("    Simple Client Goal State: %s", state.toString().c_str());
+        ROS_WARN("    Error Text: %s", state.getText().c_str());
+        ROS_WARN("    result.reached_goal = %s", result ? (result->reached_goal ? "TRUE" : "FALSE") : "null");
+        ROS_WARN("    result.stalled = %s", result ? (result->stalled ? "TRUE" : "FALSE") : "null");
+        cmu_manipulation_msgs::GraspObjectCommandResult result;
+        result.result = cmu_manipulation_msgs::GraspObjectCommandResult::EXECUTION_FAILED;
+        ex->m_server->setAborted(result, "Failed to preshape hand");
+        return GraspObjectExecutionStatus::FAULT;
+    }
 }
 
 auto DoOpenGripper(GraspObjectExecutor* ex)
@@ -1920,6 +1970,8 @@ int main(int argc, char* argv[])
     smach_states[GraspObjectExecutionStatus::FAULT].do_fn = OnFault;
 
     smach_states[GraspObjectExecutionStatus::GENERATING_GRASPS].do_fn = DoGenerateGrasps;
+
+    smach_states[GraspObjectExecutionStatus::PRESHAPE_HAND].do_fn = DoPreshapeHand;
 
     smach_states[GraspObjectExecutionStatus::MOVING_ARM_TO_PREGRASP].do_fn = DoMoveArmToPreGrasp;
 
