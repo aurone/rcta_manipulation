@@ -1,0 +1,8 @@
+<launch>
+    <arg name="name" default="$(optenv ROS_PLATFORM_NAME robot)"/>
+    <include ns="$(arg name)" file="$(find roman_manipulation)/launch/grasp_object_executor.launch">
+        <arg name="cloud_topic" value="/realsense_3/depth_registered/points_throttle"/>
+        <arg name="grasp_planner" value="grasp_generator"/>
+        <arg name="gripper_command_action_name" value="rcta_right_robotiq_controller"/>
+    </include>
+</launch>
