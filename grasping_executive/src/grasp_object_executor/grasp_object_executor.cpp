@@ -559,7 +559,7 @@ struct GraspObjectExecutor
 
     std::string m_action_name                   = "grasp_object_command";
     std::string m_move_arm_command_action_name  = "move_group";
-    std::string m_gripper_command_action_name   = "right_gripper/gripper_action";
+    std::string m_gripper_command_action_name;
 
     std::unique_ptr<ros::ServiceClient> m_check_state_validity_client;
 
@@ -940,6 +940,14 @@ bool GraspObjectExecutor::initialize()
     m_move_arm_command_client.reset(new MoveArmActionClient(m_move_arm_command_action_name, false));
     if (!m_move_arm_command_client) {
         ROS_ERROR("Failed to instantiate Move Arm Command Client");
+        return false;
+    }
+
+    if (!msg_utils::download_param(
+            m_ph,
+            "gripper_command_action_name",
+            m_gripper_command_action_name))
+    {
         return false;
     }
 
