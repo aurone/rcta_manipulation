@@ -584,6 +584,16 @@ struct GraspObjectExecutor
     bool m_attach_object = false;
     bool m_filter_visibility = false;
 
+    // Set to true if point clouds are received with a high amount of latency.
+    // When this happens, we often receive a point clouds after the transform
+    // from the sensor frame to the planning frame is out of date, causing
+    // us to be unable to transform the point cloud to the planning frame just
+    // before sending it to the grasp planner. While we could increase the size
+    // of the tf cache (greater than the default 10 seconds), here we just use
+    // the current transform under the assumption that the robot hasn't really
+    // moved since the point cloud was captured.
+    bool m_slow_clouds = true;
+
     ///@}
 
     /// \name GenerateGrasps Parameters
@@ -922,19 +932,22 @@ bool GraspObjectExecutor::initialize()
     // subscribers
     m_costmap_sub = m_nh.subscribe<nav_msgs::OccupancyGrid>(
             "map", 1, &GraspObjectExecutor::occupancyGridCallback, this);
-//    m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
 
-    this->point_cloud_sub.reset(
-            new message_filters::Subscriber<sensor_msgs::PointCloud2>(
-                    m_nh, "cloud_in", 1));
-    assert(this->m_robot_model);
-    this->point_cloud_filter.reset(
-            new tf::MessageFilter<sensor_msgs::PointCloud2>(
-                *this->point_cloud_sub,
-                this->m_listener,
-                this->m_robot_model->getModelFrame(),
-                1));
-    this->point_cloud_filter->registerCallback(boost::bind(&GraspObjectExecutor::pointCloudCallback, this, _1));
+    if (m_slow_clouds) {
+        m_point_cloud_sub = m_nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 1, &GraspObjectExecutor::pointCloudCallback, this);
+    } else {
+        this->point_cloud_sub.reset(
+                new message_filters::Subscriber<sensor_msgs::PointCloud2>(
+                        m_nh, "cloud_in", 1));
+        assert(this->m_robot_model);
+        this->point_cloud_filter.reset(
+                new tf::MessageFilter<sensor_msgs::PointCloud2>(
+                    *this->point_cloud_sub,
+                    this->m_listener,
+                    this->m_robot_model->getModelFrame(),
+                    1));
+        this->point_cloud_filter->registerCallback(boost::bind(&GraspObjectExecutor::pointCloudCallback, this, _1));
+    }
 
     // publishers
     m_filtered_costmap_pub = m_nh.advertise<nav_msgs::OccupancyGrid>("costmap_filtered", 1);
@@ -1236,10 +1249,16 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         // transform cloud to model frame
         ROS_INFO("Wait for transform from '%s' to '%s'", point_cloud->header.frame_id.c_str(), ex->m_robot_model->getModelFrame().c_str());
         std::string error;
+        ros::Time transform_time;
+        if (ex->m_slow_clouds) {
+            transform_time = ros::Time::now();
+        } else {
+            transform_time = point_cloud->header.stamp;
+        }
         if (!ex->m_listener.waitForTransform(
                 ex->m_robot_model->getModelFrame(),
                 point_cloud->header.frame_id,
-                point_cloud->header.stamp,
+                transform_time,
                 ros::Duration(10.0),
                 ros::Duration(0.01),
                 &error))
@@ -1257,7 +1276,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
             ex->m_listener.lookupTransform(
                     ex->m_robot_model->getModelFrame(),
                     point_cloud->header.frame_id,
-                    point_cloud->header.stamp,
+                    transform_time,
                     transform);
         } catch (const tf::TransformException& e) {
             ROS_ERROR("Failed to lookup transform (%s)", e.what());
