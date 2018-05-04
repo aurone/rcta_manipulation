@@ -1219,7 +1219,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         point_cloud = ex->m_last_point_cloud;
     }
 
-    pcl::PointCloud<pcl::PointXYZ>* grasp_cloud = NULL;
+    std::unique_ptr<pcl::PointCloud<pcl::PointXYZ>> grasp_cloud;
     if (point_cloud) {
         ROS_INFO("Have point cloud for grasp planning!");
         // sensor_msgs/PointCloud2 -> pcl::PointXYZ
@@ -1265,6 +1265,23 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         // convert to pcl point cloud for transformation
         pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
         pcl_ros::transformPointCloud(cloud, cloud_transformed, transform);
+
+        pcl::PointCloud<pcl::PointXYZ>* cloud_filtered = new pcl::PointCloud<pcl::PointXYZ>;
+        cloud_filtered->points.reserve(cloud_transformed.size());
+        cloud_filtered->header.frame_id = ex->m_robot_model->getModelFrame();
+
+        double dist_thresh = 0.5; // TODO: configurate me
+        for (int i = 0; i < cloud_transformed.points.size(); ++i) {
+            auto& point = cloud_transformed.points[i];
+            Eigen::Vector3d p(point.x, point.y, point.z);
+            auto dist_sq = (ex->m_obj_pose.translation() - p).squaredNorm();
+            if (dist_sq <= dist_thresh * dist_thresh) {
+                pcl::PointXYZ pp; pp.x = p.x(); pp.y = p.y(); pp.z = p.z();
+                cloud_filtered->points.push_back(pp);
+            }
+        }
+
+        grasp_cloud.reset(cloud_filtered);
     } else {
         ROS_WARN("No point cloud available for grasp planning");
     }
@@ -1275,7 +1292,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     // reachability/graspability analysis to.
     int max_samples = 100;
     if (!ex->m_grasp_planner->planGrasps(
-            "gascan", ex->m_obj_pose, grasp_cloud, max_samples, candidates))
+            "gascan", ex->m_obj_pose, grasp_cloud.get(), max_samples, candidates))
     {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;
