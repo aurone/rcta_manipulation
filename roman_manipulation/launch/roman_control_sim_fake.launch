@@ -18,5 +18,5 @@
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 
     <node name="odom_broadcaster" pkg="tf" type="static_transform_publisher"
-            args="0 0 0 0 0 0 odom_combined base_footprint 10"/>
+            args="0 0 0 0 0 0 odom_combined base_link 10"/>
 </launch>
