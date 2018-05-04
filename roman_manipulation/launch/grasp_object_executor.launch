@@ -1,13 +1,45 @@
 <launch>
-    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
-        <arg name="load_robot_description" value="true"/>
-    </include>
+    <!-- sensor_msgs/PointCloud2 topic to subscribe to. Used to pass down to the
+         grasp planner for determining grasps.
+    -->
+    <arg name="cloud_topic" default="cloud_in"/>
 
+    <!-- nav_msgs/OccupancyMap topic to subscribe to. Used to check for
+    successful pickup, if enabled.
+    -->
+    <arg name="map_topic" default="map"/>
+
+    <!-- Which grasp planner to use. This name corresponds to launch file named
+    <grasp_planner>_grasp_planner.launch.xml in the grasping_executive
+    package that is included to provide (1) the name of the grasp planner
+    plugin, as recognized by pluginlib, (2) the ROS parameters required by that
+    grasp planner plugin.
+    -->
+    <arg name="grasp_planner" default="gascan"/>
+
+    <!-- The namespace of the action server for commanding the gripper. The
+    action server topics are expected to exist under the
+    <gripper_command_action_name>/gripper_action/ namespace.
+    -->
+    <arg name="gripper_command_action_name" default="right_gripper"/>
+
+    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
+        <arg name="load_robot_description" value="false"/>
+    </include>
+    
     <node name="grasp_object_executor" pkg="grasping_executive" type="grasp_object_executor">
-        <remap from="map" to="global_costmap/costmap/costmap"/>
+        <remap from="cloud_in" to="$(arg cloud_topic)"/>
+        <remap from="map" to="$(arg map_topic)"/>
+
         <rosparam command="load" file="$(find hdt_control)/config/attached_markers.yaml"/>
-        <rosparam command="load" file="$(find gascan_grasp_planning)/config/gascan_grasping.yaml"/>
         <rosparam command="load" file="$(find grasping_executive)/config/grasp_object_executor.yaml"/>
+        <param name="gripper_command_action_name" value="$(arg gripper_command_action_name)/gripper_action"/>
+
+        <!-- Configure the grasp planner to be used and load its parameters -->
+        <!--arg name="grasp_planner" value="grasp_generator"/-->
+        <include file="$(find grasping_executive)/config/grasp_planner.launch.xml">
+            <arg name="grasp_planner" value="$(arg grasp_planner)"/>
+        </include>
     </node>
 </launch>
 
