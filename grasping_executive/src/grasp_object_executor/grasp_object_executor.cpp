@@ -582,6 +582,7 @@ struct GraspObjectExecutor
     moveit::core::JointModelGroup* m_manip_group = NULL;
 
     bool m_attach_object = false;
+    bool m_filter_visibility = false;
 
     ///@}
 
@@ -802,9 +803,11 @@ bool GraspObjectExecutor::initialize()
         return false;
     }
 
-    if (!m_robot_model->hasLinkModel(m_camera_view_frame)) {
-        ROS_ERROR("No link '%s' found in the robot model", m_camera_view_frame.c_str());
-        return false;
+    if (m_filter_visibility) {
+        if (!m_robot_model->hasLinkModel(m_camera_view_frame)) {
+            ROS_ERROR("No link '%s' found in the robot model", m_camera_view_frame.c_str());
+            return false;
+        }
     }
 
     auto transformer = boost::shared_ptr<tf::Transformer>(new tf::TransformListener);
@@ -1038,18 +1041,20 @@ void GraspObjectExecutor::pruneGrasps(
 {
     ROS_INFO("Filter %zu grasp candidates", candidates.size());
 
-    EigenSTL::vector_Affine3d marker_poses;
-    marker_poses.reserve(m_attached_markers.size());
-    for (auto& marker : m_attached_markers) {
-        marker_poses.push_back(marker.link_to_marker);
-    }
+    if (m_filter_visibility) {
+        EigenSTL::vector_Affine3d marker_poses;
+        marker_poses.reserve(m_attached_markers.size());
+        for (auto& marker : m_attached_markers) {
+            marker_poses.push_back(marker.link_to_marker);
+        }
 
-    // run this first since this is significantly less expensive than IK
-    PruneGraspsByVisibility(
-            candidates,
-            marker_poses,
-            camera_pose,
-            marker_incident_angle_threshold_rad);
+        // run this first since this is significantly less expensive than IK
+        PruneGraspsByVisibility(
+                candidates,
+                marker_poses,
+                camera_pose,
+                marker_incident_angle_threshold_rad);
+    }
 
     pruneGraspsIK(candidates, robot_pose);
 }
@@ -1312,8 +1317,11 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     auto& T_world_robot = robot_state.getGlobalLinkTransform(ex->m_robot_model->getRootLink());
     ROS_INFO("world -> robot: %s", to_string(T_world_robot).c_str());
 
-    auto& T_world_camera = robot_state.getGlobalLinkTransform(ex->m_camera_view_frame);
-    ROS_INFO("world -> camera: %s", to_string(T_world_camera).c_str());
+    Eigen::Affine3d T_world_camera = Eigen::Affine3d::Identity();
+    if (ex->m_filter_visibility) {
+        T_world_camera = robot_state.getGlobalLinkTransform(ex->m_camera_view_frame);
+        ROS_INFO("world -> camera: %s", to_string(T_world_camera).c_str());
+    }
 
     double vis_angle_thresh = sbpl::angles::to_radians(45.0);
     ex->pruneGrasps(candidates, T_world_robot, T_world_camera, vis_angle_thresh);
