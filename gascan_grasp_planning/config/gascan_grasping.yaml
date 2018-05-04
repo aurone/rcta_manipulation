@@ -1,41 +1,40 @@
-grasping:
-  gas_canister_mesh_scale: 1.0
-  degree: 3
-  control_points:
-    - { x:  0.002330, y: -0.02130, z: 0.1260 }
-    - { x:  0.000701, y: -0.00238, z: 0.1260 }
-    - { x:  0.000745, y:  0.01970, z: 0.1230 }
-    - { x:  0.001750, y:  0.03960, z: 0.1260 }
-    - { x:  0.001050, y:  0.06150, z: 0.1260 }
-    - { x:  0.000000, y:  0.08260, z: 0.1190 }
-    - { x:  0.000000, y:  0.09890, z: 0.1070 }
-    - { x:  0.000000, y:  0.11300, z: 0.0912 }
-    - { x:  0.000000, y:  0.12600, z: 0.0769 }
-    - { x:  0.000000, y:  0.13500, z: 0.0567 }
-    - { x:  0.000000, y:  0.13900, z: 0.0451 }
+gas_canister_mesh_scale: 1.0
+degree: 3
+control_points:
+  - { x:  0.002330, y: -0.02130, z: 0.1260 }
+  - { x:  0.000701, y: -0.00238, z: 0.1260 }
+  - { x:  0.000745, y:  0.01970, z: 0.1230 }
+  - { x:  0.001750, y:  0.03960, z: 0.1260 }
+  - { x:  0.001050, y:  0.06150, z: 0.1260 }
+  - { x:  0.000000, y:  0.08260, z: 0.1190 }
+  - { x:  0.000000, y:  0.09890, z: 0.1070 }
+  - { x:  0.000000, y:  0.11300, z: 0.0912 }
+  - { x:  0.000000, y:  0.12600, z: 0.0769 }
+  - { x:  0.000000, y:  0.13500, z: 0.0567 }
+  - { x:  0.000000, y:  0.13900, z: 0.0451 }
 
-  wrist_to_tool_transform:
-    position:
-#      x: 0.192
-      x: 0.27 # 0.212
-      y: -0.05
-      z: 0.0
-    orientation:
-      w: -0.707
-      x: 0.707
-      y: 0.0
-      z: 0.0
+wrist_to_tool_transform:
+  position:
+#    x: 0.192
+    x: 0.27 # 0.212
+    y: -0.05
+    z: 0.0
+  orientation:
+    w: -0.707
+    x: 0.707
+    y: 0.0
+    z: 0.0
 
 # parameters for robotiq c-model gripper
-#  wrist_to_tool_transform:
-#    position:
-#      x: 0.12 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
-#      y: 0.0
-#      z: 0.0
-#    orientation:
-#      w: 1.0
-#      x: 0.0
-#      y: 0.0
-#      z: 0.0
+#wrist_to_tool_transform:
+#  position:
+#    x: 0.12 # 16cm origin - shortening this so that the wrist is positioned closer to the gas can handle
+#    y: 0.0
+#    z: 0.0
+#  orientation:
+#    w: 1.0
+#    x: 0.0
+#    y: 0.0
+#    z: 0.0
 
-  pregrasp_to_grasp_offset_m: 0.12
+pregrasp_to_grasp_offset_m: 0.12

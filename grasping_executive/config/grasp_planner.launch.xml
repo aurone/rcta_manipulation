@@ -1,4 +1,4 @@
 <launch>
     <arg name="grasp_planner" default="gascan"/>
-    <include file="$(find roman_manipulation)/config/$(arg grasp_planner)_grasp_planner.launch.xml"/>
+    <include file="$(find grasping_executive)/config/$(arg grasp_planner)_grasp_planner.launch.xml"/>
 </launch>

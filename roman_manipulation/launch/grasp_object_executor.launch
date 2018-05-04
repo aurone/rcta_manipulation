@@ -26,7 +26,13 @@
     <include file="$(find roman_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="false"/>
     </include>
-    
+
+    <!-- Configure the grasp planner to be used and load its parameters -->
+    <!--arg name="grasp_planner" value="grasp_generator"/-->
+    <include ns="grasp_object_executor" file="$(find grasping_executive)/config/grasp_planner.launch.xml">
+        <arg name="grasp_planner" value="$(arg grasp_planner)"/>
+    </include>
+
     <node name="grasp_object_executor" pkg="grasping_executive" type="grasp_object_executor">
         <remap from="cloud_in" to="$(arg cloud_topic)"/>
         <remap from="map" to="$(arg map_topic)"/>
@@ -35,11 +41,6 @@
         <rosparam command="load" file="$(find grasping_executive)/config/grasp_object_executor.yaml"/>
         <param name="gripper_command_action_name" value="$(arg gripper_command_action_name)/gripper_action"/>
 
-        <!-- Configure the grasp planner to be used and load its parameters -->
-        <!--arg name="grasp_planner" value="grasp_generator"/-->
-        <include file="$(find grasping_executive)/config/grasp_planner.launch.xml">
-            <arg name="grasp_planner" value="$(arg grasp_planner)"/>
-        </include>
     </node>
 </launch>
 
