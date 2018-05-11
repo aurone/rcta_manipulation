@@ -37,83 +37,45 @@
     <virtual_joint name="world_joint" type="floating" parent_frame="map" child_link="base_link"/>
     <!--PASSIVE JOINT: Purpose: this element is used to mark joints that are not actuated-->
     <passive_joint name="world_joint" />
+
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
+
+    <!-- allowed collisions internal to body -->
     <disable_collisions link1="base_link" link2="chest" reason="Never" />
-    <disable_collisions link1="base_link" link2="limb_left_link0" reason="Never" />
-    <disable_collisions link1="base_link" link2="limb_left_link1" reason="Never" />
-    <disable_collisions link1="base_link" link2="limb_left_link2" reason="Never" />
-    <disable_collisions link1="base_link" link2="limb_left_link3" reason="Never" />
-    <disable_collisions link1="base_link" link2="limb_left_link4" reason="Never" />
-    <disable_collisions link1="base_link" link2="limb_left_link5" reason="Never" />
+    <disable_collisions link1="chest" link2="torso_link0" reason="Adjacent" />
+    <disable_collisions link1="base_link" link2="torso_link0" reason="Never" />
+
+    <!-- allowed collisions between right arm and body -->
     <disable_collisions link1="base_link" link2="limb_right_link0" reason="Never" />
     <disable_collisions link1="base_link" link2="limb_right_link1" reason="Never" />
     <disable_collisions link1="base_link" link2="limb_right_link2" reason="Never" />
     <disable_collisions link1="base_link" link2="limb_right_link3" reason="Never" />
     <disable_collisions link1="base_link" link2="limb_right_link4" reason="Never" />
     <disable_collisions link1="base_link" link2="limb_right_link5" reason="Never" />
-    <disable_collisions link1="base_link" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="chest" link2="limb_left_link0" reason="Adjacent" />
-    <disable_collisions link1="chest" link2="limb_left_link1" reason="Never" />
     <disable_collisions link1="chest" link2="limb_right_link0" reason="Adjacent" />
     <disable_collisions link1="chest" link2="limb_right_link1" reason="Never" />
-    <disable_collisions link1="chest" link2="torso_link0" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link0" link2="limb_left_link1" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link0" link2="limb_left_link2" reason="Never" />
-    <disable_collisions link1="limb_left_link0" link2="limb_left_link3" reason="Never" />
-    <disable_collisions link1="limb_left_link0" link2="limb_right_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link0" link2="limb_right_link1" reason="Never" />
-    <disable_collisions link1="limb_left_link0" link2="limb_right_link2" reason="Never" />
-    <disable_collisions link1="limb_left_link0" link2="limb_right_link3" reason="Never" />
-    <disable_collisions link1="limb_left_link0" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link1" link2="limb_left_link2" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link1" link2="limb_left_link3" reason="Never" />
-    <disable_collisions link1="limb_left_link1" link2="limb_right_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link1" link2="limb_right_link1" reason="Never" />
-    <disable_collisions link1="limb_left_link1" link2="limb_right_link2" reason="Never" />
-    <disable_collisions link1="limb_left_link1" link2="limb_right_link3" reason="Never" />
-    <disable_collisions link1="limb_left_link1" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link2" link2="limb_left_link3" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link2" link2="limb_left_link4" reason="Never" />
-    <disable_collisions link1="limb_left_link2" link2="limb_right_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link2" link2="limb_right_link1" reason="Never" />
-    <disable_collisions link1="limb_left_link2" link2="limb_right_link2" reason="Never" />
-    <disable_collisions link1="limb_left_link2" link2="limb_right_link3" reason="Never" />
-    <disable_collisions link1="limb_left_link2" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link3" link2="limb_left_link4" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link3" link2="limb_left_link5" reason="Never" />
-    <disable_collisions link1="limb_left_link3" link2="limb_right_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link3" link2="limb_right_link1" reason="Never" />
-    <disable_collisions link1="limb_left_link3" link2="limb_right_link2" reason="Never" />
-    <disable_collisions link1="limb_left_link3" link2="limb_right_link3" reason="Never" />
-    <disable_collisions link1="limb_left_link3" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link4" link2="limb_left_link5" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link4" link2="limb_left_link6" reason="Never" />
-    <disable_collisions link1="limb_left_link4" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link5" link2="limb_left_link6" reason="Adjacent" />
-    <disable_collisions link1="limb_left_link5" link2="limb_left_link7" reason="Never" />
-    <disable_collisions link1="limb_left_link5" link2="torso_link0" reason="Never" />
-    <disable_collisions link1="limb_left_link6" link2="limb_left_link7" reason="Adjacent" />
+    <disable_collisions link1="limb_right_link0" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_right_link1" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_right_link2" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_right_link3" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_right_link4" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_right_link5" link2="torso_link0" reason="Never" />
+
+    <!-- allowed collisions internal to right arm -->
     <disable_collisions link1="limb_right_link0" link2="limb_right_link1" reason="Adjacent" />
     <disable_collisions link1="limb_right_link0" link2="limb_right_link2" reason="Never" />
     <disable_collisions link1="limb_right_link0" link2="limb_right_link3" reason="Never" />
-    <disable_collisions link1="limb_right_link0" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link1" link2="limb_right_link2" reason="Adjacent" />
     <disable_collisions link1="limb_right_link1" link2="limb_right_link3" reason="Never" />
-    <disable_collisions link1="limb_right_link1" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link2" link2="limb_right_link3" reason="Adjacent" />
     <disable_collisions link1="limb_right_link2" link2="limb_right_link4" reason="Never" />
-    <disable_collisions link1="limb_right_link2" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link3" link2="limb_right_link4" reason="Adjacent" />
     <disable_collisions link1="limb_right_link3" link2="limb_right_link5" reason="Never" />
-    <disable_collisions link1="limb_right_link3" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link4" link2="limb_right_link5" reason="Adjacent" />
     <disable_collisions link1="limb_right_link4" link2="limb_right_link6" reason="Never" />
-    <disable_collisions link1="limb_right_link4" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link5" link2="limb_right_link6" reason="Adjacent" />
     <disable_collisions link1="limb_right_link5" link2="limb_right_link7" reason="Never" />
-    <disable_collisions link1="limb_right_link5" link2="torso_link0" reason="Never" />
     <disable_collisions link1="limb_right_link6" link2="limb_right_link7" reason="Adjacent" />
-
     <disable_collisions link1="limb_right_link7" link2="limb_right_palm" reason="Adjacent" />
     <disable_collisions link1="limb_right_palm" link2="limb_right_finger_1_link_0" reason="Adjacent" />
     <disable_collisions link1="limb_right_palm" link2="limb_right_finger_1_link_1" reason="Adjacent" />
@@ -122,19 +84,47 @@
     <disable_collisions link1="limb_right_palm" link2="limb_right_finger_middle_link_0" reason="Adjacent" />
     <disable_collisions link1="limb_right_palm" link2="limb_right_finger_middle_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_right_palm" link2="limb_right_tool0" reason="Adjacent" />
-
     <disable_collisions link1="limb_right_finger_1_link_0" link2="limb_right_finger_1_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_right_finger_1_link_1" link2="limb_right_finger_1_link_2" reason="Adjacent" />
     <disable_collisions link1="limb_right_finger_1_link_2" link2="limb_right_finger_1_link_3" reason="Adjacent" />
-
     <disable_collisions link1="limb_right_finger_2_link_0" link2="limb_right_finger_2_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_right_finger_2_link_1" link2="limb_right_finger_2_link_2" reason="Adjacent" />
     <disable_collisions link1="limb_right_finger_2_link_2" link2="limb_right_finger_2_link_3" reason="Adjacent" />
-
     <disable_collisions link1="limb_right_finger_middle_link_0" link2="limb_right_finger_middle_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_right_finger_middle_link_1" link2="limb_right_finger_middle_link_2" reason="Adjacent" />
     <disable_collisions link1="limb_right_finger_middle_link_2" link2="limb_right_finger_middle_link_3" reason="Adjacent" />
 
+    <!-- allowed collisions between left arm and body -->
+    <disable_collisions link1="base_link" link2="limb_left_link0" reason="Never" />
+    <disable_collisions link1="base_link" link2="limb_left_link1" reason="Never" />
+    <disable_collisions link1="base_link" link2="limb_left_link2" reason="Never" />
+    <disable_collisions link1="base_link" link2="limb_left_link3" reason="Never" />
+    <disable_collisions link1="base_link" link2="limb_left_link4" reason="Never" />
+    <disable_collisions link1="base_link" link2="limb_left_link5" reason="Never" />
+    <disable_collisions link1="chest" link2="limb_left_link0" reason="Adjacent" />
+    <disable_collisions link1="chest" link2="limb_left_link1" reason="Never" />
+    <disable_collisions link1="limb_left_link0" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link1" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link2" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link3" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link4" link2="torso_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link5" link2="torso_link0" reason="Never" />
+
+    <!-- allowed collisions internal to left arm -->
+    <disable_collisions link1="limb_left_link0" link2="limb_left_link1" reason="Adjacent" />
+    <disable_collisions link1="limb_left_link0" link2="limb_left_link2" reason="Never" />
+    <disable_collisions link1="limb_left_link0" link2="limb_left_link3" reason="Never" />
+    <disable_collisions link1="limb_left_link1" link2="limb_left_link2" reason="Adjacent" />
+    <disable_collisions link1="limb_left_link1" link2="limb_left_link3" reason="Never" />
+    <disable_collisions link1="limb_left_link2" link2="limb_left_link3" reason="Adjacent" />
+    <disable_collisions link1="limb_left_link2" link2="limb_left_link4" reason="Never" />
+    <disable_collisions link1="limb_left_link3" link2="limb_left_link4" reason="Adjacent" />
+    <disable_collisions link1="limb_left_link3" link2="limb_left_link5" reason="Never" />
+    <disable_collisions link1="limb_left_link4" link2="limb_left_link5" reason="Adjacent" />
+    <disable_collisions link1="limb_left_link4" link2="limb_left_link6" reason="Never" />
+    <disable_collisions link1="limb_left_link5" link2="limb_left_link6" reason="Adjacent" />
+    <disable_collisions link1="limb_left_link5" link2="limb_left_link7" reason="Never" />
+    <disable_collisions link1="limb_left_link6" link2="limb_left_link7" reason="Adjacent" />
     <disable_collisions link1="limb_left_link7" link2="limb_left_palm" reason="Adjacent" />
     <disable_collisions link1="limb_left_palm" link2="limb_left_finger_1_link_0" reason="Adjacent" />
     <disable_collisions link1="limb_left_palm" link2="limb_left_finger_1_link_1" reason="Adjacent" />
@@ -143,16 +133,31 @@
     <disable_collisions link1="limb_left_palm" link2="limb_left_finger_middle_link_0" reason="Adjacent" />
     <disable_collisions link1="limb_left_palm" link2="limb_left_finger_middle_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_left_palm" link2="limb_left_tool0" reason="Adjacent" />
-
     <disable_collisions link1="limb_left_finger_1_link_0" link2="limb_left_finger_1_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_left_finger_1_link_1" link2="limb_left_finger_1_link_2" reason="Adjacent" />
     <disable_collisions link1="limb_left_finger_1_link_2" link2="limb_left_finger_1_link_3" reason="Adjacent" />
-
     <disable_collisions link1="limb_left_finger_2_link_0" link2="limb_left_finger_2_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_left_finger_2_link_1" link2="limb_left_finger_2_link_2" reason="Adjacent" />
     <disable_collisions link1="limb_left_finger_2_link_2" link2="limb_left_finger_2_link_3" reason="Adjacent" />
-
     <disable_collisions link1="limb_left_finger_middle_link_0" link2="limb_left_finger_middle_link_1" reason="Adjacent" />
     <disable_collisions link1="limb_left_finger_middle_link_1" link2="limb_left_finger_middle_link_2" reason="Adjacent" />
     <disable_collisions link1="limb_left_finger_middle_link_2" link2="limb_left_finger_middle_link_3" reason="Adjacent" />
+
+    <!-- allowed collisions between left and right limbs -->
+    <disable_collisions link1="limb_left_link0" link2="limb_right_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link0" link2="limb_right_link1" reason="Never" />
+    <disable_collisions link1="limb_left_link0" link2="limb_right_link2" reason="Never" />
+    <disable_collisions link1="limb_left_link0" link2="limb_right_link3" reason="Never" />
+    <disable_collisions link1="limb_left_link1" link2="limb_right_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link1" link2="limb_right_link1" reason="Never" />
+    <disable_collisions link1="limb_left_link1" link2="limb_right_link2" reason="Never" />
+    <disable_collisions link1="limb_left_link1" link2="limb_right_link3" reason="Never" />
+    <disable_collisions link1="limb_left_link2" link2="limb_right_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link2" link2="limb_right_link1" reason="Never" />
+    <disable_collisions link1="limb_left_link2" link2="limb_right_link2" reason="Never" />
+    <disable_collisions link1="limb_left_link2" link2="limb_right_link3" reason="Never" />
+    <disable_collisions link1="limb_left_link3" link2="limb_right_link0" reason="Never" />
+    <disable_collisions link1="limb_left_link3" link2="limb_right_link1" reason="Never" />
+    <disable_collisions link1="limb_left_link3" link2="limb_right_link2" reason="Never" />
+    <disable_collisions link1="limb_left_link3" link2="limb_right_link3" reason="Never" />
 </robot>
