@@ -141,6 +141,7 @@ target_link_libraries(
     ${interactive_markers_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_LIBRARIES}
+    ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${rviz_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
