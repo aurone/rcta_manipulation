@@ -131,7 +131,7 @@ robot_collision_model:
         - { base: limb_left_link0, tip: limb_left_link7 }
     - name: right_arm
       chains:
-        - { base: limb_right_link0, tip: link_right_link7 }
+        - { base: limb_right_link0, tip: limb_right_link7 }
     - name: right_arm_and_torso
       groups:
         - right_arm
