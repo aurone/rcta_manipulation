@@ -32,11 +32,12 @@
         <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm_and_torso.mprim"/>
     </group>
 
+    <!-- directories to read/write e-graphs from for group right_arm -->
     <group ns="right_arm/planner_configs/right_arm_ARA_BFS_ML">
-        <param name="plan_output_dir" value="$(env HOME)/.ros/roman_right_arm_paths"/>
+        <param name="plan_output_dir" value="$(env HOME)/data/egraphs/roman_right_arm_paths"/>
     </group>
     <group ns="graph_configs/RightArmManipLatticeEgraphConfigDefault">
-        <param name="egraph_path" value="$(env HOME)/.ros/roman_right_arm_paths"/>
+        <param name="egraph_path" value="$(env HOME)/data/egraphs/roman_right_arm_paths"/>
     </group>
 
     <!-- directories to read/write e-graphs from for group right_arm_torso_base -->
