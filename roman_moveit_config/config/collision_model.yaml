@@ -145,3 +145,8 @@ robot_collision_model:
         - right_arm
         - left_arm
         - torso
+    - name: right_arm_torso_base
+      groups:
+        - right_arm
+        - torso
+        - body

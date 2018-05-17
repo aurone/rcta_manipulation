@@ -51,6 +51,20 @@ right_arm_and_torso:
       graph_config: RightArmAndTorsoManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
 
+right_arm_torso_base:
+  planner_configs:
+    ARA_BFS_WS:
+      search_config: ARAConfigDefault
+      heuristic_config: BFSConfigDefault
+      graph_config: RightArmTorsoBaseWorkspace
+      shortcut_config: PVJointConfigDefault
+    EGWA_BFSEG_WSEG:
+      search_config: EGWAConfigDefault
+      heuristic_config: BFSEGraphConfig
+      graph_config: RightArmTorsoBaseWorkspaceEGraph
+      shortcut_config: PVJointConfigDefault
+
+
 search_configs:
   ARAConfigDefault:
     search: arastar
@@ -77,7 +91,7 @@ heuristic_configs:
     bfs_sphere_radius: 0.02
   BFSEGraphConfig:
     heuristic: bfs_egraph
-    egraph_epsilon: 20.0
+    egraph_epsilon: 50.0
     bfs_res_x: 0.04
     bfs_res_y: 0.04
     bfs_res_z: 0.04
@@ -126,6 +140,22 @@ graph_configs:
     short_dist_mprims_thresh: 0.4
   RightArmWorkspaceConfigDefault:
     graph: workspace
+  RightArmTorsoBaseWorkspace:
+    graph: workspace
+  RightArmTorsoBaseWorkspaceEGraph:
+    graph: workspace_egraph
+    discretization:
+        pos_x: 0.02
+        pos_y: 0.02
+        pos_z: 0.02
+        rot_r: 0.017453292519943
+        rot_p: 0.017453292519943
+        rot_y: 0.017453292519943
+        limb_left_joint_3: 0.017453292519943
+        torso_joint1: 0.017453292519943
+        world_joint_x: 0.02
+        world_joint_y: 0.02
+        world_joint_theta: 0.017453292519943
   LeftArmManipLatticeConfigDefault:
     graph: manip
     discretization:
