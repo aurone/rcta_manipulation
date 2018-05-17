@@ -31,19 +31,6 @@
         max_distance_m: 0.8
         frame_id: map
     </rosparam>
-    <!--
-    <rosparam param="world_collision_model">
-        size_x: 3.0
-        size_y: 3.0
-        size_z: 2.1
-        origin_x: -1.5
-        origin_y: -1.5
-        origin_z: -0.10
-        res_m: 0.02
-        max_distance_m: 0.8 # will be buffed out by the largest sphere in the collision model
-        frame_id: base_footprint
-    </rosparam>
-    -->
     <rosparam param="self_collision_model">
         size_x: 4.0
         size_y: 4.0
