@@ -1,4 +1,7 @@
 robot_collision_model:
+  world_joint:
+    name: world_joint
+    type: planar
   voxels_models:
     - { link_name: torso_link0, res: 0.01 }
     - { link_name: chest,       res: 0.01 }
