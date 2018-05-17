@@ -10,8 +10,15 @@
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_state/conversions.h>
 
+#define RIGHT_ARM 1
+
+#if RIGHT_ARM
+static const auto door_min_pos = -M_PI;
+static const auto door_max_pos = -1.0 * M_PI / 4.0;
+#else
 static const auto door_min_pos = -3.0 * M_PI / 4.0;
 static const auto door_max_pos = 0.0;
+#endif
 
 struct CabinetModel
 {
@@ -29,28 +36,49 @@ struct CabinetModel
 auto GetCabinetToHingeTransform(CabinetModel* model)
     -> Eigen::Affine3d
 {
+#if RIGHT_ARM
+    Eigen::Affine3d T_cabinet_hinge(Eigen::Translation3d(
+            0.5 * model->depth + 0.5 * model->thickness,
+            0.5 * model->width - 0.5 * model->thickness,
+            0.0));
+#else
     Eigen::Affine3d T_cabinet_hinge(Eigen::Translation3d(
             0.5 * model->depth + 0.5 * model->thickness,
             -0.5 * model->width + 0.5 * model->thickness,
             0.0));
+#endif
     return T_cabinet_hinge;
 }
 
 // hinge_pos in [0, 1]
 auto GetHingeTransform(CabinetModel* model, double hinge_pos) -> Eigen::Affine3d
 {
+#if RIGHT_ARM
+    return Eigen::Affine3d(
+            Eigen::AngleAxisd(
+                3.0 * M_PI / 4.0 * hinge_pos,
+                Eigen::Vector3d::UnitZ()));
+#else
     return Eigen::Affine3d(
             Eigen::AngleAxisd(
                 -3.0 * M_PI / 4.0 * hinge_pos,
                 Eigen::Vector3d::UnitZ()));
+#endif
 }
 
 auto GetHingeToDoorTransform(CabinetModel* model) -> Eigen::Affine3d
 {
+#if RIGHT_ARM
+    return Eigen::Affine3d(Eigen::Translation3d(
+            0.0,
+            -(0.5 * model->width - 0.5 * model->thickness),
+            0.0));
+#else
     return Eigen::Affine3d(Eigen::Translation3d(
             0.0,
             0.5 * model->width - 0.5 * model->thickness,
             0.0));
+#endif
 }
 
 auto GetHandleRotationRadius(CabinetModel* model) -> double
@@ -63,7 +91,11 @@ auto GetHandleRotationRadius(CabinetModel* model) -> double
 auto GetHandleRotationOffset(CabinetModel* model) -> double
 {
     auto dx = 0.5 * model->thickness + model->handle_offset_x;
+#if RIGHT_ARM
+    auto dy = 0.5 * model->width - 0.5 * model->thickness - model->handle_offset_y;
+#else
     auto dy = 0.5 * model->width - 0.5 * model->thickness + model->handle_offset_y;
+#endif
     return atan2(fabs(dx), fabs(dy));
 //    return std::sqrt(dx * dx + dy * dy);
 }
@@ -341,7 +373,11 @@ int main(int argc, char* argv[])
     cabinet.height = 0.80;
     cabinet.depth = 0.50;
     cabinet.thickness = 0.02;
+#if RIGHT_ARM
+    cabinet.handle_offset_y = -0.4 * cabinet.width;
+#else
     cabinet.handle_offset_y = 0.4 * cabinet.width;
+#endif
     cabinet.handle_offset_x = 0.08;
     cabinet.handle_height = 0.20;
     cabinet.handle_radius = 0.01;
@@ -413,17 +449,28 @@ int main(int argc, char* argv[])
 
             Eigen::Vector3d nearest = radius * tool_in_hinge.translation().normalized();
 
+#if RIGHT_ARM
+            ROS_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
+            auto theta = atan2(nearest.y(), nearest.x()) - GetHandleRotationOffset(&cabinet);
+            ROS_INFO("   theta adjusted = %f", theta);
+            if (theta < door_min_pos) theta = door_min_pos;
+#else
             auto theta = atan2(nearest.y(), nearest.x()) + GetHandleRotationOffset(&cabinet);
+#endif
 
             if (theta < door_min_pos || theta > door_max_pos) {
-                double new_theta = theta;
+                auto new_theta = theta;
                 new_theta = std::max(new_theta, door_min_pos);
                 new_theta = std::min(new_theta, door_max_pos);
                 ROS_INFO("Clamped door position %f -> %f", theta, new_theta);
                 theta = new_theta;
             }
 
+#if RIGHT_ARM
+            door_pos = (theta - door_min_pos) / (door_max_pos - door_min_pos);
+#else
             door_pos = 1.0 - (door_min_pos - theta) / door_min_pos;
+#endif
 
             // get the position of the tool in the hinge frame
         }
