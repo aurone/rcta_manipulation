@@ -9,6 +9,40 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_state/conversions.h>
+#include <moveit_msgs/GetStateValidity.h>
+
+////////////////////
+// STEALING DEFER //
+////////////////////
+
+namespace scdl {
+
+template <class Callable>
+struct CallOnDestruct
+{
+    Callable c;
+    CallOnDestruct(Callable c) : c(c) { }
+    ~CallOnDestruct() { c(); }
+};
+
+template <class Callable>
+CallOnDestruct<Callable> MakeCallOnDestruct(Callable c) {
+    return CallOnDestruct<Callable>(c);
+}
+
+} // namespace scdl
+
+////////////////////
+
+// preprocessor magic to get a prefix to concatenate with the __LINE__ macro
+#define MAKE_LINE_IDENT_JOIN_(a, b) a##b
+#define MAKE_LINE_IDENT_JOIN(a, b) MAKE_LINE_IDENT_JOIN_(a, b)
+#define MAKE_LINE_IDENT(prefix) MAKE_LINE_IDENT_JOIN(prefix, __LINE__)
+
+// create an obscurely named CallOnDestruct with an anonymous lambda that
+// executes the given statement sequence
+#define DEFER(fun) auto MAKE_LINE_IDENT(tmp_call_on_destruct_) = scdl::MakeCallOnDestruct([&](){ fun; })
+
 
 #define RIGHT_ARM 1
 
@@ -340,7 +374,6 @@ auto MakeCabinetMarkers(
 }
 
 bool g_state_received = false;
-moveit_msgs::RobotState::ConstPtr g_prev_robot_state;
 moveit_msgs::RobotState::ConstPtr g_curr_robot_state;
 
 void RobotStateCallback(const moveit_msgs::RobotState::ConstPtr& msg)
@@ -354,15 +387,67 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "door_demonstrator");
     ros::NodeHandle nh;
 
+    ROS_INFO("argc: %d", argc);
+
+    bool record = argc > 1 ? true : false;
+    bool record_object = argc > 2 ? true: false;
+
     ros::Publisher marker_pub = nh.advertise<visualization_msgs::MarkerArray>(
             "visualization_markers", 1);
 
-    ros::Subscriber state_sub = nh.subscribe("robot_state", 1, RobotStateCallback);
+    // to perform usual validity checking
+    ros::ServiceClient check_state_service =
+            nh.serviceClient<moveit_msgs::GetStateValidity>(
+                    "check_state_validity");
+
+    ros::Subscriber state_sub =
+            nh.subscribe("robot_state", 1, RobotStateCallback);
 
     robot_model_loader::RobotModelLoader loader;
     auto model = loader.getModel();
 
     moveit::core::RobotState robot_state(model);
+
+    auto group_name = "right_arm_torso_base";
+    if (!model->hasJointModelGroup(group_name)) {
+        ROS_ERROR("Demonstration group '%s' does not exist in the robot model", group_name);
+        return 1;
+    }
+
+    auto* demo_group = model->getJointModelGroup(group_name);
+
+    FILE* fdemo = NULL;
+    if (record) {
+        auto demo_filename = "cabinet_demo.csv";
+        fdemo = fopen("cabinet_demo.csv", "w");
+        if (!fdemo) {
+            ROS_ERROR("Failed to open '%s' for writing", demo_filename);
+            return 1;
+        }
+
+        // write group variable names to the header
+        for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
+            auto& name = demo_group->getVariableNames()[vidx];
+            fprintf(fdemo, "%s", name.c_str());
+            if (record_object) {
+                fprintf(fdemo, ",");
+            } else {
+                if (vidx != demo_group->getVariableCount() - 1) {
+                    fprintf(fdemo, ",");
+                } else {
+                    fprintf(fdemo, "\n");
+                }
+            }
+        }
+        if (record_object) {
+            fprintf(fdemo, "hinge\n");
+        }
+    }
+    // close the demonstration file when we kill the program
+    DEFER(if (record && fdemo != NULL) {
+            fclose(fdemo);
+            fdemo = NULL;
+    });
 
     /////////////////////////////////////
     // define the model of the cabinet //
@@ -394,6 +479,31 @@ int main(int argc, char* argv[])
 
     auto contact_error_z = 0.5 * cabinet.handle_height;
     auto contact_error = 0.03;
+    bool contacted = false; // ever came into contact?
+    bool contact = false;
+
+    auto IsStateValid = [&](
+        moveit_msgs::GetStateValidity::Request& req,
+        moveit_msgs::GetStateValidity::Response& res)
+        -> bool
+    {
+        if (contacted) {
+            bool result = check_state_service.call(req, res);
+            if (result) {
+                res.valid = res.valid && contact;
+            }
+            return result;
+        } else {
+            return check_state_service.call(req, res);
+        }
+        return true; //check_state_service.call(req, res);
+    };
+
+    boost::function<bool(moveit_msgs::GetStateValidity::Request& req, moveit_msgs::GetStateValidity::Response& res)> service_fun;
+    service_fun = IsStateValid;
+
+    ros::ServiceServer check_state_server = nh.advertiseService(
+            "check_state_validity_manipulation", service_fun);
 
     ros::Rate loop_rate(30.0);
     while (ros::ok()) {
@@ -406,15 +516,46 @@ int main(int argc, char* argv[])
             prev_door_pos = door_pos;
         }
 
+        bool robot_moved = g_state_received;
+        if (robot_moved && record) {
+            assert(g_curr_robot_state && "State shouldn't be null if we received it");
+            // TODO we should probably just always do this when a state is received to avoid
+            // doing it over and over again
+            moveit::core::robotStateMsgToRobotState(*g_curr_robot_state, robot_state);
+
+            std::vector<double> group_state;
+            robot_state.copyJointGroupPositions(demo_group, group_state);
+
+            for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
+                auto pos = group_state[vidx];
+                fprintf(fdemo, "%f", pos);
+                if (record_object) {
+                    fprintf(fdemo, ",");
+                } else {
+                    if (vidx != demo_group->getVariableCount() - 1) {
+                        fprintf(fdemo, ",");
+                    } else {
+                        fprintf(fdemo, "\n");
+                    }
+                }
+            }
+            if (record_object) {
+                fprintf(fdemo, "%f\n", door_pos);
+            }
+        }
+        g_state_received = false;
+
+        //////////////////////////////////////////////////////////
+        // check for contact with the door in the current state //
+        //////////////////////////////////////////////////////////
+
         auto handle_pose = GetHandlePose(&cabinet, &cabinet_pose, door_pos);
         ROS_DEBUG("  handle @ (%f, %f, %f)",
                 handle_pose.translation().x(),
                 handle_pose.translation().y(),
                 handle_pose.translation().z());
 
-        bool contact = false;
-
-        // check for contact with the door in the current state
+        contact = false;
         Eigen::Affine3d curr_tool_pose;
         if (g_curr_robot_state) {
             moveit::core::robotStateMsgToRobotState(*g_curr_robot_state, robot_state);
@@ -429,10 +570,14 @@ int main(int argc, char* argv[])
                 dp.x() * dp.x() + dp.y() * dp.y() < contact_error * contact_error)
             {
                 contact = true;
+                contacted = true; // never reset to false
             }
         }
 
-        // update door pose to follow the robot's tool frame
+        ///////////////////////////////////////////////////////
+        // update door pose to follow the robot's tool frame //
+        ///////////////////////////////////////////////////////
+
         if (contact) {
             auto hinge_frame =
                     GetHingeFrame(&cabinet, &cabinet_pose) *
@@ -473,19 +618,6 @@ int main(int argc, char* argv[])
 #endif
 
             // get the position of the tool in the hinge frame
-        }
-
-        if (g_state_received) {
-            ROS_DEBUG("Received robot state update");
-
-            if (g_prev_robot_state) {
-
-                moveit::core::robotStateMsgToRobotState(*g_prev_robot_state, robot_state);
-                Eigen::Affine3d prev_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
-            }
-
-            g_prev_robot_state = g_curr_robot_state;
-            g_state_received = false;
         }
 
         auto markers = MakeCabinetMarkers(&cabinet, door_pos, &cabinet_pose, "cabinet", contact);
