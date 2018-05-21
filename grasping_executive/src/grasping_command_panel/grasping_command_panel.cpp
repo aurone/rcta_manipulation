@@ -277,6 +277,10 @@ void GraspingCommandPanel::send_grasp_object_command()
     grasp_object_goal.gas_can_in_map.header.frame_id = global_frame_;
     tf::poseEigenToMsg(T_world_object_, grasp_object_goal.gas_can_in_map.pose);
 
+    grasp_object_goal.object_dims.x = 0.5;
+    grasp_object_goal.object_dims.y = 0.5;
+    grasp_object_goal.object_dims.z = 0.5;
+
     auto result_callback = boost::bind(&GraspingCommandPanel::grasp_object_command_result_cb, this, _1, _2);
     grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
 
