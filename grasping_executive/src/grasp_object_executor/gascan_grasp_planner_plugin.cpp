@@ -21,6 +21,7 @@ public:
     bool planGrasps(
         const std::string& object_id,
         const Eigen::Affine3d& T_grasp_object,
+        const Eigen::Vector3d& object_bbx,
         const pcl::PointCloud<pcl::PointXYZ>* cloud,
         int max_grasps,
         std::vector<Grasp>& grasps) override

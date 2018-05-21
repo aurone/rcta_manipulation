@@ -1316,8 +1316,10 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
     // amount we will actually use so that we have a larger set to apply our own
     // reachability/graspability analysis to.
     int max_samples = 100;
+    Eigen::Vector3d object_dims;
+    tf::vectorMsgToEigen(ex->m_current_goal->object_dims, object_dims);
     if (!ex->m_grasp_planner->planGrasps(
-            "gascan", ex->m_obj_pose, grasp_cloud.get(), max_samples, candidates))
+            "gascan", ex->m_obj_pose, object_dims, grasp_cloud.get(), max_samples, candidates))
     {
         ROS_ERROR("Failed to sample grasps");
         return GraspObjectExecutionStatus::FAULT;

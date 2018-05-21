@@ -32,6 +32,17 @@ void Manipulate(
         grasp_goal.id = executive->grasp_goal_id++;
         grasp_goal.gas_can_in_map = goal->goal_poses[0];
 
+        grasp_goal.object_dims.x = 0.5;
+        grasp_goal.object_dims.y = 0.5;
+        grasp_goal.object_dims.z = 0.5;
+        for (auto& feature : goal->goal_features) {
+            if (feature.header.frame_id == "upper_right") {
+                grasp_goal.object_dims.x = 2.0 * feature.point.x;
+                grasp_goal.object_dims.y = 2.0 * feature.point.y;
+                grasp_goal.object_dims.z = 2.0 * feature.point.z;
+            }
+        }
+
         auto state = executive->grasp_object_client->sendGoalAndWait(grasp_goal);
         if (state != actionlib::SimpleClientGoalState::SUCCEEDED) {
             cmu_manipulation_msgs::ManipulateResult result;

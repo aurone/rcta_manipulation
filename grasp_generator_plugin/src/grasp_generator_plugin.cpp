@@ -51,7 +51,8 @@ public:
 
     bool planGrasps(
         const std::string& object_id,
-        const Eigen::Affine3d& T_grasp_object,
+        const Eigen::Affine3d& object_pose,
+        const Eigen::Vector3d& object_bbx,
         const pcl::PointCloud<pcl::PointXYZ>* cloud,
         int max_grasps,
         std::vector<Grasp>& grasps) override
@@ -64,6 +65,12 @@ public:
         grasp_planner_msgs::GraspPlannerGoal req;
         req.task = "";
         req.type = grasp_planner_msgs::GraspPlannerGoal::POWER;
+
+        req.roi_pose.header.frame_id = cloud->header.frame_id;
+        tf::poseEigenToMsg(object_pose, req.roi_pose.pose);
+
+        req.roi_dimensions.header.frame_id = "huh";
+        tf::pointEigenToMsg(object_bbx, req.roi_dimensions.point);
 
         pcl::toROSMsg(*cloud, req.point_cloud);
         req.selected_arms = grasp_planner_msgs::GraspPlannerGoal::RIGHT;

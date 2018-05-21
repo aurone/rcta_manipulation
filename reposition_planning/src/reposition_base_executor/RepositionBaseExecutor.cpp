@@ -1982,8 +1982,9 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
 {
     // generate grasps in the world frame
     int max_samples = m_max_grasp_samples; //100;
+    Eigen::Vector3d object_bbx = Eigen::Vector3d(0.5, 0.5, 0.5);
     if (!m_grasp_planner->planGrasps(
-            "gascan", object_pose, NULL, max_samples, candidates))
+            "gascan", object_pose, object_bbx, NULL, max_samples, candidates))
     {
         ROS_ERROR("Failed to sample grasps");
         return false;
@@ -1997,8 +1998,7 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     auto robot_state = currentRobotState();
     robot_state.setJointPositions(robot_model_->getRootJoint(), robot_pose);
     robot_state.update();
-    const Eigen::Affine3d& camera_pose =
-            robot_state.getGlobalLinkTransform(camera_view_frame_);
+    auto& camera_pose = robot_state.getGlobalLinkTransform(camera_view_frame_);
 
     ROS_DEBUG("world -> camera: %s", to_string(camera_pose).c_str());
 
@@ -2008,10 +2008,7 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
     ROS_INFO("Produced %zd feasible grasp poses", candidates.size());
 
     sort(begin(candidates), end(candidates),
-            [](const Grasp& a, const Grasp& b)
-            {
-                return a.u < b.u;
-            });
+            [](const Grasp& a, const Grasp& b) { return a.u < b.u; });
 
 //    RankGrasps(candidates);
 

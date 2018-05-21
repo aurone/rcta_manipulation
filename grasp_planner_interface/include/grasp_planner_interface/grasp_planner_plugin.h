@@ -56,6 +56,7 @@ public:
     virtual bool planGrasps(
         const std::string& object_id,
         const Eigen::Affine3d& object_pose,
+        const Eigen::Vector3d& object_bbx,
         const pcl::PointCloud<pcl::PointXYZ>* cloud,
         int max_grasps,
         std::vector<Grasp>& grasps) = 0;
