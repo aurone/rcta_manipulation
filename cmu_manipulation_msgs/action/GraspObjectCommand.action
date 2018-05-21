@@ -1,0 +1,26 @@
+# goal
+uint32 id
+int32 retry_count
+geometry_msgs/PoseStamped gas_can_in_map
+geometry_msgs/PoseStamped gas_can_in_base_link
+geometry_msgs/Vector3 object_dims
+octomap_msgs/Octomap octomap
+---
+# result
+uint8 SUCCESS=0
+uint8 PLANNING_FAILED=1
+uint8 EXECUTION_FAILED=2
+uint8 OBJECT_OUT_OF_REACH=3
+uint8 result
+geometry_msgs/PoseStamped attached_object_pose_in_base_link
+---
+# feedback
+uint8 PLANNIG_ARM_MOTION_TO_PREGRASP=0
+uint8 EXECUTING_ARM_MOTION_TO_PREGRASP=1
+uint8 EXECUTING_VISUAL_SERVO_MOTION_TO_PREGRASP=2
+uint8 EXECUTING_VISUAL_SERVO_MOTION_TO_GRASP=3
+uint8 GRASPING_OBJECT=4
+uint8 PLANNING_ARM_MOTION_TO_STOW=5
+uint8 EXECUTING_ARM_MOTION_TO_STOW=6
+uint8 status
+
