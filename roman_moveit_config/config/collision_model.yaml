@@ -1,27 +1,19 @@
 robot_collision_model:
   voxels_models:
-    - { link_name: talon,       res: 0.01 }
     - { link_name: torso_link0, res: 0.01 }
     - { link_name: chest,       res: 0.01 }
 
     # links with trivial or no geometry (stated here for reference)
-    - { link_name: base_footprint,  res: 0.01 }
     - { link_name: base_link,       res: 0.01 }
-    - { link_name: track_left,      res: 0.01 }
-    - { link_name: track_right,     res: 0.01 }
 
   spheres_models:
     - link_name: torso_link0
-      auto: false
-      radius: 0.02
       spheres:
         - { name: t0, x: 0.5, y: 0.0, z: 0.0, radius: 0.15 }
         - { name: t1, x: 0.42, y: 0.0, z: 0.0, radius: 0.15 }
         - { name: t2, x: 0.35, y: 0.16, z: 0.05, radius: 0.08 }
         - { name: t3, x: 0.35, y: 0.16, z: -0.05, radius: 0.08 }
     - link_name: chest
-      auto: false
-      radius: 0.02
       spheres:
         - { name: c01, x: 0.00, y: -0.12, z: -0.12, radius: 0.08 }
         - { name: c02, x: 0.00, y:  0.00, z: -0.12, radius: 0.08 }
@@ -43,8 +35,13 @@ robot_collision_model:
         - { name: h01, x: 0.20, y:  0.03, z: -0.13, radius: 0.08 }
         - { name: h02, x: 0.20, y:  0.03, z:  0.00, radius: 0.08 }
         - { name: a01, x: 0.05, y: -0.16, z:  0.04, radius: 0.11 }
+
+#    - link_name: limb_left_link0
+#      spheres:
+#        - { name: ll0s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
     - link_name: limb_left_link1
       spheres:
+#        - { name: ll1s0, x: -0.06, y: 0.0, z: 0.0, radius: 0.06 }
         - { name: ll1s0, x:  0.00, y: 0.0, z: 0.0, radius: 0.055 }
     - link_name: limb_left_link2
       spheres:
@@ -81,6 +78,7 @@ robot_collision_model:
     - link_name: limb_left_link7
       spheres:
         - { name: ll7s0, x: 0.165, y: 0.0, z: 0.0, radius: 0.13 }
+
 #    - link_name: limb_right_link0
 #      spheres:
 #        - { name: lr0s0, x: 0.0, y: 0.0, z: 0.0, radius: 0.05 }
@@ -124,23 +122,26 @@ robot_collision_model:
       spheres:
         - { name: lr7s0, x: 0.165, y: 0.0, z: 0.0, radius: 0.13 }
   collision_groups:
+    - name: torso
+      links:
+        - name: torso_link0
+        - name: chest
     - name: left_arm
       chains:
         - { base: limb_left_link0, tip: limb_left_link7 }
     - name: right_arm
       chains:
         - { base: limb_right_link0, tip: limb_right_link7 }
-    - name: torso
-      links:
-        - name: torso_link0
-        - name: chest
     - name: right_arm_and_torso
       groups:
         - right_arm
+        - torso
+    - name: left_arm_and_torso
+      groups:
+        - left_arm
         - torso
     - name: body
       groups:
         - right_arm
         - left_arm
         - torso
-

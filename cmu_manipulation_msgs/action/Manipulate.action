@@ -1,0 +1,19 @@
+# goal
+string task # type of command: goto, pickup, move, place, open_door, etc.
+geometry_msgs/PoseStamped[] goal_poses # pose for end effectors, or start (and/or destination) pose of objets of interest	
+geometry_msgs/PointStamped[] goal_features # features for objects of interest (relative), use frame_id for feature name
+bool[] grippers_closed
+uint8 BOTH=0
+uint8 RIGHT=1
+uint8 LEFT=2
+uint8 selected_arms
+uint8 speed
+---
+# result
+bool success
+string error_string # if success is false
+---
+# feedback
+string status_string # current state machine status
+trajectory_msgs/JointTrajectory planned_trajectory
+

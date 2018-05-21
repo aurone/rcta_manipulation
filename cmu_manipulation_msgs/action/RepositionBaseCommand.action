@@ -1,0 +1,16 @@
+# goal
+uint32 id
+int32 retry_count
+geometry_msgs/PoseStamped gas_can_in_map
+geometry_msgs/PoseStamped base_link_in_map
+nav_msgs/OccupancyGrid map
+---
+# result
+uint8 SUCCESS=0
+uint8 PLANNING_FAILURE_OBJECT_UNREACHABLE=1
+uint8 result
+geometry_msgs/PoseStamped[] candidate_base_poses
+---
+# feedback
+float64 planning_time_s
+
