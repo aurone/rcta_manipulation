@@ -67,7 +67,7 @@ right_arm_torso_base:
       search_config: EGWAConfigDefault
       heuristic_config: ObjectManipHeuristic
       graph_config: RightArmTorsoBaseWorkspaceEGraph
-      shortcut_config: PVJointConfigDefault
+      shortcut_config: NoShortcutting
 
 search_configs:
   ARAConfigDefault:
@@ -208,3 +208,6 @@ shortcut_configs:
     shortcut_path: true
     shortcutter: joint_position_velocity_space
     interpolate_path: true
+  NoShortcutting:
+    shortcut_path: false
+    interpolate_path: false
