@@ -1,6 +1,7 @@
 <launch>
     <arg name="live" default="true"/>
     <arg name="fake" default="false"/>
+    <arg name="debug" default="false"/>
 
     <arg name="load_robot_description" default="false"/>
 
@@ -58,8 +59,10 @@
         <arg name="moveit_sensor_manager" value="rcta_roman"/>
     </include>
 
+    <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
+    <arg unless="$(arg debug)" name="launch_prefix" value=""/>
     <!-- Start the actual move_group node/action server -->
-    <node name="move_group" pkg="moveit_ros_move_group" type="move_group">
+    <node name="move_group" pkg="moveit_ros_move_group" type="move_group" launch-prefix="$(arg launch_prefix)">
         <!-- Set the display variable, in case OpenGL code is used internally -->
         <env name="DISPLAY" value="$(optenv DISPLAY :0)"/>
 
