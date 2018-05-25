@@ -46,3 +46,8 @@ target_link_libraries(door_demonstrator ${eigen_conversions_LIBRARIES})
 target_link_libraries(door_demonstrator ${moveit_core_LIBRARIES})
 target_link_libraries(door_demonstrator ${moveit_ros_planning_LIBRARIES})
 
+add_executable(translate_demo src/translate_demo.cpp)
+target_include_directories(translate_demo PUBLIC SYSTEM ${smpl_INCLUDE_DIRS})
+target_include_directories(translate_demo PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(translate_demo ${smpl_LIBRARIES})
+
