@@ -467,9 +467,23 @@ int main(int argc, char* argv[])
     cabinet.handle_height = 0.20;
     cabinet.handle_radius = 0.01;
 
+#if 1 // original
     Eigen::Affine3d cabinet_pose =
             Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
             Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+#elif 0 // cabinet1
+    Eigen::Affine3d cabinet_pose =
+            Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
+            Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+#elif 0
+    Eigen::Affine3d cabinet_pose =
+            Eigen::Translation3d(2.0, -1.0, 0.5 * cabinet.height) *
+            Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+#else // cabinet2
+    Eigen::Affine3d cabinet_pose =
+            Eigen::Translation3d(1.0, 2.0, 0.5 * cabinet.height) *
+            Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
+#endif
 
     auto prev_door_pos = 0.0;
     auto door_pos = 0.0;
