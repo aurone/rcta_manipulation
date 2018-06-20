@@ -105,6 +105,22 @@ heuristic_configs:
   ObjectManipHeuristic:
     heuristic: object_manip
 
+    # when the base distance is above this threshold, the base theta
+    # term in the heuristic includes turning toward the nearest e-graph
+    # state, and then turning to the orientation of the e-graph state;
+    # otherwise, the base theta term only includes turning toward the
+    # nearest e-graph state
+    heading_thresh: 0.05 # cabinet1, cabinet2@35
+    #heading_thresh: 0.1
+    #heading_thresh: 0.15 # cabinet_demo@60
+
+    # tolerance before the base theta term is dropped to 0
+    theta_db: 0.0349066
+
+    # tolerance before the base position term is dropped to 0
+    pos_db: 0.1 # cabinet1, cabinet2@35
+    #pos_db: 0.2 # cabinet_demo@60
+
 graph_configs:
   RightArmManipLatticeConfigDefault:
     graph: manip
@@ -151,17 +167,19 @@ graph_configs:
   RightArmTorsoBaseWorkspaceEGraph:
     graph: workspace_egraph
     discretization:
-        pos_x: 0.02
-        pos_y: 0.02
-        pos_z: 0.02
-        rot_r: 0.017453292519943
-        rot_p: 0.017453292519943
-        rot_y: 0.017453292519943
-        limb_left_joint_3: 0.017453292519943
-        torso_joint1: 0.017453292519943
-        world_joint_x: 0.02
-        world_joint_y: 0.02
-        world_joint_theta: 0.017453292519943
+        fk_pos_x: 0.05
+        fk_pos_y: 0.05
+        fk_pos_z: 0.05
+        fk_rot_r: 0.0174532             # 1 degree = 360 angles
+#        fk_rot_p: 0.0698132             # 4 degree = 46 angles #181 angles
+        fk_rot_p: 0.0174532             # 4 degree = 46 angles #181 angles
+        fk_rot_y: 0.0872664             # 5 degrees = 72 angles
+        limb_right_joint3: 0.0872664    # 5 degrees
+        torso_joint1: 0.0872664         # 5 degrees
+        world_joint_x: 0.05
+        world_joint_y: 0.05
+        world_joint_theta: 0.392699     # 22.5 degrees = 16 angles
+        hinge: 0.00001
   LeftArmManipLatticeConfigDefault:
     graph: manip
     discretization:
