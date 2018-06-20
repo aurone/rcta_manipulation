@@ -384,13 +384,14 @@ void RobotStateCallback(const moveit_msgs::RobotState::ConstPtr& msg)
 
 int main(int argc, char* argv[])
 {
-    ros::init(argc, argv, "door_demonstrator");
+    ros::init(argc, argv, "door_demonstrator", ros::init_options::AnonymousName);
     ros::NodeHandle nh;
 
     ROS_INFO("argc: %d", argc);
 
-    bool record = argc > 1 ? true : false;
-    bool record_object = argc > 2 ? true: false;
+    auto cabinet_id = (argc > 1) ? atoi(argv[1]) : 0;
+    bool record = argc > 2 ? true : false;
+    bool record_object = argc > 3 ? true: false;
 
     ros::Publisher marker_pub = nh.advertise<visualization_msgs::MarkerArray>(
             "visualization_markers", 1);
@@ -467,23 +468,26 @@ int main(int argc, char* argv[])
     cabinet.handle_height = 0.20;
     cabinet.handle_radius = 0.01;
 
-#if 1 // original
-    Eigen::Affine3d cabinet_pose =
-            Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
-            Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-#elif 0 // cabinet1
-    Eigen::Affine3d cabinet_pose =
-            Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
-            Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-#elif 0
-    Eigen::Affine3d cabinet_pose =
-            Eigen::Translation3d(2.0, -1.0, 0.5 * cabinet.height) *
-            Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-#else // cabinet2
-    Eigen::Affine3d cabinet_pose =
-            Eigen::Translation3d(1.0, 2.0, 0.5 * cabinet.height) *
-            Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
-#endif
+    Eigen::Affine3d cabinet_pose;
+    switch (cabinet_id) {
+    case 0:
+        cabinet_pose =
+                Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
+                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+        break;
+    case 1:
+        cabinet_pose =
+                Eigen::Translation3d(2.0, -1.0, 0.5 * cabinet.height) *
+                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+        break;
+    case 2:
+        cabinet_pose =
+                Eigen::Translation3d(1.0, 2.0, 0.5 * cabinet.height) *
+                Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
+        break;
+    default:
+        return 1;
+    }
 
     auto prev_door_pos = 0.0;
     auto door_pos = 0.0;
@@ -635,6 +639,9 @@ int main(int argc, char* argv[])
         }
 
         auto markers = MakeCabinetMarkers(&cabinet, door_pos, &cabinet_pose, "cabinet", contact);
+        for (auto& marker : markers.markers) {
+            marker.id += cabinet_id * markers.markers.size();
+        }
 
         marker_pub.publish(markers);
         loop_rate.sleep();
