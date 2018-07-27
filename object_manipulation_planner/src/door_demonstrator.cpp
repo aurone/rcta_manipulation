@@ -10,6 +10,9 @@
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/GetStateValidity.h>
+#include <smpl/angles.h>
+
+#include "cabinet_model.h"
 
 ////////////////////
 // STEALING DEFER //
@@ -43,126 +46,6 @@ CallOnDestruct<Callable> MakeCallOnDestruct(Callable c) {
 // executes the given statement sequence
 #define DEFER(fun) auto MAKE_LINE_IDENT(tmp_call_on_destruct_) = scdl::MakeCallOnDestruct([&](){ fun; })
 
-
-#define RIGHT_ARM 1
-
-#if RIGHT_ARM
-static const auto door_min_pos = -M_PI;
-static const auto door_max_pos = -1.0 * M_PI / 4.0;
-#else
-static const auto door_min_pos = -3.0 * M_PI / 4.0;
-static const auto door_max_pos = 0.0;
-#endif
-
-struct CabinetModel
-{
-    double depth;
-    double width;
-    double height;
-    double thickness;
-
-    double handle_offset_y; // how far from the center of the door is the handle positioned
-    double handle_offset_x; // how much space between the door and the handle
-    double handle_height; // how tall is the handle
-    double handle_radius; // how thick is the handle (and its supports)
-};
-
-auto GetCabinetToHingeTransform(CabinetModel* model)
-    -> Eigen::Affine3d
-{
-#if RIGHT_ARM
-    Eigen::Affine3d T_cabinet_hinge(Eigen::Translation3d(
-            0.5 * model->depth + 0.5 * model->thickness,
-            0.5 * model->width - 0.5 * model->thickness,
-            0.0));
-#else
-    Eigen::Affine3d T_cabinet_hinge(Eigen::Translation3d(
-            0.5 * model->depth + 0.5 * model->thickness,
-            -0.5 * model->width + 0.5 * model->thickness,
-            0.0));
-#endif
-    return T_cabinet_hinge;
-}
-
-// hinge_pos in [0, 1]
-auto GetHingeTransform(CabinetModel* model, double hinge_pos) -> Eigen::Affine3d
-{
-#if RIGHT_ARM
-    return Eigen::Affine3d(
-            Eigen::AngleAxisd(
-                3.0 * M_PI / 4.0 * hinge_pos,
-                Eigen::Vector3d::UnitZ()));
-#else
-    return Eigen::Affine3d(
-            Eigen::AngleAxisd(
-                -3.0 * M_PI / 4.0 * hinge_pos,
-                Eigen::Vector3d::UnitZ()));
-#endif
-}
-
-auto GetHingeToDoorTransform(CabinetModel* model) -> Eigen::Affine3d
-{
-#if RIGHT_ARM
-    return Eigen::Affine3d(Eigen::Translation3d(
-            0.0,
-            -(0.5 * model->width - 0.5 * model->thickness),
-            0.0));
-#else
-    return Eigen::Affine3d(Eigen::Translation3d(
-            0.0,
-            0.5 * model->width - 0.5 * model->thickness,
-            0.0));
-#endif
-}
-
-auto GetHandleRotationRadius(CabinetModel* model) -> double
-{
-    auto dx = 0.5 * model->thickness + model->handle_offset_x;
-    auto dy = 0.5 * model->width - 0.5 * model->thickness + model->handle_offset_y;
-    return std::sqrt(dx * dx + dy * dy);
-}
-
-auto GetHandleRotationOffset(CabinetModel* model) -> double
-{
-    auto dx = 0.5 * model->thickness + model->handle_offset_x;
-#if RIGHT_ARM
-    auto dy = 0.5 * model->width - 0.5 * model->thickness - model->handle_offset_y;
-#else
-    auto dy = 0.5 * model->width - 0.5 * model->thickness + model->handle_offset_y;
-#endif
-    return atan2(fabs(dx), fabs(dy));
-//    return std::sqrt(dx * dx + dy * dy);
-}
-
-auto GetHingeFrame(CabinetModel* model, const Eigen::Affine3d* pose)
-    -> Eigen::Affine3d
-{
-    Eigen::Affine3d T_cabinet_hinge = GetCabinetToHingeTransform(model);
-    return (*pose) * T_cabinet_hinge;
-}
-
-auto GetHandlePose(CabinetModel* model, const Eigen::Affine3d* pose, double door_pos)
-    -> Eigen::Affine3d
-{
-    Eigen::Affine3d T_cabinet_hinge = GetCabinetToHingeTransform(model);
-
-    Eigen::Affine3d door_pose;
-    door_pose = (*pose)
-            * T_cabinet_hinge
-            * GetHingeTransform(model, door_pos)
-            * GetHingeToDoorTransform(model);
-
-    Eigen::Affine3d handle_pose;
-    handle_pose =
-            door_pose *
-            Eigen::Translation3d(
-                    0.5 * model->thickness + model->handle_offset_x + model->handle_radius,
-                    model->handle_offset_y,
-                    0.0);
-
-    return handle_pose;
-}
-
 auto MakeCabinetMarkers(
     CabinetModel* model,
     double door_pos,
@@ -190,15 +73,11 @@ auto MakeCabinetMarkers(
 
     m.id = 0;
 
-    Eigen::Affine3d b_wall_pose;
-    b_wall_pose = (*pose) * Eigen::Translation3d(
-            0.0, 0.0, -0.5 * model->height + 0.5 * model->thickness);
-
+    auto b_wall_pose = GetCabinetBottomGeometryPose(model, door_pos);
+    b_wall_pose = (*pose) * b_wall_pose;
     tf::poseEigenToMsg(b_wall_pose, m.pose);
 
-    m.scale.x = model->depth;
-    m.scale.y = model->width;
-    m.scale.z = model->thickness;
+    tf::vectorEigenToMsg(GetCabinetBottomGeometrySize(model), m.scale);
 
     ma.markers.push_back(m);
 
@@ -208,14 +87,11 @@ auto MakeCabinetMarkers(
 
     m.id = 1;
 
-    Eigen::Affine3d t_wall_pose;
-    t_wall_pose = (*pose) * Eigen::Translation3d(
-            0.0, 0.0, 0.5 * model->height - 0.5 * model->thickness);
+    auto t_wall_pose = GetCabinetTopGeometryPose(model, door_pos);
+    t_wall_pose = (*pose) * t_wall_pose;
     tf::poseEigenToMsg(t_wall_pose, m.pose);
 
-    m.scale.x = model->depth;
-    m.scale.y = model->width;
-    m.scale.z = model->thickness;
+    tf::vectorEigenToMsg(GetCabinetTopGeometrySize(model), m.scale);
 
     ma.markers.push_back(m);
 
@@ -225,14 +101,11 @@ auto MakeCabinetMarkers(
 
     m.id = 2;
 
-    Eigen::Affine3d l_wall_pose;
-    l_wall_pose = (*pose) * Eigen::Translation3d(
-            0.0, -0.5 * model->width + 0.5 * model->thickness, 0.0);
+    auto l_wall_pose = GetCabinetLeftGeometryPose(model, door_pos);
+    l_wall_pose = (*pose) * l_wall_pose;
     tf::poseEigenToMsg(l_wall_pose, m.pose);
 
-    m.scale.x = model->depth;
-    m.scale.y = model->thickness;
-    m.scale.z = model->height - 2.0 * model->thickness;
+    tf::vectorEigenToMsg(GetCabinetLeftGeometrySize(model), m.scale);
 
     ma.markers.push_back(m);
 
@@ -243,13 +116,10 @@ auto MakeCabinetMarkers(
     m.id = 3;
 
     Eigen::Affine3d r_wall_pose;
-    r_wall_pose = (*pose) * Eigen::Translation3d(
-            0.0, 0.5 * model->width - 0.5 * model->thickness, 0.0);
+    r_wall_pose = (*pose) * GetCabinetRightGeometryPose(model, door_pos);
     tf::poseEigenToMsg(r_wall_pose, m.pose);
 
-    m.scale.x = model->depth;
-    m.scale.y = model->thickness;
-    m.scale.z = model->height - 2.0 * model->thickness;
+    tf::vectorEigenToMsg(GetCabinetRightGeometrySize(model), m.scale);
 
     ma.markers.push_back(m);
 
@@ -259,17 +129,11 @@ auto MakeCabinetMarkers(
 
     m.id = 4;
 
-    Eigen::Affine3d back_wall_pose;
-    back_wall_pose = (*pose)
-        * Eigen::Translation3d(
-                -0.5 * model->depth - 0.5 * model->thickness,
-                0.0,
-                0.0);
+    auto back_wall_pose = GetCabinetBackGeometryPose(model, door_pos);
+    back_wall_pose = (*pose) * back_wall_pose;
     tf::poseEigenToMsg(back_wall_pose, m.pose);
 
-    m.scale.x = model->thickness;
-    m.scale.y = model->width;
-    m.scale.z = model->height;// - 2.0 * model->thickness;
+    tf::vectorEigenToMsg(GetCabinetBackGeometrySize(model), m.scale);
 
     ma.markers.push_back(m);
 
@@ -281,17 +145,11 @@ auto MakeCabinetMarkers(
 
     m.id = 5;
 
-    Eigen::Affine3d door_pose;
-    door_pose = (*pose)
-            * T_cabinet_hinge
-            * GetHingeTransform(model, door_pos)
-            * GetHingeToDoorTransform(model);
-
+    auto door_pose = GetDoorGeometryPose(model, door_pos);
+    door_pose = (*pose) * door_pose;
     tf::poseEigenToMsg(door_pose, m.pose);
 
-    m.scale.x = model->thickness;
-    m.scale.y = model->width;
-    m.scale.z = model->height;
+    tf::vectorEigenToMsg(GetDoorGeometrySize(model), m.scale);
 
     ma.markers.push_back(m);
 
@@ -308,14 +166,8 @@ auto MakeCabinetMarkers(
 
     m.id = 6;
 
-    Eigen::Affine3d shaft_pose;
-    shaft_pose =
-            door_pose *
-            Eigen::Translation3d(
-                    0.5 * model->thickness + model->handle_offset_x + model->handle_radius,
-                    model->handle_offset_y,
-                    0.0);
-
+    auto shaft_pose = GetHandlePose(model, door_pos);
+    shaft_pose = (*pose) * shaft_pose;
     tf::poseEigenToMsg(shaft_pose, m.pose);
 
     m.scale.x = 2.0 * model->handle_radius;
@@ -330,15 +182,8 @@ auto MakeCabinetMarkers(
 
     m.id = 7;
 
-    Eigen::Affine3d t_support_pose;
-    t_support_pose =
-            door_pose *
-            Eigen::Translation3d(
-                    0.5 * (0.5 * model->thickness + model->handle_offset_x + model->handle_radius),
-                    model->handle_offset_y,
-                    0.5 * model->handle_height + model->handle_radius) *
-            Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitY());
-
+    auto t_support_pose = GetHandleUpperGeometryPose(model, door_pos);
+    t_support_pose = (*pose) * t_support_pose;
     tf::poseEigenToMsg(t_support_pose, m.pose);
 
     m.scale.x = 2.0 * model->handle_radius;
@@ -353,15 +198,8 @@ auto MakeCabinetMarkers(
 
     m.id = 8;
 
-    Eigen::Affine3d b_support_pose;
-    b_support_pose =
-            door_pose *
-            Eigen::Translation3d(
-                    0.5 * (0.5 * model->thickness + model->handle_offset_x + model->handle_radius),
-                    model->handle_offset_y,
-                    -(0.5 * model->handle_height + model->handle_radius)) *
-            Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitY());
-
+    auto b_support_pose = GetHandleLowerGeometryPose(model, door_pos);
+    b_support_pose = (*pose) * b_support_pose;
     tf::poseEigenToMsg(b_support_pose, m.pose);
 
     m.scale.x = 2.0 * model->handle_radius;
@@ -373,43 +211,88 @@ auto MakeCabinetMarkers(
     return ma;
 }
 
-bool g_state_received = false;
-moveit_msgs::RobotState::ConstPtr g_curr_robot_state;
-
-void RobotStateCallback(const moveit_msgs::RobotState::ConstPtr& msg)
-{
-    g_curr_robot_state = msg;
-    g_state_received = true;
-}
-
 int main(int argc, char* argv[])
 {
+    ////////////////
+    // Parameters //
+    ////////////////
+
+    auto group_name = "right_arm_torso_base";
+    auto demo_filename = "cabinet_demo.csv";
+    auto tip_link = "limb_right_tool0";
+
+    auto right_arm = true;
+
+    CabinetModel cabinet;
+    cabinet.right = true;
+    cabinet.width = 0.50;
+    cabinet.height = 0.80;
+    cabinet.depth = 0.50;
+    cabinet.thickness = 0.02;
+    if (right_arm) {
+        cabinet.handle_offset_y = -0.4 * cabinet.width;
+    } else {
+        cabinet.handle_offset_y = 0.4 * cabinet.width;
+    }
+    cabinet.handle_offset_x = 0.08;
+    cabinet.handle_height = 0.20;
+    cabinet.handle_radius = 0.01;
+
+    auto contact_error_z = 0.5 * cabinet.handle_height;
+    auto contact_error = 0.03;
+
+    ///////////////
+    // Arguments //
+    ///////////////
+
     ros::init(argc, argv, "door_demonstrator", ros::init_options::AnonymousName);
     ros::NodeHandle nh;
 
+    printf("Usage: door_demonstrator [cabinet_id] [record] [record_object]\n");
     ROS_INFO("argc: %d", argc);
 
     auto cabinet_id = (argc > 1) ? atoi(argv[1]) : 0;
-    bool record = argc > 2 ? true : false;
-    bool record_object = argc > 3 ? true: false;
+    auto record = argc > 2 ? true : false;
+    auto record_object = argc > 3 ? true: false;
 
-    ros::Publisher marker_pub = nh.advertise<visualization_msgs::MarkerArray>(
-            "visualization_markers", 1);
+    ROS_INFO("Cabinet ID: %d", cabinet_id);
+    ROS_INFO("Record: %s", record ? "true" : "false");
+    ROS_INFO("Record Object: %s", record_object ? "true" : "false");
 
-    // to perform usual validity checking
-    ros::ServiceClient check_state_service =
-            nh.serviceClient<moveit_msgs::GetStateValidity>(
-                    "check_state_validity");
+    ////////////////////
+    // Initialization //
+    ////////////////////
 
-    ros::Subscriber state_sub =
-            nh.subscribe("robot_state", 1, RobotStateCallback);
+    // initialize cabinet pose based on id...
+    Eigen::Affine3d cabinet_pose;
+    switch (cabinet_id) {
+    case 0:
+        cabinet_pose =
+                Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
+                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+        break;
+    case 1:
+        cabinet_pose =
+                Eigen::Translation3d(2.0, -1.0, 0.5 * cabinet.height) *
+                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
+        break;
+    case 2:
+        cabinet_pose =
+                Eigen::Translation3d(1.0, 2.0, 0.5 * cabinet.height) *
+                Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
+        break;
+    default:
+        return 1;
+    }
 
+    // initialize robot model...
     robot_model_loader::RobotModelLoader loader;
     auto model = loader.getModel();
 
+    // initialize robot state...
     moveit::core::RobotState robot_state(model);
 
-    auto group_name = "right_arm_torso_base";
+    // initialize joint group...
     if (!model->hasJointModelGroup(group_name)) {
         ROS_ERROR("Demonstration group '%s' does not exist in the robot model", group_name);
         return 1;
@@ -417,10 +300,10 @@ int main(int argc, char* argv[])
 
     auto* demo_group = model->getJointModelGroup(group_name);
 
+    // initialize the demonstration recording...
     FILE* fdemo = NULL;
     if (record) {
-        auto demo_filename = "cabinet_demo.csv";
-        fdemo = fopen("cabinet_demo.csv", "w");
+        fdemo = fopen(demo_filename, "w");
         if (!fdemo) {
             ROS_ERROR("Failed to open '%s' for writing", demo_filename);
             return 1;
@@ -444,61 +327,46 @@ int main(int argc, char* argv[])
             fprintf(fdemo, "hinge\n");
         }
     }
-    // close the demonstration file when we kill the program
-    DEFER(if (record && fdemo != NULL) {
+
+    // close the demonstration file when we kill the program...
+    DEFER(
+        if (record && fdemo != NULL) {
             fclose(fdemo);
             fdemo = NULL;
-    });
+        }
+    );
 
-    /////////////////////////////////////
-    // define the model of the cabinet //
-    /////////////////////////////////////
+    // state variables...
+    auto prev_door_pos = GetHingeDefaultPosition(&cabinet);
+//    auto door_pos = GetHingeDefaultPosition(&cabinet);
+    auto door_pos = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
 
-    CabinetModel cabinet;
-    cabinet.width = 0.50;
-    cabinet.height = 0.80;
-    cabinet.depth = 0.50;
-    cabinet.thickness = 0.02;
-#if RIGHT_ARM
-    cabinet.handle_offset_y = -0.4 * cabinet.width;
-#else
-    cabinet.handle_offset_y = 0.4 * cabinet.width;
-#endif
-    cabinet.handle_offset_x = 0.08;
-    cabinet.handle_height = 0.20;
-    cabinet.handle_radius = 0.01;
+    auto contacted = false; // ever came into contact?
+    auto contact = false;   // in contact at the last frame
 
-    Eigen::Affine3d cabinet_pose;
-    switch (cabinet_id) {
-    case 0:
-        cabinet_pose =
-                Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
-                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-        break;
-    case 1:
-        cabinet_pose =
-                Eigen::Translation3d(2.0, -1.0, 0.5 * cabinet.height) *
-                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-        break;
-    case 2:
-        cabinet_pose =
-                Eigen::Translation3d(1.0, 2.0, 0.5 * cabinet.height) *
-                Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
-        break;
-    default:
-        return 1;
-    }
+    auto state_received = false;
+    moveit_msgs::RobotState::ConstPtr curr_robot_state;
 
-    auto prev_door_pos = 0.0;
-    auto door_pos = 0.0;
-    auto t = 0.0;
+    //////////////////////
+    // Fire up the node //
+    //////////////////////
 
-    auto tip_link = "limb_right_tool0";
+    boost::function<void(const moveit_msgs::RobotState::ConstPtr&)>
+    robot_state_callback = [&](const moveit_msgs::RobotState::ConstPtr& msg) {
+        curr_robot_state = msg;
+        state_received = true;
+    };
 
-    auto contact_error_z = 0.5 * cabinet.handle_height;
-    auto contact_error = 0.03;
-    bool contacted = false; // ever came into contact?
-    bool contact = false;
+    auto state_sub = nh.subscribe("robot_state", 1, robot_state_callback);
+
+    // to perform usual validity checking
+    auto check_state_service = nh.serviceClient<moveit_msgs::GetStateValidity>(
+            "check_state_validity");
+
+    auto marker_pub = nh.advertise<visualization_msgs::MarkerArray>(
+            "visualization_markers", 1);
+
+    boost::function<bool(moveit_msgs::GetStateValidity::Request& req, moveit_msgs::GetStateValidity::Response& res)> service_fun;
 
     auto IsStateValid = [&](
         moveit_msgs::GetStateValidity::Request& req,
@@ -514,32 +382,44 @@ int main(int argc, char* argv[])
         } else {
             return check_state_service.call(req, res);
         }
-        return true; //check_state_service.call(req, res);
     };
 
-    boost::function<bool(moveit_msgs::GetStateValidity::Request& req, moveit_msgs::GetStateValidity::Response& res)> service_fun;
     service_fun = IsStateValid;
 
-    ros::ServiceServer check_state_server = nh.advertiseService(
-            "check_state_validity_manipulation", service_fun);
+    auto check_state_server =
+            nh.advertiseService("check_state_validity_manipulation", service_fun);
 
+    ////////////////////////
+    // demonstration loop //
+    ////////////////////////
+
+    auto t = 0.0;
     ros::Rate loop_rate(30.0);
     while (ros::ok()) {
         ros::spinOnce();
+        t += 1.0 / 30.0;
 
-//        door_pos = 0.5 * sin(t) + 0.5;
+        // 0 to 3*pi/4
+        auto amplitude = 0.5 * GetHingeSpan(&cabinet);
+        auto median = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
+
+        door_pos += (amplitude * std::cos(t)) / 30.0;
 
         if (door_pos != prev_door_pos) {
-            ROS_INFO("door position = %f", door_pos);
+            ROS_INFO("door position = %f", sbpl::angles::to_degrees(door_pos));
             prev_door_pos = door_pos;
         }
 
-        bool robot_moved = g_state_received;
+        ////////////////////////////////////////////////////////////////
+        // record the motion of the robot and the state of the object //
+        ////////////////////////////////////////////////////////////////
+
+        auto robot_moved = state_received;
         if (robot_moved && record) {
-            assert(g_curr_robot_state && "State shouldn't be null if we received it");
+            assert(curr_robot_state && "State shouldn't be null if we received it");
             // TODO we should probably just always do this when a state is received to avoid
             // doing it over and over again
-            moveit::core::robotStateMsgToRobotState(*g_curr_robot_state, robot_state);
+            moveit::core::robotStateMsgToRobotState(*curr_robot_state, robot_state);
 
             std::vector<double> group_state;
             robot_state.copyJointGroupPositions(demo_group, group_state);
@@ -561,13 +441,13 @@ int main(int argc, char* argv[])
                 fprintf(fdemo, "%f\n", door_pos);
             }
         }
-        g_state_received = false;
+        state_received = false;
 
         //////////////////////////////////////////////////////////
         // check for contact with the door in the current state //
         //////////////////////////////////////////////////////////
 
-        auto handle_pose = GetHandlePose(&cabinet, &cabinet_pose, door_pos);
+        auto handle_pose = cabinet_pose * GetHandlePose(&cabinet, door_pos);
         ROS_DEBUG("  handle @ (%f, %f, %f)",
                 handle_pose.translation().x(),
                 handle_pose.translation().y(),
@@ -575,8 +455,8 @@ int main(int argc, char* argv[])
 
         contact = false;
         Eigen::Affine3d curr_tool_pose;
-        if (g_curr_robot_state) {
-            moveit::core::robotStateMsgToRobotState(*g_curr_robot_state, robot_state);
+        if (curr_robot_state) {
+            moveit::core::robotStateMsgToRobotState(*curr_robot_state, robot_state);
             curr_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
             ROS_DEBUG("  curr tool @ (%f, %f, %f)",
                     curr_tool_pose.translation().x(),
@@ -597,10 +477,14 @@ int main(int argc, char* argv[])
         ///////////////////////////////////////////////////////
 
         if (contact) {
-            auto hinge_frame =
-                    GetHingeFrame(&cabinet, &cabinet_pose) *
+            // T_world_hinge, rotated so x is to the cabinet's left and y is to
+            // the cabinet's back
+            Eigen::Affine3d hinge_frame =
+                    cabinet_pose *              // T_world_cabinet
+                    GetHingeOrigin(&cabinet) *  // T_cabinet_hinge
                     Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ());
 
+            // T_hinge_world * T_world_tool
             Eigen::Affine3d tool_in_hinge = hinge_frame.inverse() * curr_tool_pose;
 
             ROS_INFO("tool position (hinge frame) = (%f, %f, %f)",
@@ -612,31 +496,36 @@ int main(int argc, char* argv[])
 
             Eigen::Vector3d nearest = radius * tool_in_hinge.translation().normalized();
 
-#if RIGHT_ARM
-            ROS_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
-            auto theta = atan2(nearest.y(), nearest.x()) - GetHandleRotationOffset(&cabinet);
-            ROS_INFO("   theta adjusted = %f", theta);
-            if (theta < door_min_pos) theta = door_min_pos;
-#else
-            auto theta = atan2(nearest.y(), nearest.x()) + GetHandleRotationOffset(&cabinet);
-#endif
+            auto ccw_dist = [](double ai, double af)
+            {
+                return 0.0;
+            };
 
-            if (theta < door_min_pos || theta > door_max_pos) {
-                auto new_theta = theta;
-                new_theta = std::max(new_theta, door_min_pos);
-                new_theta = std::min(new_theta, door_max_pos);
-                ROS_INFO("Clamped door position %f -> %f", theta, new_theta);
-                theta = new_theta;
+            double theta;
+            if (right_arm) {
+                ROS_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
+                theta = atan2(nearest.y(), nearest.x()) - GetHandleRotationOffset(&cabinet);
+                ROS_INFO("   theta adjusted = %f", theta);
+
+                if (theta <= M_PI && theta >= -0.25 * M_PI) {
+                    if (sbpl::angles::shortest_angle_dist(-M_PI, theta) <
+                        sbpl::angles::shortest_angle_dist(-0.25 * M_PI, theta))
+                    {
+                        theta = 0.0;
+                    } else {
+                        theta = 0.75 * M_PI;
+                    }
+                } else {
+                    theta = ccw_dist(-M_PI, theta);
+                }
+            } else {
+                theta = atan2(nearest.y(), nearest.x()) + GetHandleRotationOffset(&cabinet);
             }
-
-#if RIGHT_ARM
-            door_pos = (theta - door_min_pos) / (door_max_pos - door_min_pos);
-#else
-            door_pos = 1.0 - (door_min_pos - theta) / door_min_pos;
-#endif
-
-            // get the position of the tool in the hinge frame
         }
+
+        /////////////////////////////////////////////
+        // visualize the cabinet and contact state //
+        /////////////////////////////////////////////
 
         auto markers = MakeCabinetMarkers(&cabinet, door_pos, &cabinet_pose, "cabinet", contact);
         for (auto& marker : markers.markers) {
@@ -645,7 +534,6 @@ int main(int argc, char* argv[])
 
         marker_pub.publish(markers);
         loop_rate.sleep();
-        t += loop_rate.expectedCycleTime().toSec();
     }
 
     return 0;

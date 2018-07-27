@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<robot name="crate" xmlns:xacro="http://ros.org/wiki/xacro">
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="1.57 0 0"/>
+            <geometry>
+                <mesh filename="package://object_manipulation_planner/meshes/crate_base.obj" scale="0.01 0.01 0.01"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="1.57 0 0"/>
+            <geometry>
+                <mesh filename="package://object_manipulation_planner/meshes/crate_base.obj" scale="0.01 0.01 0.01"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <joint name="lid_joint" type="revolute">
+        <parent link="base_link"/>
+        <child link="lid"/>
+        <origin xyz="-0.157 0 0.12" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit lower="-3.6651914291881" upper="0.0" velocity="0" effort="0"/>
+    </joint>
+
+    <link name="lid">
+        <visual>
+            <origin xyz="0.1587915 0 0.00852894" rpy="1.57 0 0"/>
+            <geometry>
+                <mesh filename="package://object_manipulation_planner/meshes/crate_lid.obj" scale="0.01 0.01 0.01"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0.1587915 0 0.00852894" rpy="1.57 0 0"/>
+            <geometry>
+                <mesh filename="package://object_manipulation_planner/meshes/crate_lid.obj" scale="0.01 0.01 0.01"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <joint name="handle_joint" type="revolute">
+        <parent link="lid"/>
+        <child link="handle"/>
+        <origin xyz="0.157 0.0 0.0309377" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit lower="-0.087266462599716" upper="1.57" velocity="0" effort="0"/>
+    </joint>
+
+    <link name="handle">
+        <visual>
+            <origin xyz="0 0 0.0375" rpy="1.57 0 0"/>
+            <geometry>
+                <mesh filename="package://object_manipulation_planner/meshes/crate_handle.obj" scale="0.01 0.01 0.01"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0.0375" rpy="1.57 0 0"/>
+            <geometry>
+                <mesh filename="package://object_manipulation_planner/meshes/crate_handle.obj" scale="0.01 0.01 0.01"/>
+            </geometry>
+        </collision>
+    </link>
+</robot>

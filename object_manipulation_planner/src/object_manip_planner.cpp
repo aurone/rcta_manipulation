@@ -11,6 +11,7 @@
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
 #include <smpl/graph/workspace_lattice_egraph.h>
+#include <smpl/graph/simple_workspace_lattice_action_space.h>
 
 //#include "workspace_lattice_egraph.h"
 
@@ -313,10 +314,16 @@ int main(int argc, char* argv[])
 
     smpl::WorkspaceLatticeEGraph graph;
 
+    smpl::SimpleWorkspaceLatticeActionSpace actions;
+
     smpl::WorkspaceLattice::Params p;
     smpl::PlanningParams params;
-    if (!graph.init(&omanip, &cspace, &params, p)) {
+    if (!graph.init(&omanip, &cspace, &params, p, &actions)) {
         ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
+        return false;
+    }
+
+    if (!InitSimpleWorkspaceLatticeActions(&graph, &actions)) {
         return false;
     }
 
