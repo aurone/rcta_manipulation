@@ -1,4 +1,7 @@
+// standard includes
 #include <math.h>
+
+// system includes
 #include <Eigen/Dense>
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -12,6 +15,7 @@
 #include <moveit_msgs/GetStateValidity.h>
 #include <smpl/angles.h>
 
+// project includes
 #include "cabinet_model.h"
 
 ////////////////////
@@ -498,14 +502,19 @@ int main(int argc, char* argv[])
 
             auto ccw_dist = [](double ai, double af)
             {
-                return 0.0;
+                auto diff = sbpl::angles::shortest_angle_diff(af, ai);
+                if (diff >= 0.0) {
+                    return diff;
+                } else {
+                    return 2.0 * M_PI - std::fabs(diff);
+                }
             };
 
             double theta;
             if (right_arm) {
                 ROS_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
                 theta = atan2(nearest.y(), nearest.x()) - GetHandleRotationOffset(&cabinet);
-                ROS_INFO("   theta adjusted = %f", theta);
+                ROS_INFO("  theta adjusted = %f", theta);
 
                 if (theta <= M_PI && theta >= -0.25 * M_PI) {
                     if (sbpl::angles::shortest_angle_dist(-M_PI, theta) <

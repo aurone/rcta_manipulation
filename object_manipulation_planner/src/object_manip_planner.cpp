@@ -1,246 +1,110 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit/robot_state/robot_state.h>
+#include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit_planners_sbpl/planner/moveit_robot_model.h>
 #include <ros/ros.h>
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
-#include <smpl/robot_model.h>
-#include <smpl/heuristic/egraph_bfs_heuristic.h>
-#include <smpl/occupancy_grid.h>
-#include <smpl/search/arastar.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
-#include <smpl/graph/workspace_lattice_egraph.h>
 #include <smpl/graph/simple_workspace_lattice_action_space.h>
+#include <smpl/graph/workspace_lattice_egraph.h>
+#include <smpl/heuristic/egraph_bfs_heuristic.h>
+#include <smpl/heuristic/object_manip_heuristic.h>
+#include <smpl/occupancy_grid.h>
+#include <smpl/robot_model.h>
+#include <smpl/search/arastar.h>
+
+#include "object_manipulation_model.h"
 
 //#include "workspace_lattice_egraph.h"
 
 namespace smpl = sbpl::motion;
 
-// A RobotModel struct that takes an existing RobotModel and extends it by
-// adding a single degree-of-freedom.
-struct ObjectManipulationModel :
-    public virtual smpl::RobotModel,
-    public virtual smpl::ForwardKinematicsInterface,
-    public virtual smpl::InverseKinematicsInterface,
-    public virtual smpl::RedundantManipulatorInterface
+struct ObjectManipPlanner
 {
-    smpl::RobotModel* robot_model = NULL;
+    smpl::PlanningParams                    params;
+    smpl::WorkspaceLatticeEGraph            graph;
+    smpl::SimpleWorkspaceLatticeActionSpace actions;
+    smpl::ObjectManipulationHeuristic       heuristic;
+    sbpl::ARAStar                           search;
 
-    // cache the underlying interfaces that we wrap
-    smpl::ForwardKinematicsInterface* fk_iface = NULL;
-    smpl::InverseKinematicsInterface* ik_iface = NULL;
-    smpl::RedundantManipulatorInterface* rm_iface = NULL;
+    ObjectManipPlanner() : search(&graph, &heuristic) { }
+};
 
-    double min_object_pos = 0.0;
-    double max_object_pos = 0.0;
+bool Init(
+    ObjectManipPlanner* planner,
+    smpl::RobotModel* model,
+    smpl::CollisionChecker* checker,
+    sbpl::OccupancyGrid* grid)
+{
+    smpl::WorkspaceLatticeEGraph graph;
 
-//    ObjectManipulationModel() = default;
+    smpl::SimpleWorkspaceLatticeActionSpace actions;
 
-    double minPosLimit(int vidx) const override
-    {
-        if (vidx < robot_model->jointCount()) {
-            return robot_model->minPosLimit(vidx);
-        } else {
-            return this->min_object_pos;
-        }
-    }
-
-    double maxPosLimit(int vidx) const override
-    {
-        if (vidx < robot_model->jointCount()) {
-            return robot_model->maxPosLimit(vidx);
-        } else {
-            return this->max_object_pos;
-        }
-    }
-
-    bool hasPosLimit(int vidx) const override
-    {
-        if (vidx < robot_model->jointCount()) {
-            return robot_model->hasPosLimit(vidx);
-        } else {
-            return true;
-        }
-    }
-
-    bool isContinuous(int vidx) const override
-    {
-        if (vidx < robot_model->jointCount()) {
-            return robot_model->isContinuous(vidx);
-        } else {
-            return false;
-        }
-    }
-
-    double velLimit(int vidx) const override
-    {
-        if (vidx < robot_model->jointCount()) {
-            return robot_model->velLimit(vidx);
-        } else {
-            return 0.0;
-        }
-    }
-
-    double accLimit(int vidx) const override
-    {
-        if (vidx < robot_model->jointCount()) {
-            return robot_model->accLimit(vidx);
-        } else {
-            return 0.0;
-        }
-    }
-
-    bool checkJointLimits(const smpl::RobotState& state, bool verbose = false) override
-    {
-        auto ovar = state.back();
-        return robot_model->checkJointLimits(state) &&
-                ovar >= this->min_object_pos &&
-                ovar <= this->max_object_pos;
-    }
-
-    auto getExtension(size_t class_code) -> smpl::Extension* override
-    {
-        if (class_code == smpl::GetClassCode<smpl::ForwardKinematicsInterface>()) {
-            return this->fk_iface ? this : NULL;
-        } else if (class_code == smpl::GetClassCode<smpl::InverseKinematicsInterface>()) {
-            return this->ik_iface ? this : NULL;
-        } else if (class_code == smpl::GetClassCode<smpl::RedundantManipulatorInterface>()) {
-            return this->rm_iface ? this : NULL;
-        } else if (class_code == smpl::GetClassCode<smpl::RobotModel>()) {
-            return this;
-        }
-
-        return NULL;
-    }
-
-    // we should just be able to use the underlying robot model's forward
-    // kinematics
-    auto computeFK(const smpl::RobotState& state) -> Eigen::Affine3d override
-    {
-        return this->fk_iface->computeFK(state);
-    }
-
-    // same for ik...
-    bool computeIK(
-        const Eigen::Affine3d& pose,
-        const smpl::RobotState& start,
-        smpl::RobotState& solution,
-        smpl::ik_option::IkOption option = smpl::ik_option::UNRESTRICTED) override
-    {
-        if (!this->ik_iface->computeIK(pose, start, solution, option)) {
-            return false;
-        }
-
-        // push back the object variable
-        solution.push_back(start.back());
-        return true;
-    }
-
-    bool computeIK(
-        const Eigen::Affine3d& pose,
-        const smpl::RobotState& start,
-        std::vector<smpl::RobotState>& solutions,
-        smpl::ik_option::IkOption option = smpl::ik_option::UNRESTRICTED) override
-    {
-        if (!this->ik_iface->computeIK(pose, start, solutions, option)) {
-            return false;
-        }
-        for (auto& sol : solutions) {
-            sol.push_back(start.back());
-        }
-        return true;
-    }
-
-    const int redundantVariableCount() const override
-    {
-        return this->rm_iface->redundantVariableCount() + 1;
-    }
-
-    const int redundantVariableIndex(int rvidx) const override
-    {
-        if (rvidx < this->rm_iface->redundantVariableCount()) {
-            return this->rm_iface->redundantVariableIndex(rvidx);
-        } else {
-            // the object variable is always the last variable in the robot state
-            return robot_model->jointCount();
-        }
-    }
-
-    bool computeFastIK(
-        const Eigen::Affine3d& pose,
-        const smpl::RobotState& state,
-        smpl::RobotState& solution)
-    {
+    smpl::WorkspaceLattice::Params p;
+    if (!graph.init(model, checker, &planner->params, p, &planner->actions)) {
+        ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
         return false;
     }
 
-#if 0
+    if (!InitSimpleWorkspaceLatticeActions(&planner->graph, &planner->actions)) {
+        return false;
+    }
 
+    if (!planner->heuristic.init(&graph)) {
+        ROS_ERROR("Failed to initialize Dijkstra E-Graph Heuristic 3D");
+        return false;
+    }
 
-    // the redundant manipulator interface will be a little different...
-    // we need to tell smpl that the object dimension is a 'free angle'
-#endif
-};
+    planner->search.allowPartialSolutions(false);
+    planner->search.setTargetEpsilon(1.0);
+    planner->search.setDeltaEpsilon(1.0);
+    planner->search.setImproveSolution(true);
+    planner->search.setBoundExpansions(true);
+    return true;
+}
 
-//ObjectManipulationModel::ObjectManipulationModel()
-//{
-//    // given a state space representation of the robot
-//    // (base/x, base/y, base/theta, torso, arm/1, arm/2, arm/3, arm/4, arm/5, arm/6, arm/7)
-//    // transform a given state to workspace representation (
-//    std::vector<std::string> var_names =
-//    {
-//        "base/x",
-//        "base/y",
-//        "base/theta",
-//        "torso",
-//        "arm/free",
-//        "ee/x",
-//        "ee/y",
-//        "ee/z",
-//        "ee/yaw",
-//        "object",
-//    };
-//    setPlanningJoints(var_names);
-//}
-
-// Some design decisions here...
-// * Do we want to construct a RobotModel explicitly defining the workspace
-// representation and pass that to ManipLattice, or to construct a standard
-// RobotModel and pass that to something like Workspace Lattice
-// * Do we want to include the object dimension as part of the RobotModel? We'll
-// (probably) need to if we want to use an existing graph structure
-// 4-ish combinations
-//
-// * ManipLattice     w/  object variable
-//
-// bounds need to be given for the variable to affect discretization. Do we
-// discretize values from Z or do we just consider all the discrete values
-// from the demonstrated trajectory.
-//
-// * ManipLattice     w/o object variable
-//
-// * WorkspaceLattice w/  object variable
-//
-// * WorkspaceLattice w/o object variable
-//
-// Construct RobotModel as you usually would, describing the variables of your
-// robot that the planner may reason about. WorkspaceLattice requires a
-// ForwardKinematicsInterface, InverseKinematicsInterface, and a
-// RedundantManipulatorInterface.
-//
-// * no/no   -
-// * no/yes  -
-// * yes/no  -
-// * yes/yes -
-//
-// Z = all possible values of z from the demonstration
-
-template <class T>
-T* GetExtension(smpl::Extension* extension)
+bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
 {
-    auto* e = extension->getExtension(smpl::GetClassCode<T>());
-    return dynamic_cast<T*>(e);
+    if (!planner->graph.loadExperienceGraph(path)) {
+        ROS_ERROR("Failed to load experience graph");
+        return false;
+    }
+    return true;
+}
+
+bool PlanPath(
+    ObjectManipPlanner* planner,
+    const moveit::core::RobotState& start_state,
+    const Eigen::Affine3d& object_pose,
+    double object_start_state,
+    double allowed_time,
+    double object_goal_state,
+    robot_trajectory::RobotTrajectory* trajectory)
+{
+    // TODO: behavior to level out the end effector
+
+    // goal is to open the object all the way
+
+    smpl::GoalConstraint goal;
+    goal.type = smpl::GoalType::JOINT_STATE_GOAL;
+
+    sbpl::ARAStar::TimeParameters timing;
+    timing.bounded = true;
+    timing.improve = true;
+    timing.max_allowed_time_init = std::chrono::seconds(10);
+    timing.max_allowed_time = std::chrono::seconds(10);
+    std::vector<int> solution;
+    int solution_cost;
+    bool res = planner->search.replan(timing, &solution, &solution_cost);
+    if (!res) {
+        ROS_ERROR("Failed to plan path");
+        return false;
+    }
+
+    return true;
 }
 
 // 1. Generate a trajectory using the model of the object
@@ -255,7 +119,9 @@ int main(int argc, char* argv[])
     sbpl::VisualizerROS visualizer;
     sbpl::visual::set_visualizer(&visualizer);
 
-    auto group_name = "right_arm_and_torso";
+    auto group_name = "right_arm_torso_base";
+    auto tip_link = "limb_right_tool0";
+    auto ik_group_name = "right_arm";
 
     // We basically have to be a ROS node for this to work. We could use
     // RobotModelLoader to load the RobotModel from urdf/srdf strings, but
@@ -264,6 +130,10 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "object_manip_planner");
     ros::NodeHandle nh;
 
+    /////////////////////////////////////////////
+    // Load the Robot Model from the URDF/SRDF //
+    /////////////////////////////////////////////
+
     robot_model_loader::RobotModelLoader loader;
     auto robot_model = loader.getModel();
     if (!robot_model) {
@@ -271,30 +141,57 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    std::vector<std::string> redundant_joints = { "limb_right_joint3" };
+    auto* ik_group = robot_model->getJointModelGroup(ik_group_name);
+    if (!ik_group->setRedundantJoints(redundant_joints)) {
+        ROS_ERROR("Failed to set redundant joints");
+        return 1;
+    }
+
+    ///////////////////////////////////
+    // Initialize the Planning Model //
+    ///////////////////////////////////
+
     // want to include the object degree-of-freedom as a free variable in the
     // robot model to be able to use workspace lattice directly
     sbpl_interface::MoveItRobotModel planning_model;
-    if (!planning_model.init(robot_model, group_name)) {
+    if (!planning_model.init(robot_model, group_name, ik_group_name)) {
         ROS_ERROR("Failed to initialize robot model");
         return 1;
     }
 
-    ObjectManipulationModel omanip;
-    omanip.robot_model = &planning_model;
-    omanip.fk_iface = GetExtension<smpl::ForwardKinematicsInterface>(&planning_model);
-    omanip.ik_iface = GetExtension<smpl::InverseKinematicsInterface>(&planning_model);
-    omanip.min_object_pos = 0.0;
-    omanip.max_object_pos = 1.0;
+    if (!planning_model.setPlanningLink(tip_link)) {
+        ROS_ERROR("Failed to set planning link");
+        return 1;
+    }
 
-    sbpl::collision::CollisionSpace cspace;
-    double size_x, size_y, size_z;
-    double resolution;
-    double origin_x, origin_y, origin_z;
-    double max_dist;
+    ObjectManipulationModel omanip;
+    if (!Init(&omanip, &planning_model, 0.0, 1.0)) {
+        ROS_ERROR("Failed to initialize Object Manipulation Model");
+        return 1;
+    }
+
+    //////////////////////////////////////
+    // Initialize the Collision Checker //
+    //////////////////////////////////////
+
+    // Parameters taken from 'world_collision_model' declared in move_group.launch
+    auto size_x = 20.0;
+    auto size_y = 20.0;
+    auto size_z = 2.1;
+    auto origin_x = -10.0;
+    auto origin_y = -10.0;
+    auto origin_z = -0.15;
+    auto resolution = 0.05;
+    auto max_dist = 0.8;
     auto grid = sbpl::OccupancyGrid(
-            size_x, size_y, size_z,
+            size_x,
+            size_y,
+            size_z,
             resolution,
-            origin_x, origin_y, origin_z,
+            origin_x,
+            origin_y,
+            origin_z,
             max_dist);
 
     sbpl::collision::CollisionModelConfig config;
@@ -303,63 +200,74 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::vector<std::string> planning_variables;
+    auto planning_variables = omanip.getPlanningJoints();
+    planning_variables.pop_back();
+    sbpl::collision::CollisionSpace cspace;
     if (!cspace.init(&grid, *robot_model->getURDF().get(), config, group_name, planning_variables)) {
         ROS_ERROR("Failed to initialize Collision Space");
         return 1;
     }
 
+    moveit::core::RobotState robot_state(robot_model);
+    robot_state.setToDefaultValues();
+
     // TODO: set up the scene (set the initial robot state)
     SV_SHOW_INFO(cspace.getCollisionRobotVisualization());
 
-    smpl::WorkspaceLatticeEGraph graph;
+    ////////////////////////////
+    // Initialize the Planner //
+    ////////////////////////////
 
-    smpl::SimpleWorkspaceLatticeActionSpace actions;
-
-    smpl::WorkspaceLattice::Params p;
-    smpl::PlanningParams params;
-    if (!graph.init(&omanip, &cspace, &params, p, &actions)) {
-        ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
-        return false;
+    ObjectManipPlanner planner;
+    if (!Init(&planner, &omanip, &cspace, &grid)) {
+        ROS_ERROR("Failed to initialize Object Manipulation Planner");
+        return 1;
+    }
+    auto demos = "/home/aurone/data/egraphs/right_arm_torso_base_paths";
+    if (!LoadDemonstrations(&planner, demos)) {
+        return 1;
     }
 
-    if (!InitSimpleWorkspaceLatticeActions(&graph, &actions)) {
-        return false;
-    }
+    ////////////
+    // Inputs //
+    ////////////
 
-    // TODO: heuristic is only built from the grid during
-    // construction...that's pretty fucking stupid
-    smpl::DijkstraEgraphHeuristic3D heuristic;
-    if (!heuristic.init(&graph, &grid)) {
-        ROS_ERROR("Failed to initialize Dijkstra E-Graph Heuristic 3D");
-        return false;
-    }
+    moveit::core::RobotState start_state(robot_model);
+    start_state.setToDefaultValues();
+    Eigen::Affine3d object_pose =
+            Eigen::Translation3d(1.0, 2.0, 0.4) *
+            Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
+    auto object_start_state = 0.0;
+    auto allowed_time = 10.0;
 
-    sbpl::ARAStar search(&graph, &heuristic);
-    search.allowPartialSolutions(false);
-    search.setTargetEpsilon(1.0);
-    search.setDeltaEpsilon(1.0);
-    search.setImproveSolution(true);
-    search.setBoundExpansions(true);
+    auto object_goal_state = 1.0;
 
-    // level out the end effector
+    /////////////
+    // Outputs //
+    /////////////
 
-    // goal is to open the object all the way
-    smpl::GoalConstraint goal;
-    goal.type = smpl::GoalType::JOINT_STATE_GOAL;
+    robot_trajectory::RobotTrajectory trajectory(robot_model, group_name);
 
-    sbpl::ARAStar::TimeParameters timing;
-    timing.bounded = true;
-    timing.improve = true;
-    timing.max_allowed_time_init = std::chrono::seconds(10);
-    timing.max_allowed_time = std::chrono::seconds(10);
-    std::vector<int> solution;
-    int solution_cost;
-    bool res = search.replan(timing, &solution, &solution_cost);
-    if (!res) {
+    ///////////
+    // Plan! //
+    ///////////
+
+    if (!PlanPath(
+            &planner,
+            start_state,
+            object_pose,
+            object_start_state,
+            allowed_time,
+            object_goal_state,
+            &trajectory))
+    {
         ROS_ERROR("Failed to plan path");
         return 1;
     }
+
+    // convert to:
+    // (1) moveit_msgs::DisplayTrajectory for debugging
+    // (2) FollowJointTrajectoryGoal for execution
 
     return 0;
 }
