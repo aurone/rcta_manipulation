@@ -31,6 +31,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_executable(
     object_manip_planner
     src/object_manip_planner.cpp
+    src/roman_workspace_lattice_action_space.cpp
     src/object_manipulation_model.cpp)
 target_include_directories(object_manip_planner PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})
 target_include_directories(object_manip_planner PUBLIC include)
