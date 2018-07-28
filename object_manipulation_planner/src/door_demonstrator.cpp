@@ -193,7 +193,130 @@ bool SetCrateFromIK(
     const Eigen::Affine3d* pose,
     const smpl::urdf::Link* link)
 {
-    return false;
+    auto* robot = GetRobotModel(state);
+
+    // T_world_crate
+    auto* crate_link = GetLinkTransform(state, GetRootLink(robot));
+
+    // transform from the world to the frame of the first joint:
+    // T_world_J1 = T_world_L0 * T_L0_J2
+    Eigen::Affine3d lid_frame = (*crate_link) * (*GetJointOrigin(GetJoint(robot, "lid_joint")));
+
+    ROS_INFO("lid frame[world] = (%f, %f, %f)",
+            lid_frame.translation().x(),
+            lid_frame.translation().y(),
+            lid_frame.translation().z());
+
+    auto best_lid = std::numeric_limits<double>::max();
+    auto best_dist = std::numeric_limits<double>::max();
+    auto best_handle = std::numeric_limits<double>::quiet_NaN();
+
+    // sample orientations for the handle and choose the configuration that
+    // (1) TODO: best reaches the target point
+    // (2) TODO: minimizes the lid opening
+    auto sample_count = 100;
+    for (int i = 0; i < sample_count; ++i) {
+        auto alpha = (double)i / (double)(sample_count - 1);
+        auto pitch =
+                (1.0 - alpha) * GetVariableLimits(GetVariable(robot, "handle_joint"))->min_position +
+                alpha *         GetVariableLimits(GetVariable(robot, "handle_joint"))->max_position;
+
+        // desired pose of the tool in the frame of the first joint:
+        // T_J1_L3 = (T_world_J1)^-1 * T_world_L3
+        Eigen::Affine3d T_J1_L3 = lid_frame.inverse() *
+                Eigen::Translation3d(pose->translation()) *
+                Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY());
+
+        ROS_DEBUG("tool frame[lid frame] = (%f, %f, %f)", T_J1_L3.translation().x(), T_J1_L3.translation().y(), T_J1_L3.translation().z());
+
+        // note: J3 fixed => L3 = J3
+
+        // desired pose of the handle in the frame of the first joint:
+        // T_J1_L2 = T_J1_L3 * T_L3_L2
+        auto* J3_local = GetJointOrigin(GetJoint(robot, "tool_joint"));
+        Eigen::Affine3d T_J1_L2 = T_J1_L3 * J3_local->inverse();
+
+        ROS_DEBUG("handle frame[lid frame] = (%f, %f, %f)",
+                T_J1_L2.translation().x(),
+                T_J1_L2.translation().y(),
+                T_J1_L2.translation().z());
+
+        // revolute J2 => position(J2) = position(L2)
+
+        auto J1_J2_x = T_J1_L2.translation().x();
+        auto J1_J2_y = T_J1_L2.translation().z();
+
+        auto J2_ox = GetJointOrigin(GetJoint(robot, "handle_joint"))->translation().x();
+        auto J2_oy = GetJointOrigin(GetJoint(robot, "handle_joint"))->translation().z();
+
+//        J1_J2_x = J2_ox * cos(th1) - J2_oy * sin(th1);
+//        J1_J2_y = J2_ox * sin(th1) + J2_oy * cos(th1);
+
+        auto x = J2_ox;
+        auto y = J2_oy;
+        auto xp = J1_J2_x;
+        auto yp = J1_J2_y;
+
+        ROS_DEBUG("x' = %f", xp);
+        ROS_DEBUG("y' = %f", yp);
+        ROS_DEBUG("x = %f", x);
+        ROS_DEBUG("y = %f", y);
+
+        auto th1 = std::atan2(x * yp - y * xp, y * yp + x * xp);
+
+        // put the lid in its place
+        th1 = -th1;
+        th1 = std::min(th1, GetVariableLimits(GetVariable(robot, "lid_joint"))->max_position);
+        th1 = std::max(th1, GetVariableLimits(GetVariable(robot, "lid_joint"))->min_position);
+
+        SetVariablePosition(state, GetVariable(robot, "lid_joint"), th1);
+        UpdateLinkTransform(state, GetLink(robot, "lid"));
+
+        Eigen::Affine3d T_J1_J2 =
+                lid_frame.inverse() * // (T_world_J1^1) = T_J1_world
+                (*GetLinkTransform(state, GetLink(robot, "lid"))) * // T_world_L1
+                (*GetJointOrigin(GetJoint(robot, "handle_joint"))); // T_L1_J2
+
+        // get the transform from J2 to L2
+        Eigen::Affine3d T_J2_L2 = T_J1_J2.inverse() * T_J1_L2;
+
+        auto angle = Eigen::AngleAxisd(T_J2_L2.rotation()).angle();
+        angle = std::min(angle, GetVariableLimits(GetVariable(robot, "handle_joint"))->max_position);
+        angle = std::max(angle, GetVariableLimits(GetVariable(robot, "handle_joint"))->min_position);
+        SetVariablePosition(state, GetVariable(robot, "handle_joint"), angle);
+        UpdateLinkTransform(state, GetLink(robot, "tool"));
+
+        // a configuration is better if...
+        // ...the tool pose is closer to the ee pose
+        // ...the joint variable is higher (lid more closed)
+        auto margin = 0.01;
+        auto* tip_trans = GetLinkTransform(state, GetLink(robot, "tool"));
+        auto ee_dist = (pose->translation() - tip_trans->translation()).norm();
+
+        if (ee_dist < best_dist) { // - margin) {
+            ROS_INFO("Better distance! %f -> %f @ (%f, %f)", best_dist, ee_dist, th1, angle);
+            best_lid = th1;
+            best_handle = angle;
+            best_dist = ee_dist;
+        }
+#if 0
+        else if (ee_dist < best_dist + margin) {
+            if (th1 > best_lid) {
+                ROS_INFO("Heavier lid! %f -> %f @ (%f, %f)", best_lid, th1, th1, angle);
+                best_lid = th1;
+                best_handle = angle;
+                best_dist = ee_dist;
+            }
+        }
+#endif
+        else {
+        }
+    }
+
+    SetVariablePosition(state, GetVariable(robot, "lid_joint"), best_lid);
+    SetVariablePosition(state, GetVariable(robot, "handle_joint"), best_handle);
+
+    return true;
 }
 
 auto ConvertMarkersToMarkersMsg(const std::vector<sbpl::visual::Marker>& markers)
@@ -521,7 +644,7 @@ int main(int argc, char* argv[])
         // update object state from ik //
         /////////////////////////////////
 
-        if (curr_robot_state || contact) {
+        if (robot_moved || contact) {
             if (object_urdf->getName() == "cabinet") {
                 if (!SetCabinetFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
 //                    SMPL_WARN("Failed to set cabinet from IK");

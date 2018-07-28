@@ -1,7 +1,7 @@
 <launch>
     <arg name="debug" default="false"/>
 
-    <arg if="$(arg debug)" name="launch_prefix" value="valgrind --track-origins=yes"/>
+    <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
 
     <include file="$(find object_manipulation_planner)/launch/object_manip_planner_params.launch"/>
@@ -12,9 +12,11 @@
         <param name="contact_error" value="0.03"/>
         <param name="object_tip_link" value="handle"/>
         <param name="robot_tip_link" value="limb_right_tool0"/>
+        <!--param name="robot_tip_link" value="limb_right_tool0"/-->
         <param name="demo_filename" value="cabinet_demo.csv"/>
         <param name="group_name" value="right_arm_torso_base"/>
 
+        <!-- cabinet -->
         <param name="object_x" value="2.0"/>
         <param name="object_y" value="0.0"/>
         <param name="object_z" value="0.4"/>
@@ -22,6 +24,7 @@
         <param name="object_pitch" value="0.0"/>
         <param name="object_roll" value="0.0"/>
 
+        <!-- cabinet -->
         <!--
         <param name="object_x" value="2.0"/>
         <param name="object_y" value="-1.0"/>
@@ -31,6 +34,7 @@
         <param name="object_roll" value="0.0"/>
         -->
 
+        <!-- cabinet -->
         <!--
         <param name="object_x" value="1.0"/>
         <param name="object_y" value="2.0"/>
@@ -39,5 +43,13 @@
         <param name="object_pitch" value="0.0"/>
         <param name="object_roll" value="0.0"/>
         -->
+
+        <!-- crate -->
+        <param name="object_x" value="0.0"/>
+        <param name="object_y" value="0.0"/>
+        <param name="object_z" value="0.0"/>
+        <param name="object_yaw" value="0.0"/>
+        <param name="object_pitch" value="0.0"/>
+        <param name="object_roll" value="0.0"/>
     </node>
 </launch>

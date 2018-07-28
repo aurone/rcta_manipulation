@@ -60,4 +60,12 @@
             </geometry>
         </collision>
     </link>
+
+    <joint name="tool_joint" type="fixed">
+        <parent link="handle"/>
+        <child link="tool"/>
+        <origin xyz="0.0 0.0 0.0725" rpy="0 0 0"/>
+    </joint>
+
+    <link name="tool"/>
 </robot>

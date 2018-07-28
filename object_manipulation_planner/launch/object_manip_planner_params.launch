@@ -4,5 +4,6 @@
         <arg name="load_robot_description" value="true"/>
     </include>
 
-    <include file="$(find object_manipulation_planner)/launch/upload_cabinet.launch"/>
+    <!--include file="$(find object_manipulation_planner)/launch/upload_cabinet.launch"/-->
+    <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
 </launch>
