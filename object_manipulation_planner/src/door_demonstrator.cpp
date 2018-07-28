@@ -14,11 +14,19 @@
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/GetStateValidity.h>
 #include <smpl/angles.h>
+#include <smpl/console/console.h>
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/marker_conversions.h>
+#include <smpl/console/nonstd.h>
+#include <urdf_parser/urdf_parser.h>
+#include <smpl_urdf_robot_model/robot_model.h>
+#include <smpl_urdf_robot_model/robot_state.h>
+#include <smpl_urdf_robot_model/robot_state_visualization.h>
 
 // project includes
 #include "cabinet_model.h"
+
+namespace smpl = sbpl::motion;
 
 ////////////////////
 // STEALING DEFER //
@@ -217,97 +225,270 @@ auto MakeCabinetMarkers(
     return ma;
 }
 
+auto MakeContactVisualization(
+    const smpl::urdf::RobotState* state,
+    const smpl::urdf::Link* contact_link,
+    const char* frame,
+    const char* ns,
+    bool contact,
+    int32_t* id = NULL)
+    -> std::vector<sbpl::visual::Marker>
+{
+    std::vector<sbpl::visual::Marker> markers;
+
+    auto first_id = id == NULL ? 0 : *id;
+    for (auto& link : Links(GetRobotModel(state))) {
+        auto* pose = GetLinkTransform(state, &link);
+        for (auto& visual : link.visual) {
+            sbpl::visual::Marker m;
+
+            m.pose = *GetVisualBodyTransform(state, &visual);
+            m.shape = MakeShapeVisualization(visual.shape);
+            if (&link == contact_link) {
+                if (contact) {
+                    m.color = sbpl::visual::Color{ 0.0f, 0.0f, 1.0f, 1.0f };
+                } else {
+                    m.color = sbpl::visual::Color{ 1.0f, 0.0f, 0.0f, 1.0f };
+                }
+            } else {
+                m.color = sbpl::visual::Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+            }
+            m.frame_id = frame;
+            m.ns = ns;
+            m.lifetime = 0;
+            m.id = first_id++;
+            markers.push_back(m);
+        }
+    }
+
+    if (id != NULL) *id = first_id;
+    return markers;
+}
+
+template <class T>
+bool GetParam(const ros::NodeHandle& nh, const std::string& key, T& value)
+{
+    if (!nh.getParam(key, value)) {
+        SMPL_ERROR("Failed to retrieve '%s' from the param server", key.c_str());
+        return false;
+    }
+
+    return true;
+}
+
+bool SetCabinetFromIK(
+    smpl::urdf::RobotState* state,
+    const Eigen::Affine3d* pose,
+    const smpl::urdf::Link* link)
+{
+    auto world_jidx = 0;
+    auto hinge_jidx = 1;
+    auto handle_jidx = 2;
+
+    // T_world_hinge, rotated so x is to the cabinet's left and y is to
+    // the cabinet's back
+    UpdateLinkTransform(state, GetRootLink(GetRobotModel(state)));
+    Eigen::Affine3d hinge_frame =
+            // T_world_cabinet
+            *GetLinkTransform(state, GetRootLink(GetRobotModel(state))) *
+            // T_cabinet_hinge
+            *GetJointOrigin(GetJoint(GetRobotModel(state), hinge_jidx));
+
+    // T_hinge_world * T_world_tool
+    Eigen::Affine3d tool_in_hinge = hinge_frame.inverse() * (*pose);
+
+    SMPL_INFO("tool position (hinge frame) = (%f, %f, %f)",
+            tool_in_hinge.translation().x(),
+            tool_in_hinge.translation().y(),
+            tool_in_hinge.translation().z());
+
+    auto GetHandleRotationRadius = [&]()
+    {
+        auto* J2 = GetJointOrigin(GetJoint(GetRobotModel(state), handle_jidx));
+        auto dx = J2->translation().x();
+        auto dy = J2->translation().y();
+        return std::sqrt(dx * dx + dy * dy);
+    };
+
+    auto radius = GetHandleRotationRadius();
+
+    auto GetHandleRotationOffset = [&]()
+    {
+        auto* J2 = GetJointOrigin(GetJoint(GetRobotModel(state), handle_jidx));
+        auto dx = J2->translation().x();
+        auto dy = J2->translation().y();
+        return std::atan2(std::fabs(dx), std::fabs(dy));
+    };
+
+    // closest point on the circle mapped by the handle radius
+    Eigen::Vector3d nearest = radius * tool_in_hinge.translation().normalized();
+
+
+    auto ccw_dist = [](double ai, double af)
+    {
+        auto diff = sbpl::angles::shortest_angle_diff(af, ai);
+        if (diff >= 0.0) {
+            return diff;
+        } else {
+            return 2.0 * M_PI - std::fabs(diff);
+        }
+    };
+
+
+    double theta;
+    SMPL_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
+    theta = atan2(nearest.y(), nearest.x());
+
+    // clamp to the boundaries for the hinge, theta is now the angle
+    // the handle
+    theta = std::max(theta, -0.5 * M_PI + GetHandleRotationOffset());
+    theta = std::min(theta, 0.25 * M_PI + GetHandleRotationOffset());
+
+    theta -= GetHandleRotationOffset();
+    theta += 0.5 * M_PI;
+
+    SMPL_INFO("  theta adjusted = %f", theta);
+
+    SetVariablePosition(state, GetVariable(GetRobotModel(state), "door_joint"), theta);
+    return true;
+}
+
+auto ConvertMarkersToMarkersMsg(const std::vector<sbpl::visual::Marker>& markers)
+    -> visualization_msgs::MarkerArray
+{
+    visualization_msgs::MarkerArray ma;
+    ma.markers.reserve(markers.size());
+    for (auto& marker : markers) {
+        visualization_msgs::Marker m;
+        ConvertMarkerToMarkerMsg(marker, m);
+        ma.markers.push_back(std::move(m));
+    }
+    return ma;
+}
+
 int main(int argc, char* argv[])
 {
+    ros::init(argc, argv, "door_demonstrator", ros::init_options::AnonymousName);
+    ros::NodeHandle nh;
+    ros::NodeHandle ph("~");
+
     ////////////////
     // Parameters //
     ////////////////
 
-    auto group_name = "right_arm_torso_base";
-    auto demo_filename = "cabinet_demo.csv";
-    auto tip_link = "limb_right_tool0";
+    std::string group_name;
+    std::string demo_filename;
+    std::string tip_link;
+    std::string object_tip_link_name;
+    std::string object_description;
+    double contact_error_z;
+    double contact_error;
 
-    auto right_arm = true;
+    if (!GetParam(ph, "group_name", group_name)) return 1;
+    if (!GetParam(ph, "demo_filename", demo_filename)) return 1;
+    if (!GetParam(ph, "robot_tip_link", tip_link)) return 1;
+    if (!GetParam(ph, "object_tip_link", object_tip_link_name)) return 1;
+    if (!GetParam(nh, "object_description", object_description)) return 1;
+    if (!GetParam(ph, "contact_error_z", contact_error_z)) return 1;
+    if (!GetParam(ph, "contact_error", contact_error)) return 1;
 
-    CabinetModel cabinet;
-    cabinet.right = right_arm;
-    cabinet.width = 0.50;
-    cabinet.height = 0.80;
-    cabinet.depth = 0.50;
-    cabinet.thickness = 0.02;
-    cabinet.handle_offset_y = 0.4 * cabinet.width;
-    cabinet.handle_offset_x = 0.08;
-    cabinet.handle_height = 0.20;
-    cabinet.handle_radius = 0.01;
-
-    auto contact_error_z = 0.5 * cabinet.handle_height;
-    auto contact_error = 0.03;
+    // initialize object pose
+    Eigen::Affine3d object_pose;
+    {
+        double ox, oy, oz, oyaw, opitch, oroll;
+        if (!GetParam(ph, "object_x", ox)) return 1;
+        if (!GetParam(ph, "object_y", oy)) return 1;
+        if (!GetParam(ph, "object_z", oz)) return 1;
+        if (!GetParam(ph, "object_yaw", oyaw)) return 1;
+        if (!GetParam(ph, "object_pitch", opitch)) return 1;
+        if (!GetParam(ph, "object_roll", oroll)) return 1;
+        object_pose =
+                Eigen::Translation3d(ox, oy, oz) *
+                Eigen::AngleAxisd(oyaw, Eigen::Vector3d::UnitZ()) *
+                Eigen::AngleAxisd(opitch, Eigen::Vector3d::UnitY()) *
+                Eigen::AngleAxisd(oroll, Eigen::Vector3d::UnitX());
+    }
 
     ///////////////
     // Arguments //
     ///////////////
 
-    ros::init(argc, argv, "door_demonstrator", ros::init_options::AnonymousName);
-    ros::NodeHandle nh;
+    printf("Usage: door_demonstrator [record] [record_object]\n");
 
-    printf("Usage: door_demonstrator [cabinet_id] [record] [record_object]\n");
-    ROS_INFO("argc: %d", argc);
+    auto record = argc > 1 ? true : false;
+    auto record_object = argc > 2 ? true: false;
 
-    auto cabinet_id = (argc > 1) ? atoi(argv[1]) : 0;
-    auto record = argc > 2 ? true : false;
-    auto record_object = argc > 3 ? true: false;
-
-    ROS_INFO("Cabinet ID: %d", cabinet_id);
-    ROS_INFO("Record: %s", record ? "true" : "false");
-    ROS_INFO("Record Object: %s", record_object ? "true" : "false");
+    SMPL_INFO("Record: %s", record ? "true" : "false");
+    SMPL_INFO("Record Object: %s", record_object ? "true" : "false");
 
     ////////////////////
     // Initialization //
     ////////////////////
 
-    // initialize cabinet pose based on id...
-    Eigen::Affine3d cabinet_pose;
-    switch (cabinet_id) {
-    case 0:
-        cabinet_pose =
-                Eigen::Translation3d(2.0, 0.0, 0.5 * cabinet.height) *
-                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-        break;
-    case 1:
-        cabinet_pose =
-                Eigen::Translation3d(2.0, -1.0, 0.5 * cabinet.height) *
-                Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitZ());
-        break;
-    case 2:
-        cabinet_pose =
-                Eigen::Translation3d(1.0, 2.0, 0.5 * cabinet.height) *
-                Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
-        break;
-    default:
-        return 1;
-    }
-
     // initialize robot model...
     robot_model_loader::RobotModelLoader loader;
     auto model = loader.getModel();
 
+    // initialize object model...
+    auto object_urdf = urdf::parseURDF(object_description);
+    if (!object_urdf) {
+        SMPL_ERROR("Failed to parse object URDF");
+        return 1;
+    }
+
+    smpl::urdf::RobotModel object_model;
+    if (!InitRobotModel(&object_model, object_urdf.get())) {
+        SMPL_ERROR("Failed to initialize object model");
+        return 1;
+    }
+
     // initialize robot state...
     moveit::core::RobotState robot_state(model);
+    robot_state.setToDefaultValues();
 
-    // initialize joint group...
+    // initialize object state...
+    smpl::urdf::RobotState object_state;
+    if (!Init(&object_state, &object_model)) {
+        SMPL_ERROR("Failed to initialize object state");
+        return 1;
+    }
+    SetToDefaultValues(&object_state);
+    UpdateTransforms(&object_state);
+
+    {
+        double world_joint_state[7];
+        world_joint_state[0] = object_pose.translation().x();
+        world_joint_state[1] = object_pose.translation().y();
+        world_joint_state[2] = object_pose.translation().z();
+        Eigen::Quaterniond q(object_pose.rotation());
+        world_joint_state[3] = q.x();
+        world_joint_state[4] = q.y();
+        world_joint_state[5] = q.z();
+        world_joint_state[6] = q.w();
+        SetJointPositions(&object_state, GetRootJoint(&object_model), world_joint_state);
+    }
+
+    // initialize demonstration joint group...
     if (!model->hasJointModelGroup(group_name)) {
-        ROS_ERROR("Demonstration group '%s' does not exist in the robot model", group_name);
+        SMPL_ERROR("Demonstration group '%s' does not exist in the robot model", group_name.c_str());
         return 1;
     }
 
     auto* demo_group = model->getJointModelGroup(group_name);
 
+    // initialize object tip...
+    auto* object_tip_link = GetLink(&object_model, object_tip_link_name.c_str());
+    if (object_tip_link == NULL) {
+        SMPL_ERROR("Tip link '%s' not found in object model", object_tip_link_name.c_str());
+        return 1;
+    }
+
     // initialize the demonstration recording...
     FILE* fdemo = NULL;
     if (record) {
-        fdemo = fopen(demo_filename, "w");
+        fdemo = fopen(demo_filename.c_str(), "w");
         if (!fdemo) {
-            ROS_ERROR("Failed to open '%s' for writing", demo_filename);
+            SMPL_ERROR("Failed to open '%s' for writing", demo_filename.c_str());
             return 1;
         }
 
@@ -332,17 +513,19 @@ int main(int argc, char* argv[])
 
     // close the demonstration file when we kill the program...
     DEFER(
-        if (record && fdemo != NULL) {
+        if (fdemo != NULL) {
             fclose(fdemo);
             fdemo = NULL;
         }
     );
 
-    // state variables...
-    auto prev_door_pos = GetHingeDefaultPosition(&cabinet);
-    auto door_pos = GetHingeDefaultPosition(&cabinet);
-//    auto door_pos = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
+    // initialize object state variables...
+    std::vector<double> prev_object_state(
+            GetVariablePositions(&object_state),
+            GetVariablePositions(&object_state) + GetVariableCount(&object_model));
+    auto curr_object_state = prev_object_state;
 
+    // initialize contact state...
     auto contacted = false; // ever came into contact?
     auto contact = false;   // in contact at the last frame
 
@@ -395,21 +578,28 @@ int main(int argc, char* argv[])
     // demonstration loop //
     ////////////////////////
 
-    auto t = 0.0;
     ros::Rate loop_rate(30.0);
     while (ros::ok()) {
         ros::spinOnce();
-//        t += 1.0 / 30.0;
+
+        DEFER(state_received = false);
 
         // 0 to 3*pi/4
-        auto amplitude = 0.5 * GetHingeSpan(&cabinet);
-        auto median = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
+//        auto amplitude = 0.5 * GetHingeSpan(&cabinet);
+//        auto median = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
 
-//        door_pos += (amplitude * std::cos(t)) / 30.0;
+        if (!std::equal(
+                begin(prev_object_state),
+                end(prev_object_state),
+                begin(curr_object_state)))
+        {
+            SMPL_INFO_STREAM("object state = " << curr_object_state);
+            prev_object_state = curr_object_state;
+        }
 
-        if (door_pos != prev_door_pos) {
-            ROS_INFO("door position = %f", sbpl::angles::to_degrees(door_pos));
-            prev_door_pos = door_pos;
+
+        if (state_received) {
+            moveit::core::robotStateMsgToRobotState(*curr_robot_state, robot_state);
         }
 
         ////////////////////////////////////////////////////////////////
@@ -419,9 +609,6 @@ int main(int argc, char* argv[])
         auto robot_moved = state_received;
         if (robot_moved && record) {
             assert(curr_robot_state && "State shouldn't be null if we received it");
-            // TODO we should probably just always do this when a state is received to avoid
-            // doing it over and over again
-            moveit::core::robotStateMsgToRobotState(*curr_robot_state, robot_state);
 
             std::vector<double> group_state;
             robot_state.copyJointGroupPositions(demo_group, group_state);
@@ -440,32 +627,36 @@ int main(int argc, char* argv[])
                 }
             }
             if (record_object) {
-                fprintf(fdemo, "%f\n", door_pos);
+                for (auto i = 0; i < curr_object_state.size(); ++i) {
+                    fprintf(fdemo, "%f", curr_object_state[i]);
+                    if (i != curr_object_state.size() - 1) {
+                        fprintf(fdemo, ",");
+                    }
+                }
             }
         }
-        state_received = false;
 
-        //////////////////////////////////////////////////////////
-        // check for contact with the door in the current state //
-        //////////////////////////////////////////////////////////
+        //////////////////////////
+        // update contact state //
+        //////////////////////////
 
-        auto handle_pose = cabinet_pose * GetHandlePose(&cabinet, door_pos);
-        ROS_DEBUG("  handle @ (%f, %f, %f)",
-                handle_pose.translation().x(),
-                handle_pose.translation().y(),
-                handle_pose.translation().z());
+        UpdateLinkTransform(&object_state, object_tip_link);
+        auto* handle_pose = GetLinkTransform(&object_state, object_tip_link);
+        SMPL_DEBUG("  handle @ (%f, %f, %f)",
+                handle_pose->translation().x(),
+                handle_pose->translation().y(),
+                handle_pose->translation().z());
 
         contact = false;
         Eigen::Affine3d curr_tool_pose;
         if (curr_robot_state) {
-            moveit::core::robotStateMsgToRobotState(*curr_robot_state, robot_state);
             curr_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
-            ROS_DEBUG("  curr tool @ (%f, %f, %f)",
+            SMPL_DEBUG("  curr tool @ (%f, %f, %f)",
                     curr_tool_pose.translation().x(),
                     curr_tool_pose.translation().y(),
                     curr_tool_pose.translation().z());
 
-            Eigen::Vector3d dp = curr_tool_pose.translation() - handle_pose.translation();
+            Eigen::Vector3d dp = curr_tool_pose.translation() - handle_pose->translation();
             if (std::fabs(dp.z()) < contact_error_z &&
                 dp.x() * dp.x() + dp.y() * dp.y() < contact_error * contact_error)
             {
@@ -483,70 +674,36 @@ int main(int argc, char* argv[])
             marker_pub.publish(ma);
         }
 
-        ///////////////////////////////////////////////////////
-        // update door pose to follow the robot's tool frame //
-        ///////////////////////////////////////////////////////
+        /////////////////////////////////
+        // update object state from ik //
+        /////////////////////////////////
 
-        if (true || contact) {
-            // T_world_hinge, rotated so x is to the cabinet's left and y is to
-            // the cabinet's back
-            Eigen::Affine3d hinge_frame =
-                    cabinet_pose *              // T_world_cabinet
-                    GetHingeOrigin(&cabinet);// *  // T_cabinet_hinge
-//                    Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ());
-
-            // T_hinge_world * T_world_tool
-            Eigen::Affine3d tool_in_hinge = hinge_frame.inverse() * curr_tool_pose;
-
-            ROS_INFO("tool position (hinge frame) = (%f, %f, %f)",
-                    tool_in_hinge.translation().x(),
-                    tool_in_hinge.translation().y(),
-                    tool_in_hinge.translation().z());
-
-            auto radius = GetHandleRotationRadius(&cabinet);
-
-            // closest point on the circle mapped by the handle radius
-            Eigen::Vector3d nearest = radius * tool_in_hinge.translation().normalized();
-
-            auto ccw_dist = [](double ai, double af)
-            {
-                auto diff = sbpl::angles::shortest_angle_diff(af, ai);
-                if (diff >= 0.0) {
-                    return diff;
-                } else {
-                    return 2.0 * M_PI - std::fabs(diff);
+        if (curr_robot_state || contact) {
+            if (object_urdf->getName() == "cabinet") {
+                if (!SetCabinetFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
+//                    SMPL_WARN("Failed to set cabinet from IK");
                 }
-            };
-
-            double theta;
-            if (right_arm) {
-                ROS_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
-                theta = atan2(nearest.y(), nearest.x());// - GetHandleRotationOffset(&cabinet);
-
-                // clamp to the boundaries for the hinge, theta is now the angle
-                // the handle
-                theta = std::max(theta, -0.5 * M_PI + GetHandleRotationOffset(&cabinet));
-                theta = std::min(theta, 0.25 * M_PI + GetHandleRotationOffset(&cabinet));
-
-                theta -= GetHandleRotationOffset(&cabinet);
-                theta += 0.5 * M_PI;
-
-                ROS_INFO("  theta adjusted = %f", theta);
-            } else {
-                theta = atan2(nearest.y(), nearest.x()) + GetHandleRotationOffset(&cabinet);
             }
-
-            door_pos = theta;
         }
 
-        /////////////////////////////////////////////
-        // visualize the cabinet and contact state //
-        /////////////////////////////////////////////
+        //////////////////////////
+        // visualize the object //
+        //////////////////////////
 
-        auto markers = MakeCabinetMarkers(&cabinet, door_pos, &cabinet_pose, "cabinet", contact);
-        for (auto& marker : markers.markers) {
-            marker.id += cabinet_id * markers.markers.size();
-        }
+        UpdateCollisionBodyTransforms(&object_state);
+        UpdateVisualBodyTransforms(&object_state);
+#if 1
+        auto markers = ConvertMarkersToMarkersMsg(MakeContactVisualization(
+                &object_state, object_tip_link, "map", "cabinet", contact));
+#else
+        auto markers = ConvertMarkersToMarkersMsg(MakeCollisionVisualization(
+                    &object_state,
+                    sbpl::visual::Color{ 0.8f, 0.8f, 0.8f, 1.0f },
+                    "map",
+                    "cabinet"));
+#endif
+
+        // TODO: anonymize ids to allow visualizations from multiple anonymous nodes
 
         marker_pub.publish(markers);
         loop_rate.sleep();

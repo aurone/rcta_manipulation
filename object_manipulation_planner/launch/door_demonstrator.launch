@@ -1,0 +1,43 @@
+<launch>
+    <arg name="debug" default="false"/>
+
+    <arg if="$(arg debug)" name="launch_prefix" value="valgrind --track-origins=yes"/>
+    <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+
+    <include file="$(find object_manipulation_planner)/launch/object_manip_planner_params.launch"/>
+    <node name="$(anon door_demonstrator)" pkg="object_manipulation_planner" type="door_demonstrator" launch-prefix="$(arg launch_prefix)">
+        <remap from="robot_state" to="command_robot_state"/>
+
+        <param name="contact_error_z" value="0.10"/> <!-- handle height / 2 -->
+        <param name="contact_error" value="0.03"/>
+        <param name="object_tip_link" value="handle"/>
+        <param name="robot_tip_link" value="limb_right_tool0"/>
+        <param name="demo_filename" value="cabinet_demo.csv"/>
+        <param name="group_name" value="right_arm_torso_base"/>
+
+        <param name="object_x" value="2.0"/>
+        <param name="object_y" value="0.0"/>
+        <param name="object_z" value="0.4"/>
+        <param name="object_yaw" value="3.1415926"/>
+        <param name="object_pitch" value="0.0"/>
+        <param name="object_roll" value="0.0"/>
+
+        <!--
+        <param name="object_x" value="2.0"/>
+        <param name="object_y" value="-1.0"/>
+        <param name="object_z" value="0.4"/>
+        <param name="object_yaw" value="3.1415926"/>
+        <param name="object_pitch" value="0.0"/>
+        <param name="object_roll" value="0.0"/>
+        -->
+
+        <!--
+        <param name="object_x" value="1.0"/>
+        <param name="object_y" value="2.0"/>
+        <param name="object_z" value="0.4"/>
+        <param name="object_yaw" value="-1.570796"/>
+        <param name="object_pitch" value="0.0"/>
+        <param name="object_roll" value="0.0"/>
+        -->
+    </node>
+</launch>

@@ -93,6 +93,13 @@ auto GetHandleGeometryPose(CabinetModel* model, double pos) -> Eigen::Affine3d;
 auto GetHandleLowerGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d;
 auto GetHandleUpperGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d;
 
+auto GetHandleGeometryRadius(CabinetModel* model) -> double;
+auto GetHandleGeometryHeight(CabinetModel* model) -> double;
+auto GetHandleLowerGeometryRadius(CabinetModel* model) -> double;
+auto GetHandleUpperGeometryRadius(CabinetModel* model) -> double;
+auto GetHandleLowerGeometryHeight(CabinetModel* model) -> double;
+auto GetHandleUpperGeometryHeight(CabinetModel* model) -> double;
+
 // handle geometry transforms (global)
 auto GetHandleLowerGeometryPose(CabinetModel* model, double pos) -> Eigen::Affine3d;
 auto GetHandleUpperGeometryPose(CabinetModel* model, double pos) -> Eigen::Affine3d;

@@ -1,0 +1,129 @@
+<?xml version="1.0"?>
+<robot name="cabinet" xmlns:xacro="http://ros.org/wiki/xacro">
+    <link name="base_link">
+        <visual>
+            <origin xyz="0.000000 0.000000 -0.390000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.500000 0.020000"/>
+            </geometry>
+        </visual>
+        <visual>
+            <origin xyz="0.000000 0.000000 0.390000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.500000 0.020000"/>
+            </geometry>
+        </visual>
+        <visual>
+            <origin xyz="0.000000 -0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.020000 0.760000"/>
+            </geometry>
+        </visual>
+        <visual>
+            <origin xyz="0.000000 0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.020000 0.760000"/>
+            </geometry>
+        </visual>
+        <visual>
+            <origin xyz="-0.260000 0.000000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.020000 0.500000 0.800000"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0.000000 0.000000 -0.390000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.500000 0.020000"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0.000000 0.000000 0.390000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.500000 0.020000"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0.000000 -0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.020000 0.760000"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0.000000 0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.500000 0.020000 0.760000"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="-0.260000 0.000000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.020000 0.500000 0.800000"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="door_joint" type="revolute">
+        <parent link="base_link"/>
+        <child link="door"/>
+        <origin xyz="0.260000 0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+        <axis xyz="0.000000 0.000000 1.000000"/>
+        <limit lower="0.000000" upper="2.356194" velocity="0" effort="0"/>
+    </joint>
+    <link name="door">
+        <visual>
+            <origin xyz="0.000000 -0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.020000 0.500000 0.800000"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0.000000 -0.240000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <box size="0.020000 0.500000 0.800000"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="handle_joint" type="fixed">
+        <parent link="door"/>
+        <child link="handle"/>
+        <origin xyz="0.100000 -0.440000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+    </joint>
+    <link name="handle">
+        <visual>
+            <origin xyz="0.000000 0.000000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <cylinder radius="0.010000" length="0.200000"/>
+            </geometry>
+        </visual>
+        <visual>
+            <origin xyz="-0.050000 0.000000 -0.090000" rpy="-0.000000 1.570796 0.000000"/>
+            <geometry>
+                <cylinder radius="0.010000" length="0.100000"/>
+            </geometry>
+        </visual>
+        <visual>
+            <origin xyz="-0.050000 0.000000 0.110000" rpy="-0.000000 1.570796 0.000000"/>
+            <geometry>
+                <cylinder radius="0.010000" length="0.100000"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0.000000 0.000000 0.000000" rpy="-0.000000 0.000000 -0.000000"/>
+            <geometry>
+                <cylinder radius="0.010000" length="0.200000"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="-0.050000 0.000000 -0.090000" rpy="-0.000000 1.570796 0.000000"/>
+            <geometry>
+                <cylinder radius="0.010000" length="0.100000"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="-0.050000 0.000000 0.110000" rpy="-0.000000 1.570796 0.000000"/>
+            <geometry>
+                <cylinder radius="0.010000" length="0.100000"/>
+            </geometry>
+        </collision>
+    </link>
+</robot>

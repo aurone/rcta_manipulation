@@ -1,0 +1,3 @@
+<launch>
+    <param name="object_description" textfile="$(find object_manipulation_planner)/urdf/cabinet.urdf"/>
+</launch>

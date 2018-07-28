@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
     cabinet.height = 0.80;
     cabinet.depth = 0.50;
     cabinet.thickness = 0.02;
-    cabinet.handle_offset_y = -0.5 * cabinet.width;
+    cabinet.handle_offset_y = 0.4 * cabinet.width;
     cabinet.handle_offset_x = 0.08;
     cabinet.handle_height = 0.20;
     cabinet.handle_radius = 0.01;
@@ -29,9 +29,9 @@ int main(int argc, char* argv[])
     ++depth;
     auto print_depth = [&]() { fprintf(f, "%*s", 4 * depth, ""); };
 
-    auto print_box_visual = [&](const Eigen::Affine3d& origin, const Eigen::Vector3d& size) {
+    auto print_box_geometry = [&](const Eigen::Affine3d& origin, const Eigen::Vector3d& size)
+    {
         Eigen::Vector3d rpy = origin.rotation().eulerAngles(0, 1, 2);
-        print_depth(); fprintf(f, "<visual>\n");
         ++depth;
         print_depth(); fprintf(f, "<origin xyz=\"%f %f %f\" rpy=\"%f %f %f\"/>\n", origin.translation().x(), origin.translation().y(), origin.translation().z(), rpy.x(), rpy.y(), rpy.z());
         print_depth(); fprintf(f, "<geometry>\n");
@@ -40,20 +40,44 @@ int main(int argc, char* argv[])
         --depth;
         print_depth(); fprintf(f, "</geometry>\n");
         --depth;
+    };
+
+    auto print_cylinder_geometry = [&](const Eigen::Affine3d& origin, double radius, double height)
+    {
+        Eigen::Vector3d rpy = origin.rotation().eulerAngles(0, 1, 2);
+        ++depth;
+        print_depth(); fprintf(f, "<origin xyz=\"%f %f %f\" rpy=\"%f %f %f\"/>\n", origin.translation().x(), origin.translation().y(), origin.translation().z(), rpy.x(), rpy.y(), rpy.z());
+        print_depth(); fprintf(f, "<geometry>\n");
+        ++depth;
+        print_depth(); fprintf(f, "<cylinder radius=\"%f\" length=\"%f\"/>\n", radius, height);
+        --depth;
+        print_depth(); fprintf(f, "</geometry>\n");
+        --depth;
+    };
+
+    auto print_box_visual = [&](const Eigen::Affine3d& origin, const Eigen::Vector3d& size) {
+        print_depth(); fprintf(f, "<visual>\n");
+        print_box_geometry(origin, size);
+        print_depth(); fprintf(f, "</visual>\n");
+    };
+
+    auto print_cylinder_visual = [&](const Eigen::Affine3d& origin, double radius, double height)
+    {
+        print_depth(); fprintf(f, "<visual>\n");
+        print_cylinder_geometry(origin, radius, height);
         print_depth(); fprintf(f, "</visual>\n");
     };
 
     auto print_box_collision = [&](const Eigen::Affine3d& origin, const Eigen::Vector3d& size) {
-        Eigen::Vector3d rpy = origin.rotation().eulerAngles(0, 1, 2);
         print_depth(); fprintf(f, "<collision>\n");
-        ++depth;
-        print_depth(); fprintf(f, "<origin xyz=\"%f %f %f\" rpy=\"%f %f %f\"/>\n", origin.translation().x(), origin.translation().y(), origin.translation().z(), rpy.x(), rpy.y(), rpy.z());
-        print_depth(); fprintf(f, "<geometry>\n");
-        ++depth;
-        print_depth(); fprintf(f, "<box size=\"%f %f %f\"/>\n", size.x(), size.y(), size.z());
-        --depth;
-        print_depth(); fprintf(f, "</geometry>\n");
-        --depth;
+        print_box_geometry(origin, size);
+        print_depth(); fprintf(f, "</collision>\n");
+    };
+
+    auto print_cylinder_collision = [&](const Eigen::Affine3d& origin, double radius, double height)
+    {
+        print_depth(); fprintf(f, "<collision>\n");
+        print_cylinder_geometry(origin, radius, height);
         print_depth(); fprintf(f, "</collision>\n");
     };
 
@@ -96,7 +120,7 @@ int main(int argc, char* argv[])
     auto T_J1 = GetHandleOrigin(&cabinet);
     auto T_J1_rpy = T_J1.rotation().eulerAngles(0, 1, 2);
 
-    print_depth(); fprintf(f, "<joint name=\"handle_joint\" type=\"fixed\"/>\n");
+    print_depth(); fprintf(f, "<joint name=\"handle_joint\" type=\"fixed\">\n");
     ++depth;
     print_depth(); fprintf(f, "<parent link=\"door\"/>\n");
     print_depth(); fprintf(f, "<child link=\"handle\"/>\n");
@@ -106,12 +130,12 @@ int main(int argc, char* argv[])
 
     print_depth(); fprintf(f, "<link name=\"handle\">\n");
     ++depth;
-    print_box_visual(GetHandleGeometryOrigin(&cabinet), Eigen::Vector3d::Zero());
-    print_box_visual(GetHandleLowerGeometryOrigin(&cabinet), Eigen::Vector3d::Zero());
-    print_box_visual(GetHandleUpperGeometryOrigin(&cabinet), Eigen::Vector3d::Zero());
-    print_box_collision(GetHandleGeometryOrigin(&cabinet), Eigen::Vector3d::Zero());
-    print_box_collision(GetHandleLowerGeometryOrigin(&cabinet), Eigen::Vector3d::Zero());
-    print_box_collision(GetHandleUpperGeometryOrigin(&cabinet), Eigen::Vector3d::Zero());
+    print_cylinder_visual(GetHandleGeometryOrigin(&cabinet), GetHandleGeometryRadius(&cabinet), GetHandleGeometryHeight(&cabinet));
+    print_cylinder_visual(GetHandleLowerGeometryOrigin(&cabinet), GetHandleLowerGeometryRadius(&cabinet), GetHandleLowerGeometryHeight(&cabinet));
+    print_cylinder_visual(GetHandleUpperGeometryOrigin(&cabinet), GetHandleUpperGeometryRadius(&cabinet), GetHandleUpperGeometryHeight(&cabinet));
+    print_cylinder_collision(GetHandleGeometryOrigin(&cabinet), GetHandleGeometryRadius(&cabinet), GetHandleGeometryHeight(&cabinet));
+    print_cylinder_collision(GetHandleLowerGeometryOrigin(&cabinet), GetHandleLowerGeometryRadius(&cabinet), GetHandleLowerGeometryHeight(&cabinet));
+    print_cylinder_collision(GetHandleUpperGeometryOrigin(&cabinet), GetHandleUpperGeometryRadius(&cabinet), GetHandleUpperGeometryHeight(&cabinet));
     --depth;
     print_depth(); fprintf(f, "</link>\n");
 

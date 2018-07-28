@@ -222,6 +222,36 @@ auto GetHandleLowerGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
             0.0);
 }
 
+auto GetHandleGeometryRadius(CabinetModel* model) -> double
+{
+    return model->handle_radius;
+}
+
+auto GetHandleGeometryHeight(CabinetModel* model) -> double
+{
+    return model->handle_height;
+}
+
+auto GetHandleLowerGeometryRadius(CabinetModel* model) -> double
+{
+    return model->handle_radius;
+}
+
+auto GetHandleUpperGeometryRadius(CabinetModel* model) -> double
+{
+    return model->handle_radius;
+}
+
+auto GetHandleLowerGeometryHeight(CabinetModel* model) -> double
+{
+    return model->handle_offset_x + 2.0 * model->handle_radius;
+}
+
+auto GetHandleUpperGeometryHeight(CabinetModel* model) -> double
+{
+    return model->handle_offset_x + 2.0 * model->handle_radius;
+}
+
 auto GetHandleUpperGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
     return MakeAffine3d(

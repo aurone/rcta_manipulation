@@ -19,7 +19,10 @@ find_package(
         roscpp
         sbpl_collision_checking
         smpl
+        smpl_urdf_robot_model
         smpl_ros)
+
+find_package(urdfdom REQUIRED)
 
 catkin_package()
 
@@ -44,12 +47,16 @@ target_link_libraries(
 add_executable(door_demonstrator src/door_demonstrator.cpp src/cabinet_model.cpp)
 target_include_directories(door_demonstrator PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})
 target_include_directories(door_demonstrator PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
+target_include_directories(door_demonstrator PUBLIC SYSTEM ${urdfdom_INCLUDE_DIRS})
+target_include_directories(door_demonstrator PUBLIC SYSTEM ${smpl_urdf_robot_model_INCLUDE_DIRS})
 target_link_libraries(door_demonstrator ${roscpp_LIBRARIES})
 target_link_libraries(door_demonstrator ${eigen_conversions_LIBRARIES})
 target_link_libraries(door_demonstrator ${moveit_core_LIBRARIES})
 target_link_libraries(door_demonstrator ${moveit_ros_planning_LIBRARIES})
 target_link_libraries(door_demonstrator ${smpl_LIBRARIES})
 target_link_libraries(door_demonstrator ${smpl_ros_LIBRARIES})
+target_link_libraries(door_demonstrator ${smpl_urdf_robot_model_LIBRARIES})
+target_link_libraries(door_demonstrator ${urdfdom_LIBRARIES})
 
 add_executable(translate_demo src/translate_demo.cpp)
 target_include_directories(translate_demo PUBLIC SYSTEM ${smpl_INCLUDE_DIRS})
