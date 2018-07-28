@@ -14,6 +14,8 @@
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/GetStateValidity.h>
 #include <smpl/angles.h>
+#include <smpl/debug/marker_utils.h>
+#include <smpl/debug/marker_conversions.h>
 
 // project includes
 #include "cabinet_model.h"
@@ -228,16 +230,12 @@ int main(int argc, char* argv[])
     auto right_arm = true;
 
     CabinetModel cabinet;
-    cabinet.right = true;
+    cabinet.right = right_arm;
     cabinet.width = 0.50;
     cabinet.height = 0.80;
     cabinet.depth = 0.50;
     cabinet.thickness = 0.02;
-    if (right_arm) {
-        cabinet.handle_offset_y = -0.4 * cabinet.width;
-    } else {
-        cabinet.handle_offset_y = 0.4 * cabinet.width;
-    }
+    cabinet.handle_offset_y = 0.4 * cabinet.width;
     cabinet.handle_offset_x = 0.08;
     cabinet.handle_height = 0.20;
     cabinet.handle_radius = 0.01;
@@ -342,8 +340,8 @@ int main(int argc, char* argv[])
 
     // state variables...
     auto prev_door_pos = GetHingeDefaultPosition(&cabinet);
-//    auto door_pos = GetHingeDefaultPosition(&cabinet);
-    auto door_pos = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
+    auto door_pos = GetHingeDefaultPosition(&cabinet);
+//    auto door_pos = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
 
     auto contacted = false; // ever came into contact?
     auto contact = false;   // in contact at the last frame
@@ -401,13 +399,13 @@ int main(int argc, char* argv[])
     ros::Rate loop_rate(30.0);
     while (ros::ok()) {
         ros::spinOnce();
-        t += 1.0 / 30.0;
+//        t += 1.0 / 30.0;
 
         // 0 to 3*pi/4
         auto amplitude = 0.5 * GetHingeSpan(&cabinet);
         auto median = 0.5 * (GetHingeLowerLimit(&cabinet) + GetHingeUpperLimit(&cabinet));
 
-        door_pos += (amplitude * std::cos(t)) / 30.0;
+//        door_pos += (amplitude * std::cos(t)) / 30.0;
 
         if (door_pos != prev_door_pos) {
             ROS_INFO("door position = %f", sbpl::angles::to_degrees(door_pos));
@@ -474,19 +472,28 @@ int main(int argc, char* argv[])
                 contact = true;
                 contacted = true; // never reset to false
             }
+
+            auto markers = sbpl::visual::MakeFrameMarkers(curr_tool_pose, "map", "tool");
+            visualization_msgs::MarkerArray ma;
+            for (auto& marker : markers) {
+                visualization_msgs::Marker m;
+                ConvertMarkerToMarkerMsg(marker, m);
+                ma.markers.push_back(std::move(m));
+            }
+            marker_pub.publish(ma);
         }
 
         ///////////////////////////////////////////////////////
         // update door pose to follow the robot's tool frame //
         ///////////////////////////////////////////////////////
 
-        if (contact) {
+        if (true || contact) {
             // T_world_hinge, rotated so x is to the cabinet's left and y is to
             // the cabinet's back
             Eigen::Affine3d hinge_frame =
                     cabinet_pose *              // T_world_cabinet
-                    GetHingeOrigin(&cabinet) *  // T_cabinet_hinge
-                    Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ());
+                    GetHingeOrigin(&cabinet);// *  // T_cabinet_hinge
+//                    Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ());
 
             // T_hinge_world * T_world_tool
             Eigen::Affine3d tool_in_hinge = hinge_frame.inverse() * curr_tool_pose;
@@ -498,6 +505,7 @@ int main(int argc, char* argv[])
 
             auto radius = GetHandleRotationRadius(&cabinet);
 
+            // closest point on the circle mapped by the handle radius
             Eigen::Vector3d nearest = radius * tool_in_hinge.translation().normalized();
 
             auto ccw_dist = [](double ai, double af)
@@ -513,23 +521,22 @@ int main(int argc, char* argv[])
             double theta;
             if (right_arm) {
                 ROS_INFO("  theta = %f", atan2(nearest.y(), nearest.x()));
-                theta = atan2(nearest.y(), nearest.x()) - GetHandleRotationOffset(&cabinet);
-                ROS_INFO("  theta adjusted = %f", theta);
+                theta = atan2(nearest.y(), nearest.x());// - GetHandleRotationOffset(&cabinet);
 
-                if (theta <= M_PI && theta >= -0.25 * M_PI) {
-                    if (sbpl::angles::shortest_angle_dist(-M_PI, theta) <
-                        sbpl::angles::shortest_angle_dist(-0.25 * M_PI, theta))
-                    {
-                        theta = 0.0;
-                    } else {
-                        theta = 0.75 * M_PI;
-                    }
-                } else {
-                    theta = ccw_dist(-M_PI, theta);
-                }
+                // clamp to the boundaries for the hinge, theta is now the angle
+                // the handle
+                theta = std::max(theta, -0.5 * M_PI + GetHandleRotationOffset(&cabinet));
+                theta = std::min(theta, 0.25 * M_PI + GetHandleRotationOffset(&cabinet));
+
+                theta -= GetHandleRotationOffset(&cabinet);
+                theta += 0.5 * M_PI;
+
+                ROS_INFO("  theta adjusted = %f", theta);
             } else {
                 theta = atan2(nearest.y(), nearest.x()) + GetHandleRotationOffset(&cabinet);
             }
+
+            door_pos = theta;
         }
 
         /////////////////////////////////////////////

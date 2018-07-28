@@ -1,28 +1,40 @@
 #include "cabinet_model.h"
 
+static
+auto MakeAffine3d(
+    double x, double y, double z,
+    double Y = 0.0, double P = 0.0, double R = 0.0)
+    -> Eigen::Affine3d
+{
+    return Eigen::Translation3d(x, y, z) *
+            Eigen::AngleAxisd(Y, Eigen::Vector3d::UnitZ()) *
+            Eigen::AngleAxisd(P, Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(R, Eigen::Vector3d::UnitX());
+}
+
 auto GetCabinetTopGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(Eigen::Translation3d(0.0, 0.0, 0.5 * model->height - 0.5 * model->thickness));
+    return MakeAffine3d(0.0, 0.0, 0.5 * model->height - 0.5 * model->thickness);
 }
 
 auto GetCabinetBottomGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(Eigen::Translation3d(0.0, 0.0, -0.5 * model->height + 0.5 * model->thickness));
+    return MakeAffine3d(0.0, 0.0, -0.5 * model->height + 0.5 * model->thickness);
 }
 
 auto GetCabinetLeftGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(Eigen::Translation3d(0.0, -0.5 * model->width + 0.5 * model->thickness, 0.0));
+    return MakeAffine3d(0.0, -0.5 * model->width + 0.5 * model->thickness, 0.0);
 }
 
 auto GetCabinetRightGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(Eigen::Translation3d(0.0, 0.5 * model->width - 0.5 * model->thickness, 0.0));
+    return MakeAffine3d(0.0, 0.5 * model->width - 0.5 * model->thickness, 0.0);
 }
 
 auto GetCabinetBackGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(Eigen::Translation3d(-0.5 * model->depth - 0.5 * model->thickness, 0.0, 0.0));
+    return MakeAffine3d(-0.5 * model->depth - 0.5 * model->thickness, 0.0, 0.0);
 }
 
 auto GetCabinetTopGeometrySize(CabinetModel* model) -> Eigen::Vector3d
@@ -37,12 +49,18 @@ auto GetCabinetBottomGeometrySize(CabinetModel* model) -> Eigen::Vector3d
 
 auto GetCabinetLeftGeometrySize(CabinetModel* model) -> Eigen::Vector3d
 {
-    return Eigen::Vector3d(model->depth, model->thickness, model->height - 2.0 * model->thickness);
+    return Eigen::Vector3d(
+            model->depth,
+            model->thickness,
+            model->height - 2.0 * model->thickness);
 }
 
 auto GetCabinetRightGeometrySize(CabinetModel* model) -> Eigen::Vector3d
 {
-    return Eigen::Vector3d(model->depth, model->thickness, model->height - 2.0 * model->thickness);
+    return Eigen::Vector3d(
+            model->depth,
+            model->thickness,
+            model->height - 2.0 * model->thickness);
 }
 
 auto GetCabinetBackGeometrySize(CabinetModel* model) -> Eigen::Vector3d
@@ -145,7 +163,7 @@ auto GetDoorGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
     } else {
         y_offset = 0.5 * model->width - 0.5 * model->thickness;
     }
-    return Eigen::Affine3d(Eigen::Translation3d(0.0, y_offset, 0.0));
+    return MakeAffine3d(0.0, y_offset, 0.0);
 }
 
 auto GetDoorGeometrySize(CabinetModel* model) -> Eigen::Vector3d
@@ -167,10 +185,10 @@ auto GetHandleOrigin(CabinetModel* model) -> Eigen::Affine3d
         y_offset = -0.5 * model->thickness + 0.5 * model->width + model->handle_offset_y;
     }
 
-    return Eigen::Affine3d(Eigen::Translation3d(
+    return MakeAffine3d(
                 0.5 * model->thickness + model->handle_offset_x + model->handle_radius,
                 y_offset,
-                0.0));
+                0.0);
 }
 
 auto GetHandleTransform(CabinetModel* model, double pos) -> Eigen::Affine3d
@@ -195,22 +213,24 @@ auto GetHandleGeometryPose(CabinetModel* model, double pos) -> Eigen::Affine3d
 
 auto GetHandleLowerGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(
-            Eigen::Translation3d(
-                0.5 * (-model->handle_radius - model->handle_offset_x - 0.5 * model->thickness),
-                0.0,
-                -0.5 * model->handle_height + model->handle_radius) *
-            Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitY()));
+    return MakeAffine3d(
+            0.5 * (-model->handle_radius - model->handle_offset_x - 0.5 * model->thickness),
+            0.0,
+            -0.5 * model->handle_height + model->handle_radius,
+            0.0,
+            0.5 * M_PI,
+            0.0);
 }
 
 auto GetHandleUpperGeometryOrigin(CabinetModel* model) -> Eigen::Affine3d
 {
-    return Eigen::Affine3d(
-            Eigen::Translation3d(
-                0.5 * (-model->handle_radius - model->handle_offset_x - 0.5 * model->thickness),
-                0.0,
-                0.5 * model->handle_height + model->handle_radius) *
-            Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitY()));
+    return MakeAffine3d(
+            0.5 * (-model->handle_radius - model->handle_offset_x - 0.5 * model->thickness),
+            0.0,
+            0.5 * model->handle_height + model->handle_radius,
+            0.0,
+            0.5 * M_PI,
+            0.0);
 }
 
 auto GetHandleLowerGeometryPose(CabinetModel* model, double pos) -> Eigen::Affine3d
@@ -226,7 +246,7 @@ auto GetHandleUpperGeometryPose(CabinetModel* model, double pos) -> Eigen::Affin
 auto GetHandleRotationRadius(CabinetModel* model) -> double
 {
     // TODO: + handle radius?
-    auto dx = 0.5 * model->thickness + model->handle_offset_x;
+    auto dx = 0.5 * model->thickness + model->handle_offset_x + model->handle_radius;
     auto dy = 0.5 * model->width - 0.5 * model->thickness + model->handle_offset_y;
     return std::sqrt(dx * dx + dy * dy);
 }
@@ -234,14 +254,9 @@ auto GetHandleRotationRadius(CabinetModel* model) -> double
 auto GetHandleRotationOffset(CabinetModel* model) -> double
 {
     // TODO: + handle radius?
-    auto dx = 0.5 * model->thickness + model->handle_offset_x;
-    if (model->right) {
-        auto dy = 0.5 * model->width - 0.5 * model->thickness - model->handle_offset_y;
-        return atan2(fabs(dx), fabs(dy));
-    } else {
-        auto dy = 0.5 * model->width - 0.5 * model->thickness + model->handle_offset_y;
-        return atan2(fabs(dx), fabs(dy));
-    }
+    auto dx = 0.5 * model->thickness + model->handle_offset_x + model->handle_radius;
+    auto dy = 0.5 * model->width - 0.5 * model->thickness + model->handle_offset_y;
+    return atan2(fabs(dx), fabs(dy));
 }
 
 /////////
