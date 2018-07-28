@@ -60,171 +60,6 @@ CallOnDestruct<Callable> MakeCallOnDestruct(Callable c) {
 // executes the given statement sequence
 #define DEFER(fun) auto MAKE_LINE_IDENT(tmp_call_on_destruct_) = scdl::MakeCallOnDestruct([&](){ fun; })
 
-auto MakeCabinetMarkers(
-    CabinetModel* model,
-    double door_pos,
-    const Eigen::Affine3d* pose,
-    const char* ns,
-    bool contact)
-    -> visualization_msgs::MarkerArray
-{
-    visualization_msgs::MarkerArray ma;
-    ma.markers.reserve(9);
-
-    visualization_msgs::Marker m;
-
-    // common marker settings
-    m.header.frame_id = "map";
-    m.ns = ns;
-    m.type = visualization_msgs::Marker::CUBE;
-    m.action = visualization_msgs::Marker::ADD;
-    m.color = leatherman::colors::AntiqueWhite();
-    m.lifetime = ros::Duration(0.0);
-
-    /////////////////
-    // bottom wall //
-    /////////////////
-
-    m.id = 0;
-
-    auto b_wall_pose = GetCabinetBottomGeometryPose(model, door_pos);
-    b_wall_pose = (*pose) * b_wall_pose;
-    tf::poseEigenToMsg(b_wall_pose, m.pose);
-
-    tf::vectorEigenToMsg(GetCabinetBottomGeometrySize(model), m.scale);
-
-    ma.markers.push_back(m);
-
-    //////////////
-    // top wall //
-    //////////////
-
-    m.id = 1;
-
-    auto t_wall_pose = GetCabinetTopGeometryPose(model, door_pos);
-    t_wall_pose = (*pose) * t_wall_pose;
-    tf::poseEigenToMsg(t_wall_pose, m.pose);
-
-    tf::vectorEigenToMsg(GetCabinetTopGeometrySize(model), m.scale);
-
-    ma.markers.push_back(m);
-
-    ///////////////
-    // left wall //
-    ///////////////
-
-    m.id = 2;
-
-    auto l_wall_pose = GetCabinetLeftGeometryPose(model, door_pos);
-    l_wall_pose = (*pose) * l_wall_pose;
-    tf::poseEigenToMsg(l_wall_pose, m.pose);
-
-    tf::vectorEigenToMsg(GetCabinetLeftGeometrySize(model), m.scale);
-
-    ma.markers.push_back(m);
-
-    ////////////////
-    // right wall //
-    ////////////////
-
-    m.id = 3;
-
-    Eigen::Affine3d r_wall_pose;
-    r_wall_pose = (*pose) * GetCabinetRightGeometryPose(model, door_pos);
-    tf::poseEigenToMsg(r_wall_pose, m.pose);
-
-    tf::vectorEigenToMsg(GetCabinetRightGeometrySize(model), m.scale);
-
-    ma.markers.push_back(m);
-
-    ///////////////
-    // back wall //
-    ///////////////
-
-    m.id = 4;
-
-    auto back_wall_pose = GetCabinetBackGeometryPose(model, door_pos);
-    back_wall_pose = (*pose) * back_wall_pose;
-    tf::poseEigenToMsg(back_wall_pose, m.pose);
-
-    tf::vectorEigenToMsg(GetCabinetBackGeometrySize(model), m.scale);
-
-    ma.markers.push_back(m);
-
-    //////////
-    // door //
-    //////////
-
-    Eigen::Affine3d T_cabinet_hinge = GetCabinetToHingeTransform(model);
-
-    m.id = 5;
-
-    auto door_pose = GetDoorGeometryPose(model, door_pos);
-    door_pose = (*pose) * door_pose;
-    tf::poseEigenToMsg(door_pose, m.pose);
-
-    tf::vectorEigenToMsg(GetDoorGeometrySize(model), m.scale);
-
-    ma.markers.push_back(m);
-
-    //////////////////
-    // handle shaft //
-    //////////////////
-
-    if (contact) {
-        m.color = leatherman::colors::Red();
-    } else {
-        m.color = leatherman::colors::DarkSlateGray();
-    }
-    m.type = visualization_msgs::Marker::CYLINDER;
-
-    m.id = 6;
-
-    auto shaft_pose = GetHandlePose(model, door_pos);
-    shaft_pose = (*pose) * shaft_pose;
-    tf::poseEigenToMsg(shaft_pose, m.pose);
-
-    m.scale.x = 2.0 * model->handle_radius;
-    m.scale.y = 2.0 * model->handle_radius;
-    m.scale.z = model->handle_height + 4.0 * model->handle_radius;
-
-    ma.markers.push_back(m);
-
-    ////////////////////
-    // handle support //
-    ////////////////////
-
-    m.id = 7;
-
-    auto t_support_pose = GetHandleUpperGeometryPose(model, door_pos);
-    t_support_pose = (*pose) * t_support_pose;
-    tf::poseEigenToMsg(t_support_pose, m.pose);
-
-    m.scale.x = 2.0 * model->handle_radius;
-    m.scale.y = 2.0 * model->handle_radius;
-    m.scale.z = (0.5 * model->thickness + model->handle_offset_x + model->handle_radius);
-
-    ma.markers.push_back(m);
-
-    ////////////////////
-    // handle support //
-    ////////////////////
-
-    m.id = 8;
-
-    auto b_support_pose = GetHandleLowerGeometryPose(model, door_pos);
-    b_support_pose = (*pose) * b_support_pose;
-    tf::poseEigenToMsg(b_support_pose, m.pose);
-
-    m.scale.x = 2.0 * model->handle_radius;
-    m.scale.y = 2.0 * model->handle_radius;
-    m.scale.z = (0.5 * model->thickness + model->handle_offset_x + model->handle_radius);
-
-    ma.markers.push_back(m);
-
-    return ma;
-}
-
 auto MakeContactVisualization(
     const smpl::urdf::RobotState* state,
     const smpl::urdf::Link* contact_link,
@@ -351,6 +186,14 @@ bool SetCabinetFromIK(
 
     SetVariablePosition(state, GetVariable(GetRobotModel(state), "door_joint"), theta);
     return true;
+}
+
+bool SetCrateFromIK(
+    smpl::urdf::RobotState* state,
+    const Eigen::Affine3d* pose,
+    const smpl::urdf::Link* link)
+{
+    return false;
 }
 
 auto ConvertMarkersToMarkersMsg(const std::vector<sbpl::visual::Marker>& markers)
@@ -682,6 +525,10 @@ int main(int argc, char* argv[])
             if (object_urdf->getName() == "cabinet") {
                 if (!SetCabinetFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
 //                    SMPL_WARN("Failed to set cabinet from IK");
+                }
+            } else if (object_urdf->getName() == "crate") {
+                if (!SetCrateFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
+
                 }
             }
         }
