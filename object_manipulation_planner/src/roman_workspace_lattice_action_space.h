@@ -9,8 +9,7 @@
 #include <smpl/graph/workspace_lattice_types.h>
 #include <smpl/graph/motion_primitive.h>
 
-namespace sbpl {
-namespace motion {
+namespace smpl {
 
 struct WorkspaceLattice;
 
@@ -32,8 +31,7 @@ bool InitRomanWorkspaceLatticeActions(
     WorkspaceLattice* space,
     RomanWorkspaceLatticeActionSpace* actions);
 
-} // namespace motion
-} // namespace sbpl
+} // namespace smpl
 
 #endif
 
