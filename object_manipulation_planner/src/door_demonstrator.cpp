@@ -26,8 +26,6 @@
 // project includes
 #include "cabinet_model.h"
 
-namespace smpl = sbpl::motion;
-
 ////////////////////
 // STEALING DEFER //
 ////////////////////
@@ -67,26 +65,26 @@ auto MakeContactVisualization(
     const char* ns,
     bool contact,
     int32_t* id = NULL)
-    -> std::vector<sbpl::visual::Marker>
+    -> std::vector<smpl::visual::Marker>
 {
-    std::vector<sbpl::visual::Marker> markers;
+    std::vector<smpl::visual::Marker> markers;
 
     auto first_id = id == NULL ? 0 : *id;
     for (auto& link : Links(GetRobotModel(state))) {
         auto* pose = GetLinkTransform(state, &link);
         for (auto& visual : link.visual) {
-            sbpl::visual::Marker m;
+            smpl::visual::Marker m;
 
             m.pose = *GetVisualBodyTransform(state, &visual);
             m.shape = MakeShapeVisualization(visual.shape);
             if (&link == contact_link) {
                 if (contact) {
-                    m.color = sbpl::visual::Color{ 0.0f, 0.0f, 1.0f, 1.0f };
+                    m.color = smpl::visual::Color{ 0.0f, 0.0f, 1.0f, 1.0f };
                 } else {
-                    m.color = sbpl::visual::Color{ 1.0f, 0.0f, 0.0f, 1.0f };
+                    m.color = smpl::visual::Color{ 1.0f, 0.0f, 0.0f, 1.0f };
                 }
             } else {
-                m.color = sbpl::visual::Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+                m.color = smpl::visual::Color{ 1.0f, 1.0f, 1.0f, 1.0f };
             }
             m.frame_id = frame;
             m.ns = ns;
@@ -161,7 +159,7 @@ bool SetCabinetFromIK(
 
     auto ccw_dist = [](double ai, double af)
     {
-        auto diff = sbpl::angles::shortest_angle_diff(af, ai);
+        auto diff = smpl::angles::shortest_angle_diff(af, ai);
         if (diff >= 0.0) {
             return diff;
         } else {
@@ -319,7 +317,7 @@ bool SetCrateFromIK(
     return true;
 }
 
-auto ConvertMarkersToMarkersMsg(const std::vector<sbpl::visual::Marker>& markers)
+auto ConvertMarkersToMarkersMsg(const std::vector<smpl::visual::Marker>& markers)
     -> visualization_msgs::MarkerArray
 {
     visualization_msgs::MarkerArray ma;
@@ -630,7 +628,7 @@ int main(int argc, char* argv[])
                 contacted = true; // never reset to false
             }
 
-            auto markers = sbpl::visual::MakeFrameMarkers(curr_tool_pose, "map", "tool");
+            auto markers = smpl::visual::MakeFrameMarkers(curr_tool_pose, "map", "tool");
             visualization_msgs::MarkerArray ma;
             for (auto& marker : markers) {
                 visualization_msgs::Marker m;
@@ -668,7 +666,7 @@ int main(int argc, char* argv[])
 #else
         auto markers = ConvertMarkersToMarkersMsg(MakeCollisionVisualization(
                     &object_state,
-                    sbpl::visual::Color{ 0.8f, 0.8f, 0.8f, 1.0f },
+                    smpl::visual::Color{ 0.8f, 0.8f, 0.8f, 1.0f },
                     "map",
                     "cabinet"));
 #endif

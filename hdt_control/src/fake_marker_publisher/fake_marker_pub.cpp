@@ -79,9 +79,9 @@ int FakeMarkerPublisher::run()
 
     Eigen::Affine3d wrist_to_marker_transform =
                     Eigen::Translation3d(wrist_to_marker_x, wrist_to_marker_y, wrist_to_marker_z) *
-                    Eigen::AngleAxisd(sbpl::angles::to_radians(wrist_to_marker_Y), Eigen::Vector3d(0, 0, 1)) *
-                    Eigen::AngleAxisd(sbpl::angles::to_radians(wrist_to_marker_P), Eigen::Vector3d(0, 1, 0)) *
-                    Eigen::AngleAxisd(sbpl::angles::to_radians(wrist_to_marker_R), Eigen::Vector3d(1, 0, 0));
+                    Eigen::AngleAxisd(smpl::angles::to_radians(wrist_to_marker_Y), Eigen::Vector3d(0, 0, 1)) *
+                    Eigen::AngleAxisd(smpl::angles::to_radians(wrist_to_marker_P), Eigen::Vector3d(0, 1, 0)) *
+                    Eigen::AngleAxisd(smpl::angles::to_radians(wrist_to_marker_R), Eigen::Vector3d(1, 0, 0));
 
     ros::Rate loop_rate(10.0);
     int marker_seqno = 0;

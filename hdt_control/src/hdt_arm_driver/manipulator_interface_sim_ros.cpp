@@ -86,7 +86,7 @@ ManipulatorInterfaceROS::RunResult ManipulatorInterfaceSimROS::run()
         std::vector<std::normal_distribution<>> dists;
         const double variance_deg = 0.05;
         for (const double jpos : true_joint_positions_) {
-            dists.push_back(std::normal_distribution<>(jpos, sbpl::angles::to_radians(variance_deg)));
+            dists.push_back(std::normal_distribution<>(jpos, smpl::angles::to_radians(variance_deg)));
         }
 
         std::vector<double> perturbations(true_joint_positions_.size());
@@ -320,7 +320,7 @@ std::vector<double> ManipulatorInterfaceSimROS::anglediff(
         double clamp_v = v[i];
         clamp(clamp_u, min_limits[i], max_limits[i]);
         clamp(clamp_v, min_limits[i], max_limits[i]);
-        res[i] = sbpl::angles::ShortestAngleDiffWithLimits(clamp_u, clamp_v, min_limits[i], max_limits[i]);
+        res[i] = smpl::angles::ShortestAngleDiffWithLimits(clamp_u, clamp_v, min_limits[i], max_limits[i]);
     }
 
     return res;

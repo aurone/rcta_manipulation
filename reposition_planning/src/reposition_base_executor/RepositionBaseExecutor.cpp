@@ -179,7 +179,7 @@ private:
 
     tf::TransformListener listener_;
 
-    sbpl::VisualizerROS viz_;
+    smpl::VisualizerROS viz_;
 
     std::string action_name_;
     typedef actionlib::SimpleActionServer<cmu_manipulation_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionServer;
@@ -505,9 +505,9 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
     const char* pose_goal_planner_id = "right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]";
     const char* joint_goal_planner_id = "right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]";
 
-    double joint_tolerance = sbpl::angles::to_radians(5.0);
+    double joint_tolerance = smpl::angles::to_radians(5.0);
     double pos_tolerance = 0.01;
-    double rot_tolerance = sbpl::angles::to_radians(5.0);
+    double rot_tolerance = smpl::angles::to_radians(5.0);
     std::string tip_link = "limb_right_link7";
 
     moveit_msgs::MoveGroupGoal g;
@@ -665,13 +665,13 @@ RepositionBaseExecutor::RepositionBaseExecutor() :
     last_status_(RepositionBaseExecutionStatus::INVALID),
     m_grasp_planner_loader("grasp_planner_interface", "rcta::GraspPlannerPlugin")
 {
-    sbpl::viz::set_visualizer(&viz_);
+    smpl::viz::set_visualizer(&viz_);
 }
 
 RepositionBaseExecutor::~RepositionBaseExecutor()
 {
-    if (sbpl::viz::visualizer() == &viz_) {
-        sbpl::viz::unset_visualizer();
+    if (smpl::viz::visualizer() == &viz_) {
+        smpl::viz::unset_visualizer();
     }
 }
 
@@ -2002,7 +2002,7 @@ bool RepositionBaseExecutor::generateFilteredGraspCandidates(
 
     ROS_DEBUG("world -> camera: %s", to_string(camera_pose).c_str());
 
-    const double vis_angle_thresh = sbpl::angles::to_radians(45.0);
+    const double vis_angle_thresh = smpl::angles::to_radians(45.0);
     pruneGraspCandidates(candidates, robot_pose, camera_pose, vis_angle_thresh);
 
     ROS_INFO("Produced %zd feasible grasp poses", candidates.size());
@@ -2344,9 +2344,9 @@ bool RepositionBaseExecutor::downloadMarkerParameters()
     attached_marker.link_to_marker =
             Eigen::Affine3d(
                     Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
-                    Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
-                    Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
-                    Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
+                    Eigen::AngleAxisd(smpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+                    Eigen::AngleAxisd(smpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+                    Eigen::AngleAxisd(smpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
     attached_markers_.push_back(std::move(attached_marker));
     return true;

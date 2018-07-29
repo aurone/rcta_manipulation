@@ -72,11 +72,11 @@ double HDTRobotModel::accLimit(int jidx) const
     return 0.0;
 }
 
-sbpl::motion::Extension* HDTRobotModel::getExtension(size_t class_code)
+smpl::Extension* HDTRobotModel::getExtension(size_t class_code)
 {
-    if (class_code == sbpl::motion::GetClassCode<sbpl::motion::RobotModel>() ||
-        class_code == sbpl::motion::GetClassCode<sbpl::motion::ForwardKinematicsInterface>() ||
-        class_code == sbpl::motion::GetClassCode<sbpl::motion::InverseKinematicsInterface>())
+    if (class_code == smpl::GetClassCode<smpl::RobotModel>() ||
+        class_code == smpl::GetClassCode<smpl::ForwardKinematicsInterface>() ||
+        class_code == smpl::GetClassCode<smpl::InverseKinematicsInterface>())
     {
         return this;
     }
@@ -137,9 +137,9 @@ bool HDTRobotModel::computeIK(
     const std::vector<double>& pose,
     const std::vector<double>& start,
     std::vector<double>& solution,
-    sbpl::motion::ik_option::IkOption option)
+    smpl::ik_option::IkOption option)
 {
-    if (option != sbpl::motion::ik_option::UNRESTRICTED) {
+    if (option != smpl::ik_option::UNRESTRICTED) {
         ROS_WARN_ONCE("HDTRobotModel does not support restricted IK queries");
         return false;
     }
@@ -176,7 +176,7 @@ bool HDTRobotModel::computeIK(
     ma = viz::getPoseMarkerArray(p, "arm_mount_panel_dummy", "ik_goal_armmount");
     pub_.publish(ma);
     std::vector<double> fake_start = start;
-    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, sbpl::angles::to_radians(1.0));
+    bool res = robot_model_->search_nearest_ik(eef_transform, start, solution, smpl::angles::to_radians(1.0));
     if (res) {
         ROS_WARN("IK Succeeded");
     }
@@ -190,9 +190,9 @@ bool HDTRobotModel::computeIK(
     const std::vector<double>& pose,
     const std::vector<double>& start,
     std::vector<std::vector<double>>& solutions,
-    sbpl::motion::ik_option::IkOption option)
+    smpl::ik_option::IkOption option)
 {
-    if (option != sbpl::motion::ik_option::UNRESTRICTED) {
+    if (option != smpl::ik_option::UNRESTRICTED) {
         ROS_WARN_ONCE("HDTRobotModel does not support unrestricted IK calls");
         return false;
     }
@@ -228,7 +228,7 @@ bool HDTRobotModel::computeIK(
     pub_.publish(ma);
 
     std::vector<double> fake_start(7, 0);
-    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, fake_start, sbpl::angles::to_radians(1.0));
+    IKSolutionGenerator ik_gen = robot_model_->search_all_ik_solutions(eef_transform, fake_start, smpl::angles::to_radians(1.0));
     std::vector<double> sol;
     while(ik_gen(sol)){
       solutions.push_back(sol);

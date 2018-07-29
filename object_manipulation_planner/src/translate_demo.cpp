@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Failed to open %s\n", demo_filename);
         return 2;
     }
-    sbpl::CSVParser parser;
+    smpl::CSVParser parser;
     if (!parser.parseStream(ifs, true)) {
         fprintf(stderr, "Failed to parse %s\n", demo_filename);
         return 3;
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
             case 2:
             {
                 Eigen::Quaterniond q(T_robot_new_cabinet.rotation());
-                fprintf(f, "%f", sbpl::angles::get_nearest_planar_rotation(q));
+                fprintf(f, "%f", smpl::angles::get_nearest_planar_rotation(q));
                 break;
             }
             default:

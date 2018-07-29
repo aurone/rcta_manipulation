@@ -7,6 +7,7 @@
 
 // system includes
 #include <Eigen/Dense>
+#include <Eigen/StdVector>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
 #include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
@@ -73,7 +74,12 @@ moveit_msgs::CollisionObject CreateGroundPlaneObject()
     return gpo;
 }
 
-auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
+template <class T>
+using AlignedVector = std::vector<T, Eigen::aligned_allocator<T>>;
+
+auto BuildMoveGroupGoal(
+    const grasping_executive::MoveArmGoal& goal,
+    AlignedVector<Eigen::Affine3d>* goal_poses = NULL)
     -> moveit_msgs::MoveGroupGoal
 {
     double allowed_planning_time = 10.0;
@@ -91,9 +97,9 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
     const char* pose_goal_planner_id = "right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]";
     const char* joint_goal_planner_id = "right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]";
 
-    double joint_tolerance = sbpl::angles::to_radians(5.0);
+    double joint_tolerance = smpl::angles::to_radians(5.0);
     double pos_tolerance = 0.01;
-    double rot_tolerance = sbpl::angles::to_radians(5.0);
+    double rot_tolerance = smpl::angles::to_radians(5.0);
     std::string tip_link = "limb_right_link7";
 
     moveit_msgs::MoveGroupGoal g;
@@ -167,41 +173,79 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
     case grasping_executive::MoveArmGoal::CartesianGoal:
     case grasping_executive::MoveArmGoal::EndEffectorGoal:
     {
-        moveit_msgs::Constraints goal_constraints;
-        goal_constraints.name = "goal_constraints";
+        if (goal_poses != NULL) {
+            for (auto& goal_pose : *goal_poses) {
+                moveit_msgs::Constraints goal_constraints;
+                goal_constraints.name = "goal_constraints";
 
-        geometry_msgs::PoseStamped tip_goal;
+                geometry_msgs::PoseStamped tip_goal;
 
-        // TODO: get this from the configured planning frame in moveit
-        tip_goal.header.frame_id = "map";
-        tip_goal.pose = goal.goal_pose;
+                // TODO: get this from the configured planning frame in moveit
+                tip_goal.header.frame_id = "map";
+                tf::poseEigenToMsg(goal_pose, tip_goal.pose);
 
-        // one position constraint
-        moveit_msgs::PositionConstraint goal_pos_constraint;
-        goal_pos_constraint.header.frame_id = tip_goal.header.frame_id;
-        goal_pos_constraint.link_name = tip_link;
-        goal_pos_constraint.target_point_offset = geometry_msgs::CreateVector3(0.0, 0.0, 0.0);
-        shape_msgs::SolidPrimitive tolerance_volume;
-        tolerance_volume.type = shape_msgs::SolidPrimitive::SPHERE;
-        tolerance_volume.dimensions = { pos_tolerance };
-        goal_pos_constraint.constraint_region.primitives.push_back(tolerance_volume);
-        goal_pos_constraint.constraint_region.primitive_poses.push_back(tip_goal.pose);
-        goal_pos_constraint.weight = 1.0;
+                // one position constraint
+                moveit_msgs::PositionConstraint goal_pos_constraint;
+                goal_pos_constraint.header.frame_id = tip_goal.header.frame_id;
+                goal_pos_constraint.link_name = tip_link;
+                goal_pos_constraint.target_point_offset = geometry_msgs::CreateVector3(0.0, 0.0, 0.0);
+                shape_msgs::SolidPrimitive tolerance_volume;
+                tolerance_volume.type = shape_msgs::SolidPrimitive::SPHERE;
+                tolerance_volume.dimensions = { pos_tolerance };
+                goal_pos_constraint.constraint_region.primitives.push_back(tolerance_volume);
+                goal_pos_constraint.constraint_region.primitive_poses.push_back(tip_goal.pose);
+                goal_pos_constraint.weight = 1.0;
 
-        // one orientation constraint
-        moveit_msgs::OrientationConstraint goal_rot_constraint;
-        goal_rot_constraint.header.frame_id = tip_goal.header.frame_id;
-        goal_rot_constraint.orientation = tip_goal.pose.orientation;
-        goal_rot_constraint.link_name = tip_link;
-        goal_rot_constraint.absolute_x_axis_tolerance = rot_tolerance;
-        goal_rot_constraint.absolute_y_axis_tolerance = rot_tolerance;
-        goal_rot_constraint.absolute_z_axis_tolerance = rot_tolerance;
-        goal_rot_constraint.weight = 1.0;
+                // one orientation constraint
+                moveit_msgs::OrientationConstraint goal_rot_constraint;
+                goal_rot_constraint.header.frame_id = tip_goal.header.frame_id;
+                goal_rot_constraint.orientation = tip_goal.pose.orientation;
+                goal_rot_constraint.link_name = tip_link;
+                goal_rot_constraint.absolute_x_axis_tolerance = rot_tolerance;
+                goal_rot_constraint.absolute_y_axis_tolerance = rot_tolerance;
+                goal_rot_constraint.absolute_z_axis_tolerance = rot_tolerance;
+                goal_rot_constraint.weight = 1.0;
 
-        goal_constraints.position_constraints.push_back(goal_pos_constraint);
-        goal_constraints.orientation_constraints.push_back(goal_rot_constraint);
-        request.goal_constraints.push_back(goal_constraints);
+                goal_constraints.position_constraints.push_back(goal_pos_constraint);
+                goal_constraints.orientation_constraints.push_back(goal_rot_constraint);
+                request.goal_constraints.push_back(goal_constraints);
+            }
+        } else {
+            moveit_msgs::Constraints goal_constraints;
+            goal_constraints.name = "goal_constraints";
 
+            geometry_msgs::PoseStamped tip_goal;
+
+            // TODO: get this from the configured planning frame in moveit
+            tip_goal.header.frame_id = "map";
+            tip_goal.pose = goal.goal_pose;
+
+            // one position constraint
+            moveit_msgs::PositionConstraint goal_pos_constraint;
+            goal_pos_constraint.header.frame_id = tip_goal.header.frame_id;
+            goal_pos_constraint.link_name = tip_link;
+            goal_pos_constraint.target_point_offset = geometry_msgs::CreateVector3(0.0, 0.0, 0.0);
+            shape_msgs::SolidPrimitive tolerance_volume;
+            tolerance_volume.type = shape_msgs::SolidPrimitive::SPHERE;
+            tolerance_volume.dimensions = { pos_tolerance };
+            goal_pos_constraint.constraint_region.primitives.push_back(tolerance_volume);
+            goal_pos_constraint.constraint_region.primitive_poses.push_back(tip_goal.pose);
+            goal_pos_constraint.weight = 1.0;
+
+            // one orientation constraint
+            moveit_msgs::OrientationConstraint goal_rot_constraint;
+            goal_rot_constraint.header.frame_id = tip_goal.header.frame_id;
+            goal_rot_constraint.orientation = tip_goal.pose.orientation;
+            goal_rot_constraint.link_name = tip_link;
+            goal_rot_constraint.absolute_x_axis_tolerance = rot_tolerance;
+            goal_rot_constraint.absolute_y_axis_tolerance = rot_tolerance;
+            goal_rot_constraint.absolute_z_axis_tolerance = rot_tolerance;
+            goal_rot_constraint.weight = 1.0;
+
+            goal_constraints.position_constraints.push_back(goal_pos_constraint);
+            goal_constraints.orientation_constraints.push_back(goal_rot_constraint);
+            request.goal_constraints.push_back(goal_constraints);
+        }
         request.planner_id = pose_goal_planner_id;
         break;
     }
@@ -564,7 +608,7 @@ struct GraspObjectExecutor
 
     std::unique_ptr<ros::ServiceClient> m_check_state_validity_client;
 
-    sbpl::VisualizerROS m_viz;
+    smpl::VisualizerROS m_viz;
     ///@}
 
     robot_model_loader::RobotModelLoaderPtr         m_rml;
@@ -787,13 +831,13 @@ void TransformWristPosesToPregraspPoses(
 GraspObjectExecutor::GraspObjectExecutor() :
     m_grasp_planner_loader("grasp_planner_interface", "rcta::GraspPlannerPlugin")
 {
-    sbpl::viz::set_visualizer(&m_viz);
+    smpl::viz::set_visualizer(&m_viz);
 }
 
 GraspObjectExecutor::~GraspObjectExecutor()
 {
-    if (sbpl::viz::visualizer() == &m_viz) {
-        sbpl::viz::unset_visualizer();
+    if (smpl::viz::visualizer() == &m_viz) {
+        smpl::viz::unset_visualizer();
     }
 }
 
@@ -1183,9 +1227,9 @@ bool GraspObjectExecutor::downloadMarkerParams()
 
     attached_marker.link_to_marker = Eigen::Affine3d(
         Eigen::Translation3d(marker_to_link_x, marker_to_link_y, marker_to_link_z) *
-        Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
-        Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
-        Eigen::AngleAxisd(sbpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
+        Eigen::AngleAxisd(smpl::angles::to_radians(marker_to_link_yaw_degs), Eigen::Vector3d::UnitZ()) *
+        Eigen::AngleAxisd(smpl::angles::to_radians(marker_to_link_pitch_degs), Eigen::Vector3d::UnitY()) *
+        Eigen::AngleAxisd(smpl::angles::to_radians(marker_to_link_roll_degs), Eigen::Vector3d::UnitX())).inverse();
 
     m_attached_markers.push_back(std::move(attached_marker));
 
@@ -1342,7 +1386,7 @@ auto DoGenerateGrasps(GraspObjectExecutor* ex)
         ROS_INFO("world -> camera: %s", to_string(T_world_camera).c_str());
     }
 
-    double vis_angle_thresh = sbpl::angles::to_radians(45.0);
+    double vis_angle_thresh = smpl::angles::to_radians(45.0);
     ex->pruneGrasps(candidates, T_world_robot, T_world_camera, vis_angle_thresh);
 
     ROS_INFO("Produced %zd reachable grasp poses", candidates.size());
@@ -1422,7 +1466,12 @@ auto DoMoveArmToPreGrasp(GraspObjectExecutor* ex)
         goal.planning_options.planning_scene_diff.is_diff = true;
         goal.planning_options.planning_scene_diff.world.collision_objects.push_back(gascan);
 
-        auto state = ex->m_move_arm_command_client->sendGoalAndWait(BuildMoveGroupGoal(goal));
+        AlignedVector<Eigen::Affine3d> goal_poses;
+        for (auto& cand : ex->m_grasp_candidates) {
+            goal_poses.push_back(cand.pose);
+        }
+
+        auto state = ex->m_move_arm_command_client->sendGoalAndWait(BuildMoveGroupGoal(goal, &goal_poses));
         auto result = ex->m_move_arm_command_client->getResult();
 
         ROS_INFO("Move Arm Goal is no longer pending");

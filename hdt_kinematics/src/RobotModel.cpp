@@ -29,13 +29,13 @@ double ComputeJointStateL2NormSqrd(const std::vector<double>& joints1, const std
 
     auto squared = [](double x) { return x * x; };
     double dist = 0.0;
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[0], joints2[0]));
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[1], joints2[1]));
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[2], joints2[2]));
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[3], joints2[3]));
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[4], joints2[4]));
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[5], joints2[5]));
-    dist += squared(sbpl::angles::shortest_angle_dist(joints1[6], joints2[6]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[0], joints2[0]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[1], joints2[1]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[2], joints2[2]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[3], joints2[3]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[4], joints2[4]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[5], joints2[5]));
+    dist += squared(smpl::angles::shortest_angle_dist(joints1[6], joints2[6]));
     return dist;
 }
 

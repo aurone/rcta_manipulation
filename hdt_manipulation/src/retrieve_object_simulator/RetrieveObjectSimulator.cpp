@@ -89,9 +89,9 @@ bool RetrieveObjectSimulator::initialize()
 
     object_to_footprint_ =
         Eigen::Translation3d(object_footprint_x_m, object_footprint_y_m, object_footprint_z_m) *
-        Eigen::AngleAxisd(sbpl::angles::to_radians(object_footprint_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0)) *
-        Eigen::AngleAxisd(sbpl::angles::to_radians(object_footprint_pitch_deg), Eigen::Vector3d(0.0, 1.0, 0.0)) *
-        Eigen::AngleAxisd(sbpl::angles::to_radians(object_footprint_roll_deg), Eigen::Vector3d(1.0, 0.0, 0.0));
+        Eigen::AngleAxisd(smpl::angles::to_radians(object_footprint_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0)) *
+        Eigen::AngleAxisd(smpl::angles::to_radians(object_footprint_pitch_deg), Eigen::Vector3d(0.0, 1.0, 0.0)) *
+        Eigen::AngleAxisd(smpl::angles::to_radians(object_footprint_roll_deg), Eigen::Vector3d(1.0, 0.0, 0.0));
 
     double robot_initial_x_m;
     double robot_initial_y_m;
@@ -164,14 +164,14 @@ bool RetrieveObjectSimulator::initialize()
 
     world_to_room_ =
             Eigen::Translation3d(room_frame_x_m, room_frame_y_m, 0.0) *
-            Eigen::AngleAxisd(sbpl::angles::to_radians(room_frame_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0));
+            Eigen::AngleAxisd(smpl::angles::to_radians(room_frame_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0));
 
     initial_robot_pose_.header.seq = 0;
     initial_robot_pose_.header.stamp = ros::Time(0);
     initial_robot_pose_.header.frame_id = world_frame_name;
     Eigen::Affine3d initial_robot_transform =
             Eigen::Translation3d(robot_initial_x_m, robot_initial_y_m, 0.0) *
-            Eigen::AngleAxisd(sbpl::angles::to_radians(robot_initial_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0));
+            Eigen::AngleAxisd(smpl::angles::to_radians(robot_initial_yaw_deg), Eigen::Vector3d(0.0, 0.0, 1.0));
     initial_robot_transform = world_to_room_ * initial_robot_transform;
     tf::poseEigenToMsg(initial_robot_transform, initial_robot_pose_.pose);
 

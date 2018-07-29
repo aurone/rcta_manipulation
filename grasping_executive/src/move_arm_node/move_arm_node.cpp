@@ -232,8 +232,8 @@ bool MoveArmNode::init()
 
     m_tip_link = tip_link;
     m_pos_tolerance = pos_tolerance;
-    m_rot_tolerance = sbpl::angles::to_radians(rot_tolerance_deg);
-    m_joint_tolerance = sbpl::angles::to_radians(joint_tolerance_deg);
+    m_rot_tolerance = smpl::angles::to_radians(rot_tolerance_deg);
+    m_joint_tolerance = smpl::angles::to_radians(joint_tolerance_deg);
 
     m_goal.request.workspace_parameters.header.frame_id = workspace_frame;
     m_goal.request.workspace_parameters.min_corner = workspace_min;

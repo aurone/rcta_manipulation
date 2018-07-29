@@ -304,7 +304,7 @@ int DepthSensorSimulatorNode::run(int argc, char* argv[])
 //    Eigen::Affine3f view_matrix = Eigen::Affine3f::Identity();
     Eigen::Affine3f view_matrix(Eigen::Translation3f(0.0f, 0.0f, -5.0f)); // camera -> world (where the camera faces down the -z axis)
 
-    Eigen::Projective3f projection_matrix = CreatePerspectiveMatrix(sbpl::angles::to_radians(60.0), 1.0f, 0.01f, 100.0f); // clip -> camera
+    Eigen::Projective3f projection_matrix = CreatePerspectiveMatrix(smpl::angles::to_radians(60.0), 1.0f, 0.01f, 100.0f); // clip -> camera
 //    Eigen::Projective3f projection_matrix(Eigen::Projective3f::Identity());
 
     // clip -> model

@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
     const double P_res = (MAX_PITCH - MIN_PITCH) / (P_samples - 1);
     const double R_res = (MAX_ROLL - MIN_ROLL)   / (R_samples - 1);
 
-    struct GridCell : public sbpl::heap_element
+    struct GridCell : public smpl::heap_element
     {
         std::vector<double> state;
         int x, y, z, R, P, Y;
@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
     auto cell_comp = [](const GridCell& c1, const GridCell& c2) {
         return c1.g < c2.g;
     };
-    sbpl::intrusive_heap<GridCell, decltype(cell_comp)> open(cell_comp);
+    smpl::intrusive_heap<GridCell, decltype(cell_comp)> open(cell_comp);
 
     robot_state.setToDefaultValues();
 
@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
         int start_y = discretize(pose.translation()[1], workspace.min_corner.y, y_res);
         int start_z = discretize(pose.translation()[2], workspace.min_corner.z, z_res);
         double yaw, pitch, roll;
-        sbpl::angles::get_euler_zyx(pose.rotation(), yaw, pitch, roll);
+        smpl::angles::get_euler_zyx(pose.rotation(), yaw, pitch, roll);
         int start_yaw = discretize(yaw, MIN_YAW, Y_res);
         int start_pitch = discretize(pitch, MIN_PITCH, P_res);
         int start_roll = discretize(roll, MIN_ROLL, R_res);

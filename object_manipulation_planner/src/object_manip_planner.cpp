@@ -20,15 +20,13 @@
 
 //#include "workspace_lattice_egraph.h"
 
-namespace smpl = sbpl::motion;
-
 struct ObjectManipPlanner
 {
     smpl::PlanningParams                    params;
     smpl::WorkspaceLatticeEGraph            graph;
     smpl::SimpleWorkspaceLatticeActionSpace actions;
     smpl::ObjectManipulationHeuristic       heuristic;
-    sbpl::ARAStar                           search;
+    smpl::ARAStar                           search;
 
     ObjectManipPlanner() : search(&graph, &heuristic) { }
 };
@@ -37,7 +35,7 @@ bool Init(
     ObjectManipPlanner* planner,
     smpl::RobotModel* model,
     smpl::CollisionChecker* checker,
-    sbpl::OccupancyGrid* grid)
+    smpl::OccupancyGrid* grid)
 {
     smpl::WorkspaceLatticeEGraph graph;
 
@@ -91,7 +89,7 @@ bool PlanPath(
     smpl::GoalConstraint goal;
     goal.type = smpl::GoalType::JOINT_STATE_GOAL;
 
-    sbpl::ARAStar::TimeParameters timing;
+    smpl::ARAStar::TimeParameters timing;
     timing.bounded = true;
     timing.improve = true;
     timing.max_allowed_time_init = std::chrono::seconds(10);
@@ -116,8 +114,8 @@ bool PlanPath(
 //  *
 int main(int argc, char* argv[])
 {
-    sbpl::VisualizerROS visualizer;
-    sbpl::visual::set_visualizer(&visualizer);
+    smpl::VisualizerROS visualizer;
+    smpl::visual::set_visualizer(&visualizer);
 
     auto group_name = "right_arm_torso_base";
     auto tip_link = "limb_right_tool0";
@@ -184,7 +182,7 @@ int main(int argc, char* argv[])
     auto origin_z = -0.15;
     auto resolution = 0.05;
     auto max_dist = 0.8;
-    auto grid = sbpl::OccupancyGrid(
+    auto grid = smpl::OccupancyGrid(
             size_x,
             size_y,
             size_z,
@@ -194,15 +192,15 @@ int main(int argc, char* argv[])
             origin_z,
             max_dist);
 
-    sbpl::collision::CollisionModelConfig config;
-    if (!sbpl::collision::CollisionModelConfig::Load(nh, config)) {
+    smpl::collision::CollisionModelConfig config;
+    if (!smpl::collision::CollisionModelConfig::Load(nh, config)) {
         ROS_ERROR("Failed to load Collision Model Configuration");
         return 1;
     }
 
     auto planning_variables = omanip.getPlanningJoints();
     planning_variables.pop_back();
-    sbpl::collision::CollisionSpace cspace;
+    smpl::collision::CollisionSpace cspace;
     if (!cspace.init(&grid, *robot_model->getURDF().get(), config, group_name, planning_variables)) {
         ROS_ERROR("Failed to initialize Collision Space");
         return 1;

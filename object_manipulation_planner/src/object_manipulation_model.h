@@ -3,8 +3,6 @@
 
 #include <smpl/robot_model.h>
 
-namespace smpl = sbpl::motion;
-
 // A RobotModel that references an existing RobotModel and extends it by
 // adding a single degree-of-freedom to represent an articulated object.
 struct ObjectManipulationModel :
