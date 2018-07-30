@@ -9,7 +9,7 @@
         <remap from="robot_state" to="command_robot_state"/>
 
         <param name="contact_error_z" value="0.10"/> <!-- handle height / 2 -->
-        <param name="contact_error" value="0.03"/>
+        <param name="contact_error" value="0.05"/>
         <param name="object_tip_link" value="handle"/>
         <param name="robot_tip_link" value="limb_right_tool0"/>
         <!--param name="robot_tip_link" value="limb_right_tool0"/-->
@@ -45,10 +45,11 @@
         -->
 
         <!-- crate -->
-        <param name="object_x" value="0.0"/>
+        <param name="object_x" value="0.85"/>
         <param name="object_y" value="0.0"/>
-        <param name="object_z" value="0.0"/>
-        <param name="object_yaw" value="0.0"/>
+        <!--param name="object_z" value="0.105"/-->
+        <param name="object_z" value="-0.03113"/>
+        <param name="object_yaw" value="1.570796"/>
         <param name="object_pitch" value="0.0"/>
         <param name="object_roll" value="0.0"/>
     </node>
