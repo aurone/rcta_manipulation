@@ -156,7 +156,6 @@ bool SetCabinetFromIK(
     // closest point on the circle mapped by the handle radius
     Eigen::Vector3d nearest = radius * tool_in_hinge.translation().normalized();
 
-
     auto ccw_dist = [](double ai, double af)
     {
         auto diff = smpl::angles::shortest_angle_diff(af, ai);
@@ -205,9 +204,11 @@ bool SetCrateFromIK(
             lid_frame.translation().y(),
             lid_frame.translation().z());
 
-    auto best_lid = std::numeric_limits<double>::max();
-    auto best_dist = std::numeric_limits<double>::max();
+    auto best_lid = std::numeric_limits<double>::infinity();
+    auto best_dist = std::numeric_limits<double>::infinity();
     auto best_handle = std::numeric_limits<double>::quiet_NaN();
+
+    std::vector<std::tuple<double, double, double>> solutions;
 
     // sample orientations for the handle and choose the configuration that
     // (1) TODO: best reaches the target point
@@ -278,7 +279,7 @@ bool SetCrateFromIK(
         // get the transform from J2 to L2
         Eigen::Affine3d T_J2_L2 = T_J1_J2.inverse() * T_J1_L2;
 
-        auto angle = Eigen::AngleAxisd(T_J2_L2.rotation()).angle();
+        auto angle = pitch; //Eigen::AngleAxisd(T_J2_L2.rotation()).angle();
         angle = std::min(angle, GetVariableLimits(GetVariable(robot, "handle_joint"))->max_position);
         angle = std::max(angle, GetVariableLimits(GetVariable(robot, "handle_joint"))->min_position);
         SetVariablePosition(state, GetVariable(robot, "handle_joint"), angle);
@@ -291,7 +292,9 @@ bool SetCrateFromIK(
         auto* tip_trans = GetLinkTransform(state, GetLink(robot, "tool"));
         auto ee_dist = (pose->translation() - tip_trans->translation()).norm();
 
-        if (ee_dist < best_dist) { // - margin) {
+        solutions.emplace_back(th1, angle, ee_dist);
+
+        if (ee_dist < best_dist) {
             ROS_INFO("Better distance! %f -> %f @ (%f, %f)", best_dist, ee_dist, th1, angle);
             best_lid = th1;
             best_handle = angle;
@@ -311,6 +314,16 @@ bool SetCrateFromIK(
         }
     }
 
+    auto sort_third = [](const std::tuple<double, double, double>& x, const std::tuple<double, double, double>& y) {
+        return std::get<2>(x) < std::get<2>(y);
+    };
+    sort(begin(solutions), end(solutions), sort_third);
+
+    ROS_DEBUG("solutions:");
+    for (int i = 0; i < std::min(4, (int)solutions.size()); ++i) {
+        ROS_DEBUG("  solution %d: (%f, %f) @ %f", i, std::get<0>(solutions[i]), std::get<1>(solutions[i]), std::get<2>(solutions[i]));
+    }
+
     SetVariablePosition(state, GetVariable(robot, "lid_joint"), best_lid);
     SetVariablePosition(state, GetVariable(robot, "handle_joint"), best_handle);
 
@@ -328,6 +341,32 @@ auto ConvertMarkersToMarkersMsg(const std::vector<smpl::visual::Marker>& markers
         ma.markers.push_back(std::move(m));
     }
     return ma;
+}
+
+bool IsInContactCabinet(
+    double contact_thresh_xy,
+    double contact_thresh_z,
+    const Eigen::Affine3d* robot_tip_pose,
+    const Eigen::Affine3d* object_tip_pose)
+{
+    Eigen::Vector3d dp = robot_tip_pose->translation() - object_tip_pose->translation();
+    return std::fabs(dp.z()) < contact_thresh_z &&
+        dp.x() * dp.x() + dp.y() * dp.y() < contact_thresh_xy * contact_thresh_xy;
+}
+
+bool IsInContactCrate(
+    double contact_thresh_xy,
+    double contact_thresh_z,
+    const Eigen::Affine3d* robot_tip_pose,
+    const Eigen::Affine3d* object_tip_pose)
+{
+    Eigen::Affine3d T_object_robot_tip = object_tip_pose->inverse() * (*robot_tip_pose);
+    Eigen::Vector3d offset(T_object_robot_tip.translation());
+    offset.y() = 0.0;
+
+    ROS_INFO("dz = %f, dxy = %f", T_object_robot_tip.translation().y(), offset.squaredNorm());
+    return std::fabs(T_object_robot_tip.translation().y()) < contact_thresh_z &&
+            offset.squaredNorm() < contact_thresh_xy * contact_thresh_xy;
 }
 
 int main(int argc, char* argv[])
@@ -417,6 +456,7 @@ int main(int argc, char* argv[])
         return 1;
     }
     SetToDefaultValues(&object_state);
+    SetVariablePosition(&object_state, GetVariable(&object_model, "handle_joint"), 1.570);
     UpdateTransforms(&object_state);
 
     {
@@ -604,28 +644,34 @@ int main(int argc, char* argv[])
         // update contact state //
         //////////////////////////
 
-        UpdateLinkTransform(&object_state, object_tip_link);
-        auto* handle_pose = GetLinkTransform(&object_state, object_tip_link);
+        auto* uhoh_link = GetLink(&object_model, "tool");
+        UpdateLinkTransform(&object_state, uhoh_link);
+        auto* object_tool_pose = GetLinkTransform(&object_state, uhoh_link);
         SMPL_DEBUG("  handle @ (%f, %f, %f)",
-                handle_pose->translation().x(),
-                handle_pose->translation().y(),
-                handle_pose->translation().z());
+                object_tool_pose->translation().x(),
+                object_tool_pose->translation().y(),
+                object_tool_pose->translation().z());
 
         contact = false;
-        Eigen::Affine3d curr_tool_pose;
         if (curr_robot_state) {
-            curr_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
+            auto& curr_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
             SMPL_DEBUG("  curr tool @ (%f, %f, %f)",
                     curr_tool_pose.translation().x(),
                     curr_tool_pose.translation().y(),
                     curr_tool_pose.translation().z());
 
-            Eigen::Vector3d dp = curr_tool_pose.translation() - handle_pose->translation();
-            if (std::fabs(dp.z()) < contact_error_z &&
-                dp.x() * dp.x() + dp.y() * dp.y() < contact_error * contact_error)
-            {
-                contact = true;
-                contacted = true; // never reset to false
+            if (object_urdf->getName() == "cabinet") {
+                if (IsInContactCabinet(contact_error, contact_error_z, &curr_tool_pose, object_tool_pose)) {
+                    contact = true;
+                    contacted = true; // never reset to false
+                }
+            } else if (object_urdf->getName() == "crate") {
+                if (IsInContactCrate(contact_error, contact_error_z, &curr_tool_pose, object_tool_pose)) {
+                    contact = true;
+                    contacted = true; // never reset to false
+                }
+            } else {
+                ROS_WARN("Unknown object '%s'", object_urdf->getName().c_str());
             }
 
             auto markers = smpl::visual::MakeFrameMarkers(curr_tool_pose, "map", "tool");
@@ -642,7 +688,8 @@ int main(int argc, char* argv[])
         // update object state from ik //
         /////////////////////////////////
 
-        if (robot_moved || contact) {
+        if (curr_robot_state && contact) {
+            auto& curr_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
             if (object_urdf->getName() == "cabinet") {
                 if (!SetCabinetFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
 //                    SMPL_WARN("Failed to set cabinet from IK");
