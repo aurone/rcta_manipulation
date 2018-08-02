@@ -12,6 +12,8 @@
 #include <smpl/planning_params.h>
 #include <smpl/search/arastar.h>
 
+#include "roman_workspace_lattice_action_space.h"
+
 namespace smpl {
 class CollisionChecker;
 class OccupancyGrid;
@@ -33,7 +35,7 @@ struct ObjectManipPlanner
 {
     smpl::PlanningParams                    params;
     smpl::WorkspaceLatticeEGraph            graph;
-    smpl::SimpleWorkspaceLatticeActionSpace actions;
+    RomanWorkspaceLatticeActionSpace        actions;
     smpl::ObjectManipulationHeuristic       heuristic;
     smpl::ARAStar                           search;
 

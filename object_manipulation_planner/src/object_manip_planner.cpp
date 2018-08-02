@@ -27,7 +27,7 @@ bool Init(
         return false;
     }
 
-    if (!InitSimpleWorkspaceLatticeActions(&planner->graph, &planner->actions)) {
+    if (!InitRomanWorkspaceLatticeActions(&planner->graph, &planner->actions)) {
         return false;
     }
 

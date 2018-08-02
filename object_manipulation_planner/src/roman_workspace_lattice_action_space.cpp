@@ -3,15 +3,13 @@
 // standard includes
 #include <utility>
 
-// project includes
+// system includes
 #include <smpl/angles.h>
 #include <smpl/robot_model.h>
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>
 #include <smpl/graph/workspace_lattice.h>
 #include <smpl/heuristic/robot_heuristic.h>
-
-namespace smpl {
 
 enum VariableIndex {
     EE_PX,
@@ -44,14 +42,14 @@ enum RobotVariableIndex {
 };
 
 bool InitRomanWorkspaceLatticeActions(
-    WorkspaceLattice* space,
+    smpl::WorkspaceLattice* space,
     RomanWorkspaceLatticeActionSpace* actions)
 {
     actions->space = space;
 
     actions->m_prims.clear();
 
-    MotionPrimitive prim;
+    smpl::MotionPrimitive prim;
 
     auto add_xyz_prim = [&](int dx, int dy, int dz)
     {
@@ -59,7 +57,7 @@ bool InitRomanWorkspaceLatticeActions(
         d[EE_PX] = space->resolution()[EE_PX] * dx;
         d[EE_PY] = space->resolution()[EE_PY] * dy;
         d[EE_PZ] = space->resolution()[EE_PZ] * dz;
-        prim.type = MotionPrimitive::Type::LONG_DISTANCE;
+        prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
         prim.action.clear();
         prim.action.push_back(std::move(d));
 
@@ -95,7 +93,7 @@ bool InitRomanWorkspaceLatticeActions(
         if (a == BD_PX || a == BD_PY) continue; // do base motions later
 
         d[a] = space->resolution()[a] * -1;
-        prim.type = MotionPrimitive::Type::LONG_DISTANCE;
+        prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
 
         if (a == BD_PX) { // base x
             d[EE_PX] = -space->resolution()[EE_PX]; // also move the end effector by -res in x
@@ -112,7 +110,7 @@ bool InitRomanWorkspaceLatticeActions(
         actions->m_prims.push_back(prim);
 
         d[a] = space->resolution()[a] * 1;
-        prim.type = MotionPrimitive::Type::LONG_DISTANCE;
+        prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
 
         if (a == BD_PX) {
             d[EE_PX] = space->resolution()[EE_PX]; // also move the end effector by +res in x
@@ -159,12 +157,12 @@ bool InitRomanWorkspaceLatticeActions(
 }
 
 void RomanWorkspaceLatticeActionSpace::apply(
-    const WorkspaceLatticeState& state,
-    std::vector<WorkspaceAction>& actions)
+    const smpl::WorkspaceLatticeState& state,
+    std::vector<smpl::WorkspaceAction>& actions)
 {
     actions.reserve(actions.size() + m_prims.size());
 
-    WorkspaceState cont_state;
+    smpl::WorkspaceState cont_state;
     space->stateCoordToWorkspace(state.coord, cont_state);
 
     SMPL_DEBUG_STREAM_NAMED(space->params()->expands_log, "  create actions for workspace state: " << cont_state);
@@ -176,10 +174,10 @@ void RomanWorkspaceLatticeActionSpace::apply(
             if (std::fabs(dx) > 1e-6 | std::fabs(dy) > 1e-6) {
                 auto heading = atan2(dy, dx);
                 auto alt_heading = heading + M_PI;
-                if (angles::shortest_angle_dist(heading, state.state[2]) >
-                        angles::to_radians(10.0) &&
-                    angles::shortest_angle_dist(alt_heading, state.state[2]) >
-                        angles::to_radians(10.0))
+                if (smpl::angles::shortest_angle_dist(heading, state.state[2]) >
+                        smpl::angles::to_radians(10.0) &&
+                    smpl::angles::shortest_angle_dist(alt_heading, state.state[2]) >
+                        smpl::angles::to_radians(10.0))
                 {
                     continue;
                 }
@@ -197,18 +195,18 @@ void RomanWorkspaceLatticeActionSpace::apply(
             prim.action.back()[TR_JP] != 0.0 ||
             prim.action.back()[BD_TH] != 0.0)
         {
-            RobotState delta_state = state.state;
+            auto delta_state = state.state;
             delta_state[WORLD_JOINT_X] += prim.action.back()[BD_PX];
             delta_state[WORLD_JOINT_Y] += prim.action.back()[BD_PY];
             delta_state[TORSO_JOINT1] += prim.action.back()[TR_JP];
             delta_state[WORLD_JOINT_THETA] += prim.action.back()[BD_TH];
             auto pose = space->m_fk_iface->computeFK(delta_state);
 
-            WorkspaceState tmp(space->dofCount(), 0.0);
+            smpl::WorkspaceState tmp(space->dofCount(), 0.0);
             tmp[EE_PX] = pose.translation().x();
             tmp[EE_PY] = pose.translation().y();
             tmp[EE_PZ] = pose.translation().z();
-            angles::get_euler_zyx(pose.rotation(), tmp[EE_QZ], tmp[EE_QY], tmp[EE_QX]);
+            smpl::angles::get_euler_zyx(pose.rotation(), tmp[EE_QZ], tmp[EE_QY], tmp[EE_QX]);
             tmp[AR_FA] = cont_state[AR_FA];// + prim.action.back()[AR_FA];
             tmp[TR_JP] = cont_state[TR_JP] + prim.action.back()[TR_JP];
             tmp[BD_TH] = cont_state[BD_TH] + prim.action.back()[BD_TH];
@@ -216,17 +214,17 @@ void RomanWorkspaceLatticeActionSpace::apply(
             tmp[BD_PY] = cont_state[BD_PY] + prim.action.back()[BD_PY];
             tmp[OB_P] = cont_state[OB_P];// + prim.action.back()[OB_P];
 
-            WorkspaceCoord ctmp;
+            smpl::WorkspaceCoord ctmp;
             space->stateWorkspaceToCoord(tmp, ctmp);
             space->stateCoordToWorkspace(ctmp, tmp);
 
-            WorkspaceAction action;
+            smpl::WorkspaceAction action;
             action.push_back(std::move(tmp));
             actions.push_back(std::move(action));
             continue;
         }
 
-        WorkspaceAction action;
+        smpl::WorkspaceAction action;
         action.reserve(prim.action.size());
 
         auto final_state = cont_state;
@@ -236,7 +234,7 @@ void RomanWorkspaceLatticeActionSpace::apply(
                 final_state[d] += delta_state[d];
             }
 
-            angles::normalize_euler_zyx(&final_state[3]);
+            smpl::angles::normalize_euler_zyx(&final_state[3]);
 
             action.push_back(final_state);
         }
@@ -249,17 +247,15 @@ void RomanWorkspaceLatticeActionSpace::apply(
         auto goal_dist = h->getMetricGoalDistance(
                 cont_state[EE_PX], cont_state[EE_PY], cont_state[EE_PZ]);
         if (goal_dist < m_ik_amp_thresh) {
-            RobotState ik_sol;
+            smpl::RobotState ik_sol;
             if (space->m_ik_iface->computeIK(space->goal().pose, state.state, ik_sol)) {
-                WorkspaceState final_state;
+                smpl::WorkspaceState final_state;
                 space->stateRobotToWorkspace(ik_sol, final_state);
-                WorkspaceAction action(1);
+                smpl::WorkspaceAction action(1);
                 action[0] = final_state;
                 actions.push_back(std::move(action));
             }
         }
     }
 }
-
-} // namespace smpl
 
