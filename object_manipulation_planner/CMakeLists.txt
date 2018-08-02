@@ -28,11 +28,12 @@ catkin_package()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-add_executable(
+add_library(
     object_manip_planner
     src/object_manip_planner.cpp
     src/roman_workspace_lattice_action_space.cpp
     src/object_manipulation_model.cpp)
+
 target_include_directories(object_manip_planner PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})
 target_include_directories(object_manip_planner PUBLIC include)
 target_link_libraries(
@@ -44,6 +45,9 @@ target_link_libraries(
     ${sbpl_collision_checking_LIBRARIES}
     ${smpl_LIBRARIES}
     ${smpl_ros_LIBRARIES})
+
+add_executable(object_manip_planner_node src/object_manip_planner_node.cpp)
+target_link_libraries(object_manip_planner_node object_manip_planner)
 
 add_executable(door_demonstrator src/door_demonstrator.cpp src/cabinet_model.cpp)
 target_include_directories(door_demonstrator PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})

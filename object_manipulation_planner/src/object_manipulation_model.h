@@ -5,12 +5,14 @@
 
 // A RobotModel that references an existing RobotModel and extends it by
 // adding a single degree-of-freedom to represent an articulated object.
-struct ObjectManipulationModel :
+class ObjectManipModel :
     public virtual smpl::RobotModel,
     public virtual smpl::ForwardKinematicsInterface,
     public virtual smpl::InverseKinematicsInterface,
     public virtual smpl::RedundantManipulatorInterface
 {
+public:
+
     smpl::RobotModel* parent_model = NULL;
 
     // cache the underlying interfaces that we wrap
@@ -21,24 +23,16 @@ struct ObjectManipulationModel :
     double min_object_pos = 0.0;
     double max_object_pos = 0.0;
 
-    double minPosLimit(int vidx) const override;
-    double maxPosLimit(int vidx) const override;
-    bool hasPosLimit(int vidx) const override;
-    bool isContinuous(int vidx) const override;
-    double velLimit(int vidx) const override;
-    double accLimit(int vidx) const override;
+    auto objectJointName() const -> const std::string&;
 
-    bool checkJointLimits(
-        const smpl::RobotState& state,
-        bool verbose = false) override;
-
-    auto getExtension(size_t class_code) -> smpl::Extension* override;
-
-    // we should just be able to use the underlying robot model's forward
-    // kinematics
+    /// \name ForwardKinematicsInterface
+    ///@{
     auto computeFK(const smpl::RobotState& state) -> Eigen::Affine3d override;
+    ///@}
 
-    // same for ik...
+    /// \name InverseKinematicsInterface
+    ///@{
+
     bool computeIK(
         const Eigen::Affine3d& pose,
         const smpl::RobotState& start,
@@ -50,21 +44,43 @@ struct ObjectManipulationModel :
         const smpl::RobotState& start,
         std::vector<smpl::RobotState>& solutions,
         smpl::ik_option::IkOption option = smpl::ik_option::UNRESTRICTED) override;
+    ///@}
 
-    // the redundant manipulator interface will be a little different...
-    // we need to tell smpl that the object dimension is a 'free angle'
+    /// \name RedundantManipulatorInterface
+    ///@{
     const int redundantVariableCount() const override;
     const int redundantVariableIndex(int rvidx) const override;
 
     bool computeFastIK(
         const Eigen::Affine3d& pose,
         const smpl::RobotState& state,
-        smpl::RobotState& solution);
+        smpl::RobotState& solution) override;
+    ///@}
+
+    /// \name RobotModel Interface
+    ///@{
+    double minPosLimit(int vidx) const override;
+    double maxPosLimit(int vidx) const override;
+    bool hasPosLimit(int vidx) const override;
+    bool isContinuous(int vidx) const override;
+    double velLimit(int vidx) const override;
+    double accLimit(int vidx) const override;
+
+    bool checkJointLimits(
+        const smpl::RobotState& state,
+        bool verbose = false) override;
+    ///@}
+
+    /// \name Extension Interface
+    ///@{
+    auto getExtension(size_t class_code) -> smpl::Extension* override;
+    ///@}
 };
 
 bool Init(
-    ObjectManipulationModel* model,
+    ObjectManipModel* model,
     smpl::RobotModel* parent,
+    const std::string& object_joint_name,
     double object_min,
     double object_max);
 
