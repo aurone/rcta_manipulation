@@ -47,7 +47,7 @@ public:
     double getMetricGoalDistance(double x, double y, double z) override;
     ///@}
 
-    void updateGoal(const GoalConstraint& goal);
+    void updateGoal(const GoalConstraint& goal) override;
 
     /// \name Required Heuristic Interface
     ///@{

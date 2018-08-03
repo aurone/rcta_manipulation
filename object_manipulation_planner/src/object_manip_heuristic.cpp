@@ -126,7 +126,7 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
     // generally all robot states (all all, including those states suggested by
     // the E_z edges)
     switch (goal.type) {
-    case GoalType::JOINT_STATE_GOAL:
+    case GoalType::USER_GOAL_CONSTRAINT_FN:
     {
         this->goal_z = goal.angles.back();
         SMPL_INFO("Goal Z: %f", this->goal_z);
@@ -224,7 +224,7 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
     case GoalType::XYZ_GOAL:
     case GoalType::XYZ_RPY_GOAL:
     case GoalType::MULTIPLE_POSE_GOAL:
-    case GoalType::USER_GOAL_CONSTRAINT_FN:
+    case GoalType::JOINT_STATE_GOAL:
     default:
         SMPL_WARN("Unsupported goal type %d", (int)goal.type);
         break;

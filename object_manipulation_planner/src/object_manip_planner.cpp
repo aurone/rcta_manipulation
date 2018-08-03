@@ -95,6 +95,11 @@ auto MakeGraphStatePrefix(const moveit::core::RobotState& state, ObjectManipMode
     return s;
 }
 
+bool IsGoal(void* user, const smpl::RobotState& state)
+{
+    return std::fabs(state.back() - static_cast<smpl::GoalConstraint*>(user)->angles.back()) < 0.1;
+}
+
 bool PlanPath(
     ObjectManipPlanner* planner,
     const moveit::core::RobotState& start_state,
@@ -108,13 +113,24 @@ bool PlanPath(
 
     auto start = MakeGraphStatePrefix(start_state, planner->model);
     start.push_back(object_start_state);
-    planner->graph.setStart(start);
+    if (!planner->graph.setStart(start)) {
+        ROS_ERROR("Failed to set start");
+        return false;
+    }
 
     // TODO: goal is to open the object all the way, frame this as a
     // partially-specified joint configuration goal
     smpl::GoalConstraint goal;
-    goal.type = smpl::GoalType::JOINT_STATE_GOAL;
+    goal.type = smpl::GoalType::USER_GOAL_CONSTRAINT_FN;
+    goal.angles.push_back(object_goal_state);
+    goal.check_goal = IsGoal;
+    goal.check_goal_user = &goal;
     planner->graph.setGoal(goal);
+
+    auto start_id = planner->graph.getStartStateID();
+    auto goal_id = planner->graph.getGoalStateID();
+    planner->search.set_start(start_id);
+    planner->search.set_goal(goal_id);
 
     smpl::ARAStar::TimeParameters timing;
     timing.bounded = true;
@@ -128,6 +144,8 @@ bool PlanPath(
         ROS_ERROR("Failed to plan path");
         return false;
     }
+
+    ROS_INFO("Found path through %zu states", solution.size());
 
     std::vector<smpl::RobotState> path;
     if (!planner->graph.extractPath(solution, path)) {
