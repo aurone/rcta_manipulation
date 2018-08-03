@@ -8,10 +8,10 @@
 #include <Eigen/Dense>
 #include <smpl/graph/simple_workspace_lattice_action_space.h>
 #include <smpl/graph/workspace_lattice_egraph.h>
-#include <smpl/heuristic/object_manip_heuristic.h>
 #include <smpl/planning_params.h>
 #include <smpl/search/arastar.h>
 
+#include "object_manip_heuristic.h"
 #include "roman_workspace_lattice_action_space.h"
 
 namespace smpl {

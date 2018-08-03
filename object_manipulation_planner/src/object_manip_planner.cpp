@@ -3,11 +3,11 @@
 // system includes
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
-#include <smpl/heuristic/object_manip_heuristic.h>
 #include <smpl/occupancy_grid.h>
 
 // project includes
 #include "object_manipulation_model.h"
+#include "object_manip_heuristic.h"
 
 ObjectManipPlanner::ObjectManipPlanner() : search(&graph, &heuristic) { }
 
@@ -20,6 +20,15 @@ bool Init(
     planner->model = model;
 
     smpl::WorkspaceLattice::Params p;
+    // TODO: parameterize these. one free angle here?
+    p.free_angle_res = { smpl::angles::to_radians(5) };
+    p.res_x = 0.05;
+    p.res_y = 0.05;
+    p.res_z = 0.05;
+    p.Y_count = 72;
+    p.P_count = 3;
+    p.R_count = 72;
+
     if (!planner->graph.init(model, checker, &planner->params, p, &planner->actions)) {
         ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
         return false;
@@ -33,6 +42,28 @@ bool Init(
         ROS_ERROR("Failed to initialize Dijkstra E-Graph Heuristic 3D");
         return false;
     }
+
+#if 1
+    // when the base distance is above this threshold, the base theta
+    // term in the heuristic includes turning toward the nearest e-graph
+    // state, and then turning to the orientation of the e-graph state;
+    // otherwise, the base theta term only includes turning toward the
+    // nearest e-graph state
+    auto heading_thresh = 0.05; // cabinet1, cabinet2@35
+    //heading_thresh: 0.1
+    //heading_thresh: 0.15 // cabinet_demo@60
+
+    // tolerance before the base theta term is dropped to 0
+    auto theta_db = 0.0349066;
+
+    // tolerance before the base position term is dropped to 0
+    auto pos_db = 0.1; // cabinet1, cabinet2@35
+    //pos_db: 0.2 // cabinet_demo@60
+#endif
+
+    planner->heuristic.heading_thresh = 0.05;
+    planner->heuristic.theta_db = theta_db;
+    planner->heuristic.pos_db = pos_db;
 
     planner->search.allowPartialSolutions(false);
     planner->search.setTargetEpsilon(1.0);
@@ -56,7 +87,12 @@ bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
 auto MakeGraphStatePrefix(const moveit::core::RobotState& state, ObjectManipModel* model)
     -> smpl::RobotState
 {
-    return { }; // TODO: extract the joint variables from the state that correspond to planning variables
+    smpl::RobotState s;
+    for (auto& joint : model->parent_model->getPlanningJoints()) {
+        auto pos = state.getVariablePosition(joint);
+        s.push_back(pos);
+    }
+    return s;
 }
 
 bool PlanPath(

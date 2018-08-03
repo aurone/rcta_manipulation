@@ -1,0 +1,24 @@
+<launch>
+    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
+        <arg name="load_robot_description" value="true"/>
+    </include>
+
+    <rosparam command="load" file="$(find roman_moveit_config)/config/collision_model.yaml"/>
+
+    <node name="object_manip_planner" pkg="object_manipulation_planner" type="object_manip_planner_node">
+        <param name="group_name" value="right_arm_torso_base"/>
+        <param name="tip_link" value="limb_right_tool0"/>
+        <param name="ik_group_name" value="right_arm"/>
+        <param name="planning_frame" value="map"/>
+        <param name="demonstrations_path" value="$(env HOME)/data/egraphs/roman_right_arm_torso_base_paths"/>
+
+        <param name="grid/size_x"       value="20.0"/>
+        <param name="grid/size_y"       value="20.0"/>
+        <param name="grid/size_z"       value="2.1"/>
+        <param name="grid/origin_x"     value="-10.0"/>
+        <param name="grid/origin_y"     value="-10.0"/>
+        <param name="grid/origin_z"     value="-0.15"/>
+        <param name="grid/resolution"   value="0.05"/>
+        <param name="grid/max_dist"     value="0.8"/>
+    </node>
+</launch>

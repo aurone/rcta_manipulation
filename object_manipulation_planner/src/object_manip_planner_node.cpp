@@ -21,6 +21,18 @@
 #include "object_manip_planner.h"
 #include "object_manipulation_model.h"
 
+template <class T>
+bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
+{
+    if (!nh.getParam(name, *value)) {
+        ROS_ERROR("Failed to download param '%s' from the param server", name.c_str());
+        return false;
+    }
+
+    ROS_INFO_STREAM("Retrieved parameter " << name << " = " << *value);
+    return true;
+}
+
 // 1. Generate a trajectory using the model of the object
 // 2. Save the example trajectory as a demonstration
 // 3. Construct state space: (base/x, base/y, base/theta, torso, ee/x, ee/y,
@@ -41,10 +53,15 @@ int main(int argc, char* argv[])
 
     ros::Duration(0.5).sleep(); // let publisher set up
 
-    // TODO: parameterize
-    auto group_name = "right_arm_torso_base";
-    auto tip_link = "limb_right_tool0";
-    auto ik_group_name = "right_arm";
+    std::string group_name;
+    std::string tip_link;
+    std::string ik_group_name;
+    if (!GetParam(ph, "group_name", &group_name) ||
+        !GetParam(ph, "tip_link", &tip_link) ||
+        !GetParam(ph, "ik_group_name", &ik_group_name))
+    {
+        return 1;
+    }
 
     /////////////////////////////////////////////
     // Load the Robot Model from the URDF/SRDF //
@@ -96,14 +113,19 @@ int main(int argc, char* argv[])
     ph.param<std::string>("planning_frame", planning_frame, "map");
 
     // Parameters taken from 'world_collision_model' declared in move_group.launch
-    auto size_x = 20.0;
-    auto size_y = 20.0;
-    auto size_z = 2.1;
-    auto origin_x = -10.0;
-    auto origin_y = -10.0;
-    auto origin_z = -0.15;
-    auto resolution = 0.05;
-    auto max_dist = 0.8;
+    double size_x, size_y, size_z, origin_x, origin_y, origin_z, resolution, max_dist;
+    ros::NodeHandle gh(ph, "grid");
+    if (!GetParam(gh, "size_x", &size_x) ||
+        !GetParam(gh, "size_y", &size_y) ||
+        !GetParam(gh, "size_z", &size_z) ||
+        !GetParam(gh, "origin_x", &origin_x) ||
+        !GetParam(gh, "origin_y", &origin_y) ||
+        !GetParam(gh, "origin_z", &origin_z) ||
+        !GetParam(gh, "resolution", &resolution) ||
+        !GetParam(gh, "max_dist", &max_dist))
+    {
+        return 1;
+    }
     auto grid = smpl::OccupancyGrid(
             size_x,
             size_y,
@@ -141,14 +163,19 @@ int main(int argc, char* argv[])
     // Initialize the Planner //
     ////////////////////////////
 
+    ROS_INFO("Initialize Object Manipulation Planner");
     ObjectManipPlanner planner;
     if (!Init(&planner, &omanip, &cspace, &grid)) {
         ROS_ERROR("Failed to initialize Object Manipulation Planner");
         return 1;
     }
 
-    // TODO: parameterize
-    auto demos = "/home/aurone/data/egraphs/right_arm_torso_base_paths";
+    std::string demos;
+    if (!GetParam(ph, "demonstrations_path", &demos)) {
+        return 1;
+    }
+
+    ROS_INFO("Load demonstrations");
     if (!LoadDemonstrations(&planner, demos)) {
         return 1;
     }
@@ -161,6 +188,7 @@ int main(int argc, char* argv[])
     start_state.setToDefaultValues();
 
     // Update the reference state in the collision model
+    ROS_INFO("Update start state in collision model");
     for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
         auto& name = robot_model->getVariableNames()[i];
         auto pos = start_state.getVariablePositions()[i];
@@ -171,6 +199,7 @@ int main(int argc, char* argv[])
     }
 
     // Update the reference state in the planning model
+    ROS_INFO("Update start state in planning model");
     if (!planning_model.updateReferenceState(start_state)) {
         ROS_ERROR("Failed to update the planning model reference state");
         return 1;
@@ -196,6 +225,7 @@ int main(int argc, char* argv[])
     // Plan! //
     ///////////
 
+    ROS_INFO("Plan path!");
     if (!PlanPath(
             &planner,
             start_state,

@@ -190,6 +190,7 @@ bool Init(
     model->parent_model = parent;
     model->fk_iface = GetExtension<smpl::ForwardKinematicsInterface>(parent);
     model->ik_iface = GetExtension<smpl::InverseKinematicsInterface>(parent);
+    model->rm_iface = GetExtension<smpl::RedundantManipulatorInterface>(parent);
     model->min_object_pos = object_min;
     model->max_object_pos = object_max;
 
