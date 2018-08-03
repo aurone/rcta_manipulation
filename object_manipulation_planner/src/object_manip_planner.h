@@ -33,6 +33,7 @@ class ObjectManipModel;
 
 struct ObjectManipPlanner
 {
+    ObjectManipModel*                       model;
     smpl::PlanningParams                    params;
     smpl::WorkspaceLatticeEGraph            graph;
     RomanWorkspaceLatticeActionSpace        actions;

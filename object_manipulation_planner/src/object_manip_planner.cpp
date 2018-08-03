@@ -17,12 +17,10 @@ bool Init(
     smpl::CollisionChecker* checker,
     smpl::OccupancyGrid* grid)
 {
-    smpl::WorkspaceLatticeEGraph graph;
-
-    smpl::SimpleWorkspaceLatticeActionSpace actions;
+    planner->model = model;
 
     smpl::WorkspaceLattice::Params p;
-    if (!graph.init(model, checker, &planner->params, p, &planner->actions)) {
+    if (!planner->graph.init(model, checker, &planner->params, p, &planner->actions)) {
         ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
         return false;
     }
@@ -31,7 +29,7 @@ bool Init(
         return false;
     }
 
-    if (!planner->heuristic.init(&graph)) {
+    if (!planner->heuristic.init(&planner->graph)) {
         ROS_ERROR("Failed to initialize Dijkstra E-Graph Heuristic 3D");
         return false;
     }
@@ -46,11 +44,19 @@ bool Init(
 
 bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
 {
+    // TODO: store demonstrations in the local frame of the object and transform
+    // demonstration prior to each planning query
     if (!planner->graph.loadExperienceGraph(path)) {
         ROS_ERROR("Failed to load experience graph");
         return false;
     }
     return true;
+}
+
+auto MakeGraphStatePrefix(const moveit::core::RobotState& state, ObjectManipModel* model)
+    -> smpl::RobotState
+{
+    return { }; // TODO: extract the joint variables from the state that correspond to planning variables
 }
 
 bool PlanPath(
@@ -64,16 +70,21 @@ bool PlanPath(
 {
     // TODO: behavior to level out the end effector
 
+    auto start = MakeGraphStatePrefix(start_state, planner->model);
+    start.push_back(object_start_state);
+    planner->graph.setStart(start);
+
     // TODO: goal is to open the object all the way, frame this as a
     // partially-specified joint configuration goal
     smpl::GoalConstraint goal;
     goal.type = smpl::GoalType::JOINT_STATE_GOAL;
+    planner->graph.setGoal(goal);
 
     smpl::ARAStar::TimeParameters timing;
     timing.bounded = true;
     timing.improve = true;
-    timing.max_allowed_time_init = std::chrono::seconds(10);
-    timing.max_allowed_time = std::chrono::seconds(10);
+    timing.max_allowed_time_init = smpl::to_duration(allowed_time);
+    timing.max_allowed_time = smpl::to_duration(allowed_time);
     std::vector<int> solution;
     int solution_cost;
     bool res = planner->search.replan(timing, &solution, &solution_cost);
@@ -81,6 +92,19 @@ bool PlanPath(
         ROS_ERROR("Failed to plan path");
         return false;
     }
+
+    std::vector<smpl::RobotState> path;
+    if (!planner->graph.extractPath(solution, path)) {
+        ROS_ERROR("Failed to extract path");
+        return false;
+    }
+
+    // TODO: smooth path
+
+    // TODO: profile trajectory
+
+    // TODO: convert to robot trajectory by extracting planning variables that
+    // correspond to robot state variables
 
     return true;
 }
