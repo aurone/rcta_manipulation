@@ -77,6 +77,7 @@ bool InitRomanWorkspaceLatticeActions(
     }
     }
 #else
+    // 2-connected motions for x, y, and z of the end effector
     add_xyz_prim(-1, 0, 0);
     add_xyz_prim(1, 0, 0);
     add_xyz_prim(0, 1, 0);
@@ -89,8 +90,11 @@ bool InitRomanWorkspaceLatticeActions(
     for (int a = 3; a < space->dofCount(); ++a) {
         std::vector<double> d(space->dofCount(), 0.0);
 
-        if (a == EE_QX || a == EE_QY) continue; // skip roll and pitch primitives
-        if (a == BD_PX || a == BD_PY) continue; // do base motions later
+        // skip roll and pitch primitives
+        if (a == EE_QX || a == EE_QY) continue;
+
+        // do base motions later
+        if (a == BD_PX || a == BD_PY) continue;
 
         d[a] = space->resolution()[a] * -1;
         prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
@@ -127,30 +131,41 @@ bool InitRomanWorkspaceLatticeActions(
         actions->m_prims.push_back(prim);
     }
 
-    for (int dx = 0; dx < 5; ++dx) {
-        for (int dy = 0; dy < 5; ++dy) {
+    // Add motions to move the base forward/backward, left/right, and
+    // diagonally. Move the end effector along with the base. Note that these
+    // actions will be pruned later to enforce non-holonomic constraints.
+    //
+    for (int dx = -2; dx <= 2; ++dx) {
+        for (int dy = -2; dy <= 2; ++dy) {
+            // skip no motion
+            if (dx == 0 && dy == 0) continue;
+
+            // skip long diagonals
+            if (dx == -2 && dy == -2) continue;
+            if (dx == -2 && dy == 2) continue;
+            if (dx == 2 && dy == -2) continue;
             if (dx == 2 && dy == 2) continue;
 
-            if (dx == 0 && dy == 0) continue;
-            if (dx == 0 && dy == 4) continue;
-            if (dx == 4 && dy == 0) continue;
-            if (dx == 4 && dy == 4) continue;
-
-            if (dx == 0 && dy == 0) continue;
-            if (dx == 2 && dy == 0) continue;
-            if (dx == 0 && dy == 2) continue;
+            if (dx == -2 && dy == -2) continue;
+            if (dx == 2 && dy == -2) continue;
+            if (dx == -2 && dy == 2) continue;
             if (dx == 2 && dy == 2) continue;
 
             std::vector<double> d(space->dofCount(), 0.0);
-            d[BD_PX] = (dx - 2) * space->resolution()[BD_PX];
-            d[BD_PY] = (dy - 2) * space->resolution()[BD_PY];
+            d[BD_PX] = dx * space->resolution()[BD_PX];
+            d[BD_PY] = dy * space->resolution()[BD_PY];
 
-            d[EE_PX] = (dx - 2) * space->resolution()[EE_PX];
-            d[EE_PY] = (dy - 2) * space->resolution()[EE_PY];
+            d[EE_PX] = dx * space->resolution()[EE_PX];
+            d[EE_PY] = dy * space->resolution()[EE_PY];
             prim.action.clear();
             prim.action.push_back(d);
             actions->m_prims.push_back(prim);
         }
+    }
+
+    SMPL_INFO("%zu total motion primitives", actions->m_prims.size());
+    for (auto& prim : actions->m_prims) {
+        SMPL_INFO_STREAM("primitive:  " << prim.action);
     }
 
     return true;
@@ -165,10 +180,10 @@ void RomanWorkspaceLatticeActionSpace::apply(
     smpl::WorkspaceState cont_state;
     space->stateCoordToWorkspace(state.coord, cont_state);
 
-    SMPL_DEBUG_STREAM_NAMED(space->params()->expands_log, "  create actions for workspace state: " << cont_state);
+    SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  create actions for workspace state: " << cont_state);
 
     for (auto& prim : m_prims) {
-        {
+        {   // disallow sideways motion
             auto dx = prim.action.back()[BD_PX]; //action.back()[BD_PX] - state.state[0];
             auto dy = prim.action.back()[BD_PY]; //action.back()[BD_PY] - state.state[1];
             if (std::fabs(dx) > 1e-6 | std::fabs(dy) > 1e-6) {

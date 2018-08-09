@@ -9,7 +9,7 @@
 #include <moveit/robot_state/conversions.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit_msgs/DisplayTrajectory.h>
-#include <moveit_planners_sbpl/planner/moveit_robot_model.h>
+#include <smpl_moveit_interface/planner/moveit_robot_model.h>
 #include <ros/ros.h>
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
@@ -67,6 +67,8 @@ int main(int argc, char* argv[])
     // Load the Robot Model from the URDF/SRDF //
     /////////////////////////////////////////////
 
+    ROS_INFO("Load Robot Model");
+
     robot_model_loader::RobotModelLoader loader;
     auto robot_model = loader.getModel();
     if (!robot_model) {
@@ -84,6 +86,8 @@ int main(int argc, char* argv[])
     ///////////////////////////////////
     // Initialize the Planning Model //
     ///////////////////////////////////
+
+    ROS_INFO("Initialize Planning Model");
 
     // want to include the object degree-of-freedom as a free variable in the
     // robot model to be able to use workspace lattice directly
@@ -108,11 +112,12 @@ int main(int argc, char* argv[])
     // Initialize the Collision Checker //
     //////////////////////////////////////
 
+    ROS_INFO("Initialize Collision Checker");
+
     // frame of the planning/collision model, for visualization
     std::string planning_frame;
     ph.param<std::string>("planning_frame", planning_frame, "map");
 
-    // Parameters taken from 'world_collision_model' declared in move_group.launch
     double size_x, size_y, size_z, origin_x, origin_y, origin_z, resolution, max_dist;
     ros::NodeHandle gh(ph, "grid");
     if (!GetParam(gh, "size_x", &size_x) ||
@@ -145,15 +150,17 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto planning_variables = omanip.getPlanningJoints();
-    planning_variables.pop_back();
+    // NOTE: Initialize CollisionSpace with the planning joints of the parent
+    // (non-object) model, since the CollisionSpace has no knowledge of the
+    // object joint. Also, it's pure luck that the CollisionSpace ignores "too
+    // large" vectors.
     smpl::collision::CollisionSpace cspace;
     if (!cspace.init(
             &grid,
             *robot_model->getURDF().get(),
             config,
             group_name,
-            planning_variables))
+            omanip.parent_model->getPlanningJoints()))
     {
         ROS_ERROR("Failed to initialize Collision Space");
         return 1;
@@ -164,6 +171,7 @@ int main(int argc, char* argv[])
     ////////////////////////////
 
     ROS_INFO("Initialize Object Manipulation Planner");
+
     ObjectManipPlanner planner;
     if (!Init(&planner, &omanip, &cspace, &grid)) {
         ROS_ERROR("Failed to initialize Object Manipulation Planner");
@@ -187,8 +195,20 @@ int main(int argc, char* argv[])
     moveit::core::RobotState start_state(robot_model);
     start_state.setToDefaultValues();
 
-    // Update the reference state in the collision model
+    start_state.setVariablePosition("limb_right_joint2", smpl::to_radians(30.0));
+    start_state.setVariablePosition("limb_right_joint4", smpl::to_radians(30.0));
+    start_state.setVariablePosition("limb_right_joint6", smpl::to_radians(30.0));
+    start_state.setVariablePosition("limb_right_joint7", smpl::to_radians(90.0));
+    start_state.setVariablePosition("limb_left_joint1", smpl::to_radians(-90.0));
+    start_state.setVariablePosition("limb_left_joint2", smpl::to_radians(90.0));
+    start_state.setVariablePosition("limb_left_joint3", smpl::to_radians(90.0));
+    start_state.setVariablePosition("limb_left_joint4", smpl::to_radians(180.0));
+    start_state.setVariablePosition("limb_left_joint5", smpl::to_radians(-90.0));
+    start_state.setVariablePosition("limb_left_joint6", smpl::to_radians(0.0));
+    start_state.setVariablePosition("limb_left_joint7", smpl::to_radians(0.0));
+
     ROS_INFO("Update start state in collision model");
+
     for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
         auto& name = robot_model->getVariableNames()[i];
         auto pos = start_state.getVariablePositions()[i];
@@ -198,8 +218,8 @@ int main(int argc, char* argv[])
         }
     }
 
-    // Update the reference state in the planning model
     ROS_INFO("Update start state in planning model");
+
     if (!planning_model.updateReferenceState(start_state)) {
         ROS_ERROR("Failed to update the planning model reference state");
         return 1;
@@ -226,6 +246,7 @@ int main(int argc, char* argv[])
     ///////////
 
     ROS_INFO("Plan path!");
+
     if (!PlanPath(
             &planner,
             start_state,
@@ -243,6 +264,8 @@ int main(int argc, char* argv[])
     // display the planned path //
     //////////////////////////////
 
+    ROS_INFO("Display trajectory");
+
     {
         moveit_msgs::DisplayTrajectory display;
 
@@ -251,12 +274,18 @@ int main(int argc, char* argv[])
         display.trajectory.resize(1);
         trajectory.getRobotTrajectoryMsg(display.trajectory[0]);
 
-        display.trajectory_start;
+        moveit::core::robotStateToRobotStateMsg(
+                trajectory.getFirstWayPoint(),
+                display.trajectory_start);
 
         display_publisher.publish(display);
     }
 
-    // TODO: convert to FollowJointTrajectoryGoal for execution
+    //////////////////////////////////////////////////////////////
+    // TODO: convert to FollowJointTrajectoryGoal for execution //
+    //////////////////////////////////////////////////////////////
+
+    ROS_INFO("Execute trajectory");
 
     return 0;
 }

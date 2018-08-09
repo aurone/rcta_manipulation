@@ -3,7 +3,10 @@
 // system includes
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
+#include <smpl/console/nonstd.h>
 #include <smpl/occupancy_grid.h>
+#include <smpl/post_processing.h>
+#include <smpl/planning_params.h>
 
 // project includes
 #include "object_manipulation_model.h"
@@ -18,10 +21,19 @@ bool Init(
     smpl::OccupancyGrid* grid)
 {
     planner->model = model;
+    planner->checker = checker;
 
     smpl::WorkspaceLattice::Params p;
     // TODO: parameterize these. one free angle here?
-    p.free_angle_res = { smpl::angles::to_radians(5) };
+    p.free_angle_res =
+    {
+        smpl::to_radians(5),        // arm free angle
+        smpl::to_radians(5),        // torso joint
+        0.05,                       // base x
+        0.05,                       // base y
+        smpl::to_radians(22.5),     // base theta
+        0.00001                     // object z
+    };
     p.res_x = 0.05;
     p.res_y = 0.05;
     p.res_z = 0.05;
@@ -29,7 +41,7 @@ bool Init(
     p.P_count = 3;
     p.R_count = 72;
 
-    if (!planner->graph.init(model, checker, &planner->params, p, &planner->actions)) {
+    if (!planner->graph.init(model, checker, p, &planner->actions)) {
         ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
         return false;
     }
@@ -84,7 +96,9 @@ bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
     return true;
 }
 
-auto MakeGraphStatePrefix(const moveit::core::RobotState& state, ObjectManipModel* model)
+auto MakeGraphStatePrefix(
+    const moveit::core::RobotState& state,
+    ObjectManipModel* model)
     -> smpl::RobotState
 {
     smpl::RobotState s;
@@ -95,9 +109,27 @@ auto MakeGraphStatePrefix(const moveit::core::RobotState& state, ObjectManipMode
     return s;
 }
 
+void UpdateRobotState(
+    moveit::core::RobotState& robot_state,
+    const smpl::RobotState& graph_state,
+    ObjectManipModel* model)
+{
+    for (size_t i = 0; i < model->parent_model->getPlanningJoints().size(); ++i) {
+        auto varname = model->parent_model->getPlanningJoints()[i];
+        robot_state.setVariablePosition(varname, graph_state[i]);
+    }
+}
+
 bool IsGoal(void* user, const smpl::RobotState& state)
 {
-    return std::fabs(state.back() - static_cast<smpl::GoalConstraint*>(user)->angles.back()) < 0.1;
+    auto* goal = static_cast<smpl::GoalConstraint*>(user);
+    auto diff = state.back() - goal->angles.back();
+    if (std::fabs(diff) < goal->angle_tolerances.back()) {
+        ROS_INFO("Found a goal state (%f vs %f)", state.back(), goal->angles.back());
+        return true;
+    }
+
+    return false;
 }
 
 bool PlanPath(
@@ -118,11 +150,12 @@ bool PlanPath(
         return false;
     }
 
-    // TODO: goal is to open the object all the way, frame this as a
-    // partially-specified joint configuration goal
+    ROS_INFO_STREAM("Start state = " << start);
+
     smpl::GoalConstraint goal;
     goal.type = smpl::GoalType::USER_GOAL_CONSTRAINT_FN;
     goal.angles.push_back(object_goal_state);
+    goal.angle_tolerances.push_back(0.05);
     goal.check_goal = IsGoal;
     goal.check_goal_user = &goal;
     planner->graph.setGoal(goal);
@@ -132,9 +165,13 @@ bool PlanPath(
     planner->search.set_start(start_id);
     planner->search.set_goal(goal_id);
 
+    ROS_INFO("start state id = %d", start_id);
+    ROS_INFO("goal state id = %d", goal_id);
+
     smpl::ARAStar::TimeParameters timing;
     timing.bounded = true;
     timing.improve = true;
+    timing.type = smpl::ARAStar::TimeParameters::TIME;
     timing.max_allowed_time_init = smpl::to_duration(allowed_time);
     timing.max_allowed_time = smpl::to_duration(allowed_time);
     std::vector<int> solution;
@@ -153,12 +190,36 @@ bool PlanPath(
         return false;
     }
 
-    // TODO: smooth path
+    /////////////////
+    // smooth path //
+    /////////////////
 
-    // TODO: profile trajectory
+    if (!smpl::InterpolatePath(*planner->checker, path)) {
+        ROS_ERROR("Failed to interpolate path");
+        return false;
+    }
 
-    // TODO: convert to robot trajectory by extracting planning variables that
-    // correspond to robot state variables
+    std::vector<smpl::RobotState> shortcut_path;
+    smpl::ShortcutPath(
+            planner->model,
+            planner->checker,
+            path,
+            shortcut_path,
+            smpl::ShortcutType::JOINT_SPACE);
+
+    //////////////////////////////
+    // TODO: Profile Trajectory //
+    //////////////////////////////
+
+    //////////////////////////////////////////////////
+    // Convert to robot_trajectory::RobotTrajectory //
+    //////////////////////////////////////////////////
+
+    for (auto& point : shortcut_path) {
+        moveit::core::RobotState state(start_state);
+        UpdateRobotState(state, point, planner->model);
+        trajectory->addSuffixWayPoint(state, 1.0);
+    }
 
     return true;
 }

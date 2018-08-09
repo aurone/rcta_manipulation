@@ -33,8 +33,8 @@ class ObjectManipModel;
 
 struct ObjectManipPlanner
 {
+    smpl::CollisionChecker*                 checker;
     ObjectManipModel*                       model;
-    smpl::PlanningParams                    params;
     smpl::WorkspaceLatticeEGraph            graph;
     RomanWorkspaceLatticeActionSpace        actions;
     smpl::ObjectManipulationHeuristic       heuristic;
