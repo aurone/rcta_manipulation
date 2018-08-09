@@ -14,7 +14,7 @@ find_package(
         eigen_conversions
         leatherman
         moveit_core
-        moveit_planners_sbpl
+        smpl_moveit_interface
         moveit_ros_planning
         roscpp
         sbpl_collision_checking
@@ -28,6 +28,8 @@ catkin_package()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
+add_definitions(-DSMPL_CONSOLE_ROS)
+
 add_library(
     object_manip_planner
     src/object_manip_planner.cpp
@@ -39,7 +41,7 @@ target_include_directories(object_manip_planner PUBLIC SYSTEM ${catkin_INCLUDE_D
 target_include_directories(object_manip_planner PUBLIC include)
 target_link_libraries(
     object_manip_planner
-    ${moveit_planners_sbpl_LIBRARIES}
+    ${smpl_moveit_interface_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
