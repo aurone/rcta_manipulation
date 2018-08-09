@@ -20,8 +20,6 @@ public:
     ExtractRobotStateExtension* extract_state = NULL;
     PointProjectionExtension* project_to_point = NULL;
 
-    double goal_z;
-
     std::vector<int> egraph_goal_heuristics;
 
     double heading_thresh = 0.1;

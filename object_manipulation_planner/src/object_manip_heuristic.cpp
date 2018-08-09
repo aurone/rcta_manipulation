@@ -4,6 +4,7 @@
 #include <smpl/console/console.h>
 #include <smpl/graph/experience_graph_extension.h>
 #include <smpl/heap/intrusive_heap.h>
+#include <smpl/planning_params.h>
 
 namespace smpl {
 
@@ -39,7 +40,7 @@ void ObjectManipulationHeuristic::getEquivalentStates(
         // TODO: THIS SHOULD BE RELATED TO THE SEARCH RESOLUTION
         double thresh = 0.08; //0.06;
         if ((egraph_pos - p).squaredNorm() < thresh * thresh) {
-            SMPL_WARN("FOUND IT!");
+            SMPL_WARN_NAMED(H_LOG, "FOUND IT!");
             ids.push_back(node_state_id);
         }
     }
@@ -49,24 +50,24 @@ bool ObjectManipulationHeuristic::init(RobotPlanningSpace* space)
 {
     this->eg = space->getExtension<ExperienceGraphExtension>();
     if (this->eg == NULL) {
-        SMPL_WARN("ObjectManipulationHeuristic requires Experience Graph Extension");
+        SMPL_WARN_NAMED(H_LOG, "ObjectManipulationHeuristic requires Experience Graph Extension");
         return false;
     }
 
     this->extract_state = space->getExtension<ExtractRobotStateExtension>();
     if (this->extract_state == NULL) {
-        SMPL_WARN("ObjectManipulationHeuristic requires Extract Robot State Extension");
+        SMPL_WARN_NAMED(H_LOG, "ObjectManipulationHeuristic requires Extract Robot State Extension");
         return false;
     }
 
     this->project_to_point = space->getExtension<PointProjectionExtension>();
     if (this->project_to_point == NULL) {
-        SMPL_WARN("ObjectManipulationHeuristic requires Point Projection Extension");
+        SMPL_WARN_NAMED(H_LOG, "ObjectManipulationHeuristic requires Point Projection Extension");
         return false;
     }
 
     if (!RobotHeuristic::init(space)) {
-        SMPL_WARN("Failed to initialize Robot Heuristic");
+        SMPL_WARN_NAMED(H_LOG, "Failed to initialize Robot Heuristic");
         return false;
     }
 
@@ -128,11 +129,14 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
     switch (goal.type) {
     case GoalType::USER_GOAL_CONSTRAINT_FN:
     {
-        this->goal_z = goal.angles.back();
-        SMPL_INFO("Goal Z: %f", this->goal_z);
+        auto goal_z = goal.angles.back();
+        auto goal_thresh = goal.angle_tolerances.back();
+
+        SMPL_INFO_NAMED(H_LOG, "Goal Z: %f", goal_z);
 
         auto* egraph = this->eg->getExperienceGraph();
 
+        SMPL_DEBUG_NAMED(H_LOG, "Precompute manipulation heuristic for %zu e-graph states", egraph->num_nodes());
         this->egraph_goal_heuristics.resize(egraph->num_nodes(), -1);
 
         struct ExperienceGraphSearchNode : heap_element
@@ -165,9 +169,20 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
             auto& egraph_state = egraph->state(node);
             auto egraph_state_z = egraph_state.back();
 
-            if (egraph_state_z == goal_z) {
+            if (std::fabs(egraph_state_z - goal_z) <= goal_thresh) {
                 search_nodes[node].g = 0;
                 open.push(&search_nodes[node]);
+            }
+        }
+
+        SMPL_DEBUG_NAMED(H_LOG, "Experience graph contains %zu goal states", open.size());
+        if (open.empty()) {
+            SMPL_WARN_NAMED(H_LOG, "Experience graph contains no goal states. Reaching the goal is impossible");
+            for (auto nit = nodes.first; nit != nodes.second; ++nit) {
+                auto node = *nit;
+                auto& egraph_state = egraph->state(node);
+                auto egraph_state_z = egraph_state.back();
+                SMPL_WARN_NAMED(H_LOG, "  z(%zu) = %f", node, egraph_state_z);
             }
         }
 
@@ -213,7 +228,7 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
             }
         }
 
-        SMPL_INFO("Expanded %d nodes looking for shortcut", exp_count);
+        SMPL_INFO_NAMED(H_LOG, "Expanded %d nodes looking for shortcut", exp_count);
         this->egraph_goal_heuristics.resize(egraph->num_nodes());
         for (int i = 0; i < egraph->num_nodes(); ++i) {
             this->egraph_goal_heuristics[i] = search_nodes[i].g;
@@ -226,26 +241,30 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
     case GoalType::MULTIPLE_POSE_GOAL:
     case GoalType::JOINT_STATE_GOAL:
     default:
-        SMPL_WARN("Unsupported goal type %d", (int)goal.type);
+        SMPL_WARN_NAMED(H_LOG, "Unsupported goal type %d", (int)goal.type);
         break;
     }
 }
 
 int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
 {
+    SMPL_DEBUG_NAMED(H_LOG, "GetGoalHeuristic(%d)", state_id);
     if (state_id == this->planningSpace()->getGoalStateID()) {
+        SMPL_DEBUG_NAMED(H_LOG, "h(goal) = 0");
         return 0;
     }
+
     auto& state = this->extract_state->extractState(state_id);
-
-    assert(!state.empty());
-
     auto state_z = state.back();
+    SMPL_DEBUG_NAMED(H_LOG, "  z(state) = %f", state_z);
 
     Eigen::Vector3d point;
     this->project_to_point->projectToPoint(state_id, point);
 
+    SMPL_DEBUG_NAMED(H_LOG, "  psi(state) = (%f, %f, %f)", point.x(), point.y(), point.z());
+
     auto* egraph = this->eg->getExperienceGraph();
+    assert(egraph != NULL);
 
     auto h_min = std::numeric_limits<int>::max();
     int h_base_min;
@@ -256,97 +275,120 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
     this->eg->getExperienceGraphNodes(state_id, the_nodes);
     auto is_egraph = !the_nodes.empty();
 
+    auto z_eps = 1e-4;
+
+    // For all nodes v in the E-Graph where z(v) == z(s)
     auto nodes = egraph->nodes();
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = (*nit);
+
         // get the state for this experience graph node
         // or just use the provided robot state directly
         auto& egraph_state = egraph->state(node);
         auto egraph_state_z = egraph_state.back();
 
-        if (std::fabs(egraph_state_z - state_z) <= 1e-4) {
-            // h_contact
-            auto egraph_state_id = this->eg->getStateID(node);
-            Eigen::Vector3d egraph_pos;
-            this->project_to_point->projectToPoint(egraph_state_id, egraph_pos);
-            auto h_contact = (int)(FixedPointRatio * (egraph_pos - point).norm());
+        if (std::fabs(egraph_state_z - state_z) > z_eps) continue;
 
-            // h_manipulate
-            assert(this->egraph_goal_heuristics.size() > node);
-            auto h_manipulate = this->egraph_goal_heuristics[node];
+        SMPL_DEBUG_NAMED(H_LOG, "    z(v) = %f", egraph_state_z);
 
-            // h_base
-            auto dbx = egraph_state[0] - state[0];
-            auto dby = egraph_state[1] - state[1];
-            auto dbtheta = angles::shortest_angle_dist(egraph_state[2], state[2]);
+        ///////////////////////
+        // Compute h_contact //
+        ///////////////////////
 
-            auto heading_weight = 0.0;
-            if ((dbx * dbx + dby * dby) > (this->heading_thresh * this->heading_thresh)) {
-                auto heading = atan2(dby, dbx);
-                double heading_diff;
-                if (smpl::angles::shortest_angle_dist(heading, state[2]) <
-                    smpl::angles::shortest_angle_dist(heading + M_PI, state[2]))
-                {
-                    heading_weight = smpl::angles::shortest_angle_dist(heading, state[2]) +
-                            smpl::angles::shortest_angle_dist(heading, egraph_state[2]);
-                } else {
-                    heading_weight = smpl::angles::shortest_angle_dist(heading + M_PI, state[2]) +
-                            smpl::angles::shortest_angle_dist(heading + M_PI, egraph_state[2]);
-                }
+        auto egraph_state_id = this->eg->getStateID(node);
+        Eigen::Vector3d egraph_pos;
+        this->project_to_point->projectToPoint(egraph_state_id, egraph_pos);
+        SMPL_DEBUG_NAMED(H_LOG, "    psi(v) = (%f, %f, %f)", egraph_pos.x(), egraph_pos.y(), egraph_pos.z());
+
+        auto h_contact = (int)(FixedPointRatio * (egraph_pos - point).norm());
+
+        SMPL_DEBUG_NAMED(H_LOG, "    h_contact(s,v) = %d", h_contact);
+
+        /////////////////////////
+        // Lookup h_manipulate //
+        /////////////////////////
+
+        assert(this->egraph_goal_heuristics.size() > node);
+        auto h_manipulate = this->egraph_goal_heuristics[node];
+        SMPL_DEBUG_NAMED(H_LOG, "    h_manip(v) = %d", h_manipulate);
+
+        ////////////
+        // h_base //
+        ////////////
+
+        auto dbx = egraph_state[0] - state[0];
+        auto dby = egraph_state[1] - state[1];
+        auto dbtheta = angles::shortest_angle_dist(egraph_state[2], state[2]);
+
+        auto heading_weight = 0.0;
+        if ((dbx * dbx + dby * dby) > (this->heading_thresh * this->heading_thresh)) {
+            auto heading = atan2(dby, dbx);
+            double heading_diff;
+            if (smpl::angles::shortest_angle_dist(heading, state[2]) <
+                smpl::angles::shortest_angle_dist(heading + M_PI, state[2]))
+            {
+                heading_weight = smpl::angles::shortest_angle_dist(heading, state[2]) +
+                        smpl::angles::shortest_angle_dist(heading, egraph_state[2]);
             } else {
-                heading_weight = dbtheta;
+                heading_weight = smpl::angles::shortest_angle_dist(heading + M_PI, state[2]) +
+                        smpl::angles::shortest_angle_dist(heading + M_PI, egraph_state[2]);
             }
+        } else {
+            heading_weight = dbtheta;
+        }
 
-            auto theta_normalizer = 0.05 / angles::to_radians(45.0);
+        auto theta_normalizer = 0.05 / angles::to_radians(45.0);
 
-            auto discretize = [](double val, double disc) {
-                return disc * std::round(val / disc);
-            };
+        auto discretize = [](double val, double disc) {
+            return disc * std::round(val / disc);
+        };
 
-            auto deadband = [](double val, double disc) {
-                if (val < disc) {
-                    return 0.0;
-                } else {
-                    return val;
-                }
-            };
-
-            // heading heuristic (1 or 10 weight)
-            auto h_base_pos = deadband(sqrt(dbx * dbx + dby * dby), this->pos_db);
-            auto h_base_rot = theta_normalizer * deadband(heading_weight, this->theta_db);
-            auto h_base = (int)(
-                    FixedPointRatio *
-                    (
-                        h_base_rot +
-//                        std::fabs(dbx) + std::fabs(dby) +
-                        h_base_pos
-//                        theta_normalizer * heading_weight +
-//                        + dbtheta * theta_normalizer
-                    ));
-
-            h_base *= 10;
-            auto cost = std::max(h_base, h_contact) + h_manipulate;
-//            auto cost = h_base + h_contact + h_manipulate;
-            if (cost < h_min) {
-                h_min = cost;
-                h_base_min = h_base;
-                h_contact_min = h_contact;
-                h_manipulate_min = h_manipulate;
+        auto deadband = [](double val, double disc) {
+            if (val < disc) {
+                return 0.0;
+            } else {
+                return val;
             }
+        };
+
+        // heading heuristic (1 or 10 weight)
+        auto h_base_pos = deadband(sqrt(dbx * dbx + dby * dby), this->pos_db);
+        auto h_base_rot = theta_normalizer * deadband(heading_weight, this->theta_db);
+        auto h_base = (int)(
+                FixedPointRatio *
+                (
+                    h_base_rot +
+//                    std::fabs(dbx) + std::fabs(dby) +
+                    h_base_pos
+//                    theta_normalizer * heading_weight +
+//                    + dbtheta * theta_normalizer
+                ));
+
+        h_base *= 10;
+
+        SMPL_DEBUG_NAMED(H_LOG, "    h_base(s,v) = %d", h_base);
+        auto cost = std::max(h_base, h_contact) + h_manipulate;
+//        auto cost = h_base + h_contact + h_manipulate;
+        if (cost < h_min) {
+            h_min = cost;
+            h_base_min = h_base;
+            h_contact_min = h_contact;
+            h_manipulate_min = h_manipulate;
         }
     }
 
     if (h_min == std::numeric_limits<int>::max()) {
-        SMPL_INFO("state z = %0.12f", state_z);
+        SMPL_INFO_NAMED(H_LOG, "state z = %0.12f", state_z);
     }
 
     if (is_egraph) {
+        SMPL_DEBUG_NAMED(H_LOG, "  h(%d) = %d", state_id, h_manipulate_min);
         return h_manipulate_min;
+    } else {
+        SMPL_DEBUG_NAMED(H_LOG, "h(%d) = %d + %d + %d = %d",
+                state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
+        return h_min;
     }
-
-    SMPL_DEBUG_NAMED("heuristic", "h(%d) = %d + %d + %d = %d",
-            state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
-    return h_min;
 }
 
 int ObjectManipulationHeuristic::GetStartHeuristic(int state_id)
