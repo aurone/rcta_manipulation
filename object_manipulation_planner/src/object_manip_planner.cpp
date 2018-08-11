@@ -38,9 +38,9 @@ bool Init(
     p.res_x = 0.05;
     p.res_y = 0.05;
     p.res_z = 0.05;
-    p.Y_count = 72;
-    p.P_count = 3;
-    p.R_count = 72;
+    p.Y_count = 36; //72;
+    p.P_count = 19;//73;
+    p.R_count = 36;
 
     if (!planner->graph.init(model, checker, p, &planner->actions)) {
         ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
