@@ -137,10 +137,20 @@ bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
     smpl::WorkspaceState finish_state;
     this->stateCoordToWorkspace(src_state->coord, start_state);
     this->stateCoordToWorkspace(dst_state->coord, finish_state);
-    int num_waypoints = 10;
-    for (int i = 0; i < num_waypoints; ++i) {
+
+    SMPL_WARN_STREAM_NAMED(G_LOG, "Interpolate between states " << start_state << " and " << finish_state);
+
+    auto prev_fa = start_state[AR_FA];
+
+    auto num_waypoints = 10;
+    for (auto i = 0; i < num_waypoints; ++i) {
+        // Construct a seed state by interpolating between the start and final
+        // snap state. Run IK to determine the free angles that it is allowed
+        // to change
         smpl::WorkspaceState interm_workspace_state;
         interm_workspace_state.resize(this->dofCount());
+
+        // interpolate x, y, z, r, p, y too?
 
         // x, y, z, R, P, Y, FA1 same as start
         interm_workspace_state[EE_PX] = finish_state[EE_PX];
@@ -149,7 +159,7 @@ bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
         interm_workspace_state[EE_QX] = finish_state[EE_QX];
         interm_workspace_state[EE_QY] = finish_state[EE_QY];
         interm_workspace_state[EE_QZ] = finish_state[EE_QZ];
-        interm_workspace_state[AR_FA] = finish_state[AR_FA];
+        interm_workspace_state[AR_FA] = prev_fa; //finish_state[AR_FA];
 
         auto interp = [](double a, double b, double t) {
             return (1.0 - t) * a + t * b;
@@ -187,9 +197,12 @@ bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
         smpl::RobotState robot_state;
         // TODO: this should be permissive and allow moving the redundant angles
         if (!stateWorkspaceToRobotPermissive(interm_workspace_state, robot_state)) {
-            SMPL_WARN("Failed to find ik solution for interpolated state");
+            SMPL_WARN_STREAM("Failed to find ik solution for interpolated state " << interm_workspace_state);
             return false;
+        } else {
+            SMPL_INFO_STREAM("found ik solution for interpolated state " << interm_workspace_state);
         }
+        prev_fa = robot_state[LIMB_JOINT3];
     }
 
     if (!this->collisionChecker()->isStateToStateValid(
