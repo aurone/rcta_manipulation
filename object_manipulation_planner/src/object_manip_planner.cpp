@@ -3,6 +3,7 @@
 // system includes
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
+#include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <smpl/console/nonstd.h>
 #include <smpl/occupancy_grid.h>
 #include <smpl/post_processing.h>
@@ -24,14 +25,14 @@ bool Init(
     planner->checker = checker;
 
     smpl::WorkspaceLattice::Params p;
-    // TODO: parameterize these. one free angle here?
+    // TODO: configurate these
     p.free_angle_res =
     {
         smpl::to_radians(5),        // arm free angle
         smpl::to_radians(5),        // torso joint
+        smpl::to_radians(22.5),     // base theta
         0.05,                       // base x
         0.05,                       // base y
-        smpl::to_radians(22.5),     // base theta
         0.00001                     // object z
     };
     p.res_x = 0.05;
@@ -55,27 +56,32 @@ bool Init(
         return false;
     }
 
-#if 1
-    // when the base distance is above this threshold, the base theta
-    // term in the heuristic includes turning toward the nearest e-graph
-    // state, and then turning to the orientation of the e-graph state;
-    // otherwise, the base theta term only includes turning toward the
-    // nearest e-graph state
-    auto heading_thresh = 0.05; // cabinet1, cabinet2@35
-    //heading_thresh: 0.1
-    //heading_thresh: 0.15 // cabinet_demo@60
+    // define parameters here for now, TODO: configurate
+    ObjectManipPlannerParams params;
+    params.use_rotation = false;
+    params.disc_rotation_heuristic = true;
+    params.rot_db = smpl::to_radians(2);
+    params.heading_condition = ObjectManipPlannerParams::HeadingCondition::Discrete;
+    params.heading_thresh = 0.05; // 0.35, 0.1, 0.15
 
-    // tolerance before the base theta term is dropped to 0
-    auto theta_db = 0.0349066;
+    params.disc_position_heuristic = true;
+    params.pos_db = 0.1;
 
-    // tolerance before the base position term is dropped to 0
-    auto pos_db = 0.1; // cabinet1, cabinet2@35
-    //pos_db: 0.2 // cabinet_demo@60
-#endif
+    params.rot_weight = 0.45 / smpl::to_radians(45);
 
-    planner->heuristic.heading_thresh = 0.05;
-    planner->heuristic.theta_db = theta_db;
-    planner->heuristic.pos_db = pos_db;
+    params.base_weight = 10.0;
+    params.combination = ObjectManipPlannerParams::CombinationMethod::Max;
+
+    // any necessary conversions should go here
+    planner->heuristic.heading_thresh = params.heading_thresh;
+    planner->heuristic.theta_db = params.rot_db;
+    planner->heuristic.pos_db = params.pos_db;
+    planner->heuristic.theta_normalizer = params.rot_weight;
+    planner->heuristic.h_base_weight = params.base_weight;
+    planner->heuristic.use_rotation = params.use_rotation;
+    planner->heuristic.heading_condition = (int)params.heading_condition;
+    planner->heuristic.disc_rotation_heuristic = params.disc_rotation_heuristic;
+    planner->heuristic.disc_position_heuristic = params.disc_position_heuristic;
 
     planner->search.allowPartialSolutions(false);
     planner->search.setTargetEpsilon(1.0);
@@ -150,6 +156,8 @@ bool PlanPath(
         return false;
     }
 
+    planner->heuristic.updateStart(start);
+
     ROS_INFO_STREAM("Start state = " << start);
 
     smpl::GoalConstraint goal;
@@ -159,6 +167,8 @@ bool PlanPath(
     goal.check_goal = IsGoal;
     goal.check_goal_user = &goal;
     planner->graph.setGoal(goal);
+
+    planner->heuristic.updateGoal(goal);
 
     auto start_id = planner->graph.getStartStateID();
     auto goal_id = planner->graph.getGoalStateID();
@@ -207,10 +217,6 @@ bool PlanPath(
             shortcut_path,
             smpl::ShortcutType::JOINT_SPACE);
 
-    //////////////////////////////
-    // TODO: Profile Trajectory //
-    //////////////////////////////
-
     //////////////////////////////////////////////////
     // Convert to robot_trajectory::RobotTrajectory //
     //////////////////////////////////////////////////
@@ -220,6 +226,13 @@ bool PlanPath(
         UpdateRobotState(state, point, planner->model);
         trajectory->addSuffixWayPoint(state, 1.0);
     }
+
+    ////////////////////////
+    // Profile Trajectory //
+    ////////////////////////
+
+    trajectory_processing::IterativeParabolicTimeParameterization profiler;
+    profiler.computeTimeStamps(*trajectory);
 
     return true;
 }

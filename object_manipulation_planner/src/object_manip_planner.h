@@ -13,6 +13,7 @@
 
 #include "object_manip_heuristic.h"
 #include "roman_workspace_lattice_action_space.h"
+#include "workspace_lattice_egraph_roman.h"
 
 namespace smpl {
 class CollisionChecker;
@@ -31,13 +32,46 @@ class RobotTrajectory;
 
 class ObjectManipModel;
 
+struct ObjectManipPlannerParams
+{
+    // when the base distance is above this threshold, the base theta
+    // term in the heuristic includes turning toward the nearest e-graph
+    // state, and then turning to the orientation of the e-graph state;
+    // otherwise, the base theta term only includes turning toward the
+    // nearest e-graph state
+
+    // tolerance before the base theta term is dropped to 0
+    bool use_rotation = false;
+
+    // determine base rotation distances in (radianized) cells or radians
+    bool disc_rotation_heuristic = true;
+    // if continuous, tolerance before the base rotation term is dropped to 0
+    double rot_db = smpl::to_radians(2);
+
+    enum HeadingCondition{ Discrete = 0, Continuous = 1, Never = 2 } heading_condition;
+    // (heading condition = continuous and position distance <= thresh) -> ignore heading
+    double heading_thresh = 0.05;
+
+    // determine base position distance in (meterized) cells or meters
+    bool disc_position_heuristic = true;
+
+    // if continuous, tolerance before the base position term is dropped to 0
+    double pos_db = 0.1;
+
+    // for combining position + rotation terms
+    double rot_weight = 0.45 / smpl::to_radians(45);
+
+    double base_weight = 10.0;
+    enum CombinationMethod{ Sum = 0, Max = 1 } combination = CombinationMethod::Max;
+};
+
 struct ObjectManipPlanner
 {
     smpl::CollisionChecker*                 checker;
     ObjectManipModel*                       model;
-    smpl::WorkspaceLatticeEGraph            graph;
+    RomanWorkspaceLatticeEGraph             graph;
     RomanWorkspaceLatticeActionSpace        actions;
-    smpl::ObjectManipulationHeuristic       heuristic;
+    ObjectManipulationHeuristic             heuristic;
     smpl::ARAStar                           search;
 
     ObjectManipPlanner();

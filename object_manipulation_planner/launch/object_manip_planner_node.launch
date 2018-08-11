@@ -1,4 +1,9 @@
 <launch>
+    <arg name="debug" default="false"/>
+
+    <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
+    <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+
     <include file="$(find roman_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="true"/>
     </include>
@@ -7,20 +12,36 @@
 
     <env name="SMPL_VISUALIZE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/smpl_visual.ini"/>
     <env name="ROSCONSOLE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/rosconsole.properties"/>
-    <node name="object_manip_planner" pkg="object_manipulation_planner" type="object_manip_planner_node">
+    <node name="object_manip_planner" pkg="object_manipulation_planner" type="object_manip_planner_node" launch-prefix="$(arg launch_prefix)">
         <param name="group_name" value="right_arm_torso_base"/>
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>
         <param name="planning_frame" value="map"/>
         <param name="demonstrations_path" value="$(env HOME)/data/egraphs/roman_right_arm_torso_base_paths"/>
 
-        <param name="grid/size_x"       value="10.0"/>
-        <param name="grid/size_y"       value="10.0"/>
+        <param name="grid/size_x"       value="6.0"/>
+        <param name="grid/size_y"       value="6.0"/>
         <param name="grid/size_z"       value="2.1"/>
-        <param name="grid/origin_x"     value="-5.0"/>
-        <param name="grid/origin_y"     value="-5.0"/>
+        <param name="grid/origin_x"     value="-3.0"/>
+        <param name="grid/origin_y"     value="-3.0"/>
         <param name="grid/origin_z"     value="-0.15"/>
         <param name="grid/resolution"   value="0.05"/>
         <param name="grid/max_dist"     value="0.8"/>
+
+        <!--
+        <param name="heading_thresh" value="0.05"/>
+        <param name="rot_db" value="smpl::to_radians(2)"/>
+        <param name="pos_db" value="0.1"/>
+        <param name="rot_weight" value="0.45 / smpl::to_radians(45)"/>
+        <param name="base_weight" value="10.0"/>
+        <param name="combination" value="max"/>
+        <param name="use_rotation" value="false"/>
+        <param name="use_heading" value="false"/>
+        <param name="heading_condition" value="discrete"/>
+        <param name="disc_rotation_heuristic" value="true"/>
+        <param name="disc_position_heuristic" value="true"/>
+        -->
+
+        <param name="allowed_planning_time" value="60.0"/>
     </node>
 </launch>

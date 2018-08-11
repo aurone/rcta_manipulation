@@ -6,27 +6,41 @@
 #include <smpl/heuristic/egraph_heuristic.h>
 
 namespace smpl {
-
 class ExperienceGraphExtension;
 class ExtractRobotStateExtension;
+}
 
 class ObjectManipulationHeuristic :
-    public RobotHeuristic,
-    public ExperienceGraphHeuristicExtension
+    public smpl::RobotHeuristic,
+    public smpl::ExperienceGraphHeuristicExtension
 {
 public:
 
-    ExperienceGraphExtension* eg = NULL;
-    ExtractRobotStateExtension* extract_state = NULL;
-    PointProjectionExtension* project_to_point = NULL;
+    smpl::ExperienceGraphExtension* eg = NULL;
+    smpl::ExtractRobotStateExtension* extract_state = NULL;
+    smpl::PointProjectionExtension* project_to_point = NULL;
 
     std::vector<int> egraph_goal_heuristics;
 
     double heading_thresh = 0.1;
-    double theta_db = angles::to_radians(2.0);
+    double theta_db = smpl::to_radians(2.0);
     double pos_db = 0.1;
+    double theta_normalizer = 0.05 / smpl::to_radians(45.0);
+    int h_base_weight = 10;
 
-    bool init(RobotPlanningSpace* space);
+    // whether to combine the contact and base heuristics via sum or max
+    enum struct CombinationMethod
+    {
+        Sum = 0,
+        Max = 1
+    } combination = CombinationMethod::Max;
+
+    bool use_rotation = false;
+    int heading_condition = 0; // 0 = discrete, or 1 = continuous + threshold, 2 = none
+    bool disc_rotation_heuristic = true;
+    bool disc_position_heuristic = true;
+
+    bool init(smpl::RobotPlanningSpace* space);
 
     /// \name Required ExperienceGraphHeuristicExtension Interface
     ///@{
@@ -45,7 +59,7 @@ public:
     double getMetricGoalDistance(double x, double y, double z) override;
     ///@}
 
-    void updateGoal(const GoalConstraint& goal) override;
+    void updateGoal(const smpl::GoalConstraint& goal) override;
 
     /// \name Required Heuristic Interface
     ///@{
@@ -56,8 +70,6 @@ public:
 
     auto getExtension(size_t class_code) -> Extension* override;
 };
-
-} // namespace smpl
 
 #endif
 

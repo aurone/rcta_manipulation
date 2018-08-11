@@ -20,6 +20,7 @@
 // project includes
 #include "object_manip_planner.h"
 #include "object_manipulation_model.h"
+#include "object_manip_checker.h"
 
 template <class T>
 bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
@@ -166,6 +167,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    ObjectManipChecker checker;
+    checker.parent = &cspace;
+
     ////////////////////////////
     // Initialize the Planner //
     ////////////////////////////
@@ -173,7 +177,7 @@ int main(int argc, char* argv[])
     ROS_INFO("Initialize Object Manipulation Planner");
 
     ObjectManipPlanner planner;
-    if (!Init(&planner, &omanip, &cspace, &grid)) {
+    if (!Init(&planner, &omanip, &checker, &grid)) {
         ROS_ERROR("Failed to initialize Object Manipulation Planner");
         return 1;
     }
@@ -233,7 +237,8 @@ int main(int argc, char* argv[])
 
     auto object_goal_state = 1.0;
 
-    auto allowed_time = 10.0;
+    double allowed_time;
+    ph.param("allowed_planning_time", allowed_time, 10.0);
 
     /////////////
     // Outputs //

@@ -2,11 +2,16 @@
 
 #include <smpl/angles.h>
 #include <smpl/console/console.h>
+#include <smpl/console/nonstd.h>
 #include <smpl/graph/experience_graph_extension.h>
 #include <smpl/heap/intrusive_heap.h>
 #include <smpl/planning_params.h>
+#include <smpl/debug/marker_utils.h>
+#include <smpl/debug/visualize.h>
 
-namespace smpl {
+#include "assert.h"
+#include "variables.h"
+#include "workspace_lattice_egraph_roman.h"
 
 static const double FixedPointRatio = 1000.0;
 
@@ -18,7 +23,13 @@ void ObjectManipulationHeuristic::getEquivalentStates(
     Eigen::Vector3d p;
     this->project_to_point->projectToPoint(state_id, p);
 
+    auto* graph = static_cast<RomanWorkspaceLatticeEGraph*>(planningSpace());
+
+    int state_coord_xyz[3];
+    graph->posWorkspaceToCoord(p.data(), state_coord_xyz);
+
     auto& state = this->extract_state->extractState(state_id);
+    SMPL_ASSERT(state.size() == VARIABLE_COUNT, "state has insufficient variables");
 
     auto* egraph = this->eg->getExperienceGraph();
     auto nodes = egraph->nodes();
@@ -29,38 +40,58 @@ void ObjectManipulationHeuristic::getEquivalentStates(
     // lie near the input state's end effector position
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = *nit;
-        auto& state = egraph->state(node);
+        auto& egraph_state = egraph->state(node);
+        SMPL_ASSERT(egraph_state.size() == VARIABLE_COUNT, "egraph state has insufficient variables");
 
-        if (state.back() != state.back()) continue;
+        if (state.back() != egraph_state.back()) continue;
 
         auto node_state_id = this->eg->getStateID(node);
         Eigen::Vector3d egraph_pos;
         this->project_to_point->projectToPoint(node_state_id, egraph_pos);
 
+        int egraph_coord_xyz[3];
+        graph->posWorkspaceToCoord(egraph_pos.data(), egraph_coord_xyz);
+
         // TODO: THIS SHOULD BE RELATED TO THE SEARCH RESOLUTION
+#if 0
         double thresh = 0.08; //0.06;
         if ((egraph_pos - p).squaredNorm() < thresh * thresh) {
+#else
+        if (egraph_coord_xyz[0] == state_coord_xyz[0] &
+            egraph_coord_xyz[1] == state_coord_xyz[1] &
+            egraph_coord_xyz[2] == state_coord_xyz[2])
+        {
+#endif
             SMPL_WARN_NAMED(H_LOG, "FOUND IT!");
             ids.push_back(node_state_id);
         }
     }
 }
 
-bool ObjectManipulationHeuristic::init(RobotPlanningSpace* space)
+auto deadband(double val, double bot) -> double
 {
-    this->eg = space->getExtension<ExperienceGraphExtension>();
+    if (val < bot) {
+        return 0.0;
+    } else {
+        return val;
+    }
+}
+
+bool ObjectManipulationHeuristic::init(smpl::RobotPlanningSpace* space)
+{
+    this->eg = space->getExtension<smpl::ExperienceGraphExtension>();
     if (this->eg == NULL) {
         SMPL_WARN_NAMED(H_LOG, "ObjectManipulationHeuristic requires Experience Graph Extension");
         return false;
     }
 
-    this->extract_state = space->getExtension<ExtractRobotStateExtension>();
+    this->extract_state = space->getExtension<smpl::ExtractRobotStateExtension>();
     if (this->extract_state == NULL) {
         SMPL_WARN_NAMED(H_LOG, "ObjectManipulationHeuristic requires Extract Robot State Extension");
         return false;
     }
 
-    this->project_to_point = space->getExtension<PointProjectionExtension>();
+    this->project_to_point = space->getExtension<smpl::PointProjectionExtension>();
     if (this->project_to_point == NULL) {
         SMPL_WARN_NAMED(H_LOG, "ObjectManipulationHeuristic requires Point Projection Extension");
         return false;
@@ -78,17 +109,20 @@ void ObjectManipulationHeuristic::getShortcutSuccs(
     int state_id,
     std::vector<int>& ids)
 {
-    auto* egraph = this->eg->getExperienceGraph();
+    SMPL_ASSERT(this->eg != NULL, "Need experience graph extension");
 
-    std::vector<ExperienceGraph::node_id> egraph_nodes;
+    auto* egraph = this->eg->getExperienceGraph();
+    SMPL_ASSERT(egraph != NULL, "Need an e-graph");
+
+    std::vector<smpl::ExperienceGraph::node_id> egraph_nodes;
     this->eg->getExperienceGraphNodes(state_id, egraph_nodes);
 
     for (auto node : egraph_nodes) {
         // Return the final state on the demonstration
         // TODO: check for same component
-        ExperienceGraph::node_id min_node;
+        smpl::ExperienceGraph::node_id min_node;
         auto min_g = std::numeric_limits<int>::max();
-        for (ExperienceGraph::node_id i = 0; i < egraph_goal_heuristics.size(); ++i) {
+        for (auto i = smpl::ExperienceGraph::node_id(0); i < egraph_goal_heuristics.size(); ++i) {
             if (this->egraph_goal_heuristics[i] < min_g) {
                 min_node = i;
                 min_g = this->egraph_goal_heuristics[i];
@@ -117,7 +151,7 @@ double ObjectManipulationHeuristic::getMetricGoalDistance(double x, double y, do
     return 0.0;
 }
 
-void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
+void ObjectManipulationHeuristic::updateGoal(const smpl::GoalConstraint& goal)
 {
     // find the shortest path from any state in the demonstration to the final
     // demonstration state (basically get the length of the 3d arc motion
@@ -127,7 +161,7 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
     // generally all robot states (all all, including those states suggested by
     // the E_z edges)
     switch (goal.type) {
-    case GoalType::USER_GOAL_CONSTRAINT_FN:
+    case smpl::GoalType::USER_GOAL_CONSTRAINT_FN:
     {
         auto goal_z = goal.angles.back();
         auto goal_thresh = goal.angle_tolerances.back();
@@ -139,7 +173,7 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
         SMPL_DEBUG_NAMED(H_LOG, "Precompute manipulation heuristic for %zu e-graph states", egraph->num_nodes());
         this->egraph_goal_heuristics.resize(egraph->num_nodes(), -1);
 
-        struct ExperienceGraphSearchNode : heap_element
+        struct ExperienceGraphSearchNode : smpl::heap_element
         {
             int                         g = std::numeric_limits<int>::max();
             bool                        closed = false;
@@ -156,7 +190,7 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
             }
         };
 
-        typedef intrusive_heap<ExperienceGraphSearchNode, NodeCompare> heap_type;
+        using heap_type = smpl::intrusive_heap<ExperienceGraphSearchNode, NodeCompare>;
 
         std::vector<ExperienceGraphSearchNode> search_nodes(egraph->num_nodes());
 
@@ -236,14 +270,52 @@ void ObjectManipulationHeuristic::updateGoal(const GoalConstraint& goal)
 
         break;
     }
-    case GoalType::XYZ_GOAL:
-    case GoalType::XYZ_RPY_GOAL:
-    case GoalType::MULTIPLE_POSE_GOAL:
-    case GoalType::JOINT_STATE_GOAL:
+    case smpl::GoalType::XYZ_GOAL:
+    case smpl::GoalType::XYZ_RPY_GOAL:
+    case smpl::GoalType::MULTIPLE_POSE_GOAL:
+    case smpl::GoalType::JOINT_STATE_GOAL:
     default:
         SMPL_WARN_NAMED(H_LOG, "Unsupported goal type %d", (int)goal.type);
         break;
     }
+}
+
+auto normalize_disc_theta(int theta, int num_angles) -> int
+{
+    if (theta >= 0) {
+        return theta % num_angles;
+    } else {
+        return (theta % num_angles + num_angles) % num_angles;
+    }
+}
+
+auto shortest_angle_dist(int t1, int t2, int num_angles) -> int
+{
+    if (t2 > t1) {
+        auto diff = (t2 - t1) % num_angles;
+        return std::min(diff, num_angles - diff);
+    } else {
+        auto diff = (t1 - t2) % num_angles;
+        return std::min(diff, num_angles - diff);
+    }
+}
+
+auto discretize_angle(double angle, double res, int num_angles) -> int
+{
+    angle = smpl::normalize_angle_positive(angle);
+
+    auto coord = (int)((angle + res * 0.5) / res);
+
+    if (coord == num_angles) {
+        coord = 0;
+    }
+
+    return coord;
+}
+
+auto MakePoseTransform(double x, double y, double theta) -> Eigen::Affine3d
+{
+    return Eigen::Translation3d(x, y, 0.0) * Eigen::AngleAxisd(theta, Eigen::Vector3d::Zero());
 }
 
 int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
@@ -255,8 +327,21 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
     }
 
     auto& state = this->extract_state->extractState(state_id);
+    SMPL_ASSERT(state.size() == VARIABLE_COUNT, "state has incorrect variables");
+
+    // visualize the base pose
+    SV_SHOW_INFO_NAMED("state_base", smpl::visual::MakeFrameMarkers(
+            MakePoseTransform(
+                    state[WORLD_JOINT_X],
+                    state[WORLD_JOINT_Y],
+                    state[WORLD_JOINT_THETA]),
+            "map",
+            "state_base"));
+
+    SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state);
+
     auto state_z = state.back();
-    SMPL_DEBUG_NAMED(H_LOG, "  z(state) = %f", state_z);
+//    SMPL_DEBUG_NAMED(H_LOG, "  z(state) = %f", state_z);
 
     Eigen::Vector3d point;
     this->project_to_point->projectToPoint(state_id, point);
@@ -264,18 +349,16 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
     SMPL_DEBUG_NAMED(H_LOG, "  psi(state) = (%f, %f, %f)", point.x(), point.y(), point.z());
 
     auto* egraph = this->eg->getExperienceGraph();
-    assert(egraph != NULL);
+    SMPL_ASSERT(egraph != NULL, "egraph is null");
 
     auto h_min = std::numeric_limits<int>::max();
     int h_base_min;
     int h_contact_min;
     int h_manipulate_min;
 
-    std::vector<ExperienceGraph::node_id> the_nodes;
+    std::vector<smpl::ExperienceGraph::node_id> the_nodes;
     this->eg->getExperienceGraphNodes(state_id, the_nodes);
     auto is_egraph = !the_nodes.empty();
-
-    auto z_eps = 1e-4;
 
     // For all nodes v in the E-Graph where z(v) == z(s)
     auto nodes = egraph->nodes();
@@ -285,8 +368,11 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
         // get the state for this experience graph node
         // or just use the provided robot state directly
         auto& egraph_state = egraph->state(node);
-        auto egraph_state_z = egraph_state.back();
+        SMPL_ASSERT(egraph_state.size() == VARIABLE_COUNT, "egraph state is empty");
+        auto egraph_state_z = egraph_state[HINGE];
 
+        // z-value should be exact, but we'll test a small threshold here anyway
+        auto z_eps = 1e-4;
         if (std::fabs(egraph_state_z - state_z) > z_eps) continue;
 
         SMPL_DEBUG_NAMED(H_LOG, "    z(v) = %f", egraph_state_z);
@@ -308,7 +394,7 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
         // Lookup h_manipulate //
         /////////////////////////
 
-        assert(this->egraph_goal_heuristics.size() > node);
+        SMPL_ASSERT(node < this->egraph_goal_heuristics.size(), "node is out of bounds");
         auto h_manipulate = this->egraph_goal_heuristics[node];
         SMPL_DEBUG_NAMED(H_LOG, "    h_manip(v) = %d", h_manipulate);
 
@@ -316,59 +402,126 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
         // h_base //
         ////////////
 
-        auto dbx = egraph_state[0] - state[0];
-        auto dby = egraph_state[1] - state[1];
-        auto dbtheta = angles::shortest_angle_dist(egraph_state[2], state[2]);
+        auto* graph = static_cast<RomanWorkspaceLatticeEGraph*>(planningSpace());
 
-        auto heading_weight = 0.0;
-        if ((dbx * dbx + dby * dby) > (this->heading_thresh * this->heading_thresh)) {
+        auto* egraph_graph_state = graph->getState(egraph_state_id);
+        auto* graph_state = graph->getState(state_id);
+
+        // visualize the base pose of the egraph state
+        SV_SHOW_INFO_NAMED("egraph_base", smpl::visual::MakeFrameMarkers(
+                MakePoseTransform(
+                        egraph_state[WORLD_JOINT_X],
+                        egraph_state[WORLD_JOINT_Y],
+                        egraph_state[WORLD_JOINT_THETA]),
+                "map",
+                "egraph_base"));
+
+        // pose delta in discrete space
+        auto ddx = graph_state->coord[BD_PX] - egraph_graph_state->coord[BD_PX];
+        auto ddy = graph_state->coord[BD_PY] - egraph_graph_state->coord[BD_PY];
+        auto ddtheta = shortest_angle_dist(graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH], graph->m_val_count[BD_TH]);
+
+        SMPL_DEBUG_NAMED(H_LOG, "    disc delta base = (%d, %d, %d)", ddx, ddy, ddtheta);
+
+        // pose delta in continuous space
+        auto dbx = egraph_state[WORLD_JOINT_X] - state[WORLD_JOINT_X];
+        auto dby = egraph_state[WORLD_JOINT_Y] - state[WORLD_JOINT_Y];
+        auto dbtheta = smpl::shortest_angle_dist(
+                egraph_state[WORLD_JOINT_THETA], state[WORLD_JOINT_THETA]);
+
+        auto rot_dist = 0.0;
+        if (this->use_rotation) {
             auto heading = atan2(dby, dbx);
-            double heading_diff;
-            if (smpl::angles::shortest_angle_dist(heading, state[2]) <
-                smpl::angles::shortest_angle_dist(heading + M_PI, state[2]))
-            {
-                heading_weight = smpl::angles::shortest_angle_dist(heading, state[2]) +
-                        smpl::angles::shortest_angle_dist(heading, egraph_state[2]);
-            } else {
-                heading_weight = smpl::angles::shortest_angle_dist(heading + M_PI, state[2]) +
-                        smpl::angles::shortest_angle_dist(heading + M_PI, egraph_state[2]);
+
+            // determine whether to add heading information
+            auto add_heading = false;
+            switch (this->heading_condition) {
+            case 0:
+                add_heading = (ddx != 0 || ddy != 0);
+                break;
+            case 1:
+                add_heading = dbx * dbx + dby * dby > this->heading_thresh * this->heading_thresh;
+                break;
+            case 2:
+                break;
             }
-        } else {
-            heading_weight = dbtheta;
+
+            auto num_angles = graph->m_val_count[BD_TH];
+
+            if (add_heading) {
+                if (this->disc_rotation_heuristic) {
+                    auto disc_heading = discretize_angle(
+                            heading,
+                            graph->resolution()[BD_TH],
+                            graph->m_val_count[BD_TH]);
+                    auto disc_theta = graph_state->coord[BD_TH];
+                    auto egraph_theta = egraph_graph_state->coord[BD_TH];
+                    if (shortest_angle_dist(disc_heading, disc_theta, num_angles) <
+                        shortest_angle_dist(disc_heading + (num_angles >> 1), disc_theta, num_angles))
+                    {
+                        rot_dist =
+                                2.0 * M_PI / num_angles *
+                                double(shortest_angle_dist(disc_heading, disc_theta, num_angles) +
+                                shortest_angle_dist(disc_heading, egraph_theta, num_angles));
+                    } else {
+                        rot_dist =
+                                2.0 * M_PI / num_angles *
+                                double(shortest_angle_dist(disc_heading + (num_angles >> 1), disc_theta, num_angles) +
+                                shortest_angle_dist(disc_heading + (num_angles >> 1), egraph_theta, num_angles));
+                    }
+                } else {
+                    // closer to face the e-graph state's base position
+                    if (smpl::shortest_angle_dist(heading, state[WORLD_JOINT_THETA]) <
+                        smpl::shortest_angle_dist(heading + M_PI, state[WORLD_JOINT_THETA]))
+                    {
+                        rot_dist =
+                                smpl::shortest_angle_dist(heading, state[WORLD_JOINT_THETA]) +
+                                smpl::shortest_angle_dist(heading, egraph_state[WORLD_JOINT_THETA]);
+                    } else { // close to face away from the e-graph state's base position
+                        rot_dist =
+                                smpl::shortest_angle_dist(heading + M_PI, state[WORLD_JOINT_THETA]) +
+                                smpl::shortest_angle_dist(heading + M_PI, egraph_state[WORLD_JOINT_THETA]);
+                    }
+                }
+            } else {
+                // return nominal rotation term
+                if (this->disc_rotation_heuristic) {
+                    rot_dist = 2.0 * M_PI / num_angles * double(ddtheta);
+                } else {
+                    rot_dist = deadband(dbtheta, this->theta_db);
+                }
+            }
         }
 
-        auto theta_normalizer = 0.05 / angles::to_radians(45.0);
+        auto pos_dist = 0.0;
+        if (disc_position_heuristic) {
+            pos_dist = graph->resolution()[BD_PX] * std::sqrt((double)(ddx * ddx + ddy * ddy));
+        } else {
+            pos_dist = deadband(std::sqrt(dbx * dbx + dby * dby), this->pos_db);
+        }
 
-        auto discretize = [](double val, double disc) {
-            return disc * std::round(val / disc);
-        };
+        SMPL_DEBUG_NAMED(H_LOG, "    pos dist = %f", pos_dist);
+        SMPL_DEBUG_NAMED(H_LOG, "    rot dist(degs) = %f", smpl::to_degrees(rot_dist));
 
-        auto deadband = [](double val, double disc) {
-            if (val < disc) {
-                return 0.0;
-            } else {
-                return val;
-            }
-        };
+        auto h_base_pos = pos_dist;
+        auto h_base_rot = this->theta_normalizer * rot_dist;
+        auto h_base = (int)(FixedPointRatio * (h_base_rot + h_base_pos));
 
-        // heading heuristic (1 or 10 weight)
-        auto h_base_pos = deadband(sqrt(dbx * dbx + dby * dby), this->pos_db);
-        auto h_base_rot = theta_normalizer * deadband(heading_weight, this->theta_db);
-        auto h_base = (int)(
-                FixedPointRatio *
-                (
-                    h_base_rot +
-//                    std::fabs(dbx) + std::fabs(dby) +
-                    h_base_pos
-//                    theta_normalizer * heading_weight +
-//                    + dbtheta * theta_normalizer
-                ));
-
-        h_base *= 10;
+        SMPL_DEBUG_NAMED(H_LOG, "  h_base_pos = %f, h_base_rot = %f", h_base_pos, h_base_rot);
+        h_base *= this->h_base_weight;
 
         SMPL_DEBUG_NAMED(H_LOG, "    h_base(s,v) = %d", h_base);
-        auto cost = std::max(h_base, h_contact) + h_manipulate;
-//        auto cost = h_base + h_contact + h_manipulate;
+
+        auto cost = 0;
+        switch (this->combination) {
+        case CombinationMethod::Max:
+            cost = std::max(h_base, h_contact) + h_manipulate;
+            break;
+        case CombinationMethod::Sum:
+            cost = h_base + h_contact + h_manipulate;
+            break;
+        }
+
         if (cost < h_min) {
             h_min = cost;
             h_base_min = h_base;
@@ -385,8 +538,14 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
         SMPL_DEBUG_NAMED(H_LOG, "  h(%d) = %d", state_id, h_manipulate_min);
         return h_manipulate_min;
     } else {
-        SMPL_DEBUG_NAMED(H_LOG, "h(%d) = %d + %d + %d = %d",
-                state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
+        switch (this->combination) {
+        case CombinationMethod::Max:
+            SMPL_DEBUG_NAMED(H_LOG, "h(%d) = max(%d, %d) + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
+            break;
+        case CombinationMethod::Sum:
+            SMPL_DEBUG_NAMED(H_LOG, "h(%d) = %d + %d + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
+            break;
+        }
         return h_min;
     }
 }
@@ -401,12 +560,10 @@ int ObjectManipulationHeuristic::GetFromToHeuristic(int from_id, int to_id)
     return 0;
 }
 
-Extension* ObjectManipulationHeuristic::getExtension(size_t class_code)
+auto ObjectManipulationHeuristic::getExtension(size_t class_code) -> Extension*
 {
-    if (class_code == GetClassCode<ExperienceGraphHeuristicExtension>()) {
+    if (class_code == smpl::GetClassCode<ExperienceGraphHeuristicExtension>()) {
         return this;
     }
     return nullptr;
 }
-
-} // namespace smpl

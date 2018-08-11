@@ -11,35 +11,8 @@
 #include <smpl/graph/workspace_lattice.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
-enum VariableIndex {
-    EE_PX,
-    EE_PY,
-    EE_PZ,
-    EE_QX,
-    EE_QY,
-    EE_QZ,
-    AR_FA,
-    TR_JP,
-    BD_TH,
-    BD_PX,
-    BD_PY,
-    OB_P,
-};
-
-enum RobotVariableIndex {
-    WORLD_JOINT_X,
-    WORLD_JOINT_Y,
-    WORLD_JOINT_THETA,
-    TORSO_JOINT1,
-    LIMB_JOINT1,
-    LIMB_JOINT2,
-    LIMB_JOINT3,
-    LIMB_JOINT4,
-    LIMB_JOINT5,
-    LIMB_JOINT6,
-    LIMB_JOINT7,
-    HINGE,
-};
+#include "assert.h"
+#include "variables.h"
 
 bool InitRomanWorkspaceLatticeActions(
     smpl::WorkspaceLattice* space,
@@ -105,6 +78,11 @@ bool InitRomanWorkspaceLatticeActions(
         if (a == BD_PY) { // base y
             d[EE_PY] = -space->resolution()[EE_PY]; // also move the end effector by -res in y
         }
+
+        // don't move the object, what are you doing?
+        if (a == OB_P) continue;
+
+        // TODO: this isn't right if we want to have differing resolutions
         if (a == TR_JP || a == BD_TH) {
             d[EE_QZ] = -space->resolution()[EE_QZ]; // also move the end effector yaw by -res in theta
         }
@@ -122,6 +100,8 @@ bool InitRomanWorkspaceLatticeActions(
         if (a == BD_PY) {
             d[EE_PY] = space->resolution()[EE_PY]; // also move the end effector by +res in y
         }
+
+        // TODO: this isn't right if we want to have differing resolutions
         if (a == TR_JP || a == BD_TH) {
             d[EE_QZ] = space->resolution()[EE_QZ];
         }
@@ -141,15 +121,11 @@ bool InitRomanWorkspaceLatticeActions(
             if (dx == 0 && dy == 0) continue;
 
             // skip long diagonals
-            if (dx == -2 && dy == -2) continue;
-            if (dx == -2 && dy == 2) continue;
-            if (dx == 2 && dy == -2) continue;
-            if (dx == 2 && dy == 2) continue;
+            if (abs(dx) == 2 & abs(dy) == 2) continue;
 
-            if (dx == -2 && dy == -2) continue;
-            if (dx == 2 && dy == -2) continue;
-            if (dx == -2 && dy == 2) continue;
-            if (dx == 2 && dy == 2) continue;
+            // skip long translations
+            if (abs(dx) == 2 & dy == 0) continue;
+            if (dx == 0 & abs(dy) == 2) continue;
 
             std::vector<double> d(space->dofCount(), 0.0);
             d[BD_PX] = dx * space->resolution()[BD_PX];
@@ -171,11 +147,46 @@ bool InitRomanWorkspaceLatticeActions(
     return true;
 }
 
+static
+bool IsSidewaysMotion(
+    const smpl::WorkspaceLatticeState& state,
+    const smpl::MotionPrimitive& mprim)
+{
+    SMPL_ASSERT(!mprim.action.empty(), "Motion primitive must not be empty");
+
+    auto& last = mprim.action.back();
+    SMPL_ASSERT(last.size() == VARIABLE_COUNT, "Motion primitive waypoint needs more variables");
+
+    SMPL_ASSERT(state.state.size() == VARIABLE_COUNT, "Continuous state needs more variables");
+
+    auto dx = last[BD_PX];
+    auto dy = last[BD_PY];
+
+    if (std::fabs(dx) < 1e-6 & std::fabs(dy) < 1e-6) {
+        return false;
+    }
+
+    auto thresh = smpl::to_radians(10.0);
+
+    auto heading = atan2(dy, dx);
+    auto alt_heading = heading + M_PI;
+    if (smpl::shortest_angle_dist(heading, state.state[2]) > thresh &&
+        smpl::shortest_angle_dist(alt_heading, state.state[2]) > thresh)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 void RomanWorkspaceLatticeActionSpace::apply(
     const smpl::WorkspaceLatticeState& state,
     std::vector<smpl::WorkspaceAction>& actions)
 {
     actions.reserve(actions.size() + m_prims.size());
+
+    SMPL_ASSERT(state.state.size() == VARIABLE_COUNT, "Continuous state needs more variables");
+    SMPL_ASSERT(state.coord.size() == VARIABLE_COUNT, "Discrete state needs more variables");
 
     smpl::WorkspaceState cont_state;
     space->stateCoordToWorkspace(state.coord, cont_state);
@@ -183,81 +194,73 @@ void RomanWorkspaceLatticeActionSpace::apply(
     SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  create actions for workspace state: " << cont_state);
 
     for (auto& prim : m_prims) {
-        {   // disallow sideways motion
-            auto dx = prim.action.back()[BD_PX]; //action.back()[BD_PX] - state.state[0];
-            auto dy = prim.action.back()[BD_PY]; //action.back()[BD_PY] - state.state[1];
-            if (std::fabs(dx) > 1e-6 | std::fabs(dy) > 1e-6) {
-                auto heading = atan2(dy, dx);
-                auto alt_heading = heading + M_PI;
-                if (smpl::angles::shortest_angle_dist(heading, state.state[2]) >
-                        smpl::angles::to_radians(10.0) &&
-                    smpl::angles::shortest_angle_dist(alt_heading, state.state[2]) >
-                        smpl::angles::to_radians(10.0))
-                {
-                    continue;
-                }
-            }
+        if (IsSidewaysMotion(state, prim)) {
+            continue;
         }
+
+        SMPL_ASSERT(!prim.action.empty(), "Motion primitive must not be empty");
+        auto& last = prim.action.back();
 
 #define CORRECT_EE 0
 
         // action moves the torso or the base theta
         if (
 #if CORRECT_EE
-            prim.action.back()[BD_PX] != 0.0 ||
-            prim.action.back()[BD_PY] != 0.0 ||
+            last[BD_PX] != 0.0 ||
+            last[BD_PY] != 0.0 ||
 #endif
-            prim.action.back()[TR_JP] != 0.0 ||
-            prim.action.back()[BD_TH] != 0.0)
+            last[TR_JP] != 0.0 ||
+            last[BD_TH] != 0.0)
         {
-            auto delta_state = state.state;
-            delta_state[WORLD_JOINT_X] += prim.action.back()[BD_PX];
-            delta_state[WORLD_JOINT_Y] += prim.action.back()[BD_PY];
-            delta_state[TORSO_JOINT1] += prim.action.back()[TR_JP];
-            delta_state[WORLD_JOINT_THETA] += prim.action.back()[BD_TH];
-            auto pose = space->m_fk_iface->computeFK(delta_state);
+            // apply the delta in joint space
+            auto final_state = state.state;
+            final_state[WORLD_JOINT_X] += last[BD_PX];
+            final_state[WORLD_JOINT_Y] += last[BD_PY];
+            final_state[TORSO_JOINT1] += last[TR_JP];
+            final_state[WORLD_JOINT_THETA] += last[BD_TH];
 
-            smpl::WorkspaceState tmp(space->dofCount(), 0.0);
-            tmp[EE_PX] = pose.translation().x();
-            tmp[EE_PY] = pose.translation().y();
-            tmp[EE_PZ] = pose.translation().z();
-            smpl::angles::get_euler_zyx(pose.rotation(), tmp[EE_QZ], tmp[EE_QY], tmp[EE_QX]);
-            tmp[AR_FA] = cont_state[AR_FA];// + prim.action.back()[AR_FA];
-            tmp[TR_JP] = cont_state[TR_JP] + prim.action.back()[TR_JP];
-            tmp[BD_TH] = cont_state[BD_TH] + prim.action.back()[BD_TH];
-            tmp[BD_PX] = cont_state[BD_PX] + prim.action.back()[BD_PX];
-            tmp[BD_PY] = cont_state[BD_PY] + prim.action.back()[BD_PY];
-            tmp[OB_P] = cont_state[OB_P];// + prim.action.back()[OB_P];
+            // robot state -> workspace state
+            smpl::WorkspaceState tmp(space->dofCount());
+            space->stateRobotToWorkspace(final_state, tmp);
 
-            smpl::WorkspaceCoord ctmp;
-            space->stateWorkspaceToCoord(tmp, ctmp);
-            space->stateCoordToWorkspace(ctmp, tmp);
+            // workspace state -> discrete state -> workspace state (get cell
+            // center)
+            // correct for cell center
+            auto get_center_state = [this](smpl::WorkspaceState& tmp)
+            {
+                smpl::WorkspaceCoord ctmp;
+                space->stateWorkspaceToCoord(tmp, ctmp);
+                space->stateCoordToWorkspace(ctmp, tmp);
+            };
+
+//            get_center_state(tmp);
 
             smpl::WorkspaceAction action;
             action.push_back(std::move(tmp));
             actions.push_back(std::move(action));
-            continue;
-        }
+        } else {
+            // simply apply the delta
+            smpl::WorkspaceAction action;
+            action.reserve(prim.action.size());
 
-        smpl::WorkspaceAction action;
-        action.reserve(prim.action.size());
+            auto final_state = cont_state;
+            for (auto& delta_state : prim.action) {
+                // increment the state
+                for (size_t d = 0; d < space->dofCount(); ++d) {
+                    final_state[d] += delta_state[d];
+                }
 
-        auto final_state = cont_state;
-        for (auto& delta_state : prim.action) {
-            // increment the state
-            for (size_t d = 0; d < space->dofCount(); ++d) {
-                final_state[d] += delta_state[d];
+                smpl::normalize_euler_zyx(&final_state[3]);
+
+                action.push_back(final_state);
             }
 
-            smpl::angles::normalize_euler_zyx(&final_state[3]);
-
-            action.push_back(final_state);
+            actions.push_back(std::move(action));
         }
-
-        actions.push_back(std::move(action));
     }
 
     if (m_ik_amp_enabled && space->numHeuristics() > 0) {
+        // apply the adaptive motion primitive
         auto* h = space->heuristic(0);
         auto goal_dist = h->getMetricGoalDistance(
                 cont_state[EE_PX], cont_state[EE_PY], cont_state[EE_PZ]);

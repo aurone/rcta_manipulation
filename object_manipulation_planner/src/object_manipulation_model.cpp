@@ -1,5 +1,10 @@
 #include "object_manipulation_model.h"
 
+#include <smpl/console/console.h>
+#include <smpl/console/nonstd.h>
+
+static const char* R_LOG = "robot";
+
 double ObjectManipModel::minPosLimit(int vidx) const
 {
     if (vidx < this->parent_model->jointCount()) {
@@ -112,6 +117,7 @@ bool ObjectManipModel::computeIK(
     smpl::RobotState& solution,
     smpl::ik_option::IkOption option)
 {
+    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute ik(seed = " << start << ")");
     auto small_start = ExtractParentState(start, this->parent_model);
     if (!this->ik_iface->computeIK(pose, small_start, solution, option)) {
         return false;
@@ -128,6 +134,7 @@ bool ObjectManipModel::computeIK(
     std::vector<smpl::RobotState>& solutions,
     smpl::ik_option::IkOption option)
 {
+    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute multi-ik(seed = " << start << ")");
     auto small_start = ExtractParentState(start, this->parent_model);
     if (!this->ik_iface->computeIK(pose, small_start, solutions, option)) {
         return false;
@@ -163,6 +170,7 @@ bool ObjectManipModel::computeFastIK(
     const smpl::RobotState& state,
     smpl::RobotState& solution)
 {
+    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute fast-ik(seed = " << state << ")");
     auto small_start = ExtractParentState(state, this->parent_model);
     if (!this->rm_iface->computeFastIK(pose, small_start, solution)) {
         return false;
