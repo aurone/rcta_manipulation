@@ -58,7 +58,7 @@ bool Init(
 
     // define parameters here for now, TODO: configurate
     ObjectManipPlannerParams params;
-    params.use_rotation = false;
+    params.use_rotation = true; //false;
     params.disc_rotation_heuristic = true;
     params.rot_db = smpl::to_radians(2);
     params.heading_condition = ObjectManipPlannerParams::HeadingCondition::Discrete;
