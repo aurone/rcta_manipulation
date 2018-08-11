@@ -4,7 +4,13 @@
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
 
-    <include file="$(find object_manipulation_planner)/launch/object_manip_planner_params.launch"/>
+    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
+        <arg name="load_robot_description" value="true"/>
+    </include>
+
+    <!--include file="$(find object_manipulation_planner)/launch/upload_cabinet.launch"/-->
+    <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
+
     <node name="$(anon door_demonstrator)" pkg="object_manipulation_planner" type="door_demonstrator" launch-prefix="$(arg launch_prefix)">
         <!-- remap output of MoveGroupCommandPanel to input robot state -->
         <remap from="robot_state" to="command_robot_state"/>
