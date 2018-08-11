@@ -390,7 +390,6 @@ int main(int argc, char* argv[])
     // Parameters //
     ////////////////
 
-    std::string group_name;
     std::string demo_filename;
     std::string tip_link;
     std::string object_tip_link_name;
@@ -398,7 +397,6 @@ int main(int argc, char* argv[])
     double contact_error_z;
     double contact_error;
 
-    if (!GetParam(ph, "group_name", group_name)) return 1;
     if (!GetParam(ph, "demo_filename", demo_filename)) return 1;
     if (!GetParam(ph, "robot_tip_link", tip_link)) return 1;
     if (!GetParam(ph, "object_tip_link", object_tip_link_name)) return 1;
@@ -500,12 +498,18 @@ int main(int argc, char* argv[])
     }
 
     // initialize demonstration joint group...
-    if (!model->hasJointModelGroup(group_name)) {
-        SMPL_ERROR("Demonstration group '%s' does not exist in the robot model", group_name.c_str());
+    std::vector<std::string> robot_record_variables;
+    if (!GetParam(ph, "robot_record_variables", robot_record_variables)) {
         return 1;
     }
 
-    auto* demo_group = model->getJointModelGroup(group_name);
+    SMPL_INFO("Recording %zu robot variables", robot_record_variables.size());
+
+    std::vector<std::string> object_record_variables;
+    if (!GetParam(ph, "object_record_variables", object_record_variables)) {
+        return 1;
+    }
+    SMPL_INFO("Recording %zu object variables", object_record_variables.size());
 
     // initialize object tip...
     auto* object_tip_link = GetLink(&object_model, object_tip_link_name.c_str());
@@ -524,11 +528,18 @@ int main(int argc, char* argv[])
         }
 
         // write group variable names to the header
-        for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
-            auto& name = demo_group->getVariableNames()[vidx];
-            fprintf(fdemo, "%s,", name.c_str());
+        auto first = true;
+        for (auto& variable : robot_record_variables) {
+            if (!first) { fprintf(fdemo, ","); }
+            fprintf(fdemo, "%s", variable.c_str());
+            first = false;
         }
-        fprintf(fdemo, "hinge\n");
+        for (auto& variable : object_record_variables) {
+            if (!first) { fprintf(fdemo, ","); }
+            fprintf(fdemo, "%s", variable.c_str());
+            first = false;
+        }
+        fprintf(fdemo, "\n");
     }
 
     // close the demonstration file when we kill the program...
@@ -597,22 +608,25 @@ int main(int argc, char* argv[])
     auto record_positions = [&]()
     {
         std::vector<double> group_state;
-        robot_state.copyJointGroupPositions(demo_group, group_state);
+        group_state.reserve(robot_record_variables.size());
+        for (auto& variable : robot_record_variables) {
+            group_state.push_back(robot_state.getVariablePosition(variable));
+        }
 
-        for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
-            auto pos = group_state[vidx];
-            fprintf(fdemo, "%f,", pos);
+        auto first = true;
+        for (auto position : group_state) {
+            if (!first) fprintf(fdemo, ",");
+            fprintf(fdemo, "%f", position);
+            first = false;
         }
-#if 0   // record all object positions
-        for (auto i = 0; i < curr_object_state.size(); ++i) {
-            fprintf(fdemo, "%f", curr_object_state[i]);
-            if (i != curr_object_state.size() - 1) {
-                fprintf(fdemo, ",");
-            }
+        for (auto& var : object_record_variables) {
+            if (!first) fprintf(fdemo, ",");
+            auto* v = GetVariable(&object_model, var.c_str());
+            assert(v != NULL);
+            fprintf(fdemo, "%f", GetVariablePosition(&object_state, v));
+            first = false;
         }
-#else   // hack to record only the first object position
-        fprintf(fdemo, "%f\n", curr_object_state[0]);
-#endif
+        fprintf(fdemo, "\n");
     };
 
     ////////////////////////

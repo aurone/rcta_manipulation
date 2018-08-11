@@ -35,7 +35,24 @@
         <!-- configure the tolerances for testing whether the robot has
              grasped the object -->
         <param name="contact_error_z" value="0.10"/>
-        <param name="contact_error" value="0.05"/>
+        <param name="contact_error" value="0.02"/>
+
+        <rosparam param="robot_record_variables">
+            - world_joint/x
+            - world_joint/y
+            - world_joint/theta
+            - torso_joint1
+            - limb_right_joint1
+            - limb_right_joint2
+            - limb_right_joint3
+            - limb_right_joint4
+            - limb_right_joint5
+            - limb_right_joint6
+            - limb_right_joint7
+        </rosparam>
+        <rosparam param="object_record_variables">
+            - lid_joint
+        </rosparam>
 
         <!-- OBJECT POSE -->
 
