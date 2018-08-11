@@ -26,6 +26,8 @@
 // project includes
 #include "cabinet_model.h"
 
+#define CRATE_LID_ONLY 1
+
 ////////////////////
 // STEALING DEFER //
 ////////////////////
@@ -183,6 +185,15 @@ bool SetCabinetFromIK(
 
     SetVariablePosition(state, GetVariable(GetRobotModel(state), "door_joint"), theta);
     return true;
+}
+
+bool SetCrateFromLidOnlyIK(
+    smpl::urdf::RobotState* state,
+    const Eigen::Affine3d* pose,
+    const smpl::urdf::Link* link)
+{
+    auto* model = GetRobotModel(state);
+    return false;
 }
 
 bool SetCrateFromIK(
@@ -416,13 +427,10 @@ int main(int argc, char* argv[])
     // Arguments //
     ///////////////
 
-    printf("Usage: door_demonstrator [record] [record_object]\n");
-
-    auto record = argc > 1 ? true : false;
-    auto record_object = argc > 2 ? true: false;
+    bool record = false;
+    GetParam(ph, "record", record);
 
     SMPL_INFO("Record: %s", record ? "true" : "false");
-    SMPL_INFO("Record Object: %s", record_object ? "true" : "false");
 
     ////////////////////
     // Initialization //
@@ -456,7 +464,26 @@ int main(int argc, char* argv[])
         return 1;
     }
     SetToDefaultValues(&object_state);
-    SetVariablePosition(&object_state, GetVariable(&object_model, "handle_joint"), 1.570);
+
+    // set the initial positions of the object joints
+    XmlRpc::XmlRpcValue object_positions;
+    if (GetParam(ph, "object_positions", object_positions)) {
+        if (object_positions.getType() == XmlRpc::XmlRpcValue::TypeStruct) {
+            for (auto it = object_positions.begin(); it != object_positions.end(); ++it) {
+                if (it->second.getType() != XmlRpc::XmlRpcValue::TypeDouble) {
+                    continue;
+                }
+
+                auto& key = it->first;
+                auto value = double(it->second);
+
+                auto* var = GetVariable(&object_model, key.c_str());
+                if (var == NULL) continue;
+                SetVariablePosition(&object_state, var, value);
+            }
+        }
+    }
+
     UpdateTransforms(&object_state);
 
     {
@@ -499,20 +526,9 @@ int main(int argc, char* argv[])
         // write group variable names to the header
         for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
             auto& name = demo_group->getVariableNames()[vidx];
-            fprintf(fdemo, "%s", name.c_str());
-            if (record_object) {
-                fprintf(fdemo, ",");
-            } else {
-                if (vidx != demo_group->getVariableCount() - 1) {
-                    fprintf(fdemo, ",");
-                } else {
-                    fprintf(fdemo, "\n");
-                }
-            }
+            fprintf(fdemo, "%s,", name.c_str());
         }
-        if (record_object) {
-            fprintf(fdemo, "hinge\n");
-        }
+        fprintf(fdemo, "hinge\n");
     }
 
     // close the demonstration file when we kill the program...
@@ -524,7 +540,7 @@ int main(int argc, char* argv[])
     );
 
     // initialize object state variables...
-    std::vector<double> prev_object_state(
+    auto prev_object_state = std::vector<double>(
             GetVariablePositions(&object_state),
             GetVariablePositions(&object_state) + GetVariableCount(&object_model));
     auto curr_object_state = prev_object_state;
@@ -578,6 +594,27 @@ int main(int argc, char* argv[])
     auto check_state_server =
             nh.advertiseService("check_state_validity_manipulation", service_fun);
 
+    auto record_positions = [&]()
+    {
+        std::vector<double> group_state;
+        robot_state.copyJointGroupPositions(demo_group, group_state);
+
+        for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
+            auto pos = group_state[vidx];
+            fprintf(fdemo, "%f,", pos);
+        }
+#if 0   // record all object positions
+        for (auto i = 0; i < curr_object_state.size(); ++i) {
+            fprintf(fdemo, "%f", curr_object_state[i]);
+            if (i != curr_object_state.size() - 1) {
+                fprintf(fdemo, ",");
+            }
+        }
+#else   // hack to record only the first object position
+        fprintf(fdemo, "%f\n", curr_object_state[0]);
+#endif
+    };
+
     ////////////////////////
     // demonstration loop //
     ////////////////////////
@@ -586,6 +623,7 @@ int main(int argc, char* argv[])
     while (ros::ok()) {
         ros::spinOnce();
 
+        // Reset to only detect if a new state was received this iteration.
         DEFER(state_received = false);
 
         // 0 to 3*pi/4
@@ -610,34 +648,13 @@ int main(int argc, char* argv[])
         // record the motion of the robot and the state of the object //
         ////////////////////////////////////////////////////////////////
 
+        // With the current input, a new state is only received when the robot
+        // is moved during demonstration.
         auto robot_moved = state_received;
+
         if (robot_moved && record) {
             assert(curr_robot_state && "State shouldn't be null if we received it");
-
-            std::vector<double> group_state;
-            robot_state.copyJointGroupPositions(demo_group, group_state);
-
-            for (size_t vidx = 0; vidx < demo_group->getVariableCount(); ++vidx) {
-                auto pos = group_state[vidx];
-                fprintf(fdemo, "%f", pos);
-                if (record_object) {
-                    fprintf(fdemo, ",");
-                } else {
-                    if (vidx != demo_group->getVariableCount() - 1) {
-                        fprintf(fdemo, ",");
-                    } else {
-                        fprintf(fdemo, "\n");
-                    }
-                }
-            }
-            if (record_object) {
-                for (auto i = 0; i < curr_object_state.size(); ++i) {
-                    fprintf(fdemo, "%f", curr_object_state[i]);
-                    if (i != curr_object_state.size() - 1) {
-                        fprintf(fdemo, ",");
-                    }
-                }
-            }
+            record_positions();
         }
 
         //////////////////////////
@@ -691,13 +708,21 @@ int main(int argc, char* argv[])
         if (curr_robot_state && contact) {
             auto& curr_tool_pose = robot_state.getGlobalLinkTransform(tip_link);
             if (object_urdf->getName() == "cabinet") {
-                if (!SetCabinetFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
+                if (!SetCabinetFromIK(
+                        &object_state, &curr_tool_pose, object_tip_link))
+                {
 //                    SMPL_WARN("Failed to set cabinet from IK");
                 }
             } else if (object_urdf->getName() == "crate") {
+#if CRATE_LID_ONLY
+                if (!SetCrateFromLidOnlyIK(&object_state, &curr_tool_pose, object_tip_link)) {
+
+                }
+#else
                 if (!SetCrateFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
 
                 }
+#endif
             }
         }
 

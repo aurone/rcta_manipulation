@@ -6,15 +6,32 @@
 
     <include file="$(find object_manipulation_planner)/launch/object_manip_planner_params.launch"/>
     <node name="$(anon door_demonstrator)" pkg="object_manipulation_planner" type="door_demonstrator" launch-prefix="$(arg launch_prefix)">
+        <!-- remap output of MoveGroupCommandPanel to input robot state -->
         <remap from="robot_state" to="command_robot_state"/>
 
-        <param name="contact_error_z" value="0.10"/> <!-- handle height / 2 -->
-        <param name="contact_error" value="0.05"/>
+        <!-- the link of the object to run IK for to follow the position of the
+             robot's end effector -->
         <param name="object_tip_link" value="handle"/>
+
+        <!-- the robot link used to test if the object has been grasped and
+             to have the object follow when grasped -->
         <param name="robot_tip_link" value="limb_right_tool0"/>
-        <!--param name="robot_tip_link" value="limb_right_tool0"/-->
+
+        <!-- the file to store the recorded demonstration in -->
         <param name="demo_filename" value="cabinet_demo.csv"/>
+
+        <!-- the robot joint group whose positions to record -->
         <param name="group_name" value="right_arm_torso_base"/>
+
+        <!-- enable/disable recording the robot and object movements -->
+        <param name="record" value="false"/>
+
+        <!-- configure the tolerances for testing whether the robot has
+             grasped the object -->
+        <param name="contact_error_z" value="0.10"/>
+        <param name="contact_error" value="0.05"/>
+
+        <!-- OBJECT POSE -->
 
         <!-- cabinet -->
         <param name="object_x" value="2.0"/>
@@ -52,5 +69,11 @@
         <param name="object_yaw" value="1.570796"/>
         <param name="object_pitch" value="0.0"/>
         <param name="object_roll" value="0.0"/>
+
+        <!-- OBJECT CONFIGURATION -->
+
+        <rosparam param="object_positions">
+            handle_joint: 0.0
+        </rosparam>
     </node>
 </launch>
