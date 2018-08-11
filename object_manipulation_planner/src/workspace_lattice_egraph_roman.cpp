@@ -83,6 +83,15 @@ bool GetSnapMotion(
     return true;
 }
 
+auto color(std::vector<smpl::visual::Marker>&& markers, smpl::visual::Color color)
+    -> std::vector<smpl::visual::Marker>&&
+{
+    for (auto& m : markers) {
+        m.color = color;
+    }
+    return std::move(markers);
+}
+
 bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
 {
     SMPL_WARN_NAMED(G_LOG, "Try snap(%d, %d)", src_id, dst_id);
@@ -97,8 +106,8 @@ bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
 
     SMPL_DEBUG_STREAM("Snap " << src_state->coord << " -> " << dst_state->coord);
     auto* vis_name = "snap";
-    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(src_state->state, "snap_from"));
-    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(dst_state->state, "snap_to"));
+    SV_SHOW_INFO_NAMED(vis_name, color(getStateVisualization(src_state->state, "snap_from"), smpl::visual::Color{ 1.0f, 0.5f, 0.0f, 0.8f }));
+    SV_SHOW_INFO_NAMED(vis_name, color(getStateVisualization(dst_state->state, "snap_to"), smpl::visual::Color{ 0.0f, 0.5f, 1.0f, 0.8f }));
 
     // if end effector is not on the handle:
     // ....drive to base pose
