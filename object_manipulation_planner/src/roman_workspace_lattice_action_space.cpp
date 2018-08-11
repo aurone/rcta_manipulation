@@ -233,7 +233,7 @@ void RomanWorkspaceLatticeActionSpace::apply(
                 space->stateCoordToWorkspace(ctmp, tmp);
             };
 
-//            get_center_state(tmp);
+            get_center_state(tmp);
 
             smpl::WorkspaceAction action;
             action.push_back(std::move(tmp));
