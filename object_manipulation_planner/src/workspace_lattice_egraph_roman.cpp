@@ -120,7 +120,8 @@ bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
 
     auto dx = dst_state->state[WORLD_JOINT_X] - src_state->state[WORLD_JOINT_X];
     auto dy = dst_state->state[WORLD_JOINT_Y] - src_state->state[WORLD_JOINT_Y];
-    if (std::fabs(dx) > 1e-6 || std::fabs(dy) > 1e-6) {
+    auto thresh = 1e-4;
+    if (std::fabs(dx) > thresh | std::fabs(dy) > thresh) {
         auto heading = atan2(dy, dx);
         auto alt_heading = heading + M_PI;
         auto thresh = smpl::to_radians(10.0);
