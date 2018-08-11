@@ -193,7 +193,47 @@ bool SetCrateFromLidOnlyIK(
     const smpl::urdf::Link* link)
 {
     auto* model = GetRobotModel(state);
-    return false;
+
+    auto* lid_var = GetVariable(model, "lid_joint");
+    assert(lid_var != NULL);
+
+    auto* limits = GetVariableLimits(lid_var);
+    assert(limits != NULL);
+
+    auto span = limits->max_position - limits->min_position;
+    SMPL_INFO("span = %f", span);
+    auto samples = std::max(2, (int)std::round(span / smpl::to_radians(0.5)));
+
+    // move the lid to the position that minimizes the distance between the
+    // handle and the end effector, while maintaining the value of the
+    // handle_joint
+
+    auto best_dist = std::numeric_limits<double>::infinity();
+    auto best_position = std::numeric_limits<double>::quiet_NaN();
+
+    SMPL_INFO("check %d samples", samples);
+    for (auto i = 0; i < samples; ++i) {
+        auto t = double(i) / double(samples - 1);
+
+        auto position = limits->min_position + t * span;
+        SetVariablePosition(state, lid_var, position);
+
+        auto* tool_pose = GetUpdatedLinkTransform(state, link);
+
+        auto dist = (tool_pose->translation() - pose->translation()).squaredNorm();
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_position = position;
+        }
+    }
+
+    // this probably shouldn't happen
+    if (best_position != best_position) {
+        return false;
+    }
+
+    SetVariablePosition(state, lid_var, best_position);
+    return true;
 }
 
 bool SetCrateFromIK(
@@ -375,7 +415,7 @@ bool IsInContactCrate(
     Eigen::Vector3d offset(T_object_robot_tip.translation());
     offset.y() = 0.0;
 
-    ROS_INFO("dz = %f, dxy = %f", T_object_robot_tip.translation().y(), offset.squaredNorm());
+    SMPL_DEBUG("dz = %f, dxy = %f", T_object_robot_tip.translation().y(), offset.squaredNorm());
     return std::fabs(T_object_robot_tip.translation().y()) < contact_thresh_z &&
             offset.squaredNorm() < contact_thresh_xy * contact_thresh_xy;
 }
@@ -729,12 +769,14 @@ int main(int argc, char* argv[])
                 }
             } else if (object_urdf->getName() == "crate") {
 #if CRATE_LID_ONLY
-                if (!SetCrateFromLidOnlyIK(&object_state, &curr_tool_pose, object_tip_link)) {
-
+                if (!SetCrateFromLidOnlyIK(
+                        &object_state, &curr_tool_pose, uhoh_link))
+                {
                 }
 #else
-                if (!SetCrateFromIK(&object_state, &curr_tool_pose, object_tip_link)) {
-
+                if (!SetCrateFromIK(
+                        &object_state, &curr_tool_pose, object_tip_link))
+                {
                 }
 #endif
             }
