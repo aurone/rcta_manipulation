@@ -43,7 +43,7 @@ void ObjectManipulationHeuristic::getEquivalentStates(
         auto& egraph_state = egraph->state(node);
         SMPL_ASSERT(egraph_state.size() == VARIABLE_COUNT, "egraph state has insufficient variables");
 
-        if (state.back() != egraph_state.back()) continue;
+        if (state[HINGE] != egraph_state[HINGE]) continue;
 
         auto node_state_id = this->eg->getStateID(node);
         Eigen::Vector3d egraph_pos;
@@ -51,6 +51,11 @@ void ObjectManipulationHeuristic::getEquivalentStates(
 
         int egraph_coord_xyz[3];
         graph->posWorkspaceToCoord(egraph_pos.data(), egraph_coord_xyz);
+
+        SMPL_DEBUG_NAMED(H_LOG, "test for equivalent state at (%d, %d, %d)",
+                egraph_coord_xyz[0],
+                egraph_coord_xyz[1],
+                egraph_coord_xyz[2]);
 
         // TODO: THIS SHOULD BE RELATED TO THE SEARCH RESOLUTION
 #if 0
@@ -63,7 +68,10 @@ void ObjectManipulationHeuristic::getEquivalentStates(
         {
 #endif
             SMPL_WARN_NAMED(H_LOG, "FOUND IT!");
-            ids.push_back(node_state_id);
+//            if (state[HINGE] == egraph_state[HINGE])
+            {
+                ids.push_back(node_state_id);
+            }
         }
     }
 }
@@ -201,7 +209,7 @@ void ObjectManipulationHeuristic::updateGoal(const smpl::GoalConstraint& goal)
         for (auto nit = nodes.first; nit != nodes.second; ++nit) {
             auto node = *nit;
             auto& egraph_state = egraph->state(node);
-            auto egraph_state_z = egraph_state.back();
+            auto egraph_state_z = egraph_state[HINGE];
 
             if (std::fabs(egraph_state_z - goal_z) <= goal_thresh) {
                 search_nodes[node].g = 0;
@@ -215,7 +223,7 @@ void ObjectManipulationHeuristic::updateGoal(const smpl::GoalConstraint& goal)
             for (auto nit = nodes.first; nit != nodes.second; ++nit) {
                 auto node = *nit;
                 auto& egraph_state = egraph->state(node);
-                auto egraph_state_z = egraph_state.back();
+                auto egraph_state_z = egraph_state[HINGE];
                 SMPL_WARN_NAMED(H_LOG, "  z(%zu) = %f", node, egraph_state_z);
             }
         }
@@ -340,7 +348,7 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
 
     SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state);
 
-    auto state_z = state.back();
+    auto state_z = state[HINGE];
 //    SMPL_DEBUG_NAMED(H_LOG, "  z(state) = %f", state_z);
 
     Eigen::Vector3d point;
