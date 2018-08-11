@@ -83,11 +83,15 @@ bool Init(
     planner->heuristic.disc_rotation_heuristic = params.disc_rotation_heuristic;
     planner->heuristic.disc_position_heuristic = params.disc_position_heuristic;
 
+#if 0
     planner->search.allowPartialSolutions(false);
     planner->search.setTargetEpsilon(1.0);
     planner->search.setDeltaEpsilon(1.0);
     planner->search.setImproveSolution(true);
     planner->search.setBoundExpansions(true);
+#else
+    planner->search.set_initialsolution_eps(100.0);
+#endif
     return true;
 }
 
@@ -178,15 +182,21 @@ bool PlanPath(
     ROS_INFO("start state id = %d", start_id);
     ROS_INFO("goal state id = %d", goal_id);
 
+    std::vector<int> solution;
+    int solution_cost;
+
+#if 0
     smpl::ARAStar::TimeParameters timing;
     timing.bounded = true;
     timing.improve = true;
     timing.type = smpl::ARAStar::TimeParameters::TIME;
     timing.max_allowed_time_init = smpl::to_duration(allowed_time);
     timing.max_allowed_time = smpl::to_duration(allowed_time);
-    std::vector<int> solution;
-    int solution_cost;
     bool res = planner->search.replan(timing, &solution, &solution_cost);
+#else
+    bool res = planner->search.replan(allowed_time, &solution, &solution_cost);
+#endif
+
     if (!res) {
         ROS_ERROR("Failed to plan path");
         return false;
