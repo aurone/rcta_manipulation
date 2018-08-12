@@ -54,6 +54,9 @@
             - lid_joint
         </rosparam>
 
+        <!-- whether to normalize output object variables to the range [0,1] -->
+        <param name="normalize" value="true"/>
+
         <!-- OBJECT POSE -->
 
         <!-- cabinet -->

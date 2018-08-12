@@ -437,6 +437,9 @@ int main(int argc, char* argv[])
     double contact_error_z;
     double contact_error;
 
+    auto normalize_object = false;
+    GetParam(ph, "normalize", normalize_object);
+
     if (!GetParam(ph, "demo_filename", demo_filename)) return 1;
     if (!GetParam(ph, "robot_tip_link", tip_link)) return 1;
     if (!GetParam(ph, "object_tip_link", object_tip_link_name)) return 1;
@@ -663,7 +666,12 @@ int main(int argc, char* argv[])
             if (!first) fprintf(fdemo, ",");
             auto* v = GetVariable(&object_model, var.c_str());
             assert(v != NULL);
-            fprintf(fdemo, "%f", GetVariablePosition(&object_state, v));
+            auto* limits = GetVariableLimits(v);
+            auto pos = GetVariablePosition(&object_state, v);
+            if (normalize_object) {
+                pos = (pos - limits->min_position) / (limits->max_position - limits->min_position);
+            }
+            fprintf(fdemo, "%f", pos);
             first = false;
         }
         fprintf(fdemo, "\n");
