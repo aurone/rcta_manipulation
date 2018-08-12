@@ -64,10 +64,10 @@ bool InitRomanWorkspaceLatticeActions(
         std::vector<double> d(space->dofCount(), 0.0);
 
         // skip roll and pitch primitives
-        if (a == EE_QX || a == EE_QY) continue;
+//        if (a == EE_QX || a == EE_QY) continue;
 
         // do base motions later
-        if (a == BD_PX || a == BD_PY) continue;
+//        if (a == BD_PX || a == BD_PY) continue;
 
         d[a] = space->resolution()[a] * -1;
         prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;

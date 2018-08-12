@@ -210,9 +210,14 @@ int main(int argc, char* argv[])
     start_state.setVariablePosition("limb_left_joint5", smpl::to_radians(-90.0));
     start_state.setVariablePosition("limb_left_joint6", smpl::to_radians(0.0));
     start_state.setVariablePosition("limb_left_joint7", smpl::to_radians(0.0));
-    start_state.setVariablePosition("world_joint/x", 1.0);
-    start_state.setVariablePosition("world_joint/y", 0.4);
-    start_state.setVariablePosition("world_joint/theta", smpl::to_radians(90));
+
+//    start_state.setVariablePosition("world_joint/x", 1.0);
+//    start_state.setVariablePosition("world_joint/y", 0.4);
+//    start_state.setVariablePosition("world_joint/theta", smpl::to_radians(90));
+
+    start_state.setVariablePosition("world_joint/x", 0.0);
+    start_state.setVariablePosition("world_joint/y", 0.0);
+    start_state.setVariablePosition("world_joint/theta", smpl::to_radians(0));
 
     ROS_INFO("Update start state in collision model");
 
