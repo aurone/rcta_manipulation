@@ -237,8 +237,10 @@ int main(int argc, char* argv[])
             Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
 
     auto object_start_state = 0.0;
+    (void)GetParam(ph, "object_start_position", &object_start_state);
 
     auto object_goal_state = 1.0;
+    (void)GetParam(ph, "object_goal_position", &object_goal_state);
 
     double allowed_time;
     ph.param("allowed_planning_time", allowed_time, 10.0);

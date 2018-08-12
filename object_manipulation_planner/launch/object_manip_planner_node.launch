@@ -17,7 +17,7 @@
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>
         <param name="planning_frame" value="map"/>
-        <param name="demonstrations_path" value="$(env HOME)/data/egraphs/roman_right_arm_torso_base_paths"/>
+        <param name="demonstrations_path" value="$(find object_manipulation_planner)/data"/>
 
         <param name="grid/size_x"       value="6.0"/>
         <param name="grid/size_y"       value="6.0"/>
@@ -43,5 +43,8 @@
         -->
 
         <param name="allowed_planning_time" value="60.0"/>
+
+        <param name="object_start_position" value="1.0"/>
+        <param name="object_goal_position" value="0.45"/>
     </node>
 </launch>
