@@ -539,7 +539,7 @@ int ObjectManipulationHeuristic::GetGoalHeuristic(int state_id)
     }
 
     if (h_min == std::numeric_limits<int>::max()) {
-        SMPL_INFO_NAMED(H_LOG, "state z = %0.12f", state_z);
+        SMPL_WARN_ONCE_NAMED(H_LOG, "no e-graph state with z = %0.12f", state_z);
     }
 
     if (is_egraph) {

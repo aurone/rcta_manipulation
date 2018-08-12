@@ -197,10 +197,10 @@ bool RomanWorkspaceLatticeEGraph::snap(int src_id, int dst_id, int& cost)
         smpl::RobotState robot_state;
         // TODO: this should be permissive and allow moving the redundant angles
         if (!stateWorkspaceToRobotPermissive(interm_workspace_state, robot_state)) {
-            SMPL_WARN_STREAM("Failed to find ik solution for interpolated state " << interm_workspace_state);
+            SMPL_WARN_STREAM(" -> Failed to find ik solution for interpolated state " << interm_workspace_state);
             return false;
         } else {
-            SMPL_INFO_STREAM("found ik solution for interpolated state " << interm_workspace_state);
+            SMPL_INFO_STREAM(" -> found ik solution for interpolated state " << interm_workspace_state);
         }
         prev_fa = robot_state[LIMB_JOINT3];
     }
