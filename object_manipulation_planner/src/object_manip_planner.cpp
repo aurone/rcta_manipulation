@@ -219,6 +219,7 @@ bool PlanPath(
         return false;
     }
 
+#if 0
     std::vector<smpl::RobotState> shortcut_path;
     smpl::ShortcutPath(
             planner->model,
@@ -226,6 +227,9 @@ bool PlanPath(
             path,
             shortcut_path,
             smpl::ShortcutType::JOINT_SPACE);
+#else
+    auto shortcut_path = path;
+#endif
 
     //////////////////////////////////////////////////
     // Convert to robot_trajectory::RobotTrajectory //

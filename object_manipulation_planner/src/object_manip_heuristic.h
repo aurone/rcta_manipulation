@@ -1,16 +1,35 @@
 #ifndef SMPL_OBJECT_MANIP_HEURISTIC_H
 #define SMPL_OBJECT_MANIP_HEURISTIC_H
 
+#include <boost/functional/hash.hpp>
+
 #include <smpl/angles.h>
 #include <smpl/heuristic/robot_heuristic.h>
 #include <smpl/heuristic/egraph_heuristic.h>
+
+#include "workspace_lattice_egraph_roman.h"
 
 namespace smpl {
 class ExperienceGraphExtension;
 class ExtractRobotStateExtension;
 }
 
-class ObjectManipulationHeuristic :
+struct PsiCoordHash
+{
+    using argument_type = PsiCoord;
+    using result_type = size_t;
+    auto operator()(const argument_type& coord) const -> result_type
+    {
+        auto seed = size_t(0);
+        boost::hash_combine(seed, coord[0]);
+        boost::hash_combine(seed, coord[1]);
+        boost::hash_combine(seed, coord[2]);
+        boost::hash_combine(seed, coord[3]);
+        return seed;
+    }
+};
+
+class ObjectManipHeuristic :
     public smpl::RobotHeuristic,
     public smpl::ExperienceGraphHeuristicExtension
 {
@@ -39,6 +58,14 @@ public:
     int heading_condition = 0; // 0 = discrete, or 1 = continuous + threshold, 2 = none
     bool disc_rotation_heuristic = true;
     bool disc_position_heuristic = true;
+
+    // map from z value to all psi cells on the demonstration with that same z value
+    smpl::hash_map<int, std::vector<PsiCoord>> z_to_cell;
+    smpl::hash_map<int, std::vector<smpl::ExperienceGraph::node_id>> z_to_egraph_node;
+
+    // map from all 3d cells on the demonstration to the heuristic distance
+    // minimum heuristic path cost to the any cell with that same
+    smpl::hash_map<PsiCoord, int, PsiCoordHash> psi_heuristic;
 
     bool init(smpl::RobotPlanningSpace* space);
 

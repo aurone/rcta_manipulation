@@ -72,7 +72,7 @@ struct ObjectManipPlanner
     ObjectManipModel*                       model;
     RomanWorkspaceLatticeEGraph             graph;
     RomanWorkspaceLatticeActionSpace        actions;
-    ObjectManipulationHeuristic             heuristic;
+    ObjectManipHeuristic                    heuristic;
     smpl::ExperienceGraphPlanner            search;
 
     ObjectManipPlanner();

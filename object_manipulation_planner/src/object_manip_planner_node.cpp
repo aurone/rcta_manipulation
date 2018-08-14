@@ -219,6 +219,30 @@ int main(int argc, char* argv[])
     start_state.setVariablePosition("world_joint/y", 0.0);
     start_state.setVariablePosition("world_joint/theta", smpl::to_radians(0));
 
+    {
+        ros::Duration(1.0).sleep();
+        visualization_msgs::MarkerArray ma;
+        std_msgs::ColorRGBA color;
+        color.r = 0.8f;
+        color.g = 0.8f;
+        color.b = 1.0f;
+        color.a = 0.9f;
+        start_state.getRobotMarkers(
+                ma,
+                start_state.getRobotModel()->getLinkModelNames(),
+                color,
+                "start_state",
+                ros::Duration(0.0));
+        for (auto& marker : ma.markers) {
+            ROS_INFO("%s", marker.header.frame_id.c_str());
+            ROS_INFO("%f, %f, %f", marker.scale.x, marker.scale.y, marker.scale.z);
+            ROS_INFO("color = %f, %f, %f, %f", marker.color.r, marker.color.g, marker.color.b,  marker.color.a);
+        }
+        ROS_INFO("Visualize %zu markers", ma.markers.size());
+        SV_SHOW_INFO(ma);
+        ros::Duration(1.0).sleep();
+    }
+
     ROS_INFO("Update start state in collision model");
 
     for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
