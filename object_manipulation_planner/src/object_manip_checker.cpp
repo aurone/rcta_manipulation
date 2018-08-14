@@ -27,6 +27,12 @@ bool ObjectManipChecker::interpolatePath(
     const smpl::RobotState& finish,
     std::vector<smpl::RobotState>& path)
 {
+    if (start.back() != finish.back()) {
+        path.push_back(start);
+        path.push_back(finish);
+        return true;
+    }
+
     if (!parent->interpolatePath(ExtractState(start), ExtractState(finish), path)) {
         return false;
     }
