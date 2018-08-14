@@ -7,7 +7,7 @@
 #include <smpl/heuristic/robot_heuristic.h>
 #include <smpl/heuristic/egraph_heuristic.h>
 
-#include "workspace_lattice_egraph_roman.h"
+#include "roman_workspace_lattice_egraph.h"
 
 namespace smpl {
 class ExperienceGraphExtension;

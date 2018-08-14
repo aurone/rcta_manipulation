@@ -14,7 +14,7 @@
 
 #include "object_manip_heuristic.h"
 #include "roman_workspace_lattice_action_space.h"
-#include "workspace_lattice_egraph_roman.h"
+#include "roman_workspace_lattice_egraph.h"
 
 namespace smpl {
 class CollisionChecker;

@@ -1,4 +1,4 @@
-#include "workspace_lattice_egraph_roman.h"
+#include "roman_workspace_lattice_egraph.h"
 
 #include <smpl/angles.h>
 #include <smpl/console/nonstd.h>

@@ -11,7 +11,6 @@
 
 #include "assert.h"
 #include "variables.h"
-#include "workspace_lattice_egraph_roman.h"
 
 static const double FixedPointRatio = 1000.0;
 

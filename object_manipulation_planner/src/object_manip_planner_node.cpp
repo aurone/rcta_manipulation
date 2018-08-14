@@ -18,6 +18,7 @@
 #include <smpl/occupancy_grid.h>
 
 // project includes
+#include "assert.h"
 #include "object_manip_planner.h"
 #include "object_manipulation_model.h"
 #include "object_manip_checker.h"
