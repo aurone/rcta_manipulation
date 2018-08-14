@@ -76,3 +76,9 @@ target_link_libraries(translate_demo ${smpl_LIBRARIES})
 add_executable(make_cabinet_urdf src/make_cabinet_urdf.cpp src/cabinet_model.cpp)
 target_include_directories(make_cabinet_urdf PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
 
+add_executable(echo_display_traj src/echo_display_traj.cpp)
+target_include_directories(echo_display_traj PRIVATE SYSTEM ${catkin_INCLUDE_DIRS})
+target_link_libraries(echo_display_traj PRIVATE ${roscpp_LIBRARIES})
+target_link_libraries(echo_display_traj PRIVATE ${moveit_core_LIBRARIES})
+target_link_libraries(echo_display_traj PRIVATE ${moveit_ros_planning_LIBRARIES})
+
