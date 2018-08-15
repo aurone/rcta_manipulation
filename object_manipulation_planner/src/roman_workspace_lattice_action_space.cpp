@@ -5,13 +5,13 @@
 
 // system includes
 #include <smpl/angles.h>
+#include <smpl/assert.h>
 #include <smpl/robot_model.h>
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>
 #include <smpl/graph/workspace_lattice.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
-#include "assert.h"
 #include "variables.h"
 
 bool InitRomanWorkspaceLatticeActions(
@@ -152,12 +152,12 @@ bool IsSidewaysMotion(
     const smpl::WorkspaceLatticeState& state,
     const smpl::MotionPrimitive& mprim)
 {
-    SMPL_ASSERT(!mprim.action.empty(), "Motion primitive must not be empty");
+    SMPL_ASSERT(!mprim.action.empty());
 
     auto& last = mprim.action.back();
-    SMPL_ASSERT(last.size() == VARIABLE_COUNT, "Motion primitive waypoint needs more variables");
+    SMPL_ASSERT(last.size() == VARIABLE_COUNT);
 
-    SMPL_ASSERT(state.state.size() == VARIABLE_COUNT, "Continuous state needs more variables");
+    SMPL_ASSERT(state.state.size() == VARIABLE_COUNT);
 
     auto dx = last[BD_PX];
     auto dy = last[BD_PY];
@@ -185,8 +185,8 @@ void RomanWorkspaceLatticeActionSpace::apply(
 {
     actions.reserve(actions.size() + m_prims.size());
 
-    SMPL_ASSERT(state.state.size() == VARIABLE_COUNT, "Continuous state needs more variables");
-    SMPL_ASSERT(state.coord.size() == VARIABLE_COUNT, "Discrete state needs more variables");
+    SMPL_ASSERT(state.state.size() == VARIABLE_COUNT);
+    SMPL_ASSERT(state.coord.size() == VARIABLE_COUNT);
 
     smpl::WorkspaceState cont_state;
     space->stateCoordToWorkspace(state.coord, cont_state);
@@ -198,7 +198,7 @@ void RomanWorkspaceLatticeActionSpace::apply(
             continue;
         }
 
-        SMPL_ASSERT(!prim.action.empty(), "Motion primitive must not be empty");
+        SMPL_ASSERT(!prim.action.empty());
         auto& last = prim.action.back();
 
 #define CORRECT_EE 0

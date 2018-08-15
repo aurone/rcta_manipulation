@@ -1,5 +1,6 @@
 #include "object_manip_heuristic.h"
 
+#include <smpl/assert.h>
 #include <smpl/angles.h>
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>
@@ -9,7 +10,6 @@
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/visualize.h>
 
-#include "assert.h"
 #include "variables.h"
 
 static const double FixedPointRatio = 1000.0;
@@ -23,8 +23,8 @@ void GetEquivalentStates(
 
     auto* state = graph->getState(state_id);
 
-    SMPL_ASSERT(state->state.size() == VARIABLE_COUNT, "state has insufficient variables");
-    SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT, "state has insufficient variables");
+    SMPL_ASSERT(state->state.size() == VARIABLE_COUNT);
+    SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT);
 
     auto psi = GetPsiCoord(graph, state->coord);
 
@@ -41,7 +41,7 @@ void GetEquivalentStates(
 
         auto* egraph_state = graph->getState(egraph_state_id);
 
-        SMPL_ASSERT(egraph_state->state.size() == VARIABLE_COUNT, "egraph state has insufficient variables");
+        SMPL_ASSERT(egraph_state->state.size() == VARIABLE_COUNT);
 
         if (state->state[HINGE] != egraph_state->state[HINGE]) continue;
 
@@ -111,10 +111,10 @@ void GetShortcutSuccs(
     int state_id,
     std::vector<int>& ids)
 {
-    SMPL_ASSERT(heur->eg != NULL, "Need experience graph extension");
+    SMPL_ASSERT(heur->eg != NULL);
 
     auto* egraph = heur->eg->getExperienceGraph();
-    SMPL_ASSERT(egraph != NULL, "Need an e-graph");
+    SMPL_ASSERT(egraph != NULL);
 
     std::vector<smpl::ExperienceGraph::node_id> egraph_nodes;
     heur->eg->getExperienceGraphNodes(state_id, egraph_nodes);
@@ -392,8 +392,8 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     }
 
     auto* state = graph->getState(state_id);
-    SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT, "state has incorrect variables");
-    SMPL_ASSERT(state->state.size() == VARIABLE_COUNT, "state has incorrect variables");
+    SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT);
+    SMPL_ASSERT(state->state.size() == VARIABLE_COUNT);
 
     // visualize the base pose
     SV_SHOW_INFO_NAMED("state_base", smpl::visual::MakeFrameMarkers(
@@ -413,7 +413,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     SMPL_DEBUG_NAMED(H_LOG, "  psi(state) = (%d, %d, %d)", psi[0], psi[1], psi[2]);
 
     auto* egraph = heur->eg->getExperienceGraph();
-    SMPL_ASSERT(egraph != NULL, "egraph is null");
+    SMPL_ASSERT(egraph != NULL);
 
     auto h_min = std::numeric_limits<int>::max();
     int h_base_min;
@@ -452,7 +452,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         /////////////////////////
 
         auto manipit = heur->psi_heuristic.find(egraph_psi);
-        SMPL_ASSERT(manipit != end(heur->psi_heuristic), "node is out of bounds");
+        SMPL_ASSERT(manipit != end(heur->psi_heuristic));
         auto h_manipulate = manipit->second;
         SMPL_DEBUG_NAMED(H_LOG, "    h_manip(v) = %d", h_manipulate);
 
@@ -465,7 +465,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         // get the state for this experience graph node
         // or just use the provided robot state directly
         auto& egraph_state = egraph->state(node);
-        SMPL_ASSERT(egraph_state.size() == VARIABLE_COUNT, "egraph state is empty");
+        SMPL_ASSERT(egraph_state.size() == VARIABLE_COUNT);
 
         auto egraph_state_id = heur->eg->getStateID(node);
         auto* egraph_graph_state = graph->getState(egraph_state_id);

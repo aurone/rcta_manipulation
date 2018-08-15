@@ -1,12 +1,12 @@
 #include "roman_workspace_lattice_egraph.h"
 
 #include <smpl/angles.h>
+#include <smpl/assert.h>
 #include <smpl/console/nonstd.h>
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/graph/workspace_lattice_action_space.h>
 
-#include "assert.h"
 #include "variables.h"
 
 #define G_SNAP_LOG G_SUCCESSORS_LOG ".snap"
@@ -93,7 +93,7 @@ void GetNonEGraphStateSuccs(
                     for (auto nn : parent_nearby_nodes) {
                         if (graph->egraph.edge(nn, node)) {
                             auto& egraph_state = graph->egraph.state(node);
-                            SMPL_ASSERT(egraph_state.size() == graph->robot()->jointVariableCount(), "egraph state missing variables");
+                            SMPL_ASSERT(egraph_state.size() == graph->robot()->jointVariableCount());
                             auto z = egraph_state[HINGE];
                             auto this_final_state = final_state;
                             auto this_final_robot_state = final_robot_state;
@@ -183,11 +183,11 @@ int GetSnapMotion(
     auto* src_state = graph->getState(src_id);
     auto* dst_state = graph->getState(dst_id);
 
-    SMPL_ASSERT(src_state != NULL && dst_state != NULL, "snap motion endpoints are null");
-    SMPL_ASSERT(src_state->state.size() == VARIABLE_COUNT, "not enough variables");
-    SMPL_ASSERT(dst_state->state.size() == VARIABLE_COUNT, "not enough variables");
-    SMPL_ASSERT(src_state->coord.size() == VARIABLE_COUNT, "not enough variables");
-    SMPL_ASSERT(dst_state->coord.size() == VARIABLE_COUNT, "not enough variables");
+    SMPL_ASSERT(src_state != NULL && dst_state != NULL);
+    SMPL_ASSERT(src_state->state.size() == VARIABLE_COUNT);
+    SMPL_ASSERT(dst_state->state.size() == VARIABLE_COUNT);
+    SMPL_ASSERT(src_state->coord.size() == VARIABLE_COUNT);
+    SMPL_ASSERT(dst_state->coord.size() == VARIABLE_COUNT);
 
     // log source/destination states
     SMPL_DEBUG_STREAM_NAMED(G_SNAP_LOG, "  snap " << src_state->coord << " -> " << dst_state->coord);
@@ -330,17 +330,11 @@ bool ExtractPath(
 
         if (state_id == graph->getGoalStateID()) {
             auto* entry = graph->getState(graph->getStartStateID());
-            if (!entry) {
-                SMPL_ERROR_NAMED(G_LOG, "Failed to get state entry for state %d", graph->getStartStateID());
-                return false;
-            }
+            SMPL_ASSERT(entry != NULL);
             path.push_back(entry->state);
         } else {
             auto* entry = graph->getState(state_id);
-            if (!entry) {
-                SMPL_ERROR_NAMED(G_LOG, "Failed to get state entry for state %d", state_id);
-                return false;
-            }
+            SMPL_ASSERT(entry != NULL);
             path.push_back(entry->state);
         }
 
@@ -359,10 +353,7 @@ bool ExtractPath(
     // grab the first point
     {
         auto* entry = graph->getState(ids[0]);
-        if (!entry) {
-            SMPL_ERROR_NAMED(G_LOG, "Failed to get state entry for state %d", ids[0]);
-            return false;
-        }
+        SMPL_ASSERT(entry != NULL);
         opath.push_back(entry->state);
     }
 
@@ -386,19 +377,20 @@ bool ExtractPath(
 
         smpl::WorkspaceLatticeState* best_state = NULL;
         auto best_cost = std::numeric_limits<int>::max();
-        for (size_t i = 0; i < succs.size(); ++i) {
+        for (size_t ii = 0; ii < succs.size(); ++ii) {
             if (curr_id == graph->getGoalStateID()) {
-                auto* state = graph->getState(succs[i]);
+                auto* state = graph->getState(succs[ii]);
+                SMPL_ASSERT(state != NULL);
                 smpl::WorkspaceState workspace_state;
                 graph->stateRobotToWorkspace(state->state, workspace_state);
-                if (costs[i] < best_cost && graph->isGoal(workspace_state, state->state)) {
+                if (costs[ii] < best_cost && graph->isGoal(workspace_state, state->state)) {
                     best_state = state;
-                    best_cost = costs[i];
+                    best_cost = costs[ii];
                 }
             } else {
-                if (succs[i] == curr_id && costs[i] < best_cost) {
-                    best_state = graph->getState(succs[i]);
-                    best_cost = costs[i];
+                if (succs[ii] == curr_id && costs[ii] < best_cost) {
+                    best_state = graph->getState(succs[ii]);
+                    best_cost = costs[ii];
                 }
             }
         }
@@ -431,7 +423,7 @@ bool ExtractPath(
                 for (auto n : node_path) {
                     auto state_id = graph->egraph_node_to_state[n];
                     auto* entry = graph->getState(state_id);
-                    assert(entry);
+                    SMPL_ASSERT(entry != NULL);
                     opath.push_back(entry->state);
                 }
             }
