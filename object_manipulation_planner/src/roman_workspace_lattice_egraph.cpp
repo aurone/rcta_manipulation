@@ -217,7 +217,7 @@ int GetSnapMotion(
     graph->stateCoordToWorkspace(src_state->coord, start_state);
     graph->stateCoordToWorkspace(dst_state->coord, finish_state);
 
-    SMPL_WARN_STREAM_NAMED(G_SNAP_LOG, "  Interpolate between states " << start_state << " and " << finish_state);
+    SMPL_DEBUG_STREAM_NAMED(G_SNAP_LOG, "  Interpolate between states " << start_state << " and " << finish_state);
 
     auto prev_fa = start_state[AR_FA];
 

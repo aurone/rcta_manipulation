@@ -22,93 +22,109 @@ bool InitRomanWorkspaceLatticeActions(
 
     actions->m_prims.clear();
 
-    smpl::MotionPrimitive prim;
-
     auto add_xyz_prim = [&](int dx, int dy, int dz)
     {
-        std::vector<double> d(space->dofCount(), 0.0);
-        d[EE_PX] = space->resolution()[EE_PX] * dx;
-        d[EE_PY] = space->resolution()[EE_PY] * dy;
-        d[EE_PZ] = space->resolution()[EE_PZ] * dz;
+        smpl::MotionPrimitive prim;
+
         prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
-        prim.action.clear();
+
+        std::vector<double> d(space->dofCount(), 0.0);
+        d[VariableIndex::EE_PX] = space->resolution()[VariableIndex::EE_PX] * dx;
+        d[VariableIndex::EE_PY] = space->resolution()[VariableIndex::EE_PY] * dy;
+        d[VariableIndex::EE_PZ] = space->resolution()[VariableIndex::EE_PZ] * dz;
         prim.action.push_back(std::move(d));
 
-        actions->m_prims.push_back(prim);
+        actions->m_prims.push_back(std::move(prim));
     };
 
-#if 0
-    // create 26-connected position motions
-    for (int dx = -1; dx <= 1; ++dx) {
-    for (int dy = -1; dy <= 1; ++dy) {
-    for (int dz = -1; dz <= 1; ++dz) {
-        if (dx == 0 && dy == 0 && dz == 0) {
-            continue;
+    auto connected26 = false;
+    if (connected26) {
+        // create 26-connected position motions
+        for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+        for (int dz = -1; dz <= 1; ++dz) {
+            if (dx == 0 && dy == 0 && dz == 0) {
+                continue;
+            }
+            add_xyz_prim(dx, dy, dz);
         }
-        add_xyz_prim(dx, dy, dz);
+        }
+        }
+    } else {
+        // 2-connected motions for x, y, and z of the end effector
+        add_xyz_prim(-1, 0, 0);
+        add_xyz_prim(1, 0, 0);
+        add_xyz_prim(0, 1, 0);
+        add_xyz_prim(0, -1, 0);
+        add_xyz_prim(0, 0, 1);
+        add_xyz_prim(0, 0, -1);
     }
-    }
-    }
-#else
-    // 2-connected motions for x, y, and z of the end effector
-    add_xyz_prim(-1, 0, 0);
-    add_xyz_prim(1, 0, 0);
-    add_xyz_prim(0, 1, 0);
-    add_xyz_prim(0, -1, 0);
-    add_xyz_prim(0, 0, 1);
-    add_xyz_prim(0, 0, -1);
-#endif
 
     // create 2-connected motions for rotation and free angle motions
     for (int a = 3; a < space->dofCount(); ++a) {
-        std::vector<double> d(space->dofCount(), 0.0);
-
         // skip roll and pitch primitives
 //        if (a == EE_QX || a == EE_QY) continue;
 
-        // do base motions later
-//        if (a == BD_PX || a == BD_PY) continue;
-
-        d[a] = space->resolution()[a] * -1;
-        prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
-
-        if (a == BD_PX) { // base x
-            d[EE_PX] = -space->resolution()[EE_PX]; // also move the end effector by -res in x
-        }
-        if (a == BD_PY) { // base y
-            d[EE_PY] = -space->resolution()[EE_PY]; // also move the end effector by -res in y
-        }
+        // handle translational base motions later
+        if (a == BD_PX || a == BD_PY) continue;
 
         // don't move the object, what are you doing?
         if (a == OB_P) continue;
 
-        // TODO: this isn't right if we want to have differing resolutions
-        if (a == TR_JP || a == BD_TH) {
-            d[EE_QZ] = -space->resolution()[EE_QZ]; // also move the end effector yaw by -res in theta
+        // Note: We want free angle motions for the base and torso to move the
+        // end effector rather than keeping it at a fixed position. Here we
+        // move the end effector by the closest number of discretizations in x,
+        // y, z, yaw to match the change in free angle motion.
+
+        // define a motion primitive that moves backward by one discretization
+        {
+            smpl::MotionPrimitive prim;
+
+            prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
+
+            std::vector<double> d(space->dofCount(), 0.0);
+
+            d[a] = space->resolution()[a] * -1;
+
+            if (a == TR_JP) {
+                auto bins = (int)std::round(
+                        space->resolution()[TR_JP] / space->resolution()[EE_QZ]);
+                d[EE_QZ] = (double)-bins * space->resolution()[EE_QZ];
+            }
+            if (a == BD_TH) {
+                auto bins = (int)std::round(
+                        space->resolution()[BD_TH] / space->resolution()[EE_QZ]);
+                d[EE_QZ] = (double)-bins * space->resolution()[EE_QZ];
+            }
+
+            prim.action.push_back(std::move(d));
+            actions->m_prims.push_back(std::move(prim));
         }
 
-        prim.action.clear();
-        prim.action.push_back(d);
-        actions->m_prims.push_back(prim);
+        // define a motion primitive that moves forward by one discretization
+        {
+            smpl::MotionPrimitive prim;
 
-        d[a] = space->resolution()[a] * 1;
-        prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
+            prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
 
-        if (a == BD_PX) {
-            d[EE_PX] = space->resolution()[EE_PX]; // also move the end effector by +res in x
+            std::vector<double> d(space->dofCount(), 0.0);
+
+            d[a] = space->resolution()[a] * 1;
+
+            if (a == TR_JP) {
+                auto bins = (int)std::round(
+                        space->resolution()[TR_JP] / space->resolution()[EE_QZ]);
+                d[EE_QZ] = (double)bins * space->resolution()[EE_QZ];
+            }
+            if (a == BD_TH) {
+                auto bins = (int)std::round(
+                        space->resolution()[BD_TH] / space->resolution()[EE_QZ]);
+                d[EE_QZ] = (double)bins * space->resolution()[EE_QZ];
+            }
+
+            prim.action.push_back(std::move(d));
+            actions->m_prims.push_back(std::move(prim));
         }
-        if (a == BD_PY) {
-            d[EE_PY] = space->resolution()[EE_PY]; // also move the end effector by +res in y
-        }
-
-        // TODO: this isn't right if we want to have differing resolutions
-        if (a == TR_JP || a == BD_TH) {
-            d[EE_QZ] = space->resolution()[EE_QZ];
-        }
-
-        prim.action.clear();
-        prim.action.push_back(d);
-        actions->m_prims.push_back(prim);
     }
 
     // Add motions to move the base forward/backward, left/right, and
@@ -117,6 +133,9 @@ bool InitRomanWorkspaceLatticeActions(
     //
     for (int dx = -2; dx <= 2; ++dx) {
         for (int dy = -2; dy <= 2; ++dy) {
+            smpl::MotionPrimitive prim;
+            prim.type = smpl::MotionPrimitive::Type::LONG_DISTANCE;
+
             // skip no motion
             if (dx == 0 && dy == 0) continue;
 
@@ -128,14 +147,20 @@ bool InitRomanWorkspaceLatticeActions(
             if (dx == 0 & abs(dy) == 2) continue;
 
             std::vector<double> d(space->dofCount(), 0.0);
+
+            // apply the base motion
             d[BD_PX] = dx * space->resolution()[BD_PX];
             d[BD_PY] = dy * space->resolution()[BD_PY];
 
-            d[EE_PX] = dx * space->resolution()[EE_PX];
-            d[EE_PY] = dy * space->resolution()[EE_PY];
-            prim.action.clear();
-            prim.action.push_back(d);
-            actions->m_prims.push_back(prim);
+            // similar logic as above, move the end effector by the appropriate
+            // number of discrete units
+            auto xbins = (int)std::round(space->resolution()[BD_PX] / space->resolution()[EE_PX]);
+            auto ybins = (int)std::round(space->resolution()[BD_PY] / space->resolution()[EE_PY]);
+            d[EE_PX] = dx * xbins * space->resolution()[EE_PX];
+            d[EE_PY] = dy * ybins * space->resolution()[EE_PY];
+
+            prim.action.push_back(std::move(d));
+            actions->m_prims.push_back(std::move(prim));
         }
     }
 
@@ -263,7 +288,7 @@ void RomanWorkspaceLatticeActionSpace::apply(
         // apply the adaptive motion primitive
         auto* h = space->heuristic(0);
         auto goal_dist = h->getMetricGoalDistance(
-                cont_state[EE_PX], cont_state[EE_PY], cont_state[EE_PZ]);
+                cont_state[VariableIndex::EE_PX], cont_state[VariableIndex::EE_PY], cont_state[VariableIndex::EE_PZ]);
         if (goal_dist < m_ik_amp_thresh) {
             smpl::RobotState ik_sol;
             if (space->m_ik_iface->computeIK(space->goal().pose, state.state, ik_sol)) {
