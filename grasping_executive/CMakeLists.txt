@@ -67,26 +67,6 @@ include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${urdfdom_INCLUDE_DIRS})
 include_directories(${urdfdom_headers_INCLUDE_DIRS})
 
-add_executable(move_arm_node src/move_arm_node/move_arm_node.cpp)
-target_link_libraries(
-    move_arm_node
-    ${actionlib_LIBRARIES}
-    ${eigen_conversions_LIBRARIES}
-    ${leatherman_LIBRARIES}
-    ${moveit_core_LIBRARIES}
-    ${moveit_ros_move_group_LIBRARIES}
-    ${moveit_ros_planning_LIBRARIES}
-    ${moveit_ros_planning_interface_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${smpl_LIBRARIES}
-    ${sbpl_collision_checking_LIBRARIES}
-    ${sbpl_kdl_robot_model_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
-    ${tf_LIBRARIES}
-    ${urdf_model_LIBRARIES}
-    ${urdf_parser_LIBRARIES})
-add_dependencies(move_arm_node ${PROJECT_NAME}_generate_messages_cpp)
-
 add_executable(
     costmap_object_detection
     src/costmap_object_detection/costmap_object_detection.cpp)
@@ -170,7 +150,6 @@ install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY plugins DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(
     TARGETS
-        move_arm_node
         costmap_object_detection
         grasp_object_executor
         grasping_command_panel_plugin
