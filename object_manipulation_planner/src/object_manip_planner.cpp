@@ -51,8 +51,8 @@ bool Init(
         return false;
     }
 
-    if (!planner->heuristic.init(&planner->graph)) {
-        ROS_ERROR("Failed to initialize Dijkstra E-Graph Heuristic 3D");
+    if (!Init(&planner->heuristic, &planner->graph)) {
+        ROS_ERROR("Failed to initialize Object Manip Heuristic");
         return false;
     }
 

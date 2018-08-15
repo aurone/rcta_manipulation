@@ -41,6 +41,8 @@ public:
 
     std::vector<int> egraph_goal_heuristics;
 
+    double w_egraph = 5.0;
+
     double heading_thresh = 0.1;
     double theta_db = smpl::to_radians(2.0);
     double pos_db = 0.1;
@@ -66,8 +68,6 @@ public:
     // map from all 3d cells on the demonstration to the heuristic distance
     // minimum heuristic path cost to the any cell with that same
     smpl::hash_map<PsiCoord, int, PsiCoordHash> psi_heuristic;
-
-    bool init(smpl::RobotPlanningSpace* space);
 
     /// \name Required ExperienceGraphHeuristicExtension Interface
     ///@{
@@ -97,6 +97,8 @@ public:
 
     auto getExtension(size_t class_code) -> Extension* override;
 };
+
+bool Init(ObjectManipHeuristic* heur, smpl::RobotPlanningSpace* space);
 
 #endif
 

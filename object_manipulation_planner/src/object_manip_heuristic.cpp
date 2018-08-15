@@ -14,6 +14,8 @@
 
 static const double FixedPointRatio = 1000.0;
 
+#define HV_LOG H_LOG ".verbose"
+
 void GetEquivalentStates(
     ObjectManipHeuristic* heur,
     int state_id,
@@ -47,26 +49,14 @@ void GetEquivalentStates(
 
         auto egraph_psi = GetPsiCoord(graph, egraph_state->coord);
 
-        SMPL_DEBUG_NAMED(H_LOG, "test for equivalent state at (%d, %d, %d)",
-                egraph_psi[0],
-                egraph_psi[1],
-                egraph_psi[2]);
-
         if (egraph_psi[0] == psi[0] &
             egraph_psi[1] == psi[1] &
             egraph_psi[2] == psi[2])
         {
-            SMPL_WARN_NAMED(H_LOG, "FOUND IT!");
             ids.push_back(egraph_state_id);
         }
     }
-}
-
-void ObjectManipHeuristic::getEquivalentStates(
-    int state_id,
-    std::vector<int>& ids)
-{
-    return GetEquivalentStates(this, state_id, ids);
+    SMPL_DEBUG_NAMED(H_LOG, "Found %zu potential snap states!", ids.size());
 }
 
 auto deadband(double val, double bot) -> double
@@ -76,34 +66,6 @@ auto deadband(double val, double bot) -> double
     } else {
         return val;
     }
-}
-
-bool ObjectManipHeuristic::init(smpl::RobotPlanningSpace* space)
-{
-    this->eg = space->getExtension<smpl::ExperienceGraphExtension>();
-    if (this->eg == NULL) {
-        SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Experience Graph Extension");
-        return false;
-    }
-
-    this->extract_state = space->getExtension<smpl::ExtractRobotStateExtension>();
-    if (this->extract_state == NULL) {
-        SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Extract Robot State Extension");
-        return false;
-    }
-
-    this->project_to_point = space->getExtension<smpl::PointProjectionExtension>();
-    if (this->project_to_point == NULL) {
-        SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Point Projection Extension");
-        return false;
-    }
-
-    if (!RobotHeuristic::init(space)) {
-        SMPL_WARN_NAMED(H_LOG, "Failed to initialize Robot Heuristic");
-        return false;
-    }
-
-    return true;
 }
 
 void GetShortcutSuccs(
@@ -141,23 +103,6 @@ void GetShortcutSuccs(
         }
 #endif
     }
-}
-
-void ObjectManipHeuristic::getShortcutSuccs(
-    int state_id,
-    std::vector<int>& ids)
-{
-    return GetShortcutSuccs(this, state_id, ids);
-}
-
-double ObjectManipHeuristic::getMetricStartDistance(double x, double y, double z)
-{
-    return 0.0;
-}
-
-double ObjectManipHeuristic::getMetricGoalDistance(double x, double y, double z)
-{
-    return 0.0;
 }
 
 void UpdateUserGoal(
@@ -337,11 +282,6 @@ void UpdateGoal(ObjectManipHeuristic* heur, const smpl::GoalConstraint& goal)
     }
 }
 
-void ObjectManipHeuristic::updateGoal(const smpl::GoalConstraint& goal)
-{
-    return UpdateGoal(this, goal);
-}
-
 auto normalize_disc_theta(int theta, int num_angles) -> int
 {
     if (theta >= 0) {
@@ -427,25 +367,24 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     auto& psis = heur->z_to_cell[state->coord[OB_P]];
     auto& egraph_nodes = heur->z_to_egraph_node[state->coord[OB_P]];
 
-    auto w_egraph = 5.0;
-
+    SMPL_DEBUG_NAMED(H_LOG, "Inspect %zu psi nodes", psis.size());
     for (int i = 0; i < psis.size(); ++i) {
         ///////////////////////
         // Compute h_contact //
         ///////////////////////
 
         auto& egraph_psi = psis[i];
-        SMPL_DEBUG_NAMED(H_LOG, "    psi(v) = (%d, %d, %d)", egraph_psi[0], egraph_psi[1], egraph_psi[2]);
+        SMPL_DEBUG_NAMED(HV_LOG, "    psi(v) = (%d, %d, %d)", egraph_psi[0], egraph_psi[1], egraph_psi[2]);
 
         auto h_contact = 0;
         {
             auto dx = graph->resolution()[0] * double(egraph_psi[0] - psi[0]);
             auto dy = graph->resolution()[1] * double(egraph_psi[1] - psi[1]);
             auto dz = graph->resolution()[2] * double(egraph_psi[2] - psi[2]);
-            h_contact = (int)(w_egraph * FixedPointRatio * std::sqrt(dx * dx + dy * dy + dz * dz));
+            h_contact = (int)(heur->w_egraph * FixedPointRatio * std::sqrt(dx * dx + dy * dy + dz * dz));
         }
 
-        SMPL_DEBUG_NAMED(H_LOG, "    h_contact(s,v) = %d", h_contact);
+        SMPL_DEBUG_NAMED(HV_LOG, "    h_contact(s,v) = %d", h_contact);
 
         /////////////////////////
         // Lookup h_manipulate //
@@ -454,7 +393,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         auto manipit = heur->psi_heuristic.find(egraph_psi);
         SMPL_ASSERT(manipit != end(heur->psi_heuristic));
         auto h_manipulate = manipit->second;
-        SMPL_DEBUG_NAMED(H_LOG, "    h_manip(v) = %d", h_manipulate);
+        SMPL_DEBUG_NAMED(HV_LOG, "    h_manip(v) = %d", h_manipulate);
 
         ///////////////////////////////////////////////////////////////
         // h_base - now we care about the actual demonstration state //
@@ -485,7 +424,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         auto ddy = graph_state->coord[BD_PY] - egraph_graph_state->coord[BD_PY];
         auto ddtheta = shortest_angle_dist(graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH], graph->m_val_count[BD_TH]);
 
-        SMPL_DEBUG_NAMED(H_LOG, "    disc delta base = (%d, %d, %d)", ddx, ddy, ddtheta);
+        SMPL_DEBUG_NAMED(HV_LOG, "    disc delta base = (%d, %d, %d)", ddx, ddy, ddtheta);
 
         // pose delta in continuous space
         auto dbx = egraph_state[WORLD_JOINT_X] - state->state[WORLD_JOINT_X];
@@ -564,17 +503,17 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
             pos_dist = deadband(std::sqrt(dbx * dbx + dby * dby), heur->pos_db);
         }
 
-        SMPL_DEBUG_NAMED(H_LOG, "    pos dist = %f", pos_dist);
-        SMPL_DEBUG_NAMED(H_LOG, "    rot dist(degs) = %f", smpl::to_degrees(rot_dist));
+        SMPL_DEBUG_NAMED(HV_LOG, "    pos dist = %f", pos_dist);
+        SMPL_DEBUG_NAMED(HV_LOG, "    rot dist(degs) = %f", smpl::to_degrees(rot_dist));
 
         auto h_base_pos = pos_dist;
         auto h_base_rot = heur->theta_normalizer * rot_dist;
-        auto h_base = (int)(FixedPointRatio * (h_base_rot + h_base_pos));
+        auto h_base = (int)(heur->w_egraph * FixedPointRatio * (h_base_rot + h_base_pos));
 
-        SMPL_DEBUG_NAMED(H_LOG, "  h_base_pos = %f, h_base_rot = %f", h_base_pos, h_base_rot);
+        SMPL_DEBUG_NAMED(HV_LOG, "    h_base_pos = %f, h_base_rot = %f", h_base_pos, h_base_rot);
         h_base *= heur->h_base_weight;
 
-        SMPL_DEBUG_NAMED(H_LOG, "    h_base(s,v) = %d", h_base);
+        SMPL_DEBUG_NAMED(HV_LOG, "    h_base(s,v) = %d", h_base);
 
         auto cost = 0;
         switch (heur->combination) {
@@ -612,6 +551,67 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         }
         return h_min;
     }
+}
+
+////////////////////////////////////
+// ObjectManipHeuristic Interface //
+////////////////////////////////////
+
+bool Init(ObjectManipHeuristic* heur, smpl::RobotPlanningSpace* space)
+{
+    heur->eg = space->getExtension<smpl::ExperienceGraphExtension>();
+    if (heur->eg == NULL) {
+        SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Experience Graph Extension");
+        return false;
+    }
+
+    heur->extract_state = space->getExtension<smpl::ExtractRobotStateExtension>();
+    if (heur->extract_state == NULL) {
+        SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Extract Robot State Extension");
+        return false;
+    }
+
+    heur->project_to_point = space->getExtension<smpl::PointProjectionExtension>();
+    if (heur->project_to_point == NULL) {
+        SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Point Projection Extension");
+        return false;
+    }
+
+    if (!heur->RobotHeuristic::init(space)) {
+        SMPL_WARN_NAMED(H_LOG, "Failed to initialize Robot Heuristic");
+        return false;
+    }
+
+    return true;
+}
+
+void ObjectManipHeuristic::getEquivalentStates(
+    int state_id,
+    std::vector<int>& ids)
+{
+    return GetEquivalentStates(this, state_id, ids);
+}
+
+void ObjectManipHeuristic::getShortcutSuccs(
+    int state_id,
+    std::vector<int>& ids)
+{
+    return GetShortcutSuccs(this, state_id, ids);
+}
+
+double ObjectManipHeuristic::getMetricStartDistance(double x, double y, double z)
+{
+    return 0.0;
+}
+
+double ObjectManipHeuristic::getMetricGoalDistance(double x, double y, double z)
+{
+    return 0.0;
+}
+
+void ObjectManipHeuristic::updateGoal(const smpl::GoalConstraint& goal)
+{
+    return UpdateGoal(this, goal);
 }
 
 int ObjectManipHeuristic::GetGoalHeuristic(int state_id)
