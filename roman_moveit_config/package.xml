@@ -11,7 +11,7 @@
 
     <exec_depend>moveit_ros_move_group</exec_depend>
     <exec_depend>moveit_planners_ompl</exec_depend>
-    <exec_depend>moveit_planners_sbpl</exec_depend>
+    <exec_depend>smpl_moveit_interface</exec_depend>
     <exec_depend>moveit_ros_visualization</exec_depend>
     <exec_depend>roman_model</exec_depend>
     <exec_depend>kdl_kinematics_plugin</exec_depend>
