@@ -19,7 +19,7 @@ public:
 
     smpl::WorkspaceLattice* space = NULL;
     std::vector<smpl::MotionPrimitive> m_prims;
-    bool m_ik_amp_enabled = true;
+    bool m_ik_amp_enabled = false;
     double m_ik_amp_thresh = 0.2;
 
     void apply(
