@@ -10,7 +10,7 @@
 #include <smpl/planning_params.h>
 
 // project includes
-#include "object_manipulation_model.h"
+#include "object_manip_model.h"
 #include "object_manip_heuristic.h"
 
 ObjectManipPlanner::ObjectManipPlanner() : search(&graph, &heuristic) { }

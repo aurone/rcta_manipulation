@@ -1,4 +1,4 @@
-#include "object_manipulation_model.h"
+#include "object_manip_model.h"
 
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>

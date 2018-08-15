@@ -35,7 +35,7 @@ add_library(
     src/object_manip_checker.cpp
     src/object_manip_heuristic.cpp
     src/object_manip_planner.cpp
-    src/object_manipulation_model.cpp
+    src/object_manip_model.cpp
     src/roman_workspace_lattice_action_space.cpp
     src/roman_workspace_lattice_egraph.cpp)
 
