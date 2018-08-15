@@ -615,7 +615,7 @@ struct GraspObjectExecutor
     moveit::core::RobotModelPtr                     m_robot_model;
     pluginlib::ClassLoader<GraspPlannerPlugin>      m_grasp_planner_loader;
     GraspPlannerPluginPtr                           m_grasp_planner;
-    planning_scene_monitor::CurrentStateMonitorPtr  m_state_monitor;
+    std::shared_ptr<planning_scene_monitor::CurrentStateMonitor>  m_state_monitor;
     std::vector<std::string>                        m_gripper_links;
 
     /// \name Global Parameters
@@ -865,7 +865,7 @@ bool GraspObjectExecutor::initialize()
     }
 
     auto transformer = boost::shared_ptr<tf::Transformer>(new tf::TransformListener);
-    m_state_monitor = boost::make_shared<planning_scene_monitor::CurrentStateMonitor>(m_robot_model, transformer);
+    m_state_monitor = std::make_shared<planning_scene_monitor::CurrentStateMonitor>(m_robot_model, transformer);
     m_state_monitor->startStateMonitor("joint_states");
 
     if (!msg_utils::download_param(m_ph, "manipulator_group_name", m_manip_name)) {
