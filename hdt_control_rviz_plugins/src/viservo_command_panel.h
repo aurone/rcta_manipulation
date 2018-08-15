@@ -7,10 +7,12 @@
 
 // system includes
 #include <QtGui>
+#ifndef Q_MOC_RUN
 #include <actionlib/client/simple_action_client.h>
 #include <hdt_control_msgs/ViservoCommandAction.h>
 #include <rviz/panel.h>
 #include <tf/transform_listener.h>
+#endif
 
 namespace rcta {
 

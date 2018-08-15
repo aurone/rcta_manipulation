@@ -7,10 +7,12 @@
 
 // system includes
 #include <QtGui>
+#ifndef Q_MOC_RUN
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <ros/ros.h>
 #include <rviz/panel.h>
+#endif
 
 namespace rcta {
 

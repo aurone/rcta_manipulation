@@ -1,33 +1,22 @@
 <?xml version="1.0"?>
 <package format="2">
-    <name>hdt_control</name>
+    <name>hdt_control_rviz_plugins</name>
+    <description>The hdt_control_rviz_plugins package</description>
     <version>0.0.0</version>
-    <description>The hdt_control package</description>
     <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
     <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
     <license>BSD</license>
 
     <buildtool_depend>catkin</buildtool_depend>
 
-    <build_depend>eigen</build_depend>
-
-    <build_export_depend>libqt4-dev</build_export_depend>
-
-    <exec_depend>libqt4</exec_depend>
-
-    <depend>ar_track_alvar_msgs</depend>
     <depend>actionlib</depend>
-    <depend>boost</depend>
     <depend>eigen_conversions</depend>
     <depend>hdt_control_msgs</depend>
     <depend>hdt_kinematics</depend>
-    <depend>libncurses-dev</depend>
-    <depend>orocos_kdl</depend>
-    <depend>rcta_manipulation_common</depend>
+    <depend>libqt4-dev</depend>
+    <depend>rcta_manipulation_command</depend>
     <depend>roscpp</depend>
     <depend>rviz</depend>
-    <depend>sbpl_geometry_utils</depend>
-    <depend>sbpl_kdl_robot_model</depend>
     <depend>smpl</depend>
     <depend>spellbook_ros</depend>
     <depend>tf</depend>

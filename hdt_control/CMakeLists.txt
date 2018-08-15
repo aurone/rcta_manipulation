@@ -11,7 +11,6 @@ endif()
 # TODO: orocos_kdl for viservo_controller
 find_package(Boost REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Qt4 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(lua52 REQUIRED lua5.2)
 pkg_check_modules(ncurses REQUIRED ncurses)
@@ -37,8 +36,6 @@ find_package(orocos_kdl REQUIRED)
 catkin_package()
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
-
-include(${QT_USE_FILE})
 
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${EIGEN3_INCLUDE_DIR})
@@ -70,23 +67,6 @@ target_link_libraries(
     ${tf_LIBRARIES}
     ${spellbook_ros_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
-
-qt4_wrap_cpp(
-    MOC_HEADER_SOURCES
-    src/controller_status_panel/controller_status_panel_widget.h)
-qt4_wrap_ui(
-    MOC_FORM_HEADERS
-    src/controller_status_panel/controller_status_panel_widget.ui)
-add_library(
-    hdt_controller_plugins
-    ${MOC_HEADER_SOURCES}
-    ${MOC_FORM_HEADERS}
-    src/controller_status_panel/controller_status_panel_widget.cpp)
-target_link_libraries(
-    hdt_controller_plugins
-    ${QT_LIBRARIES}
-    ${smpl_LIBRARIES}
-    qwt)
 
 add_executable(
     measure_eef_error
@@ -146,21 +126,6 @@ target_link_libraries(
 #    config_block
 #    ${hdt_kinematics_LIBRARIES})
 
-qt4_wrap_ui(MOC_FORM_HEADERS src/hdt_temperature_status/TemperatureStatusPanelWidget.ui)
-qt4_wrap_cpp(MOC_HEADER_SOURCES src/hdt_temperature_status/TemperatureStatusPanel.h)
-
-add_library(
-    temperature_status_panel
-    ${MOC_HEADER_SOURCES}
-    ${MOC_FORM_HEADERS}
-    src/hdt_temperature_status/TemperatureStatusPanel.cpp)
-target_link_libraries(
-    temperature_status_panel
-    ${QT_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${rviz_LIBRARIES}
-    qwt)
-
 add_executable(
     joint_position_offset_test
     src/joint_position_offset_test/joint_position_offset_test.cpp)
@@ -203,24 +168,6 @@ target_link_libraries(
 #    config_block
 #    InputDevice)
 
-qt4_wrap_cpp(
-    TELEOP_PLUGIN_MOC_HEADER_SOURCES
-    src/teleop_status_panel/teleop_status_panel.h)
-qt4_wrap_ui(
-    TELEOP_PLUGIN_MOC_FORM_HEADERS
-    src/teleop_status_panel/teleop_status_panel.ui)
-
-add_library(
-    hdt_arm_teleop_plugin
-    ${TELEOP_PLUGIN_MOC_HEADER_SOURCES}
-    ${TELEOP_PLUGIN_MOC_FORM_HEADERS}
-    src/teleop_status_panel/teleop_status_panel.cpp)
-target_link_libraries(
-    hdt_arm_teleop_plugin
-    ${QT_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${rviz_LIBRARIES})
-
 add_executable(
     trajectory_follower
     src/trajectory_follower/trajectory_follower.cpp)
@@ -230,21 +177,6 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${sbpl_geometry_utils_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
-
-qt4_wrap_cpp(
-    RCTA_VISErVO_COMMAND_PANEL_MOC_HEADER_SOURCES
-    src/viservo_command_panel/viservo_command_panel.h)
-add_library(
-    viservo_command_panel_plugin
-    ${RCTA_VISERVO_COMMAND_PANEL_MOC_HEADER_SOURCES}
-    src/viservo_command_panel/viservo_command_panel.cpp)
-target_link_libraries(
-    viservo_command_panel_plugin
-    ${QT_LIBRARIES}
-    ${actionlib_LIBRARIES}
-    ${eigen_conversions_LIBRARIES}
-    ${rviz_LIBRARIES}
-    ${tf_LIBRARIES})
 
 #add_executable(
 #    viservo_control_executor
@@ -263,20 +195,17 @@ target_link_libraries(
 
 install(
     TARGETS
-        hdt_controller_plugins
         measure_eef_error
         fake_marker_pub
 #        motion_download_interface_HDT
         joint_trajectory_action_HDT
 #        hdt_arm_driver
-        temperature_status_panel
+#        temperature_status_panel
         joint_position_offset_test
         joint_states_filter
 #        repeatability_measure
 #        hdt_arm_teleop
-        hdt_arm_teleop_plugin
         trajectory_follower
-        viservo_command_panel_plugin
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

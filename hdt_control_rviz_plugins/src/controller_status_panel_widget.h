@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QWidget>
+#ifndef Q_MOC_RUN
 #include <boost/circular_buffer.hpp>
 #include <hdt_control_msgs/ControllerDiagnosticStatus.h>
 #include <hdt_kinematics/RobotModel.h>
@@ -21,6 +22,7 @@
 #include <rviz/panel.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Empty.h>
+#endif
 
 namespace Ui {
 class ControllerStatusPanelWidget;

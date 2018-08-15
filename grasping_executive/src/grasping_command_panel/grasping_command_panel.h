@@ -12,6 +12,7 @@
 
 // system includes
 #include <QtGui>
+#ifndef Q_MOC_RUN
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <interactive_markers/interactive_marker_server.h>
@@ -27,6 +28,7 @@
 #include <tf/transform_listener.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
+#endif
 
 namespace rcta {
 

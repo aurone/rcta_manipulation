@@ -7,9 +7,11 @@
 // system includes
 #include <QLabel>
 #include <QWidget>
+#ifndef Q_MOC_RUN
 #include <hdt_control_msgs/TeleopDiagnosticStatus.h>
 #include <rviz/panel.h>
 #include <ros/ros.h>
+#endif
 
 namespace Ui
 {

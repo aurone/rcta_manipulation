@@ -2,7 +2,9 @@
 #define TemperatureStatusPanel_h
 
 // system includes
+#ifndef Q_MOC_RUN
 #include <ros/ros.h>
+#endif
 #include <rviz/panel.h>
 
 // project includes
