@@ -59,12 +59,24 @@ double ObjectManipModel::accLimit(int vidx) const
     }
 }
 
+auto ExtractParentState(const smpl::RobotState& state, smpl::RobotModel* parent_model)
+    -> smpl::RobotState
+{
+    smpl::RobotState small_state;
+    std::copy(
+            begin(state),
+            begin(state) + parent_model->jointVariableCount(),
+            std::back_inserter(small_state));
+    return small_state;
+}
+
 bool ObjectManipModel::checkJointLimits(
     const smpl::RobotState& state,
     bool verbose)
 {
+    auto small_state = ExtractParentState(state, this->parent_model);
     auto ovar = state.back();
-    return parent_model->checkJointLimits(state, verbose) &
+    return parent_model->checkJointLimits(small_state, verbose) &
             (ovar >= this->min_object_pos) &
             (ovar <= this->max_object_pos);
 }
@@ -85,17 +97,6 @@ auto ObjectManipModel::getExtension(size_t class_code)
     return NULL;
 }
 
-auto ExtractParentState(const smpl::RobotState& state, smpl::RobotModel* parent_model)
-    -> smpl::RobotState
-{
-    smpl::RobotState small_state;
-    std::copy(
-            begin(state),
-            begin(state) + parent_model->jointVariableCount(),
-            std::back_inserter(small_state));
-    return small_state;
-}
-
 auto ObjectManipModel::objectJointName() const -> const std::string&
 {
     return this->getPlanningJoints().back();
@@ -113,18 +114,18 @@ auto ObjectManipModel::computeFK(const smpl::RobotState& state)
 // same for ik...
 bool ObjectManipModel::computeIK(
     const Eigen::Affine3d& pose,
-    const smpl::RobotState& start,
+    const smpl::RobotState& seed,
     smpl::RobotState& solution,
     smpl::ik_option::IkOption option)
 {
-    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute ik(seed = " << start << ")");
-    auto small_start = ExtractParentState(start, this->parent_model);
-    if (!this->ik_iface->computeIK(pose, small_start, solution, option)) {
+    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute ik(seed = " << seed << ")");
+    auto small_seed = ExtractParentState(seed, this->parent_model);
+    if (!this->ik_iface->computeIK(pose, small_seed, solution, option)) {
         return false;
     }
 
     // add the object variable to the solution
-    solution.push_back(start.back());
+    solution.push_back(seed.back());
     return true;
 }
 
@@ -135,8 +136,8 @@ bool ObjectManipModel::computeIK(
     smpl::ik_option::IkOption option)
 {
     SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute multi-ik(seed = " << start << ")");
-    auto small_start = ExtractParentState(start, this->parent_model);
-    if (!this->ik_iface->computeIK(pose, small_start, solutions, option)) {
+    auto small_seed = ExtractParentState(start, this->parent_model);
+    if (!this->ik_iface->computeIK(pose, small_seed, solutions, option)) {
         return false;
     }
 
@@ -167,17 +168,17 @@ auto ObjectManipModel::redundantVariableIndex(int rvidx) const
 
 bool ObjectManipModel::computeFastIK(
     const Eigen::Affine3d& pose,
-    const smpl::RobotState& state,
+    const smpl::RobotState& seed,
     smpl::RobotState& solution)
 {
-    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute fast-ik(seed = " << state << ")");
-    auto small_start = ExtractParentState(state, this->parent_model);
-    if (!this->rm_iface->computeFastIK(pose, small_start, solution)) {
+    SMPL_DEBUG_STREAM_NAMED(R_LOG, "compute fast-ik(seed = " << seed << ")");
+    auto small_seed = ExtractParentState(seed, this->parent_model);
+    if (!this->rm_iface->computeFastIK(pose, small_seed, solution)) {
         return false;
     }
 
     // add the object variable to all solutions
-    solution.push_back(state.back());
+    solution.push_back(seed.back());
     return true;
 }
 
