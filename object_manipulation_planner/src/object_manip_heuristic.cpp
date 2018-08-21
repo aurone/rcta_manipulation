@@ -336,7 +336,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     SMPL_ASSERT(state->state.size() == VARIABLE_COUNT);
 
     // visualize the base pose
-    SV_SHOW_INFO_NAMED("state_base", smpl::visual::MakeFrameMarkers(
+    SV_SHOW_DEBUG_NAMED("state_base", smpl::visual::MakeFrameMarkers(
             MakePoseTransform(
                     state->state[WORLD_JOINT_X],
                     state->state[WORLD_JOINT_Y],
@@ -411,7 +411,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         auto* graph_state = graph->getState(state_id);
 
         // visualize the base pose of the egraph state
-        SV_SHOW_INFO_NAMED("egraph_base", smpl::visual::MakeFrameMarkers(
+        SV_SHOW_DEBUG_NAMED("egraph_base", smpl::visual::MakeFrameMarkers(
                 MakePoseTransform(
                         egraph_state[WORLD_JOINT_X],
                         egraph_state[WORLD_JOINT_Y],
