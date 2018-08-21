@@ -73,12 +73,21 @@ int main(int argc, char* argv[])
 
     robot_model_loader::RobotModelLoader loader;
     auto robot_model = loader.getModel();
-    if (!robot_model) {
+    if (robot_model == NULL) {
         ROS_ERROR("Failed to load Robot Model");
         return 1;
     }
 
-    std::vector<std::string> redundant_joints = { "limb_right_joint3" };
+    std::vector<std::string> redundant_joints;
+    if (ik_group_name == "right_arm") {
+        redundant_joints = { "limb_right_joint3" };
+    } else if (ik_group_name == "right_arm_and_torso") {
+        redundant_joints = { "torso_joint1", "limb_right_joint3" };
+    } else {
+        ROS_ERROR("Get better at defining IK groups");
+        return 1;
+    }
+
     auto* ik_group = robot_model->getJointModelGroup(ik_group_name);
     if (!ik_group->setRedundantJoints(redundant_joints)) {
         ROS_ERROR("Failed to set redundant joints");
@@ -159,7 +168,7 @@ int main(int argc, char* argv[])
     smpl::collision::CollisionSpace cspace;
     if (!cspace.init(
             &grid,
-            *robot_model->getURDF().get(),
+            *robot_model->getURDF(),
             config,
             group_name,
             omanip.parent_model->getPlanningJoints()))
@@ -168,8 +177,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    ObjectManipChecker checker;
-    checker.parent = &cspace;
+    ObjectManipChecker ochecker;
+    ochecker.parent = &cspace;
 
     ////////////////////////////
     // Initialize the Planner //
@@ -178,7 +187,7 @@ int main(int argc, char* argv[])
     ROS_INFO("Initialize Object Manipulation Planner");
 
     ObjectManipPlanner planner;
-    if (!Init(&planner, &omanip, &checker, &grid)) {
+    if (!Init(&planner, &omanip, &ochecker, &grid)) {
         ROS_ERROR("Failed to initialize Object Manipulation Planner");
         return 1;
     }

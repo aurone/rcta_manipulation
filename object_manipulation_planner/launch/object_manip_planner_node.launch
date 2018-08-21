@@ -16,6 +16,7 @@
         <param name="group_name" value="right_arm_torso_base"/>
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>
+        
         <param name="planning_frame" value="map"/>
         <param name="demonstrations_path" value="$(find object_manipulation_planner)/data"/>
 
@@ -46,5 +47,8 @@
 
         <param name="object_start_position" value="1.0"/>
         <param name="object_goal_position" value="0.45"/>
+
+        <param name="w_heuristic" value="100.0"/>
+        <param name="w_egraph" value="5.0"/>
     </node>
 </launch>

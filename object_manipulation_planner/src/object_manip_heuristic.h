@@ -29,6 +29,14 @@ struct PsiCoordHash
     }
 };
 
+/// * Only works with RomanWorkspaceLatticeEGraph
+/// * Suggests destination states for snap actions by comparing phi coordinates
+/// * Provides heuristic that estimates cost to come into contact with the
+///   object constraint manifold plus the cost to manipulate the object to its
+///   goal position.
+/// * Only understands the user-defined goal type, specified in
+///   ObjectManipPlanner, which stores the goal position for the object within
+///   the same members used by joint space goals.
 class ObjectManipHeuristic :
     public smpl::RobotHeuristic,
     public smpl::ExperienceGraphHeuristicExtension

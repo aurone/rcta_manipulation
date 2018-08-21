@@ -1,6 +1,5 @@
 #include "object_manip_heuristic.h"
 
-#include <smpl/assert.h>
 #include <smpl/angles.h>
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>
@@ -10,6 +9,7 @@
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/visualize.h>
 
+#include "assert.h"
 #include "variables.h"
 
 static const double FixedPointRatio = 1000.0;
@@ -21,7 +21,7 @@ void GetEquivalentStates(
     int state_id,
     std::vector<int>& ids)
 {
-    auto* graph = static_cast<RomanWorkspaceLatticeEGraph*>(heur->planningSpace());
+    auto* graph = static_cast<const RomanWorkspaceLatticeEGraph*>(heur->planningSpace());
 
     auto* state = graph->getState(state_id);
 
@@ -109,7 +109,7 @@ void UpdateUserGoal(
     ObjectManipHeuristic* heur,
     const smpl::GoalConstraint& goal)
 {
-    auto* graph = static_cast<RomanWorkspaceLatticeEGraph*>(
+    auto* graph = static_cast<const RomanWorkspaceLatticeEGraph*>(
             heur->planningSpace());
 
     auto goal_z = goal.angles.back();
@@ -634,5 +634,5 @@ auto ObjectManipHeuristic::getExtension(size_t class_code) -> Extension*
     if (class_code == smpl::GetClassCode<ExperienceGraphHeuristicExtension>()) {
         return this;
     }
-    return nullptr;
+    return NULL;
 }

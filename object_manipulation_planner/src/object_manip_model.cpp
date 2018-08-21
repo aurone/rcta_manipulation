@@ -85,11 +85,11 @@ auto ObjectManipModel::getExtension(size_t class_code)
     -> smpl::Extension*
 {
     if (class_code == smpl::GetClassCode<smpl::ForwardKinematicsInterface>()) {
-        return this->fk_iface ? this : NULL;
+        return (this->fk_iface != NULL) ? this : NULL;
     } else if (class_code == smpl::GetClassCode<smpl::InverseKinematicsInterface>()) {
-        return this->ik_iface ? this : NULL;
+        return (this->ik_iface != NULL) ? this : NULL;
     } else if (class_code == smpl::GetClassCode<smpl::RedundantManipulatorInterface>()) {
-        return this->rm_iface ? this : NULL;
+        return (this->rm_iface != NULL) ? this : NULL;
     } else if (class_code == smpl::GetClassCode<smpl::RobotModel>()) {
         return this;
     }

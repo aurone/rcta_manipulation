@@ -1,12 +1,12 @@
 #include "roman_workspace_lattice_egraph.h"
 
 #include <smpl/angles.h>
-#include <smpl/assert.h>
 #include <smpl/console/nonstd.h>
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/graph/workspace_lattice_action_space.h>
 
+#include "assert.h"
 #include "variables.h"
 
 #define G_SNAP_LOG G_SUCCESSORS_LOG ".snap"
@@ -501,7 +501,7 @@ bool LoadExperienceGraph(
 }
 
 auto GetPsiCoord(
-    RomanWorkspaceLatticeEGraph* graph,
+    const RomanWorkspaceLatticeEGraph* graph,
     const smpl::WorkspaceCoord& coord)
     -> PsiCoord
 {
@@ -509,7 +509,7 @@ auto GetPsiCoord(
 }
 
 auto GetPsiState(
-    RomanWorkspaceLatticeEGraph* graph,
+    const RomanWorkspaceLatticeEGraph* graph,
     const smpl::WorkspaceState& state)
     -> PsiState
 {

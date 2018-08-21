@@ -33,12 +33,16 @@ bool ObjectManipChecker::interpolatePath(
         return true;
     }
 
+    auto old_size = path.size();
     if (!parent->interpolatePath(ExtractState(start), ExtractState(finish), path)) {
         return false;
     }
-    for (auto& s : path) {
-        s.push_back(start.back());
+    auto new_size = path.size();
+
+    for (auto i = old_size; i != new_size; ++i) {
+        path[i].push_back(start.back());
     }
+
     return true;
 }
 
@@ -53,6 +57,6 @@ auto ObjectManipChecker::getExtension(size_t class_code) -> smpl::Extension*
     if (class_code == smpl::GetClassCode<CollisionChecker>()) {
         return this;
     }
-    return nullptr;
+    return NULL;
 }
 

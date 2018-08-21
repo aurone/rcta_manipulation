@@ -48,6 +48,7 @@ bool Init(
     }
 
     if (!InitRomanWorkspaceLatticeActions(&planner->graph, &planner->actions)) {
+        ROS_ERROR("Failed to initialize Roman Workspace Lattice Action Space");
         return false;
     }
 
@@ -55,6 +56,11 @@ bool Init(
         ROS_ERROR("Failed to initialize Object Manip Heuristic");
         return false;
     }
+
+    // TODO: factor out config
+
+    ros::NodeHandle ph("~");
+    ph.param("w_egraph", planner->heuristic.w_egraph, 5.0);
 
     // define parameters here for now, TODO: configurate
     ObjectManipPlannerParams params;
@@ -90,7 +96,10 @@ bool Init(
     planner->search.setImproveSolution(true);
     planner->search.setBoundExpansions(true);
 #else
-    planner->search.set_initialsolution_eps(100.0);
+    auto epsilon = 100.0;
+    ph.param("w_heuristic", epsilon, 100.0);
+    ROS_INFO("epsilon = %f", epsilon);
+    planner->search.set_initialsolution_eps(epsilon);
 #endif
     return true;
 }
@@ -112,8 +121,8 @@ auto MakeGraphStatePrefix(
     -> smpl::RobotState
 {
     smpl::RobotState s;
-    for (auto& joint : model->parent_model->getPlanningJoints()) {
-        auto pos = state.getVariablePosition(joint);
+    for (auto& var : model->parent_model->getPlanningJoints()) {
+        auto pos = state.getVariablePosition(var);
         s.push_back(pos);
     }
     return s;

@@ -6,7 +6,6 @@
 
 // system includes
 #include <Eigen/Dense>
-#include <smpl/graph/simple_workspace_lattice_action_space.h>
 #include <smpl/graph/workspace_lattice_egraph.h>
 #include <smpl/planning_params.h>
 #include <smpl/search/arastar.h>

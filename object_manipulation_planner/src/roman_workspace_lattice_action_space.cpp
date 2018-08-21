@@ -5,13 +5,13 @@
 
 // system includes
 #include <smpl/angles.h>
-#include <smpl/assert.h>
 #include <smpl/robot_model.h>
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>
 #include <smpl/graph/workspace_lattice.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
+#include "assert.h"
 #include "variables.h"
 
 bool InitRomanWorkspaceLatticeActions(
@@ -231,11 +231,9 @@ void RomanWorkspaceLatticeActionSpace::apply(
         // action moves the torso or the base theta
         if (
 #if CORRECT_EE
-            last[BD_PX] != 0.0 ||
-            last[BD_PY] != 0.0 ||
+            last[BD_PX] != 0.0 || last[BD_PY] != 0.0 ||
 #endif
-            last[TR_JP] != 0.0 ||
-            last[BD_TH] != 0.0)
+            last[TR_JP] != 0.0 || last[BD_TH] != 0.0)
         {
             // apply the delta in joint space
             auto final_state = state.state;

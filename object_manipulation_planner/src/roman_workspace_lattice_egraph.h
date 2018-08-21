@@ -7,6 +7,10 @@
 using PsiState = std::vector<double>;
 using PsiCoord = std::vector<int>;
 
+/// * Provides a mapping from psi coordinates to experience graph states
+/// * Implements Roman-specific snap actions
+/// * Implements object-manipulation-specific "z-edges"
+/// * Overrides path extraction, primarily to return interpolated snap actions.
 struct RomanWorkspaceLatticeEGraph : public smpl::WorkspaceLatticeEGraph
 {
     // map: [x, y, z, yaw] -> [n1, ..., nn]
@@ -44,12 +48,12 @@ struct RomanWorkspaceLatticeEGraph : public smpl::WorkspaceLatticeEGraph
 };
 
 auto GetPsiState(
-    RomanWorkspaceLatticeEGraph* graph,
+    const RomanWorkspaceLatticeEGraph* graph,
     const smpl::WorkspaceState& state)
     -> PsiState;
 
 auto GetPsiCoord(
-    RomanWorkspaceLatticeEGraph* graph,
+    const RomanWorkspaceLatticeEGraph* graph,
     const smpl::WorkspaceCoord& coord)
     -> PsiCoord;
 
