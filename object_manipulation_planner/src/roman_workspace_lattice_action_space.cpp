@@ -60,6 +60,9 @@ bool InitRomanWorkspaceLatticeActions(
         add_xyz_prim(0, 0, -1);
     }
 
+    auto enable_base_rotations = false;
+    auto enable_base_translations = false;
+
     // create 2-connected motions for rotation and free angle motions
     for (int a = 3; a < space->dofCount(); ++a) {
         // skip roll and pitch primitives
@@ -67,6 +70,8 @@ bool InitRomanWorkspaceLatticeActions(
 
         // handle translational base motions later
         if (a == BD_PX || a == BD_PY) continue;
+
+        if (!enable_base_rotations && a == BD_TH) continue;
 
         // don't move the object, what are you doing?
         if (a == OB_P) continue;
@@ -131,6 +136,8 @@ bool InitRomanWorkspaceLatticeActions(
     // diagonally. Move the end effector along with the base. Note that these
     // actions will be pruned later to enforce non-holonomic constraints.
     //
+
+    if (enable_base_translations) {
     for (int dx = -2; dx <= 2; ++dx) {
         for (int dy = -2; dy <= 2; ++dy) {
             smpl::MotionPrimitive prim;
@@ -162,6 +169,7 @@ bool InitRomanWorkspaceLatticeActions(
             prim.action.push_back(std::move(d));
             actions->m_prims.push_back(std::move(prim));
         }
+    }
     }
 
     SMPL_INFO("%zu total motion primitives", actions->m_prims.size());
