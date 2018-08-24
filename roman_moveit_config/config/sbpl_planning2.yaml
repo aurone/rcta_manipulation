@@ -164,6 +164,18 @@ graph_configs:
     graph: workspace
   RightArmTorsoBaseWorkspace:
     graph: workspace
+    discretization:
+        fk_pos_x: 0.05
+        fk_pos_y: 0.05
+        fk_pos_z: 0.05
+        fk_rot_r: 0.0872664             # 5 degrees = 72 angles
+        fk_rot_p: 0.0872664             # 5 degrees = 72 angles
+        fk_rot_y: 0.0872664             # 5 degrees = 72 angles
+        limb_right_joint3: 0.0872664
+        torso_joint1: 0.0872664
+        world_joint_x: 0.05
+        world_joint_y: 0.05
+        world_joint_theta: 0.392699
   RightArmTorsoBaseWorkspaceEGraph:
     graph: workspace_egraph
     discretization:
