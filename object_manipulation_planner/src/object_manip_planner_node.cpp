@@ -19,6 +19,7 @@
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
 #include <smpl/occupancy_grid.h>
+#include <gperftools/profiler.h>
 
 // project includes
 #include "assert.h"
@@ -294,6 +295,7 @@ int main(int argc, char* argv[])
 
     ROS_INFO("Plan path!");
 
+    ProfilerStart("omp");
     if (!PlanPath(
             &planner,
             start_state,
@@ -303,9 +305,11 @@ int main(int argc, char* argv[])
             allowed_time,
             &trajectory))
     {
+        ProfilerStop();
         ROS_ERROR("Failed to plan path");
         return 1;
     }
+    ProfilerStop();
 
     //////////////////////////////
     // display the planned path //
