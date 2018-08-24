@@ -203,7 +203,10 @@ bool PlanPath(
     timing.max_allowed_time = smpl::to_duration(allowed_time);
     bool res = planner->search.replan(timing, &solution, &solution_cost);
 #else
+    auto plan_start = std::chrono::high_resolution_clock::now();
     bool res = planner->search.replan(allowed_time, &solution, &solution_cost);
+    auto plan_finish = std::chrono::high_resolution_clock::now();
+    ROS_INFO("Planning finished after %f seconds", smpl::to_seconds(plan_finish - plan_start));
 #endif
 
     if (!res) {
