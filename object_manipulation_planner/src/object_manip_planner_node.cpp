@@ -4,6 +4,9 @@
 
 // system includes
 #include <Eigen/Dense>
+#include <actionlib/client/simple_action_client.h>
+#include <control_msgs/FollowJointTrajectoryAction.h>
+#include <control_msgs/GripperCommandAction.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
@@ -329,7 +332,72 @@ int main(int argc, char* argv[])
     // TODO: convert to FollowJointTrajectoryGoal for execution //
     //////////////////////////////////////////////////////////////
 
-    ROS_INFO("Execute trajectory");
+    auto execute = true;
+    if (execute) {
+        using GripperCommandActionServer =
+                actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
+
+        using FollowJointTrajectoryActionServer =
+                actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
+
+        auto traj_client_name = "follow_joint_trajectory";
+        ROS_INFO("Wait for action server '%s'", traj_client_name);
+        FollowJointTrajectoryActionServer traj_client(traj_client_name);
+        if (!traj_client.waitForServer()) {
+            ROS_WARN("Failed to wait for action server '%s'", traj_client_name);
+            return 1;
+        }
+
+        auto gripper_client_name = "gripper_command";
+        ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name);
+        GripperCommandActionServer gripper_client(gripper_client_name);
+        if (!gripper_client.waitForServer()) {
+            ROS_WARN("Failed to wait for action server '%s'", gripper_client_name);
+            return 1;
+        }
+
+        // move arm to the pregrasp configuration
+        // open the gripper
+        // move arm from pre-grasp-to-grasp configuration
+        // close the gripper
+        // manipulate the object
+        // open the gripper
+        // move the arm to the post-grasp configuration
+
+        control_msgs::FollowJointTrajectoryGoal traj;
+        traj.trajectory.header.stamp = ros::Time::now();
+        traj.trajectory.header.frame_id = "";
+
+        traj.trajectory.joint_names = {
+            "torso_joint1",
+            "limb_right_joint1",
+            "limb_right_joint2",
+            "limb_right_joint3",
+            "limb_right_joint4",
+            "limb_right_joint5",
+            "limb_right_joint6",
+            "limb_right_joint7",
+        };
+
+        traj.trajectory.points.resize(trajectory.getWayPointCount());
+        for (auto i = 0; i < trajectory.getWayPointCount(); ++i) {
+            std::vector<double> positions;
+            positions.resize(traj.trajectory.joint_names.size());
+            for (auto j = 0; j < traj.trajectory.joint_names.size(); ++j) {
+                auto& joint_name = traj.trajectory.joint_names[j];
+                positions.push_back(trajectory.getWayPoint(i).getVariablePosition(joint_name));
+            }
+            traj.trajectory.points[i].positions = std::move(positions);
+
+            traj.trajectory.points[i].time_from_start =
+                    ros::Duration(trajectory.getWayPointDurations()[i]);
+        }
+
+        traj_client.sendGoalAndWait(traj);
+
+        ROS_INFO("Execute trajectory");
+    }
 
     return 0;
 }
+
