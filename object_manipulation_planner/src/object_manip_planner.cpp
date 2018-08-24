@@ -35,9 +35,9 @@ bool Init(
         0.05,                       // base y
         0.00001                     // object z
     };
-    p.res_x = 0.05;
-    p.res_y = 0.05;
-    p.res_z = 0.05;
+    p.res_x = 0.025;
+    p.res_y = 0.025;
+    p.res_z = 0.025;
     p.Y_count = 36; // resolution = 10 degrees
     p.P_count = 19; // resolution = 10 degrees
     p.R_count = 36; // resolution = 10 degrees
