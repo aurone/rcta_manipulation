@@ -3,6 +3,7 @@
 #include <smpl/angles.h>
 #include <smpl/console/console.h>
 #include <smpl/console/nonstd.h>
+#include <smpl/debug/colors.h>
 #include <smpl/graph/experience_graph_extension.h>
 #include <smpl/heap/intrusive_heap.h>
 #include <smpl/planning_params.h>
@@ -16,27 +17,30 @@ static const double FixedPointRatio = 1000.0;
 
 #define HV_LOG H_LOG ".verbose"
 
+#define ENABLE_PREPHI 1
+
+static
 void GetEquivalentStates(
     ObjectManipHeuristic* heur,
     int state_id,
     std::vector<int>& ids)
 {
-    auto* graph = static_cast<const RomanWorkspaceLatticeEGraph*>(heur->planningSpace());
+    auto* graph = static_cast<const RomanWorkspaceLatticeEGraph*>(
+            heur->planningSpace());
 
     auto* state = graph->getState(state_id);
 
     SMPL_ASSERT(state->state.size() == VARIABLE_COUNT);
     SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT);
 
-    auto psi = GetPsiCoord(graph, state->coord);
-
-    auto* egraph = heur->eg->getExperienceGraph();
-    auto nodes = egraph->nodes();
+    auto phi = GetPhiCoord(graph, state->coord);
 
     // TODO: connectable might be different than the snap condition
 
     // return the state ids of all e-graph nodes whose end effector position
     // lie near the input state's end effector position
+    auto* egraph = heur->eg->getExperienceGraph();
+    auto nodes = egraph->nodes();
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = *nit;
         auto egraph_state_id = heur->eg->getStateID(node);
@@ -47,11 +51,12 @@ void GetEquivalentStates(
 
         if (state->state[HINGE] != egraph_state->state[HINGE]) continue;
 
-        auto egraph_psi = GetPsiCoord(graph, egraph_state->coord);
+//        auto egraph_phi = graph->egraph_pre_phi_coords[node];
+        auto egraph_phi = GetPhiCoord(graph, egraph_state->coord);
 
-        if (egraph_psi[0] == psi[0] &
-            egraph_psi[1] == psi[1] &
-            egraph_psi[2] == psi[2])
+        if (egraph_phi[0] == phi[0] &
+            egraph_phi[1] == phi[1] &
+            egraph_phi[2] == phi[2])
         {
             ids.push_back(egraph_state_id);
         }
@@ -105,6 +110,42 @@ void GetShortcutSuccs(
     }
 }
 
+auto MakeManipulateHeuristicVisualization(
+    const RomanWorkspaceLatticeEGraph* graph,
+    const smpl::hash_map<PhiCoord, int, PhiCoordHash>& h)
+    -> smpl::visual::Marker
+{
+    auto min_h_manipulate = std::numeric_limits<int>::max();
+    auto max_h_manipulate = 0;
+    for (auto& e : h) {
+        min_h_manipulate = std::min(min_h_manipulate, e.second);
+        max_h_manipulate = std::max(max_h_manipulate, e.second);
+    }
+
+    std::vector<Eigen::Vector3d> points;
+    std::vector<smpl::visual::Color> colors;
+    points.reserve(h.size());
+    colors.reserve(h.size());
+    for (auto& e : h) {
+        Eigen::Vector3d pos;
+        graph->posCoordToWorkspace(e.first.data(), pos.data());
+        points.push_back(pos);
+
+        auto hue = double(e.second - min_h_manipulate) /
+                double(max_h_manipulate - min_h_manipulate);
+        auto color = smpl::visual::MakeColorHSV((1.0 - hue) * 270.0);
+        colors.push_back(color);
+    }
+
+    smpl::visual::Marker m;
+    m.pose = Eigen::Affine3d::Identity();
+    m.shape = smpl::visual::CubeList{ std::move(points), graph->resolution()[0] };
+    m.color = std::move(colors);
+    m.frame_id = "map";
+    m.ns = "h_manipulate";
+    return m;
+}
+
 void UpdateUserGoal(
     ObjectManipHeuristic* heur,
     const smpl::GoalConstraint& goal)
@@ -131,6 +172,7 @@ void UpdateUserGoal(
     };
 
     // search data for e-graph nodes
+//    std::vector<EGraphSearchNode> search_nodes(2 * egraph->num_nodes());
     std::vector<EGraphSearchNode> search_nodes(egraph->num_nodes());
 
     struct NodeCompare
@@ -146,24 +188,29 @@ void UpdateUserGoal(
 
     auto nodes = egraph->nodes();
 
-    // 1. Map from z-value -> psi coords of demonstration states with that
-    // z-value.
-    // 2. Initialize heuristic value for each psi coord to inf.
+    // 1. Map z-value -> phi coords of V_demo with that z-value.
+    // 2. Map z-value -> pre-phi coords of V_demo with that z-value.
+    // 3. Initialize heuristic value for each phi coord to inf.
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = *nit;
         auto& egraph_state = egraph->state(node);
         auto state_id = heur->eg->getStateID(node);
         auto* state = graph->getState(state_id);
 
-        auto psi = GetPsiCoord(graph, state->coord);
-        heur->z_to_cell[state->coord[OB_P]].push_back(psi);
+        auto phi = GetPhiCoord(graph, state->coord);
+        heur->z_to_phi[state->coord[OB_P]].push_back(phi);
+
+        auto pre_phi = graph->egraph_pre_phi_coords[node];
+        heur->z_to_pre_phi[state->coord[OB_P]].push_back(pre_phi);
+
         heur->z_to_egraph_node[state->coord[OB_P]].push_back(node);
-        heur->psi_heuristic[psi] = std::numeric_limits<int>::max();
+        heur->phi_heuristic[phi] = std::numeric_limits<int>::max();
+        heur->pre_phi_heuristic[pre_phi] = std::numeric_limits<int>::max();
     }
 
-    // Remove duplicate psi coordinates.
-#if 0 // don't remove for now if we want to maintain e-graph states alongside psi nodes
-    for (auto& entry : heur->z_to_cell) {
+    // Remove duplicate phi coordinates.
+#if 0 // don't remove for now if we want to maintain e-graph states alongside phi nodes
+    for (auto& entry : heur->z_to_phi) {
         std::sort(begin(entry.second), end(entry.second));
         auto uit = std::unique(begin(entry.second), end(entry.second));
         entry.second.erase(uit, end(entry.second));
@@ -174,9 +221,7 @@ void UpdateUserGoal(
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = *nit;
         auto& egraph_state = egraph->state(node);
-
         auto state_id = heur->eg->getStateID(node);
-
         auto* state = graph->getState(state_id);
 
         // TODO: maybe make the goal threshold be the resolution of the z
@@ -185,8 +230,8 @@ void UpdateUserGoal(
             search_nodes[node].g = 0;
             open.push(&search_nodes[node]);
 
-            auto psi = GetPsiCoord(graph, state->coord);
-            heur->psi_heuristic[psi] = 0;
+            auto phi = GetPhiCoord(graph, state->coord);
+            heur->phi_heuristic[phi] = 0;
         }
     }
 
@@ -201,7 +246,7 @@ void UpdateUserGoal(
         }
     }
 
-    int exp_count = 0;
+    auto exp_count = 0;
     while (!open.empty()) {
         ++exp_count;
         auto* min = open.min();
@@ -215,10 +260,12 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(egraph_node_id);
         auto* state = graph->getState(state_id);
 
-        auto psi = GetPsiCoord(graph, state->coord);
+        auto phi = GetPhiCoord(graph, state->coord);
+        auto pre_phi = graph->egraph_pre_phi_coords[egraph_node_id];
 
-        // Store the heuristic value of the psi state.
-        heur->psi_heuristic[psi] = min->g;
+        // Store the heuristic value of the phi state.
+        heur->phi_heuristic[phi] = min->g;
+        heur->pre_phi_heuristic[pre_phi] = min->g + 1;
 
         // store the heuristic value of each e-graph state
         heur->egraph_goal_heuristics[egraph_node_id] = min->g;
@@ -234,11 +281,11 @@ void UpdateUserGoal(
             auto succ_state_id = heur->eg->getStateID(succ_egraph_id);
             auto* succ_state = graph->getState(succ_state_id);
 
-            auto succ_psi = GetPsiCoord(graph, succ_state->coord);
+            auto succ_phi = GetPhiCoord(graph, succ_state->coord);
 
-            auto dx = graph->resolution()[0] * double(succ_psi[0] - psi[0]);
-            auto dy = graph->resolution()[1] * double(succ_psi[1] - psi[1]);
-            auto dz = graph->resolution()[2] * double(succ_psi[2] - psi[2]);
+            auto dx = graph->resolution()[0] * double(succ_phi[0] - phi[0]);
+            auto dy = graph->resolution()[1] * double(succ_phi[1] - phi[1]);
+            auto dz = graph->resolution()[2] * double(succ_phi[2] - phi[2]);
 
             auto cost = (int)std::round(
                     FixedPointRatio *
@@ -257,7 +304,10 @@ void UpdateUserGoal(
         }
     }
 
-    SMPL_INFO_NAMED(H_LOG, "Expanded %d nodes looking for shortcut", exp_count);
+
+    SV_SHOW_INFO_NAMED("h_manipulate", MakeManipulateHeuristicVisualization(graph, heur->phi_heuristic));
+
+    SMPL_INFO_NAMED(H_LOG, "Expanded %d nodes computing H_manipulate", exp_count);
 }
 
 void UpdateGoal(ObjectManipHeuristic* heur, const smpl::GoalConstraint& goal)
@@ -346,11 +396,11 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
 
     SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state->state);
 
-//    SMPL_DEBUG_NAMED(H_LOG, "  z(state) = %f", state->state[HINGE]);
+    auto phi = GetPhiCoord(graph, state->coord);
+    auto on_demo = heur->phi_heuristic.find(phi) != end(heur->phi_heuristic);
+    SMPL_DEBUG_NAMED(H_LOG, "on-demo(state) = %s", on_demo ? "true" : "false");
 
-    auto psi = GetPsiCoord(graph, state->coord);
-
-    SMPL_DEBUG_NAMED(H_LOG, "  psi(state) = (%d, %d, %d)", psi[0], psi[1], psi[2]);
+    SMPL_DEBUG_NAMED(H_LOG, "  phi(state) = (%d, %d, %d)", phi[0], phi[1], phi[2]);
 
     auto* egraph = heur->eg->getExperienceGraph();
     SMPL_ASSERT(egraph != NULL);
@@ -364,23 +414,25 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     heur->eg->getExperienceGraphNodes(state_id, the_nodes);
     auto is_egraph = !the_nodes.empty();
 
-    auto& psis = heur->z_to_cell[state->coord[OB_P]];
+    auto& phis = on_demo ?
+            heur->z_to_phi[state->coord[OB_P]] :
+            heur->z_to_pre_phi[state->coord[OB_P]];
     auto& egraph_nodes = heur->z_to_egraph_node[state->coord[OB_P]];
 
-    SMPL_DEBUG_NAMED(H_LOG, "Inspect %zu psi nodes", psis.size());
-    for (int i = 0; i < psis.size(); ++i) {
+    SMPL_DEBUG_NAMED(H_LOG, "Inspect %zu phi nodes", phis.size());
+    for (int i = 0; i < phis.size(); ++i) {
         ///////////////////////
         // Compute h_contact //
         ///////////////////////
 
-        auto& egraph_psi = psis[i];
-        SMPL_DEBUG_NAMED(HV_LOG, "    psi(v) = (%d, %d, %d)", egraph_psi[0], egraph_psi[1], egraph_psi[2]);
+        auto& egraph_phi = phis[i];
+        SMPL_DEBUG_NAMED(HV_LOG, "    phi(v) = (%d, %d, %d)", egraph_phi[0], egraph_phi[1], egraph_phi[2]);
 
         auto h_contact = 0;
         {
-            auto dx = graph->resolution()[0] * double(egraph_psi[0] - psi[0]);
-            auto dy = graph->resolution()[1] * double(egraph_psi[1] - psi[1]);
-            auto dz = graph->resolution()[2] * double(egraph_psi[2] - psi[2]);
+            auto dx = graph->resolution()[0] * double(egraph_phi[0] - phi[0]);
+            auto dy = graph->resolution()[1] * double(egraph_phi[1] - phi[1]);
+            auto dz = graph->resolution()[2] * double(egraph_phi[2] - phi[2]);
             h_contact = (int)(heur->w_egraph * FixedPointRatio * std::sqrt(dx * dx + dy * dy + dz * dz));
         }
 
@@ -390,8 +442,10 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         // Lookup h_manipulate //
         /////////////////////////
 
-        auto manipit = heur->psi_heuristic.find(egraph_psi);
-        SMPL_ASSERT(manipit != end(heur->psi_heuristic));
+        auto manipit = on_demo ?
+                heur->phi_heuristic.find(egraph_phi) :
+                heur->pre_phi_heuristic.find(egraph_phi);
+//        SMPL_ASSERT(manipit != end(heur->phi_heuristic));
         auto h_manipulate = manipit->second;
         SMPL_DEBUG_NAMED(HV_LOG, "    h_manip(v) = %d", h_manipulate);
 

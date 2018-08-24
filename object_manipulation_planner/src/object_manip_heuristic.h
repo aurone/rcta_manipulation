@@ -14,9 +14,9 @@ class ExperienceGraphExtension;
 class ExtractRobotStateExtension;
 }
 
-struct PsiCoordHash
+struct PhiCoordHash
 {
-    using argument_type = PsiCoord;
+    using argument_type = PhiCoord;
     using result_type = size_t;
     auto operator()(const argument_type& coord) const -> result_type
     {
@@ -69,13 +69,20 @@ public:
     bool disc_rotation_heuristic = true;
     bool disc_position_heuristic = true;
 
-    // map from z value to all psi cells on the demonstration with that same z value
-    smpl::hash_map<int, std::vector<PsiCoord>> z_to_cell;
-    smpl::hash_map<int, std::vector<smpl::ExperienceGraph::node_id>> z_to_egraph_node;
+    // map from z value to all phi cells on the demonstration with that same z value
+    smpl::hash_map<int, std::vector<PhiCoord>> z_to_phi;
+    smpl::hash_map<int, std::vector<PhiCoord>> z_to_pre_phi;
+
+    smpl::hash_map<
+        int,
+        std::vector<smpl::ExperienceGraph::node_id>>
+    z_to_egraph_node;
 
     // map from all 3d cells on the demonstration to the heuristic distance
     // minimum heuristic path cost to the any cell with that same
-    smpl::hash_map<PsiCoord, int, PsiCoordHash> psi_heuristic;
+    smpl::hash_map<PhiCoord, int, PhiCoordHash> phi_heuristic;
+
+    smpl::hash_map<PhiCoord, int, PhiCoordHash> pre_phi_heuristic;
 
     /// \name Required ExperienceGraphHeuristicExtension Interface
     ///@{

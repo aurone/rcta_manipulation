@@ -25,7 +25,7 @@ auto color(
 
 // Get successors of actions from E_z where u is an E-Graph state.
 static
-void GetEGraphStateSuccs(
+void GetEGraphStateZSuccs(
     RomanWorkspaceLatticeEGraph* graph,
     smpl::WorkspaceLatticeState* state,
     smpl::ExperienceGraph::node_id egraph_node,
@@ -38,20 +38,20 @@ void GetEGraphStateSuccs(
 
 // Get successors of actions from E_z where u is not an E-Graph state.
 static
-void GetNonEGraphStateSuccs(
+void GetOrigStateZSuccs(
     RomanWorkspaceLatticeEGraph* graph,
     smpl::WorkspaceLatticeState* state,
     std::vector<int>* succs,
     std::vector<int>* costs,
     bool unique)
 {
-    // e-graph nodes within psi tolerance, for E_z
+    // e-graph nodes within phi tolerance, for E_z
     std::vector<smpl::ExperienceGraph::node_id> parent_nearby_nodes;
     {
-        auto pose_coord = GetPsiCoord(graph, state->coord);
+        auto pose_coord = GetPhiCoord(graph, state->coord);
         SMPL_DEBUG_STREAM("parent pose coord = " << pose_coord);
-        auto it = graph->psi_to_egraph_nodes.find(pose_coord);
-        if (it != end(graph->psi_to_egraph_nodes)) {
+        auto it = graph->phi_to_egraph_nodes.find(pose_coord);
+        if (it != end(graph->phi_to_egraph_nodes)) {
             for (auto node : it->second) {
                 auto z = graph->egraph.state(node)[HINGE];
                 if (z == state->state[HINGE]) {
@@ -84,9 +84,9 @@ void GetNonEGraphStateSuccs(
 
         // E_z from V_orig
         if (false && !parent_nearby_nodes.empty()) {
-            auto pose_coord = GetPsiCoord(graph, succ_coord);
-            auto it = graph->psi_to_egraph_nodes.find(pose_coord);
-            if (it != end(graph->psi_to_egraph_nodes)) {
+            auto pose_coord = GetPhiCoord(graph, succ_coord);
+            auto it = graph->phi_to_egraph_nodes.find(pose_coord);
+            if (it != end(graph->phi_to_egraph_nodes)) {
                 // for each experience graph node within error...
                 for (auto node : it->second) {
                     // if node in the adjacent list of any nearby node...
@@ -120,6 +120,171 @@ void GetNonEGraphStateSuccs(
     }
 }
 
+// Apply an adaptive motion to a state that moves the end effector to the
+// nearest pre-grasp pose of any state in the demonstration with the same
+// z-value.
+static
+void GetPreGraspAmpSucc(
+    RomanWorkspaceLatticeEGraph* graph,
+    smpl::WorkspaceLatticeState* state,
+    const PhiCoord& phi_coord,
+    std::vector<int>* succs,
+    std::vector<int>* costs,
+    bool unique)
+{
+    auto closest = smpl::ExperienceGraph::node_id(-1);
+    auto best = std::numeric_limits<int>::max();
+    auto nodes = graph->egraph.nodes();
+    for (auto nit = nodes.first; nit != nodes.second; ++nit) {
+        auto node = *nit;
+        if (graph->egraph.state(node)[HINGE] != state->state[HINGE]) continue;
+
+        auto& egraph_phi = graph->egraph_pre_phi_coords[node];
+        auto dx = egraph_phi[0] - phi_coord[0];
+        auto dy = egraph_phi[1] - phi_coord[1];
+        auto dz = egraph_phi[2] - phi_coord[2];
+        auto dist = dx * dx + dy * dy + dz * dz;
+        if (dist < best) {
+            best = dist;
+            closest = node;
+        }
+    }
+
+    if (closest != -1) {
+        SMPL_INFO_NAMED(G_SUCCESSORS_LOG, "Attempt adaptive motion to pre-grasp");
+        auto& pregrasp = graph->egraph_node_pregrasps[closest];
+
+        SV_SHOW_INFO_NAMED("pregrasp_target", smpl::visual::MakeFrameMarkers(pregrasp, "map", "pregrasp_target"));
+
+        auto seed = state->state;
+        smpl::RobotState final_robot_state;
+        if (graph->m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) {
+            SMPL_INFO_NAMED(G_SUCCESSORS_LOG, "  Adaptive motion to pre-grasp succeeded");
+
+            // TODO: should do collision checking here
+            if (!graph->collisionChecker()->isStateToStateValid(state->state, final_robot_state)) {
+                return;
+            }
+
+            smpl::WorkspaceState succ_workspace_state;
+            graph->stateRobotToWorkspace(final_robot_state, succ_workspace_state);
+
+            smpl::WorkspaceCoord succ_coord;
+            graph->stateWorkspaceToCoord(succ_workspace_state, succ_coord);
+            auto succ_id = graph->createState(succ_coord);
+            auto* succ_state = graph->getState(succ_id);
+            succ_state->state = final_robot_state;
+
+            // TODO: We could check whether this state is a goal state
+            // or not, but we should have found the goal state already if we
+            // are at a state with the goal z-value. This might be an issue if
+            // we run the planner with start = goal?
+
+            succs->push_back(succ_id);
+            costs->push_back(1); // edge cost of one for grasp/pregrasp actions
+        }
+    }
+}
+
+static
+void GetPreGraspSuccs(
+    RomanWorkspaceLatticeEGraph* graph,
+    smpl::WorkspaceLatticeState* state,
+    const PhiCoord& phi_coord,
+    std::vector<int>* succs,
+    std::vector<int>* costs,
+    bool unique)
+{
+    // If the contact coordinates are the same as some node on the
+    // demonstration, then an action is available to "release" the object
+    // and move the end effector to the pre-grasp pose.
+    auto it = graph->phi_to_egraph_nodes.find(phi_coord);
+    if (it != end(graph->phi_to_egraph_nodes)) {
+        for (auto node : it->second) {
+            if (graph->egraph.state(node)[HINGE] != state->state[HINGE]) continue;
+
+            SMPL_INFO_NAMED(G_SUCCESSORS_LOG, "Attempt pre-grasp motion");
+            auto& pregrasp = graph->egraph_node_pregrasps[node];
+
+            // add an action that "releases" the object and moves to the post-grasp
+
+            // allowed to move the torso and right arm, but not the base...so the
+            // ik group
+            auto seed = state->state;
+            smpl::RobotState final_robot_state;
+            if (graph->m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) {
+                // TODO: no collision checking here. We explicitly don't want to
+                // run nominal collision checking, because it is expected that
+                // there will be collisions between the robot and the object when
+                // the object is grasped. It might be worthwhile to at least check
+                // the post-grasp endpoint for collisions.
+
+                smpl::WorkspaceState succ_workspace_state;
+                graph->stateRobotToWorkspace(final_robot_state, succ_workspace_state);
+
+                smpl::WorkspaceCoord succ_coord;
+                graph->stateWorkspaceToCoord(succ_workspace_state, succ_coord);
+                auto succ_id = graph->createState(succ_coord);
+                auto* succ_state = graph->getState(succ_id);
+                succ_state->state = final_robot_state;
+
+                // TODO: We could check whether this state is a goal state
+                // or not, but we should have found the goal state already if we
+                // are at a state with the goal z-value. This might be an issue if
+                // we run the planner with start = goal?
+
+                SMPL_INFO_NAMED(G_SUCCESSORS_LOG, "Pre-grasp motion succeeded");
+                succs->push_back(succ_id);
+                costs->push_back(1); // edge cost of one for grasp/pregrasp actions
+            }
+        }
+    }
+}
+
+// For all states v in the demonstration where z(v) = z(s), if pre-phi(v) =
+// phi(s), apply an adaptive motion to move the end effector from phi(s) to
+// phi(v).
+static
+void GetGraspSuccs(
+    RomanWorkspaceLatticeEGraph* graph,
+    smpl::WorkspaceLatticeState* state,
+    const PhiCoord& phi_coord,
+    std::vector<int>* succs,
+    std::vector<int>* costs,
+    bool unique)
+{
+    // If the contact coordinates are the same as the pregrasp coordinates of
+    // some state in the demonstration, then an action is available to "grasp"
+    // the object by moving the end effector to the grasp pose.
+    auto pre_it = graph->pre_phi_to_egraph_nodes.find(phi_coord);
+    if (pre_it != end(graph->pre_phi_to_egraph_nodes)) {
+        for (auto node : pre_it->second) {
+            if (graph->egraph.state(node)[HINGE] != state->state[HINGE]) continue;
+
+            SMPL_INFO_NAMED(G_SUCCESSORS_LOG, "Attempt grasp motion");
+            auto& grasp = graph->egraph_node_grasps[node];
+            auto seed = state->state;
+            // NOTE: the final robot state has the same
+            smpl::RobotState final_robot_state;
+            if (graph->m_ik_iface->computeIK(grasp, seed, final_robot_state)) {
+                smpl::WorkspaceState succ_workspace_state;
+                graph->stateRobotToWorkspace(final_robot_state, succ_workspace_state);
+
+                smpl::WorkspaceCoord succ_coord;
+                graph->stateWorkspaceToCoord(succ_workspace_state, succ_coord);
+
+                auto succ_id = graph->createState(succ_coord);
+                auto* succ_state = graph->getState(succ_id);
+                succ_state->state = final_robot_state;
+
+                SMPL_INFO_NAMED(G_SUCCESSORS_LOG, "Grasp motion succeeded");
+                succs->push_back(succ_id);
+                costs->push_back(1);
+            }
+        }
+    }
+}
+
 static
 void GetSuccs(
     RomanWorkspaceLatticeEGraph* graph,
@@ -128,11 +293,18 @@ void GetSuccs(
     std::vector<int>* costs,
     bool unique)
 {
-    // Get successors of actions from E_orig, E_demo, and E_bridge.
-    graph->WorkspaceLatticeEGraph::GetSuccs(state_id, succs, costs, unique);
-
 #if 0
-    auto* parent_entry = graph->getState(state_id);
+    // Get successors of actions from E_orig, E_demo, and E_bridge.
+    GetSuccs((smpl::WorkspaceLatticeEGraph*)graph, state_id, succs, costs, unique);
+#else
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Expand state %d", state_id);
+    auto* state = graph->getState(state_id);
+
+    SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  workspace coord: " << state->coord);
+    SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "      robot state: " << state->state);
+
+    auto* vis_name = "expansion";
+    SV_SHOW_DEBUG_NAMED(vis_name, graph->getStateVisualization(state->state, vis_name));
 
     auto is_egraph_node = false;
     smpl::ExperienceGraph::node_id egraph_node;
@@ -147,10 +319,20 @@ void GetSuccs(
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
     if (is_egraph_node) { // expanding an egraph node
-        return GetEGraphStateSuccs(graph, parent_entry, egraph_node, succs, costs, unique);
+        GetEGraphStateAdjacentSuccs(graph, state, egraph_node, succs, costs, unique);
+        GetEGraphStateBridgeSuccs(graph, state, egraph_node, succs, costs, unique);
+//        GetEGraphStateZSuccs(graph, state, egraph_node, succs, costs, unique);
     } else {
-        return GetNonEGraphStateSuccs(graph, parent_entry, succs, costs, unique);
+        GetOrigStateOrigSuccs(graph, state, succs, costs, unique);
+        GetOrigStateBridgeSuccs(graph, state, succs, costs, unique);
+//        GetOrigStateZSuccs(graph, state, succs, costs, unique);
     }
+
+    auto phi_coord = GetPhiCoord(graph, state->coord);
+    SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "phi(s) = " << phi_coord);
+    GetGraspSuccs(graph, state, phi_coord, succs, costs, unique);
+    GetPreGraspSuccs(graph, state, phi_coord, succs, costs, unique);
+    GetPreGraspAmpSucc(graph, state, phi_coord, succs, costs, unique);
 #endif
 }
 
@@ -277,6 +459,7 @@ int GetSnapMotion(
 
         smpl::RobotState robot_state;
         if (!stateWorkspaceToRobotPermissive(interm_workspace_state, robot_state)) {
+//        if (!graph->stateWorkspaceToRobot(interm_workspace_state, robot_state)) {
             SMPL_DEBUG_STREAM_NAMED(G_SNAP_LOG, " -> Failed to find ik solution for interpolated state " << interm_workspace_state);
             return -1;
         } else {
@@ -465,6 +648,69 @@ bool ExtractPath(
     return true;
 }
 
+#define PHI_INCLUDE_RP 1
+
+static
+auto GetPhiCoord(
+    const RomanWorkspaceLatticeEGraph* graph,
+    const Eigen::Affine3d& pose)
+    -> PhiCoord
+{
+#if PHI_INCLUDE_RP
+    PhiCoord coord(6);
+#else
+    PhiCoord coord(4);
+#endif
+
+    graph->posWorkspaceToCoord(pose.translation().data(), coord.data());
+
+    double ea[3];
+    smpl::get_euler_zyx(Eigen::Matrix3d(pose.rotation()), ea[2], ea[1], ea[0]);
+
+    int ea_disc[3];
+    graph->rotWorkspaceToCoord(ea, ea_disc);
+
+#if PHI_INCLUDE_RP
+    coord[3] = ea_disc[0];
+    coord[4] = ea_disc[1];
+    coord[5] = ea_disc[2];
+#else
+    coord[3] = ea_disc[2];
+#endif
+
+    return coord;
+}
+
+static
+auto GetPhiState(
+    const RomanWorkspaceLatticeEGraph* graph,
+    const Eigen::Affine3d& pose)
+    -> PhiState
+{
+#if PHI_INCLUDE_RP
+    PhiState state(6);
+#else
+    PhiState state(4);
+#endif
+
+    state[0] = pose.translation().x();
+    state[1] = pose.translation().y();
+    state[2] = pose.translation().z();
+
+    double y, p, r;
+    smpl::get_euler_zyx(Eigen::Matrix3d(pose.rotation()), y, p, r);
+
+#if PHI_INCLUDE_RP
+    state[3] = r;
+    state[4] = p;
+    state[5] = y;
+#else
+    state[3] = y;
+#endif
+
+    return state;
+}
+
 bool LoadExperienceGraph(
     RomanWorkspaceLatticeEGraph* graph,
     const std::string& path)
@@ -473,7 +719,13 @@ bool LoadExperienceGraph(
         return false;
     }
 
-    std::vector<Eigen::Vector3d> psi_points;
+    std::vector<Eigen::Vector3i> phi_points;
+    std::vector<Eigen::Vector3i> pg_phi_points;
+
+    graph->egraph_node_pregrasps.resize(graph->egraph.num_nodes());
+    graph->egraph_node_grasps.resize(graph->egraph.num_nodes());
+    graph->egraph_phi_coords.resize(graph->egraph.num_nodes());
+    graph->egraph_pre_phi_coords.resize(graph->egraph.num_nodes());
 
     auto nodes = graph->egraph.nodes();
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
@@ -483,37 +735,96 @@ bool LoadExperienceGraph(
         smpl::WorkspaceState tmp;
         graph->stateRobotToWorkspace(egraph_robot_state, tmp);
 
-        psi_points.emplace_back(tmp[0], tmp[1], tmp[2]);
+        Eigen::Affine3d pregrasp_offset(
+                Eigen::Translation3d(graph->pregrasp_offset_x, 0.0, 0.0));
+
+        Eigen::Affine3d grasp_pose =
+                Eigen::Translation3d(tmp[0], tmp[1], tmp[2]) *
+                Eigen::AngleAxisd(tmp[5], Eigen::Vector3d::UnitZ()) *
+                Eigen::AngleAxisd(tmp[4], Eigen::Vector3d::UnitY()) *
+                Eigen::AngleAxisd(tmp[3], Eigen::Vector3d::UnitX());
+
+        Eigen::Affine3d pregrasp_pose = grasp_pose * pregrasp_offset;
 
         // TODO: these are stored in the state now, get them from there
         smpl::WorkspaceCoord disc_egraph_state(graph->dofCount());
         graph->stateWorkspaceToCoord(tmp, disc_egraph_state);
 
-        // map psi(discrete egraph state) -> egraph node
-        auto psi_state = GetPsiCoord(graph, disc_egraph_state);
-        graph->psi_to_egraph_nodes[psi_state].push_back(node);
+        // map phi(discrete egraph state) -> egraph node
+        auto phi_coord = GetPhiCoord(graph, disc_egraph_state);
+        graph->phi_to_egraph_nodes[phi_coord].push_back(node);
+        phi_points.emplace_back(phi_coord[0], phi_coord[1], phi_coord[2]);
+
+        // map phi'(discrete egraph state) -> egraph node
+        auto pre_phi_coord = GetPhiCoord(graph, pregrasp_pose);
+        graph->pre_phi_to_egraph_nodes[pre_phi_coord].push_back(node);
+        pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
+
+        graph->egraph_node_grasps[node] = grasp_pose;
+        graph->egraph_node_pregrasps[node] = pregrasp_pose;
+        graph->egraph_phi_coords[node] = GetPhiCoord(graph, grasp_pose);
+        graph->egraph_pre_phi_coords[node] = GetPhiCoord(graph, pregrasp_pose);
     }
 
-    auto vis_name = "psi";
-    SV_SHOW_INFO_NAMED(vis_name, MakeCubesMarker(std::move(psi_points), graph->resolution()[0], smpl::visual::Color{ 0.5, 0.5, 0.5, 1.0f }, "map", vis_name));
+    std::vector<Eigen::Vector3d> phi_points_cont;
+    phi_points_cont.reserve(phi_points.size());
+    for (auto& point : phi_points) {
+        double pcont[3];
+        graph->posCoordToWorkspace(point.data(), pcont);
+        phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
+    }
+
+    std::vector<Eigen::Vector3d> pre_phi_points_cont;
+    pre_phi_points_cont.reserve(pg_phi_points.size());
+    for (auto& point : pg_phi_points) {
+        double pcont[3];
+        graph->posCoordToWorkspace(point.data(), pcont);
+        pre_phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
+    }
+
+    auto vis_name = "phi";
+    SV_SHOW_INFO_NAMED(
+            vis_name,
+            MakeCubesMarker(
+                    std::move(phi_points_cont),
+                    graph->resolution()[0],
+                    smpl::visual::Color{ 0.5, 0.5, 0.5, 1.0f },
+                    "map",
+                    vis_name));
+    SV_SHOW_INFO_NAMED(
+            "pre_phi",
+            MakeCubesMarker(
+                std::move(pre_phi_points_cont),
+                graph->resolution()[0],
+                smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f },
+                "map",
+                "pre_phi"));
 
     return true;
 }
 
-auto GetPsiCoord(
+auto GetPhiCoord(
     const RomanWorkspaceLatticeEGraph* graph,
     const smpl::WorkspaceCoord& coord)
-    -> PsiCoord
+    -> PhiCoord
 {
-    return PsiCoord{ coord[0], coord[1], coord[2], coord[5] };
+#if PHI_INCLUDE_RP
+    return PhiCoord{ coord[0], coord[1], coord[2], coord[3], coord[4], coord[5] };
+#else
+    return PhiCoord{ coord[0], coord[1], coord[2], coord[5] };
+#endif
 }
 
-auto GetPsiState(
+auto GetPhiState(
     const RomanWorkspaceLatticeEGraph* graph,
     const smpl::WorkspaceState& state)
-    -> PsiState
+    -> PhiState
 {
-    return PsiState{ state[0], state[1], state[2], state[5] };
+#if PHI_INCLUDE_RP
+    return PhiState{ state[0], state[1], state[2], state[3], state[4], state[5] };
+#else
+    return PhiState{ state[0], state[1], state[2], state[5] };
+#endif
 };
 
 
