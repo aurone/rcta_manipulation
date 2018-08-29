@@ -47,6 +47,8 @@ bool Init(
         return false;
     }
 
+    planner->graph.m_heuristic = &planner->heuristic;
+
     if (!InitRomanWorkspaceLatticeActions(&planner->graph, &planner->actions)) {
         ROS_ERROR("Failed to initialize Roman Workspace Lattice Action Space");
         return false;
@@ -89,18 +91,16 @@ bool Init(
     planner->heuristic.disc_rotation_heuristic = params.disc_rotation_heuristic;
     planner->heuristic.disc_position_heuristic = params.disc_position_heuristic;
 
-#if 0
     planner->search.allowPartialSolutions(false);
     planner->search.setTargetEpsilon(1.0);
     planner->search.setDeltaEpsilon(1.0);
     planner->search.setImproveSolution(true);
     planner->search.setBoundExpansions(true);
-#else
+
     auto epsilon = 100.0;
     ph.param("w_heuristic", epsilon, 100.0);
     ROS_INFO("epsilon = %f", epsilon);
     planner->search.set_initialsolution_eps(epsilon);
-#endif
     return true;
 }
 
@@ -194,10 +194,10 @@ bool PlanPath(
     std::vector<int> solution;
     int solution_cost;
 
-#if 0
+#if 1
     smpl::ARAStar::TimeParameters timing;
     timing.bounded = true;
-    timing.improve = true;
+    timing.improve = false;
     timing.type = smpl::ARAStar::TimeParameters::TIME;
     timing.max_allowed_time_init = smpl::to_duration(allowed_time);
     timing.max_allowed_time = smpl::to_duration(allowed_time);

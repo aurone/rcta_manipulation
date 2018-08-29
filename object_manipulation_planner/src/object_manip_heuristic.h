@@ -29,7 +29,7 @@ struct PhiCoordHash
     }
 };
 
-/// * Only works with RomanWorkspaceLatticeEGraph
+/// * Only works with RomanObjectManipLattice
 /// * Suggests destination states for snap actions by comparing phi coordinates
 /// * Provides heuristic that estimates cost to come into contact with the
 ///   object constraint manifold plus the cost to manipulate the object to its

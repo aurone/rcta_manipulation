@@ -9,33 +9,143 @@
 using PhiState = std::vector<double>;
 using PhiCoord = std::vector<int>;
 
+class ObjectManipHeuristic;
+
 /// * Provides a mapping from phi coordinates to experience graph states
 /// * Implements Roman-specific snap actions
 /// * Implements object-manipulation-specific "z-edges"
 /// * Overrides path extraction, primarily to return interpolated snap actions.
-struct RomanWorkspaceLatticeEGraph : public smpl::WorkspaceLatticeEGraph
+class RomanObjectManipLattice : public smpl::WorkspaceLatticeEGraph
 {
-    // map: [x, y, z, yaw] -> [n1, ..., nn]
-    using PhiCoordToEGraphNodesMap = smpl::hash_map<
-            PhiCoord,
-            std::vector<smpl::ExperienceGraph::node_id>,
-            smpl::VectorHash<int>>;
+public:
 
-    // map discrete (x, y, z, yaw) poses to e-graph states whose discrete state
-    // is within some tolerance. The tolerance is defined as lying within the
-    // same discrete bin, i.e. discrete(phi(s)) = (x, y, z, yaw). This is
-    // queried to determine the set of edges E_z during planning.
-    PhiCoordToEGraphNodesMap phi_to_egraph_nodes;
-    PhiCoordToEGraphNodesMap pre_phi_to_egraph_nodes;
-    double pregrasp_offset_x = -0.10;
+    using WorkspaceLattice::isGoal;
 
-    std::vector<PhiCoord> egraph_phi_coords;
-    std::vector<PhiCoord> egraph_pre_phi_coords;
+    auto getPhiState(const smpl::WorkspaceState& state) const -> PhiState;
+    auto getPhiCoord(const smpl::WorkspaceCoord& coord) const -> PhiCoord;
+    auto getPhiCoord(const Eigen::Affine3d& pose) const -> PhiCoord;
+    auto getPhiState(const Eigen::Affine3d& pose) const -> PhiState;
 
-    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>>
-        egraph_node_pregrasps;
-    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>>
-        egraph_node_grasps;
+    void getUniqueSuccs(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    void getOrigStateZSuccs(
+        smpl::WorkspaceLatticeState* state,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    void getEGraphStateZSuccs(
+        smpl::WorkspaceLatticeState* state,
+        smpl::ExperienceGraph::node_id egraph_node,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    void getPreGraspAmpSucc(
+        smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    void getGraspSuccs(
+        smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    void getPreGraspSuccs(
+        smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    int getSnapMotion(int src_id, int dst_id, std::vector<smpl::RobotState>* path);
+
+    bool trySnap(int src_id, int dst_id, int& cost);
+
+    bool isGoal(const smpl::WorkspaceLatticeState* state) const;
+
+    bool extractTransition(int src_id, int dst_id, std::vector<smpl::RobotState>& path);
+
+    void updateBestTransitionSimple(
+        const std::vector<int>& succs,
+        const std::vector<int>& costs,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionOrig(
+        smpl::WorkspaceLatticeState* state,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionOrigBridge(
+        smpl::WorkspaceLatticeState* state,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionOrigZ(
+        smpl::WorkspaceLatticeState* state,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionEGraphBridge(
+        smpl::WorkspaceLatticeState* state,
+        smpl::ExperienceGraph::node_id egraph_node,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionEGraphAdjacent(
+        smpl::WorkspaceLatticeState* state,
+        smpl::ExperienceGraph::node_id egraph_node,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionEGraphZ(
+        smpl::WorkspaceLatticeState* state,
+        smpl::ExperienceGraph::node_id egraph_node,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionGrasp(
+        smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionPreGrasp(
+        smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionPreGraspAmp(
+        smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionSnap(
+        int state_id,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionShortcut(
+        int state_id,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
 
     /// \name ExperienceGraphExtension Interface
     ///@{
@@ -57,17 +167,31 @@ struct RomanWorkspaceLatticeEGraph : public smpl::WorkspaceLatticeEGraph
         std::vector<int>* succs,
         std::vector<int>* costs) override;
     ///@}
+
+    // map: [x, y, z, yaw] -> [n1, ..., nn]
+    using PhiCoordToEGraphNodesMap = smpl::hash_map<
+            PhiCoord,
+            std::vector<smpl::ExperienceGraph::node_id>,
+            smpl::VectorHash<int>>;
+
+    // map discrete (x, y, z, yaw) poses to e-graph states whose discrete state
+    // is within some tolerance. The tolerance is defined as lying within the
+    // same discrete bin, i.e. discrete(phi(s)) = (x, y, z, yaw). This is
+    // queried to determine the set of edges E_z during planning.
+    PhiCoordToEGraphNodesMap m_phi_to_egraph_nodes;
+    PhiCoordToEGraphNodesMap m_pre_phi_to_egraph_nodes;
+    double pregrasp_offset_x = -0.10;
+
+    std::vector<PhiCoord> m_egraph_phi_coords;
+    std::vector<PhiCoord> m_egraph_pre_phi_coords;
+
+    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>>
+        m_egraph_node_pregrasps;
+    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>>
+        m_egraph_node_grasps;
+
+    ObjectManipHeuristic* m_heuristic = NULL;
 };
-
-auto GetPhiState(
-    const RomanWorkspaceLatticeEGraph* graph,
-    const smpl::WorkspaceState& state)
-    -> PhiState;
-
-auto GetPhiCoord(
-    const RomanWorkspaceLatticeEGraph* graph,
-    const smpl::WorkspaceCoord& coord)
-    -> PhiCoord;
 
 #endif
 

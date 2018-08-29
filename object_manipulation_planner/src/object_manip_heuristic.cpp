@@ -25,7 +25,7 @@ void GetEquivalentStates(
     int state_id,
     std::vector<int>& ids)
 {
-    auto* graph = static_cast<const RomanWorkspaceLatticeEGraph*>(
+    auto* graph = static_cast<const RomanObjectManipLattice*>(
             heur->planningSpace());
 
     auto* state = graph->getState(state_id);
@@ -33,7 +33,7 @@ void GetEquivalentStates(
     SMPL_ASSERT(state->state.size() == VARIABLE_COUNT);
     SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT);
 
-    auto phi = GetPhiCoord(graph, state->coord);
+    auto phi = graph->getPhiCoord(state->coord);
 
     // TODO: connectable might be different than the snap condition
 
@@ -52,7 +52,7 @@ void GetEquivalentStates(
         if (state->state[HINGE] != egraph_state->state[HINGE]) continue;
 
 //        auto egraph_phi = graph->egraph_pre_phi_coords[node];
-        auto egraph_phi = GetPhiCoord(graph, egraph_state->coord);
+        auto egraph_phi = graph->getPhiCoord(egraph_state->coord);
 
         if (egraph_phi[0] == phi[0] &
             egraph_phi[1] == phi[1] &
@@ -111,7 +111,7 @@ void GetShortcutSuccs(
 }
 
 auto MakeManipulateHeuristicVisualization(
-    const RomanWorkspaceLatticeEGraph* graph,
+    const RomanObjectManipLattice* graph,
     const smpl::hash_map<PhiCoord, int, PhiCoordHash>& h)
     -> smpl::visual::Marker
 {
@@ -150,7 +150,7 @@ void UpdateUserGoal(
     ObjectManipHeuristic* heur,
     const smpl::GoalConstraint& goal)
 {
-    auto* graph = static_cast<const RomanWorkspaceLatticeEGraph*>(
+    auto* graph = static_cast<const RomanObjectManipLattice*>(
             heur->planningSpace());
 
     auto goal_z = goal.angles.back();
@@ -197,10 +197,10 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(node);
         auto* state = graph->getState(state_id);
 
-        auto phi = GetPhiCoord(graph, state->coord);
+        auto phi = graph->getPhiCoord(state->coord);
         heur->z_to_phi[state->coord[OB_P]].push_back(phi);
 
-        auto pre_phi = graph->egraph_pre_phi_coords[node];
+        auto pre_phi = graph->m_egraph_pre_phi_coords[node];
         heur->z_to_pre_phi[state->coord[OB_P]].push_back(pre_phi);
 
         heur->z_to_egraph_node[state->coord[OB_P]].push_back(node);
@@ -230,7 +230,7 @@ void UpdateUserGoal(
             search_nodes[node].g = 0;
             open.push(&search_nodes[node]);
 
-            auto phi = GetPhiCoord(graph, state->coord);
+            auto phi = graph->getPhiCoord(state->coord);
             heur->phi_heuristic[phi] = 0;
         }
     }
@@ -260,8 +260,8 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(egraph_node_id);
         auto* state = graph->getState(state_id);
 
-        auto phi = GetPhiCoord(graph, state->coord);
-        auto pre_phi = graph->egraph_pre_phi_coords[egraph_node_id];
+        auto phi = graph->getPhiCoord(state->coord);
+        auto pre_phi = graph->m_egraph_pre_phi_coords[egraph_node_id];
 
         // Store the heuristic value of the phi state.
         heur->phi_heuristic[phi] = min->g;
@@ -281,7 +281,7 @@ void UpdateUserGoal(
             auto succ_state_id = heur->eg->getStateID(succ_egraph_id);
             auto* succ_state = graph->getState(succ_state_id);
 
-            auto succ_phi = GetPhiCoord(graph, succ_state->coord);
+            auto succ_phi = graph->getPhiCoord(succ_state->coord);
 
             auto dx = graph->resolution()[0] * double(succ_phi[0] - phi[0]);
             auto dy = graph->resolution()[1] * double(succ_phi[1] - phi[1]);
@@ -374,7 +374,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
 {
     SMPL_DEBUG_NAMED(H_LOG, "GetGoalHeuristic(%d)", state_id);
 
-    auto* graph = static_cast<RomanWorkspaceLatticeEGraph*>(heur->planningSpace());
+    auto* graph = static_cast<RomanObjectManipLattice*>(heur->planningSpace());
 
     if (state_id == graph->getGoalStateID()) {
         SMPL_DEBUG_NAMED(H_LOG, "h(goal) = 0");
@@ -396,7 +396,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
 
     SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state->state);
 
-    auto phi = GetPhiCoord(graph, state->coord);
+    auto phi = graph->getPhiCoord(state->coord);
     auto on_demo = heur->phi_heuristic.find(phi) != end(heur->phi_heuristic);
     SMPL_DEBUG_NAMED(H_LOG, "on-demo(state) = %s", on_demo ? "true" : "false");
 
