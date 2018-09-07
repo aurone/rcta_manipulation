@@ -6,13 +6,14 @@
 
 // system includes
 #include <Eigen/Dense>
+#include <moveit/robot_trajectory/robot_trajectory.h>
 #include <smpl/graph/workspace_lattice_egraph.h>
 #include <smpl/planning_params.h>
 #include <smpl/search/arastar.h>
 
 #include "object_manip_heuristic.h"
 #include "roman_workspace_lattice_action_space.h"
-#include "roman_workspace_lattice_egraph.h"
+#include "roman_object_manip_lattice.h"
 
 namespace smpl {
 class CollisionChecker;
@@ -84,6 +85,32 @@ bool Init(
 
 bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path);
 
+struct Command
+{
+    enum struct Type { Gripper, Trajectory } type;
+
+    Command(Type t) : type(t) { }
+
+    virtual ~Command() { }
+};
+
+struct GripperCommand : Command
+{
+    bool open = false;
+    GripperCommand() : Command(Command::Type::Gripper) { }
+    GripperCommand(bool open) : GripperCommand() { this->open = open; }
+};
+
+struct TrajectoryCommand : Command
+{
+    robot_trajectory::RobotTrajectory trajectory;
+
+    TrajectoryCommand(robot_trajectory::RobotTrajectory trajectory) :
+        Command(Command::Type::Trajectory),
+        trajectory(std::move(trajectory))
+    { }
+};
+
 bool PlanPath(
     ObjectManipPlanner* planner,
     const moveit::core::RobotState& start_state,
@@ -92,5 +119,18 @@ bool PlanPath(
     double object_goal_state,
     double allowed_time,
     robot_trajectory::RobotTrajectory* trajectory);
+
+bool PlanPath(
+    ObjectManipPlanner* planner,
+    const moveit::core::RobotState& start_state,
+    const Eigen::Affine3d& object_pose,
+    double object_start_state,
+    double object_goal_state,
+    double allowed_time,
+    std::vector<std::unique_ptr<Command>>* commands);
+
+void MakeRobotTrajectory(
+        const std::vector<std::unique_ptr<Command>>* commands,
+        robot_trajectory::RobotTrajectory* traj);
 
 #endif

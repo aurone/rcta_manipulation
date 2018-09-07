@@ -8,6 +8,7 @@
 #include <smpl/occupancy_grid.h>
 #include <smpl/post_processing.h>
 #include <smpl/planning_params.h>
+#include <smpl/stl/memory.h>
 
 // project includes
 #include "object_manip_model.h"
@@ -158,7 +159,7 @@ bool PlanPath(
     double object_start_state,
     double object_goal_state,
     double allowed_time,
-    robot_trajectory::RobotTrajectory* trajectory)
+    std::vector<std::unique_ptr<Command>>* commands)
 {
     // TODO: behavior to level out the end effector
 
@@ -216,49 +217,144 @@ bool PlanPath(
 
     ROS_INFO("Found path through %zu states", solution.size());
 
-    std::vector<smpl::RobotState> path;
+    using RobotPath = std::vector<smpl::RobotState>;
+    RobotPath path;
     if (!planner->graph.extractPath(solution, path)) {
         ROS_ERROR("Failed to extract path");
         return false;
     }
 
-    /////////////////
-    // smooth path //
-    /////////////////
+    // partition the path into several path segments based on the action
+    // type
+    std::vector<RobotPath> segments;
+    std::vector<TransitionType::Type> segment_types;
+    auto segment_type = TransitionType::Type(path.front().back());
+    RobotPath segment;
+    for (auto i = 0; i < path.size(); ++i) {
+        auto& point = path[i];
+        auto type = TransitionType::Type(point.back());
+        if (type != segment_type) {
+            // record this segment
+            segments.push_back(segment);
+            segment_types.push_back(segment_type);
 
-    if (!smpl::InterpolatePath(*planner->checker, path)) {
-        ROS_ERROR("Failed to interpolate path");
-        return false;
+            // begin a new segment
+            segment.clear();
+
+            segment.push_back(segments.back().back());
+            // add the final point of the previous segment as the first waypoint
+            // on this segment
+
+            segment_type = type;
+        }
+        segment.push_back(point);
+        segment.back().pop_back(); // remove the type information
+    }
+    segments.push_back(segment);
+    segment_types.push_back(segment_type);
+
+    // Action-specific things to do:
+    // * Before a grasp action, open the gripper
+    // * After a grasp action, close the gripper
+    // * Don't apply shortcutting whenever the state of the object is being
+    //   modified, i.e. any edges that were introduced by the demonstration,
+    //   includes adjacent e-graph edges and shortcut edges, and z-edges
+    //   unless you have some fancy way of connecting things so that they
+    //   remain on the constraint manifold
+
+    //////////////////////////
+    // smooth path segments //
+    //////////////////////////
+
+    for (auto& segment : segments) {
+        if (!smpl::InterpolatePath(*planner->checker, segment)) {
+            ROS_ERROR("Failed to interpolate path");
+            return false;
+        }
     }
 
-#if 0
-    std::vector<smpl::RobotState> shortcut_path;
-    smpl::ShortcutPath(
-            planner->model,
-            planner->checker,
-            path,
-            shortcut_path,
-            smpl::ShortcutType::JOINT_SPACE);
-#else
-    auto shortcut_path = path;
-#endif
+    // TODO(Andrew): shortcut certain types of paths
 
-    //////////////////////////////////////////////////
-    // Convert to robot_trajectory::RobotTrajectory //
-    //////////////////////////////////////////////////
+    // convert to a sequence of interleaved trajectory/gripper commands
 
-    for (auto& point : shortcut_path) {
-        moveit::core::RobotState state(start_state);
-        UpdateRobotState(state, point, planner->model);
-        trajectory->addSuffixWayPoint(state, 1.0);
+    auto MakeRobotTrajectory = [&](const std::vector<smpl::RobotState>& path)
+    {
+        robot_trajectory::RobotTrajectory traj(
+                start_state.getRobotModel(),
+                "right_arm_torso_base");
+        for (auto& point : path) {
+            moveit::core::RobotState state(start_state);
+            UpdateRobotState(state, point, planner->model);
+            traj.addSuffixWayPoint(state, 1.0);
+        }
+
+        trajectory_processing::IterativeParabolicTimeParameterization profiler;
+        profiler.computeTimeStamps(traj);
+        return traj;
+    };
+
+    // create robot trajectory for the first segment
+    auto& first_segment = segments.front();
+    commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));
+
+    for (auto i = 1; i < segments.size(); ++i) {
+        if (segment_types[i] == TransitionType::GraspSucc) {
+            commands->push_back(smpl::make_unique<GripperCommand>(true));
+        }
+
+        auto cmd = smpl::make_unique<TrajectoryCommand>(
+                MakeRobotTrajectory(segments[i]));
+        commands->push_back(std::move(cmd));
+
+        if (segment_types[i] == TransitionType::GraspSucc) {
+            commands->push_back(smpl::make_unique<GripperCommand>(false));
+        }
     }
-
-    ////////////////////////
-    // Profile Trajectory //
-    ////////////////////////
-
-    trajectory_processing::IterativeParabolicTimeParameterization profiler;
-    profiler.computeTimeStamps(*trajectory);
 
     return true;
 }
+
+bool PlanPath(
+    ObjectManipPlanner* planner,
+    const moveit::core::RobotState& start_state,
+    const Eigen::Affine3d& object_pose,
+    double object_start_state,
+    double object_goal_state,
+    double allowed_time,
+    robot_trajectory::RobotTrajectory* trajectory)
+{
+    std::vector<std::unique_ptr<Command>> commands;
+    if (!PlanPath(
+            planner,
+            start_state,
+            object_pose,
+            object_start_state,
+            object_goal_state,
+            allowed_time,
+            &commands))
+    {
+        return false;
+    }
+
+    MakeRobotTrajectory(&commands, trajectory);
+    return true;
+}
+
+void MakeRobotTrajectory(
+        const std::vector<std::unique_ptr<Command>>* commands,
+        robot_trajectory::RobotTrajectory* traj)
+{
+    // remove all gripper commands and squash all trajectories
+    for (auto& command : (*commands)) {
+        if (command->type == Command::Type::Trajectory) {
+            auto* c = static_cast<TrajectoryCommand*>(command.get());
+            for (auto i = 0; i < c->trajectory.getWayPointCount(); ++i) {
+                traj->addSuffixWayPoint(c->trajectory.getWayPoint(i), 1.0);
+            }
+        }
+    }
+
+    trajectory_processing::IterativeParabolicTimeParameterization profiler;
+    profiler.computeTimeStamps(*traj);
+}
+

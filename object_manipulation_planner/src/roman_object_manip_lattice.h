@@ -11,6 +11,27 @@ using PhiCoord = std::vector<int>;
 
 class ObjectManipHeuristic;
 
+namespace TransitionType
+{
+enum Type
+{
+    OrigStateOrigSucc       = 0,
+    OrigStateBridgeSucc     = 1,
+    OrigStateZSucc          = 2,
+    EGraphStateAdjSucc      = 3,
+    EGraphStateBridgeSucc   = 4,
+    EGraphStateZSucc        = 5,
+    PreGraspAmpSucc         = 6,
+    GraspSucc               = 7,
+    PreGraspSucc            = 8,
+    SnapSucc                = 9,
+    ShortcutSucc            = 10
+};
+
+auto to_cstring(Type) -> const char*;
+
+} // namespace TransitionType
+
 /// * Provides a mapping from phi coordinates to experience graph states
 /// * Implements Roman-specific snap actions
 /// * Implements object-manipulation-specific "z-edges"
@@ -68,12 +89,13 @@ public:
 
     bool extractTransition(int src_id, int dst_id, std::vector<smpl::RobotState>& path);
 
-    void updateBestTransitionSimple(
+    bool updateBestTransitionSimple(
         const std::vector<int>& succs,
         const std::vector<int>& costs,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        std::vector<smpl::RobotState>& best_path,
+        TransitionType::Type);
 
     void updateBestTransitionOrig(
         smpl::WorkspaceLatticeState* state,

@@ -287,6 +287,7 @@ int main(int argc, char* argv[])
     // Outputs //
     /////////////
 
+    std::vector<std::unique_ptr<Command>> commands;
     robot_trajectory::RobotTrajectory trajectory(robot_model, group_name);
 
     ///////////
@@ -303,13 +304,15 @@ int main(int argc, char* argv[])
             object_start_state,
             object_goal_state,
             allowed_time,
-            &trajectory))
+            &commands))
     {
         ProfilerStop();
         ROS_ERROR("Failed to plan path");
         return 1;
     }
     ProfilerStop();
+
+    MakeRobotTrajectory(&commands, &trajectory);
 
     //////////////////////////////
     // display the planned path //
@@ -336,6 +339,7 @@ int main(int argc, char* argv[])
     // TODO: convert to FollowJointTrajectoryGoal for execution //
     //////////////////////////////////////////////////////////////
 
+    auto fake = true;
     auto execute = true;
     if (execute) {
         using GripperCommandActionServer =
@@ -347,17 +351,21 @@ int main(int argc, char* argv[])
         auto traj_client_name = "follow_joint_trajectory";
         ROS_INFO("Wait for action server '%s'", traj_client_name);
         FollowJointTrajectoryActionServer traj_client(traj_client_name);
-        if (!traj_client.waitForServer()) {
-            ROS_WARN("Failed to wait for action server '%s'", traj_client_name);
-            return 1;
+        if (!fake) {
+            if (!traj_client.waitForServer()) {
+                ROS_WARN("Failed to wait for action server '%s'", traj_client_name);
+                return 1;
+            }
         }
 
         auto gripper_client_name = "gripper_command";
         ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name);
         GripperCommandActionServer gripper_client(gripper_client_name);
-        if (!gripper_client.waitForServer()) {
-            ROS_WARN("Failed to wait for action server '%s'", gripper_client_name);
-            return 1;
+        if (!fake) {
+            if (!gripper_client.waitForServer()) {
+                ROS_WARN("Failed to wait for action server '%s'", gripper_client_name);
+                return 1;
+            }
         }
 
         // move arm to the pregrasp configuration
@@ -368,38 +376,61 @@ int main(int argc, char* argv[])
         // open the gripper
         // move the arm to the post-grasp configuration
 
-        control_msgs::FollowJointTrajectoryGoal traj;
-        traj.trajectory.header.stamp = ros::Time::now();
-        traj.trajectory.header.frame_id = "";
+        for (auto& command : commands) {
+            if (command->type == Command::Type::Gripper) {
+                auto* c = static_cast<GripperCommand*>(command.get());
+                control_msgs::GripperCommandGoal goal;
+                if (c->open) {
+                    goal.command.position = 1.0;
+                } else {
+                    goal.command.position = 0.0;
+                }
 
-        traj.trajectory.joint_names = {
-            "torso_joint1",
-            "limb_right_joint1",
-            "limb_right_joint2",
-            "limb_right_joint3",
-            "limb_right_joint4",
-            "limb_right_joint5",
-            "limb_right_joint6",
-            "limb_right_joint7",
-        };
+                ROS_INFO("%s gripper", c->open ? "Open" : "Close");
+                if (!fake) {
+                    gripper_client.sendGoalAndWait(goal);
+                }
+            } else if (command->type == Command::Type::Trajectory) {
+                auto* c = static_cast<TrajectoryCommand*>(command.get());
 
-        traj.trajectory.points.resize(trajectory.getWayPointCount());
-        for (auto i = 0; i < trajectory.getWayPointCount(); ++i) {
-            std::vector<double> positions;
-            positions.resize(traj.trajectory.joint_names.size());
-            for (auto j = 0; j < traj.trajectory.joint_names.size(); ++j) {
-                auto& joint_name = traj.trajectory.joint_names[j];
-                positions.push_back(trajectory.getWayPoint(i).getVariablePosition(joint_name));
+                control_msgs::FollowJointTrajectoryGoal traj;
+                traj.trajectory.header.stamp = ros::Time::now();
+                traj.trajectory.header.frame_id = "";
+
+                traj.trajectory.joint_names = {
+                    "torso_joint1",
+                    "limb_right_joint1",
+                    "limb_right_joint2",
+                    "limb_right_joint3",
+                    "limb_right_joint4",
+                    "limb_right_joint5",
+                    "limb_right_joint6",
+                    "limb_right_joint7",
+                };
+
+                traj.trajectory.points.resize(c->trajectory.getWayPointCount());
+                for (auto i = 0; i < c->trajectory.getWayPointCount(); ++i) {
+                    std::vector<double> positions;
+                    positions.resize(traj.trajectory.joint_names.size());
+                    for (auto j = 0; j < traj.trajectory.joint_names.size(); ++j) {
+                        auto& joint_name = traj.trajectory.joint_names[j];
+                        positions.push_back(c->trajectory.getWayPoint(i).getVariablePosition(joint_name));
+                    }
+                    traj.trajectory.points[i].positions = std::move(positions);
+
+                    traj.trajectory.points[i].time_from_start =
+                            ros::Duration(c->trajectory.getWayPointDurations()[i]);
+                }
+
+                ROS_INFO("Execute trajectory");
+                if (!fake) {
+                    traj_client.sendGoalAndWait(traj);
+                }
+            } else {
+                ROS_ERROR("Unrecognized command type");
             }
-            traj.trajectory.points[i].positions = std::move(positions);
-
-            traj.trajectory.points[i].time_from_start =
-                    ros::Duration(trajectory.getWayPointDurations()[i]);
         }
 
-        traj_client.sendGoalAndWait(traj);
-
-        ROS_INFO("Execute trajectory");
     }
 
     return 0;

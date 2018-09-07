@@ -1,4 +1,4 @@
-#include "roman_workspace_lattice_egraph.h"
+#include "roman_object_manip_lattice.h"
 
 #include <smpl/angles.h>
 #include <smpl/console/nonstd.h>
@@ -11,6 +11,27 @@
 #include "variables.h"
 
 #define G_SNAP_LOG G_SUCCESSORS_LOG ".snap"
+
+namespace TransitionType
+{
+auto to_cstring(Type t) -> const char*
+{
+    switch (t) {
+    case OrigStateOrigSucc: return "OrigStateOrigSucc";
+    case OrigStateBridgeSucc: return "OrigStateBridgeSucc";
+    case OrigStateZSucc: return "OrigStateZSucc";
+    case EGraphStateAdjSucc: return "EGraphStateAdjSucc";
+    case EGraphStateBridgeSucc: return "EGraphStateBridgeSucc";
+    case EGraphStateZSucc: return "EGraphStateZSucc";
+    case PreGraspAmpSucc: return "PreGraspAmpSucc";
+    case GraspSucc: return "GraspSucc";
+    case PreGraspSucc: return "PreGraspSucc";
+    case SnapSucc: return "SnapSucc";
+    case ShortcutSucc: return "ShortcutSucc";
+    default: return "<UNKONWN>";
+    }
+}
+}
 
 // Color a set of markers.
 static
@@ -313,8 +334,7 @@ void RomanObjectManipLattice::getUniqueSuccs(
     if (m_heuristic != NULL) {
         std::vector<int> snap_ids;
         m_heuristic->getEquivalentStates(state_id, snap_ids);
-
-        for (auto& snap_id : snap_ids) {
+        for (auto snap_id : snap_ids) {
             int cost;
             if (snap(state_id, snap_id, cost)) {
                 succs->push_back(snap_id);
@@ -324,8 +344,7 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
         std::vector<int> shortcut_ids;
         m_heuristic->getShortcutSuccs(state_id, shortcut_ids);
-
-        for (auto& shortcut_id : shortcut_ids) {
+        for (auto shortcut_id : shortcut_ids) {
             int cost;
             if (shortcut(state_id, shortcut_id, cost)) {
                 succs->push_back(shortcut_id);
@@ -392,14 +411,17 @@ bool RomanObjectManipLattice::isGoal(
     return isGoal(workspace_state, state->state);
 }
 
-// Find the best transition to the destination state. If a cheaper transition
-// is found, return a path consisting of only the destination waypoint.
-void RomanObjectManipLattice::updateBestTransitionSimple(
+// Loop through a set of successor transitions and, if a transition is found
+// that is cheaper than the best_cost so far, update the best_cost and the
+// associated path segment. The path segment consists only of the destination
+// waypoint. Return true if a cheaper transition was found.
+bool RomanObjectManipLattice::updateBestTransitionSimple(
     const std::vector<int>& succs,
     const std::vector<int>& costs,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    std::vector<smpl::RobotState>& best_path,
+    TransitionType::Type type)
 {
     for (auto i = 0; i < succs.size(); ++i) {
         auto* succ_state = getState(succs[i]);
@@ -408,11 +430,15 @@ void RomanObjectManipLattice::updateBestTransitionSimple(
                 dst_id == succs[i])
             {
                 ROS_INFO("Found transition to state %d", dst_id);
-                best_path = { getState(succs[i])->state };
+                auto wp = getState(succs[i])->state;
+                wp.push_back(double(type));
+                best_path = { std::move(wp) };
                 best_cost = costs[i];
+                return true;
             }
         }
     }
+    return false;
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrig(
@@ -423,7 +449,7 @@ void RomanObjectManipLattice::updateBestTransitionOrig(
 {
     std::vector<int> succs, costs;
     getOrigStateOrigSuccs(state, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateOrigSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrigBridge(
@@ -434,7 +460,7 @@ void RomanObjectManipLattice::updateBestTransitionOrigBridge(
 {
     std::vector<int> succs, costs;
     getOrigStateBridgeSuccs(state, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateBridgeSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrigZ(
@@ -455,7 +481,7 @@ void RomanObjectManipLattice::updateBestTransitionEGraphBridge(
 {
     std::vector<int> succs, costs;
     getEGraphStateBridgeSuccs(state, egraph_node, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateBridgeSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionEGraphAdjacent(
@@ -467,7 +493,7 @@ void RomanObjectManipLattice::updateBestTransitionEGraphAdjacent(
 {
     std::vector<int> succs, costs;
     getEGraphStateBridgeSuccs(state, egraph_node, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateAdjSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionEGraphZ(
@@ -490,7 +516,7 @@ void RomanObjectManipLattice::updateBestTransitionGrasp(
     // TODO: finer resolution
     std::vector<int> succs, costs;
     getGraspSuccs(state, phi_coord, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::GraspSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionPreGrasp(
@@ -503,7 +529,7 @@ void RomanObjectManipLattice::updateBestTransitionPreGrasp(
     // TODO: finer resolution
     std::vector<int> succs, costs;
     getPreGraspSuccs(state, phi_coord, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::PreGraspSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionPreGraspAmp(
@@ -516,7 +542,7 @@ void RomanObjectManipLattice::updateBestTransitionPreGraspAmp(
     // TODO: finer resolution
     std::vector<int> succs, costs;
     getPreGraspAmpSucc(state, phi_coord, &succs, &costs);
-    return updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::PreGraspAmpSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionSnap(
@@ -537,6 +563,9 @@ void RomanObjectManipLattice::updateBestTransitionSnap(
             auto cost = getSnapMotion(state_id, snap_id, &snap_path);
             if (cost > 0 && cost < best_cost) {
                 best_cost = cost;
+                for (auto& wp : snap_path) {
+                    wp.push_back(TransitionType::SnapSucc);
+                }
                 best_path = std::move(snap_path);
             }
         }
@@ -581,6 +610,10 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
                     shortcut_path.push_back(entry->state);
                 }
 
+                for (auto& wp : shortcut_path) {
+                    wp.push_back(TransitionType::ShortcutSucc);
+                }
+
                 best_cost = fixed_cost;
                 best_path = std::move(shortcut_path);
                 return;
@@ -604,6 +637,9 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
             auto id = m_egraph_node_to_state[node];
             auto* entry = getState(id);
             shortcut_path.push_back(entry->state);
+        }
+        for (auto& wp : shortcut_path) {
+            wp.push_back(TransitionType::ShortcutSucc);
         }
         best_cost = fixed_cost;
         best_path = std::move(shortcut_path);
@@ -981,7 +1017,9 @@ bool RomanObjectManipLattice::extractPath(
     {
         auto* entry = getState(ids[0]);
         SMPL_ASSERT(entry != NULL);
-        opath.push_back(entry->state);
+        auto first_state = entry->state;
+        first_state.push_back(double(TransitionType::OrigStateOrigSucc));
+        opath.push_back(first_state);
     }
 
     // grab the rest of the points

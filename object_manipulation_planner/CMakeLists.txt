@@ -38,7 +38,7 @@ add_library(
     src/object_manip_planner.cpp
     src/object_manip_model.cpp
     src/roman_workspace_lattice_action_space.cpp
-    src/roman_workspace_lattice_egraph.cpp)
+    src/roman_object_manip_lattice.cpp)
 
 target_include_directories(object_manip_planner PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})
 target_include_directories(object_manip_planner PUBLIC include)
