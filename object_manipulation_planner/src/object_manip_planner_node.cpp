@@ -429,7 +429,9 @@ int main(int argc, char* argv[])
                     traj.trajectory.points[i].positions = std::move(positions);
 
                     traj.trajectory.points[i].time_from_start =
-                            ros::Duration(c->trajectory.getWayPointDurations()[i]);
+                            ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
+
+                    ROS_INFO("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
                 }
 
                 ROS_INFO("Execute trajectory");
