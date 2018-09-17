@@ -27,6 +27,7 @@
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
 
+// Little helper for uniform success/error logging
 template <class T>
 bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
 {
@@ -117,8 +118,10 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    auto object_min_position = 0.0;
+    auto object_max_position = 1.0;
     ObjectManipModel omanip;
-    if (!Init(&omanip, &planning_model, "hinge", 0.0, 1.0)) {
+    if (!Init(&omanip, &planning_model, "hinge", object_min_position, object_max_position)) {
         ROS_ERROR("Failed to initialize Object Manipulation Model");
         return 1;
     }
@@ -210,6 +213,7 @@ int main(int argc, char* argv[])
     // Inputs //
     ////////////
 
+    // Initialize hardcoded start state
     moveit::core::RobotState start_state(robot_model);
     start_state.setToDefaultValues();
 
@@ -233,6 +237,7 @@ int main(int argc, char* argv[])
     start_state.setVariablePosition("world_joint/y", 0.0);
     start_state.setVariablePosition("world_joint/theta", smpl::to_radians(0));
 
+    // Visualize the start state
     {
         ros::Duration(1.0).sleep();
         visualization_msgs::MarkerArray ma;
@@ -252,24 +257,7 @@ int main(int argc, char* argv[])
         ros::Duration(1.0).sleep();
     }
 
-    ROS_INFO("Update start state in collision model");
-
-    for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
-        auto& name = robot_model->getVariableNames()[i];
-        auto pos = start_state.getVariablePositions()[i];
-        if (!cspace.setJointPosition(name, pos)) {
-            ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
-            return 1;
-        }
-    }
-
-    ROS_INFO("Update start state in planning model");
-
-    if (!planning_model.updateReferenceState(start_state)) {
-        ROS_ERROR("Failed to update the planning model reference state");
-        return 1;
-    }
-
+    // Initialize hardcoded object pose
     Eigen::Affine3d object_pose =
             Eigen::Translation3d(1.0, 2.0, 0.4) *
             Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
@@ -293,6 +281,24 @@ int main(int argc, char* argv[])
     ///////////
     // Plan! //
     ///////////
+
+    ROS_INFO("Update start state in collision model");
+
+    for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
+        auto& name = robot_model->getVariableNames()[i];
+        auto pos = start_state.getVariablePositions()[i];
+        if (!cspace.setJointPosition(name, pos)) {
+            ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
+            return 1;
+        }
+    }
+
+    ROS_INFO("Update start state in planning model");
+
+    if (!planning_model.updateReferenceState(start_state)) {
+        ROS_ERROR("Failed to update the planning model reference state");
+        return 1;
+    }
 
     ROS_INFO("Plan path!");
 
@@ -335,12 +341,17 @@ int main(int argc, char* argv[])
         display_publisher.publish(display);
     }
 
-    //////////////////////////////////////////////////////////////
-    // TODO: convert to FollowJointTrajectoryGoal for execution //
-    //////////////////////////////////////////////////////////////
+    std::string traj_client_name;
+    std::string gripper_client_name;
+    if (!GetParam(ph, "follow_joint_trajectory_action_name", &traj_client_name) ||
+        !GetParam(ph, "gripper_command_action_name", &gripper_client_name))
+    {
+        return 1;
+    }
 
     auto fake = true;
     auto execute = true;
+
     if (execute) {
         using GripperCommandActionServer =
                 actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
@@ -348,22 +359,20 @@ int main(int argc, char* argv[])
         using FollowJointTrajectoryActionServer =
                 actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
-        auto traj_client_name = "follow_joint_trajectory";
-        ROS_INFO("Wait for action server '%s'", traj_client_name);
+        ROS_INFO("Wait for action server '%s'", traj_client_name.c_str());
         FollowJointTrajectoryActionServer traj_client(traj_client_name);
         if (!fake) {
             if (!traj_client.waitForServer()) {
-                ROS_WARN("Failed to wait for action server '%s'", traj_client_name);
+                ROS_WARN("Failed to wait for action server '%s'", traj_client_name.c_str());
                 return 1;
             }
         }
 
-        auto gripper_client_name = "gripper_command";
-        ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name);
+        ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
         GripperCommandActionServer gripper_client(gripper_client_name);
         if (!fake) {
             if (!gripper_client.waitForServer()) {
-                ROS_WARN("Failed to wait for action server '%s'", gripper_client_name);
+                ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
                 return 1;
             }
         }

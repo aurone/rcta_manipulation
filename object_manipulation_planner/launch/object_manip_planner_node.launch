@@ -17,7 +17,15 @@
         <param name="group_name" value="right_arm_torso_base"/>
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>
-        
+
+        <param name="follow_joint_trajectory_action_name" value="follow_joint_trajectory"/>
+        <param name="gripper_command_action_name" value="gripper_command"/>
+
+        <!--
+        <param name="follow_joint_trajectory_action_name" value="/roman1/rcta_joint_trajectory_controller/follow_joint_trajectory"/>
+        <param name="gripper_command_action_name" value="/roman1/rcta_right_robotiq_controller/gripper_action"/>
+        -->
+
         <param name="planning_frame" value="map"/>
         <param name="demonstrations_path" value="$(find object_manipulation_planner)/data"/>
 
