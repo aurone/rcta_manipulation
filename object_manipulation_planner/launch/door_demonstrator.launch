@@ -1,6 +1,12 @@
 <launch>
     <arg name="debug" default="false"/>
 
+    <!-- Possible inputs:
+        * "command_state" from the Move Group Command panel
+        * "plan_state" from object_manipulation_planner/echo_display_traj
+    -->
+    <arg name="robot_state_topic" default="robot_state"/>
+
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
 
@@ -12,8 +18,7 @@
     <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
 
     <node name="$(anon door_demonstrator)" pkg="object_manipulation_planner" type="door_demonstrator" launch-prefix="$(arg launch_prefix)">
-        <!-- remap output of MoveGroupCommandPanel to input robot state -->
-        <remap from="robot_state" to="command_robot_state"/>
+        <remap from="robot_state" to="$(arg robot_state_topic)"/>
 
         <!-- the link of the object to run IK for to follow the position of the
              robot's end effector -->
