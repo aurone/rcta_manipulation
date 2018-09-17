@@ -390,7 +390,7 @@ int main(int argc, char* argv[])
                 auto* c = static_cast<GripperCommand*>(command.get());
                 control_msgs::GripperCommandGoal goal;
                 if (c->open) {
-                    goal.command.position = 1.0;
+                    goal.command.position = 0.0841; //1.0;
                 } else {
                     goal.command.position = 0.0;
                 }
