@@ -397,7 +397,8 @@ int main(int argc, char* argv[])
 
                 ROS_INFO("%s gripper", c->open ? "Open" : "Close");
                 if (!fake) {
-                    gripper_client.sendGoalAndWait(goal);
+                    auto res = gripper_client.sendGoalAndWait(goal);
+                    ROS_INFO("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
                 }
             } else if (command->type == Command::Type::Trajectory) {
                 auto* c = static_cast<TrajectoryCommand*>(command.get());
@@ -433,7 +434,8 @@ int main(int argc, char* argv[])
 
                 ROS_INFO("Execute trajectory");
                 if (!fake) {
-                    traj_client.sendGoalAndWait(traj);
+                    auto res = traj_client.sendGoalAndWait(traj);
+                    ROS_INFO("traj client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
                 }
             } else {
                 ROS_ERROR("Unrecognized command type");
