@@ -16,5 +16,6 @@
     <depend>smpl</depend>
     <depend>smpl_moveit_interface</depend>
     <depend>smpl_ros</depend>
+    <depend>gperftools</depend>
 </package>
 
