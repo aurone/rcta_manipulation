@@ -19,7 +19,7 @@
     <depend>moveit_ros_perception</depend>
 
     <export>
-        <!--moveit_core plugin="${prefix}/plugin.xml"/-->
+        <moveit_core plugin="${prefix}/plugin.xml"/>
         <moveit_ros_perception plugin="${prefix}/octomap_occupancy_map_updater_plugin.xml"/>
     </export>
 </package>
