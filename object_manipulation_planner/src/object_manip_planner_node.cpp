@@ -1,5 +1,7 @@
 // standard includes
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 // system includes
@@ -37,6 +39,159 @@ bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
     }
 
     ROS_INFO_STREAM("Retrieved parameter " << name << " = " << *value);
+    return true;
+}
+
+bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_ptr<Command>>& commands)
+{
+    using GripperCommandActionServer =
+            actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
+
+    using FollowJointTrajectoryActionServer =
+            actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
+
+    std::string traj_client_name;
+    std::string gripper_client_name;
+    if (!GetParam(nh, "follow_joint_trajectory_action_name", &traj_client_name) ||
+        !GetParam(nh, "gripper_command_action_name", &gripper_client_name))
+    {
+        return 1;
+    }
+
+    ROS_INFO("Wait for action server '%s'", traj_client_name.c_str());
+    FollowJointTrajectoryActionServer traj_client(traj_client_name);
+    if (!traj_client.waitForServer()) {
+        ROS_WARN("Failed to wait for action server '%s'", traj_client_name.c_str());
+        return 1;
+    }
+
+    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
+    GripperCommandActionServer gripper_client(gripper_client_name);
+    if (!gripper_client.waitForServer()) {
+        ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
+        return 1;
+    }
+
+    // move arm to the pregrasp configuration
+    // open the gripper
+    // move arm from pre-grasp-to-grasp configuration
+    // close the gripper
+    // manipulate the object
+    // open the gripper
+    // move the arm to the post-grasp configuration
+
+    for (auto& command : commands) {
+        if (command->type == Command::Type::Gripper) {
+            auto* c = static_cast<GripperCommand*>(command.get());
+            control_msgs::GripperCommandGoal goal;
+            if (c->open) {
+                goal.command.position = 0.0841; //1.0;
+            } else {
+                goal.command.position = 0.0;
+            }
+
+            ROS_INFO("%s gripper", c->open ? "Open" : "Close");
+            auto res = gripper_client.sendGoalAndWait(goal);
+            ROS_INFO("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+        } else if (command->type == Command::Type::Trajectory) {
+            auto* c = static_cast<TrajectoryCommand*>(command.get());
+
+            control_msgs::FollowJointTrajectoryGoal traj;
+            traj.trajectory.header.stamp = ros::Time::now();
+            traj.trajectory.header.frame_id = "";
+
+            traj.trajectory.joint_names = {
+                "limb_right_joint1",
+                "limb_right_joint2",
+                "limb_right_joint3",
+                "limb_right_joint4",
+                "limb_right_joint5",
+                "limb_right_joint6",
+                "limb_right_joint7",
+                "torso_joint1",
+            };
+
+            traj.trajectory.points.resize(c->trajectory.getWayPointCount());
+            for (auto i = 0; i < c->trajectory.getWayPointCount(); ++i) {
+                std::vector<double> positions;
+                positions.resize(traj.trajectory.joint_names.size());
+                for (auto j = 0; j < traj.trajectory.joint_names.size(); ++j) {
+                    auto& joint_name = traj.trajectory.joint_names[j];
+                    positions[j] = c->trajectory.getWayPoint(i).getVariablePosition(joint_name);
+#if 0
+                    if (joint_name == "limb_right_joint7") {
+                        positions[j] -= M_PI;
+                    }
+#endif
+                }
+                traj.trajectory.points[i].positions = std::move(positions);
+
+                traj.trajectory.points[i].time_from_start =
+                        ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
+
+                ROS_INFO("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
+            }
+
+            ROS_INFO("Execute trajectory");
+            auto res = traj_client.sendGoalAndWait(traj);
+            ROS_INFO("traj client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+        } else {
+            ROS_ERROR("Unrecognized command type");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool AnimateTrajectory(
+    const moveit::core::RobotModelPtr& robot_model,
+    const std::vector<std::unique_ptr<Command>>& commands)
+{
+    auto last_wp = moveit::core::RobotState(robot_model);
+    for (auto& command : commands) {
+        if (command->type == Command::Type::Gripper) {
+            auto* gripper_cmd = static_cast<GripperCommand*>(command.get());
+
+            std_msgs::ColorRGBA color;
+            if (gripper_cmd->open) {
+                color.g = 0.5f;
+                color.a = 0.9f;
+            } else {
+                color.r = 0.5f;
+                color.a = 0.9f;
+            }
+
+            visualization_msgs::MarkerArray ma;
+            last_wp.getRobotMarkers(ma, last_wp.getRobotModel()->getLinkModelNames(), color, "trajectory", ros::Duration(0));
+
+            SV_SHOW_INFO(ma);
+
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        } else if (command->type == Command::Type::Trajectory) {
+            auto* trajectory = static_cast<TrajectoryCommand*>(command.get());
+            for (auto i = 0; i < trajectory->trajectory.getWayPointCount(); ++i) {
+                auto dur = trajectory->trajectory.getWayPointDurations()[i];
+
+                auto& wp = trajectory->trajectory.getWayPoint(i);
+
+                std_msgs::ColorRGBA color;
+                color.r = color.g = color.b = 0.5f;
+                color.a = 0.9f;
+
+                visualization_msgs::MarkerArray ma;
+                wp.getRobotMarkers(ma, wp.getRobotModel()->getLinkModelNames(), color, "trajectory", ros::Duration(0));
+
+                SV_SHOW_INFO(ma);
+
+                std::this_thread::sleep_for(std::chrono::milliseconds((int64_t)(1e3 * dur)));
+            }
+
+            last_wp = trajectory->trajectory.getLastWayPoint();
+        } else {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -217,25 +372,82 @@ int main(int argc, char* argv[])
     moveit::core::RobotState start_state(robot_model);
     start_state.setToDefaultValues();
 
-    start_state.setVariablePosition("limb_right_joint2", smpl::to_radians(30.0));
-    start_state.setVariablePosition("limb_right_joint4", smpl::to_radians(30.0));
-    start_state.setVariablePosition("limb_right_joint6", smpl::to_radians(30.0));
-    start_state.setVariablePosition("limb_right_joint7", smpl::to_radians(90.0));
-    start_state.setVariablePosition("limb_left_joint1", smpl::to_radians(-90.0));
-    start_state.setVariablePosition("limb_left_joint2", smpl::to_radians(90.0));
-    start_state.setVariablePosition("limb_left_joint3", smpl::to_radians(90.0));
-    start_state.setVariablePosition("limb_left_joint4", smpl::to_radians(180.0));
-    start_state.setVariablePosition("limb_left_joint5", smpl::to_radians(-90.0));
-    start_state.setVariablePosition("limb_left_joint6", smpl::to_radians(0.0));
-    start_state.setVariablePosition("limb_left_joint7", smpl::to_radians(0.0));
+    // because fuck you moveit, plz stahp throwing exceptions
+    auto robot_has_variable = [&](
+        const moveit::core::RobotModel& model,
+        const std::string& name)
+    {
+        auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
+        return it != end(model.getVariableNames());
+    };
 
-//    start_state.setVariablePosition("world_joint/x", 1.0);
-//    start_state.setVariablePosition("world_joint/y", 0.4);
-//    start_state.setVariablePosition("world_joint/theta", smpl::to_radians(90));
+#if 0
+    auto start_variables =
+    {
+        std::make_pair( "limb_right_joint2", smpl::to_radians(30.0) ),
+        std::make_pair( "limb_right_joint4", smpl::to_radians(30.0) ),
+        std::make_pair( "limb_right_joint6", smpl::to_radians(30.0) ),
+#if 1
+        std::make_pair( "limb_right_joint7", smpl::to_radians(-90.0) ),
+#else
+        std::make_pair( "limb_right_joint7", smpl::to_radians(0.0) ),
+#endif
+        std::make_pair( "limb_left_joint1",  smpl::to_radians(-90.0) ),
+        std::make_pair( "limb_left_joint2",  smpl::to_radians(90.0) ),
+        std::make_pair( "limb_left_joint3",  smpl::to_radians(90.0) ),
+        std::make_pair( "limb_left_joint4",  smpl::to_radians(180.0) ),
+        std::make_pair( "limb_left_joint5",  smpl::to_radians(-90.0) ),
+        std::make_pair( "limb_left_joint6",  smpl::to_radians(0.0) ),
+        std::make_pair( "limb_left_joint7",  smpl::to_radians(0.0) ),
 
-    start_state.setVariablePosition("world_joint/x", 0.0);
-    start_state.setVariablePosition("world_joint/y", 0.0);
-    start_state.setVariablePosition("world_joint/theta", smpl::to_radians(0));
+//        std::make_pair( "world_joint/x", 1.0 ),
+//        std::make_pair( "world_joint/y", 0.4 ),
+//        std::make_pair( "world_joint/theta", smpl::to_radians(90) ),
+
+        std::make_pair( "world_joint/x", 0.0 ),
+        std::make_pair( "world_joint/y", 0.0 ),
+        std::make_pair( "world_joint/theta", smpl::to_radians(0) ),
+    };
+#else
+    auto start_variables =
+    {
+        std::make_pair( "limb_right_joint1", smpl::to_radians(135) ),
+        std::make_pair( "limb_right_joint2", smpl::to_radians(0) ),
+        std::make_pair( "limb_right_joint3", smpl::to_radians(180) ),
+        std::make_pair( "limb_right_joint4", smpl::to_radians(45) ),
+        std::make_pair( "limb_right_joint5", smpl::to_radians(30) ),
+        std::make_pair( "limb_right_joint6", smpl::to_radians(90) ),
+        std::make_pair( "limb_right_joint7", smpl::to_radians(-135) ),
+        std::make_pair( "limb_left_joint1",  smpl::to_radians(-90.0) ),
+        std::make_pair( "limb_left_joint2",  smpl::to_radians(90.0) ),
+        std::make_pair( "limb_left_joint3",  smpl::to_radians(90.0) ),
+        std::make_pair( "limb_left_joint4",  smpl::to_radians(180.0) ),
+        std::make_pair( "limb_left_joint5",  smpl::to_radians(-90.0) ),
+        std::make_pair( "limb_left_joint6",  smpl::to_radians(0.0) ),
+        std::make_pair( "limb_left_joint7",  smpl::to_radians(0.0) ),
+
+//        std::make_pair( "world_joint/x", 1.0 ),
+//        std::make_pair( "world_joint/y", 0.4 ),
+//        std::make_pair( "world_joint/theta", smpl::to_radians(90) ),
+
+        std::make_pair( "world_joint/x", 0.0 ),
+        std::make_pair( "world_joint/y", 0.0 ),
+        std::make_pair( "world_joint/theta", smpl::to_radians(0) ),
+    };
+#endif
+
+    for (auto& var : start_variables) {
+        if (!robot_has_variable(*start_state.getRobotModel(), var.first)) continue;
+        start_state.setVariablePosition(var.first, var.second);
+    }
+
+
+    auto& ee_pose = start_state.getGlobalLinkTransform("limb_right_link7");
+    ROS_INFO("START EE POSE");
+    ROS_INFO("[%f, %f, %f, %f]", ee_pose(0,0), ee_pose(0,1), ee_pose(0,2), ee_pose(0,3));
+    ROS_INFO("[%f, %f, %f, %f]", ee_pose(1,0), ee_pose(1,1), ee_pose(1,2), ee_pose(1,3));
+    ROS_INFO("[%f, %f, %f, %f]", ee_pose(2,0), ee_pose(2,1), ee_pose(2,2), ee_pose(2,3));
+    ROS_INFO("[%f, %f, %f, %f]", ee_pose(3,0), ee_pose(3,1), ee_pose(3,2), ee_pose(3,3));
 
     // Visualize the start state
     {
@@ -341,109 +553,13 @@ int main(int argc, char* argv[])
         display_publisher.publish(display);
     }
 
-    std::string traj_client_name;
-    std::string gripper_client_name;
-    if (!GetParam(ph, "follow_joint_trajectory_action_name", &traj_client_name) ||
-        !GetParam(ph, "gripper_command_action_name", &gripper_client_name))
-    {
-        return 1;
-    }
-
-    auto fake = true;
-    auto execute = true;
+    auto execute = false;
+    GetParam(ph, "execute", &execute);
 
     if (execute) {
-        using GripperCommandActionServer =
-                actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
-
-        using FollowJointTrajectoryActionServer =
-                actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
-
-        ROS_INFO("Wait for action server '%s'", traj_client_name.c_str());
-        FollowJointTrajectoryActionServer traj_client(traj_client_name);
-        if (!fake) {
-            if (!traj_client.waitForServer()) {
-                ROS_WARN("Failed to wait for action server '%s'", traj_client_name.c_str());
-                return 1;
-            }
-        }
-
-        ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
-        GripperCommandActionServer gripper_client(gripper_client_name);
-        if (!fake) {
-            if (!gripper_client.waitForServer()) {
-                ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
-                return 1;
-            }
-        }
-
-        // move arm to the pregrasp configuration
-        // open the gripper
-        // move arm from pre-grasp-to-grasp configuration
-        // close the gripper
-        // manipulate the object
-        // open the gripper
-        // move the arm to the post-grasp configuration
-
-        for (auto& command : commands) {
-            if (command->type == Command::Type::Gripper) {
-                auto* c = static_cast<GripperCommand*>(command.get());
-                control_msgs::GripperCommandGoal goal;
-                if (c->open) {
-                    goal.command.position = 0.0841; //1.0;
-                } else {
-                    goal.command.position = 0.0;
-                }
-
-                ROS_INFO("%s gripper", c->open ? "Open" : "Close");
-                if (!fake) {
-                    auto res = gripper_client.sendGoalAndWait(goal);
-                    ROS_INFO("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
-                }
-            } else if (command->type == Command::Type::Trajectory) {
-                auto* c = static_cast<TrajectoryCommand*>(command.get());
-
-                control_msgs::FollowJointTrajectoryGoal traj;
-                traj.trajectory.header.stamp = ros::Time::now();
-                traj.trajectory.header.frame_id = "";
-
-                traj.trajectory.joint_names = {
-                    "torso_joint1",
-                    "limb_right_joint1",
-                    "limb_right_joint2",
-                    "limb_right_joint3",
-                    "limb_right_joint4",
-                    "limb_right_joint5",
-                    "limb_right_joint6",
-                    "limb_right_joint7",
-                };
-
-                traj.trajectory.points.resize(c->trajectory.getWayPointCount());
-                for (auto i = 0; i < c->trajectory.getWayPointCount(); ++i) {
-                    std::vector<double> positions;
-                    positions.resize(traj.trajectory.joint_names.size());
-                    for (auto j = 0; j < traj.trajectory.joint_names.size(); ++j) {
-                        auto& joint_name = traj.trajectory.joint_names[j];
-                        positions.push_back(c->trajectory.getWayPoint(i).getVariablePosition(joint_name));
-                    }
-                    traj.trajectory.points[i].positions = std::move(positions);
-
-                    traj.trajectory.points[i].time_from_start =
-                            ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
-
-                    ROS_INFO("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
-                }
-
-                ROS_INFO("Execute trajectory");
-                if (!fake) {
-                    auto res = traj_client.sendGoalAndWait(traj);
-                    ROS_INFO("traj client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
-                }
-            } else {
-                ROS_ERROR("Unrecognized command type");
-            }
-        }
-
+        ExecuteTrajectory(ph, commands);
+    } else {
+        AnimateTrajectory(robot_model, commands);
     }
 
     return 0;

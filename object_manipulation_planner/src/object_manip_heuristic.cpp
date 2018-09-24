@@ -183,8 +183,8 @@ void UpdateUserGoal(
         }
     };
 
-    using heap_type = smpl::intrusive_heap<EGraphSearchNode, NodeCompare>;
-    heap_type open;
+    using OpenList = smpl::intrusive_heap<EGraphSearchNode, NodeCompare>;
+    OpenList open;
 
     auto nodes = egraph->nodes();
 
