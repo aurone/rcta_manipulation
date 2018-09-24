@@ -1,0 +1,5 @@
+<launch>
+    <group ns="roman1">
+        <node name="rviz" pkg="rviz" type="rviz"/>
+    </group>
+</launch>
