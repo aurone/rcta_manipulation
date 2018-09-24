@@ -1,11 +1,16 @@
 <launch>
     <arg name="debug" default="false"/>
 
+    <arg name="live" default="false"/>
+    <arg name="execute" default="false"/>
+
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
 
+    <arg name="load_robot_description" default="false"/>
+
     <include file="$(find roman_moveit_config)/launch/planning_context.launch">
-        <arg name="load_robot_description" value="true"/>
+        <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     </include>
 
     <rosparam command="load" file="$(find roman_moveit_config)/config/collision_model.yaml"/>
@@ -14,17 +19,16 @@
     <env name="SMPL_VISUALIZE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/smpl_visual.ini"/>
     <env name="ROSCONSOLE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/rosconsole.properties"/>
     <node name="object_manip_planner" pkg="object_manipulation_planner" type="object_manip_planner_node" launch-prefix="$(arg launch_prefix)">
+        <param name="execute" value="$(arg execute)"/>
+
         <param name="group_name" value="right_arm_torso_base"/>
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>
 
-        <param name="follow_joint_trajectory_action_name" value="follow_joint_trajectory"/>
-        <param name="gripper_command_action_name" value="gripper_command"/>
-
-        <!--
-        <param name="follow_joint_trajectory_action_name" value="/roman1/rcta_joint_trajectory_controller/follow_joint_trajectory"/>
-        <param name="gripper_command_action_name" value="/roman1/rcta_right_robotiq_controller/gripper_action"/>
-        -->
+        <param unless="$(arg live)" name="follow_joint_trajectory_action_name" value="follow_joint_trajectory"/>
+        <param unless="$(arg live)" name="gripper_command_action_name" value="gripper_command"/>
+        <param if="$(arg live)" name="follow_joint_trajectory_action_name" value="/roman1/rcta_joint_trajectory_controller/follow_joint_trajectory"/>
+        <param if="$(arg live)" name="gripper_command_action_name" value="/roman1/rcta_right_robotiq_controller/gripper_action"/>
 
         <param name="planning_frame" value="map"/>
         <param name="demonstrations_path" value="$(find object_manipulation_planner)/data"/>
