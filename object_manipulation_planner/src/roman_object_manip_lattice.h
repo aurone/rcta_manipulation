@@ -201,17 +201,22 @@ public:
     // same discrete bin, i.e. discrete(phi(s)) = (x, y, z, yaw). This is
     // queried to determine the set of edges E_z during planning.
     PhiCoordToEGraphNodesMap m_phi_to_egraph_nodes;
-    PhiCoordToEGraphNodesMap m_pre_phi_to_egraph_nodes;
+
     double pregrasp_offset_x = -0.10;
+    PhiCoordToEGraphNodesMap m_pregrasp_phi_to_egraph_node;
+    PhiCoordToEGraphNodesMap m_grasp_phi_to_egraph_node;
 
     std::vector<PhiCoord> m_egraph_phi_coords;
     std::vector<PhiCoord> m_egraph_pre_phi_coords;
 
-    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>>
-        m_egraph_node_pregrasps;
-    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>>
-        m_egraph_node_grasps;
+    template <class T>
+    using AlignedVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
+    AlignedVector<Eigen::Affine3d> m_egraph_node_pregrasps;
+    AlignedVector<Eigen::Affine3d> m_egraph_node_grasps;
+
+    // heurisic required to determine destination states for snap and shortcut
+    // actions
     ObjectManipHeuristic* m_heuristic = NULL;
 };
 
