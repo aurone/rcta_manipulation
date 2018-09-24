@@ -53,7 +53,9 @@ void RomanObjectManipLattice::getEGraphStateZSuccs(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
-    // TODO: E_z?
+    // TODO: E_z? probably not worthwhile to generate z-edges here...we could
+    // run IK to end effector poses of adjacent states to generate alternatives
+    // but that seems covered by a bridge + orig-z action sequence
 }
 
 // Get successors of actions from E_z where u is not an E-Graph state.
@@ -62,7 +64,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
-    // e-graph nodes within phi tolerance, for E_z
+    // s_demo states where phi(s) ~ phi(s_demo) and z(s) = z(s_demo)
     std::vector<smpl::ExperienceGraph::node_id> parent_nearby_nodes;
     {
         auto pose_coord = getPhiCoord(state->coord);
@@ -70,13 +72,14 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
         auto it = m_phi_to_egraph_nodes.find(pose_coord);
         if (it != end(m_phi_to_egraph_nodes)) {
             for (auto node : it->second) {
-                auto z = m_egraph.state(node)[HINGE];
-                if (z == state->state[HINGE]) {
+                if (m_egraph.state(node)[HINGE] == state->state[HINGE]) {
                     parent_nearby_nodes.push_back(node);
                 }
             }
         }
     }
+
+    if (parent_nearby_nodes.empty()) return;
 
     std::vector<smpl::WorkspaceAction> actions;
     m_actions->apply(*state, actions);
@@ -91,43 +94,42 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
         SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "      waypoints: %zu", action.size());
 
         smpl::RobotState final_robot_state;
-        if (!checkAction(state->state, action, &final_robot_state)) {
-            continue;
-        }
+        if (!checkAction(state->state, action, &final_robot_state)) continue;
 
         auto& final_state = action.back();
         smpl::WorkspaceCoord succ_coord;
         stateWorkspaceToCoord(final_state, succ_coord);
 
         // E_z from V_orig
-        if (false && !parent_nearby_nodes.empty()) {
-            auto pose_coord = getPhiCoord(succ_coord);
-            auto it = m_phi_to_egraph_nodes.find(pose_coord);
-            if (it != end(m_phi_to_egraph_nodes)) {
-                // for each experience this node within error...
-                for (auto node : it->second) {
-                    // if node in the adjacent list of any nearby node...
-                    for (auto nn : parent_nearby_nodes) {
-                        if (m_egraph.edge(nn, node)) {
-                            auto& egraph_state = m_egraph.state(node);
-                            SMPL_ASSERT(egraph_state.size() == robot()->jointVariableCount());
-                            auto z = egraph_state[HINGE];
-                            auto this_final_state = final_state;
-                            auto this_final_robot_state = final_robot_state;
-                            this_final_state[OB_P] = z;
-                            this_final_robot_state[HINGE] = z;
-                            smpl::WorkspaceCoord succ_coord;
-                            stateWorkspaceToCoord(this_final_state, succ_coord);
-                            auto succ_id = createState(succ_coord);
-                            auto* succ_state = getState(succ_id);
-                            succ_state->state = this_final_robot_state;
-                            SMPL_DEBUG_NAMED(G_LOG, "Return Z-EDGE z = %f", z);
-                            succs->push_back(succ_id);
-                            auto edge_cost = computeCost(*state, *succ_state);
-                            costs->push_back(edge_cost);
-                        }
-                    }
-                }
+        auto pose_coord = getPhiCoord(succ_coord);
+        auto it = m_phi_to_egraph_nodes.find(pose_coord);
+        if (it == end(m_phi_to_egraph_nodes)) continue;
+
+        // for each demonstration state s_demo' where phi(s_demo') = phi(s')
+        for (auto node : it->second) {
+            // is there any edge between S_demo and S_demo'?
+            for (auto nn : parent_nearby_nodes) {
+                if (!m_egraph.edge(nn, node)) continue;
+
+                // overwrite the z value of the destination state
+                auto& egraph_state = m_egraph.state(node);
+                SMPL_ASSERT(egraph_state.size() == robot()->jointVariableCount());
+                auto z = egraph_state[HINGE];
+                auto this_final_state = final_state;
+                auto this_final_robot_state = final_robot_state;
+                this_final_state[OB_P] = z;
+                this_final_robot_state[HINGE] = z;
+
+                smpl::WorkspaceCoord succ_coord;
+                stateWorkspaceToCoord(this_final_state, succ_coord);
+                auto succ_id = createState(succ_coord);
+                auto* succ_state = getState(succ_id);
+                succ_state->state = this_final_robot_state;
+                SMPL_DEBUG_NAMED(G_LOG, "Return Z-EDGE z = %f", z);
+                succs->push_back(succ_id);
+
+                auto edge_cost = computeCost(*state, *succ_state);
+                costs->push_back(edge_cost);
             }
         }
     }
@@ -196,15 +198,17 @@ void RomanObjectManipLattice::getPreGraspAmpSucc(
     }
 }
 
+// For a state $s$, for all states $s_demo$ on the demonstration where
+// $z(s_demo) = z(s)$ and $phi(state) = phi(s_demo)$, apply an adaptive
+// motion that uses IK to move from $s$ to a state $s'$ where $phi(s') =
+// pre-phi(s_demo)$. These actions effectively "release" the object and move
+// the end effector away to the pre-grasp pose.
 void RomanObjectManipLattice::getPreGraspSuccs(
     smpl::WorkspaceLatticeState* state,
     const PhiCoord& phi_coord,
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
-    // If the contact coordinates are the same as some node on the
-    // demonstration, then an action is available to "release" the object
-    // and move the end effector to the pre-grasp pose.
     auto it = m_phi_to_egraph_nodes.find(phi_coord);
     if (it != end(m_phi_to_egraph_nodes)) {
         for (auto node : it->second) {
@@ -235,11 +239,6 @@ void RomanObjectManipLattice::getPreGraspSuccs(
                 auto* succ_state = getState(succ_id);
                 succ_state->state = final_robot_state;
 
-                // TODO: We could check whether this state is a goal state
-                // or not, but we should have found the goal state already if we
-                // are at a state with the goal z-value. This might be an issue if
-                // we run the planner with start = goal?
-
                 SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "Pre-grasp motion succeeded");
                 succs->push_back(succ_id);
                 costs->push_back(1); // edge cost of one for grasp/pregrasp actions
@@ -248,9 +247,10 @@ void RomanObjectManipLattice::getPreGraspSuccs(
     }
 }
 
-// For all states v in the demonstration where z(v) = z(s), if pre-phi(v) =
-// phi(s), apply an adaptive motion to move the end effector from phi(s) to
-// phi(v).
+// For a state $s$, for all states $s_demo$ on the demonstration where
+// $z(s_demo) = z(s)$ and $phi(state) = pre-phi(s_demo)$, apply an adaptive
+// motion that uses IK to move from $s$ to a state $s'$ where $phi(s') =
+// phi(s_demo)$.
 void RomanObjectManipLattice::getGraspSuccs(
     smpl::WorkspaceLatticeState* state,
     const PhiCoord& phi_coord,
@@ -260,15 +260,14 @@ void RomanObjectManipLattice::getGraspSuccs(
     // If the contact coordinates are the same as the pregrasp coordinates of
     // some state in the demonstration, then an action is available to "grasp"
     // the object by moving the end effector to the grasp pose.
-    auto pre_it = m_pre_phi_to_egraph_nodes.find(phi_coord);
-    if (pre_it != end(m_pre_phi_to_egraph_nodes)) {
+    auto pre_it = m_pregrasp_phi_to_egraph_node.find(phi_coord);
+    if (pre_it != end(m_pregrasp_phi_to_egraph_node)) {
         for (auto node : pre_it->second) {
             if (m_egraph.state(node)[HINGE] != state->state[HINGE]) continue;
 
             SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "Attempt grasp motion");
             auto& grasp = m_egraph_node_grasps[node];
             auto seed = state->state;
-            // NOTE: the final robot state has the same
             smpl::RobotState final_robot_state;
             if (m_ik_iface->computeIK(grasp, seed, final_robot_state)) {
                 smpl::WorkspaceState succ_workspace_state;
@@ -315,14 +314,23 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
+    auto enable_z_edges = true; //false;
+    auto enable_egraph_edges = true; //false; //true
+
     if (is_egraph_node) { // expanding an egraph node
         getEGraphStateAdjacentSuccs(state, egraph_node, succs, costs);
         getEGraphStateBridgeSuccs(state, egraph_node, succs, costs);
-//        getEGraphStateZSuccs(state, egraph_node, succs, costs);
+        if (enable_z_edges) {
+            getEGraphStateZSuccs(state, egraph_node, succs, costs);
+        }
     } else {
         getOrigStateOrigSuccs(state, succs, costs);
-        getOrigStateBridgeSuccs(state, succs, costs);
-//        getOrigStateZSuccs(state, succs, costs);
+        if (enable_egraph_edges) {
+            getOrigStateBridgeSuccs(state, succs, costs);
+        }
+        if (enable_z_edges) {
+            getOrigStateZSuccs(state, succs, costs);
+        }
     }
 
     auto phi_coord = getPhiCoord(state->coord);
@@ -331,6 +339,7 @@ void RomanObjectManipLattice::getUniqueSuccs(
     getPreGraspSuccs(state, phi_coord, succs, costs);
     getPreGraspAmpSucc(state, phi_coord, succs, costs);
 
+//    m_heuristic = NULL;
     if (m_heuristic != NULL) {
         std::vector<int> snap_ids;
         m_heuristic->getEquivalentStates(state_id, snap_ids);
@@ -894,7 +903,10 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
         return false;
     }
 
+    // discrete 3d positions of the end effector throughout the demonstration
     std::vector<Eigen::Vector3i> phi_points;
+
+    // discrete 3d positions of potential pre-grasp poses for the end effector
     std::vector<Eigen::Vector3i> pg_phi_points;
 
     m_egraph_node_pregrasps.resize(m_egraph.num_nodes());
@@ -925,15 +937,25 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
         smpl::WorkspaceCoord disc_egraph_state(dofCount());
         stateWorkspaceToCoord(tmp, disc_egraph_state);
 
-        // map phi(discrete egraph state) -> egraph node
-        auto phi_coord = getPhiCoord(disc_egraph_state);
-        m_phi_to_egraph_nodes[phi_coord].push_back(node);
-        phi_points.emplace_back(phi_coord[0], phi_coord[1], phi_coord[2]);
+        auto adj = m_egraph.adjacent_nodes(node);
+        for (auto ait = adj.first; ait != adj.second; ++ait) {
+            auto anode = *ait;
+            auto& adj_state = m_egraph.state(anode);
+            if (egraph_robot_state[RobotVariableIndex::HINGE] !=
+                adj_state[RobotVariableIndex::HINGE])
+            {
+                // map phi(discrete egraph state) -> egraph node
+                auto phi_coord = getPhiCoord(disc_egraph_state);
+                m_phi_to_egraph_nodes[phi_coord].push_back(node);
+                phi_points.emplace_back(phi_coord[0], phi_coord[1], phi_coord[2]);
 
-        // map phi'(discrete egraph state) -> egraph node
-        auto pre_phi_coord = getPhiCoord(pregrasp_pose);
-        m_pre_phi_to_egraph_nodes[pre_phi_coord].push_back(node);
-        pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
+                // map phi'(discrete egraph state) -> egraph node
+                auto pre_phi_coord = getPhiCoord(pregrasp_pose);
+                m_pregrasp_phi_to_egraph_node[pre_phi_coord].push_back(node);
+                pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
+                break;
+            }
+        }
 
         m_egraph_node_grasps[node] = grasp_pose;
         m_egraph_node_pregrasps[node] = pregrasp_pose;
