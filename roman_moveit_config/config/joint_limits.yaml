@@ -1,74 +1,80 @@
 # joint_limits.yaml allows the dynamics properties specified in the URDF to be overwritten or augmented as needed
 # Specific joint properties can be changed with the keys [max_position, min_position, max_velocity, max_acceleration]
 # Joint limits can be turned off with [has_velocity_limits, has_acceleration_limits]
+#maximum_velocity: &maximum_velocity 0.785
+#maximum_acceleration: &maximum_acceleration 0.349
+
+maximum_velocity: &maximum_velocity 1.2217
+maximum_acceleration: &maximum_acceleration 0.785
+
 joint_limits:
   limb_left_joint1:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_left_joint2:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_left_joint3:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_left_joint4:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_left_joint5:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_left_joint6:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_left_joint7:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint1:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint2:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint3:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint4:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint5:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint6:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
   limb_right_joint7:
     has_velocity_limits: true
-    max_velocity: 0.348
+    max_velocity: *maximum_velocity
     has_acceleration_limits: true
-    max_acceleration: 0.175
+    max_acceleration: *maximum_acceleration
