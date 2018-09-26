@@ -1,4 +1,7 @@
 controller_list:
+    # MoveIt will choose this controller for any subgroup of the joints
+    # governed by this controller. Miraculously, this also appears to
+    # not complain when the extra joints are missing from the arm
     - name: rcta_joint_trajectory_controller
       action_ns: follow_joint_trajectory
       type: FollowJointTrajectory
@@ -11,10 +14,16 @@ controller_list:
         - limb_right_joint5
         - limb_right_joint6
         - limb_right_joint7
+        - limb_left_joint1
+        - limb_left_joint2
+        - limb_left_joint3
+        - limb_left_joint4
+        - limb_left_joint5
+        - limb_left_joint6
+        - limb_left_joint7
         - torso_joint1
     - name: rcta_right_robotiq_controller
       action_ns: gripper_action
       type: GripperCommand
       default: true
       joints: []
-
