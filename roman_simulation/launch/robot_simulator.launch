@@ -1,0 +1,41 @@
+<launch>
+    <include file="$(find roman_model)/robots/upload_rcta_roman.launch"/>
+    <node name="robot_simulator" pkg="roman_simulation" type="robot_simulator"/>
+    <rosparam>
+        # JOINT STATE CONTROLLER
+        joint_state_controller:
+          type: joint_state_controller/JointStateController
+          publish_rate: 50
+        # TORSO + RIGHT ARM TRAJECTORY CONTROLLER
+        rcta_joint_trajectory_controller:
+          type: position_controllers/JointTrajectoryController
+          joints:
+            - torso_joint1
+            - limb_right_joint1
+            - limb_right_joint2
+            - limb_right_joint3
+            - limb_right_joint4
+            - limb_right_joint5
+            - limb_right_joint6
+            - limb_right_joint7
+            - limb_left_joint1
+            - limb_left_joint2
+            - limb_left_joint3
+            - limb_left_joint4
+            - limb_left_joint5
+            - limb_left_joint6
+            - limb_left_joint7
+          constraints:
+            goal_time: 0.5
+            stopped_velocity_tolerance: 0.02
+          allow_partial_joints_goal: True
+    </rosparam>
+
+    <node name="controller_spawner" pkg="controller_manager" type="spawner"
+            args="joint_state_controller rcta_joint_trajectory_controller"/>
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+    <node name="fake_localization" pkg="tf" type="static_transform_publisher"
+            args="0 0 0 0 0 0 map base_link 16"/>
+</launch>

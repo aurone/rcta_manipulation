@@ -8,22 +8,26 @@ endif()
 find_package(Eigen3 REQUIRED)
 find_package(
     catkin
-    REQUIRED 
-    COMPONENTS 
-        actionlib 
-        eigen_conversions 
-        nav_msgs 
+    REQUIRED
+    COMPONENTS
+        actionlib
+        controller_manager
+        eigen_conversions
+        hardware_interface
+        nav_msgs
         rosbag
-        roscpp 
+        roscpp
         rospack
         smpl
-        spellbook_ros 
+        smpl_urdf_robot_model
+        spellbook_ros
         tf
         tf_conversions)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(sdl2 REQUIRED sdl2)
+find_package(urdfdom REQUIRED)
 
 catkin_package()
 
@@ -36,7 +40,7 @@ include_directories(${sdl2_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 
 add_executable(
-    depth_sensor_simulator 
+    depth_sensor_simulator
     src/depth_sensor_simulator/depth_sensor_simulator.cpp)
 target_link_libraries(
     depth_sensor_simulator
@@ -48,7 +52,7 @@ target_link_libraries(
     ${GLEW_LIBRARIES})
 
 add_executable(
-    ground_truth_publisher 
+    ground_truth_publisher
     src/ground_truth_publisher/ground_truth_publisher.cpp)
 target_link_libraries(
     ground_truth_publisher
@@ -58,14 +62,14 @@ target_link_libraries(
     ${tf_conversions_LIBRARIES})
 
 add_executable(
-    kinect_simulator 
+    kinect_simulator
     src/kinect_simulator/kinect_simulator.cpp)
 target_link_libraries(
-    kinect_simulator 
+    kinect_simulator
     ${roscpp_LIBRARIES})
 
 #add_executable(
-#    localization_simulator 
+#    localization_simulator
 #    src/localization_simulator/localization_simulator.cpp)
 #target_link_libraries(
 #    localization_simulator
@@ -77,18 +81,39 @@ target_link_libraries(
 #    ${tf_LIBRARIES})
 
 add_executable(
-    tilt_mount_simulator 
+    tilt_mount_simulator
     src/tilt_mount_simulator/tilt_mount_simulator.cpp)
 target_link_libraries(
-    tilt_mount_simulator 
+    tilt_mount_simulator
     ${roscpp_LIBRARIES})
+
+add_executable(robot_simulator src/robot_simulator/robot_simulator.cpp)
+target_compile_options(robot_simulator PRIVATE -std=c++11)
+target_include_directories(
+    robot_simulator
+    SYSTEM
+    PRIVATE
+    ${controller_manager_INCLUDE_DIRS}
+    ${roscpp_INCLUDE_DIRS}
+    ${urdfdom_INCLUDE_DIRS}
+    ${smpl_urdf_robot_model_INCLUDE_DIRS}
+    ${hardware_interface_INCLUDE_DIRS})
+target_link_libraries(
+    robot_simulator
+    PRIVATE
+    ${controller_manager_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${urdfdom_LIBRARIES}
+    ${smpl_urdf_robot_model_LIBRARIES}
+    ${hardware_interface_LIBRARIES})
 
 install(
     TARGETS
-        depth_sensor_simulator 
-        ground_truth_publisher 
-        kinect_simulator 
-#        localization_simulator 
+        depth_sensor_simulator
+        ground_truth_publisher
+        kinect_simulator
+#        localization_simulator
+        robot_simulator
         tilt_mount_simulator
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
