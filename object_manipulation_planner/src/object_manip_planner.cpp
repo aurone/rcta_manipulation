@@ -266,11 +266,38 @@ bool PlanPath(
     // smooth path segments //
     //////////////////////////
 
-    for (auto& segment : segments) {
+    for (auto i = 0; i < segments.size(); ++i) {
+        auto& segment = segments[i];
         if (!smpl::InterpolatePath(*planner->checker, segment)) {
             ROS_ERROR("Failed to interpolate path");
             return false;
         }
+
+        auto type = segment_types[i];
+        switch (type) {
+        case TransitionType::OrigStateOrigSucc:     // yes
+        case TransitionType::OrigStateBridgeSucc:   // yes
+        case TransitionType::EGraphStateBridgeSucc: // yes
+        case TransitionType::PreGraspAmpSucc:       // yes
+        case TransitionType::SnapSucc:              // yes
+        {
+            std::vector<smpl::RobotState> shortcut;
+            auto type = smpl::ShortcutType::JOINT_POSITION_VELOCITY_SPACE;
+            smpl::ShortcutPath(planner->model, planner->checker, segment, shortcut, type);
+            (void)smpl::InterpolatePath(*planner->checker, shortcut);
+            segment = std::move(shortcut);
+            break;
+        }
+        case TransitionType::OrigStateZSucc:        // no
+        case TransitionType::EGraphStateAdjSucc:    // no
+        case TransitionType::EGraphStateZSucc:      // no
+        case TransitionType::GraspSucc:             // no
+        case TransitionType::PreGraspSucc:          // no
+        case TransitionType::ShortcutSucc:          // no
+            break;
+        }
+    }
+    for (auto& segment : segments) {
     }
 
     // TODO(Andrew): shortcut certain types of paths
