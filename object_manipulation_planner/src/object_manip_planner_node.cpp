@@ -30,6 +30,25 @@
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
 
+namespace std {
+template <class Key, class Value>
+auto operator<<(std::ostream& o, const std::map<Key, Value>& m) -> std::ostream&
+{
+    o << '{';
+    auto i = 0;
+    for (auto& e : m) {
+        if (i++ != 0) {
+            o << ", ";
+        }
+        o << '(' << e.first << ", " << e.second << ')';
+    }
+    o << '}';
+
+    return o;
+}
+
+} // namespace
+
 // Little helper for uniform success/error logging
 template <class T>
 bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
@@ -152,6 +171,8 @@ bool AnimateTrajectory(
     auto last_wp = moveit::core::RobotState(robot_model);
     for (auto& command : commands) {
         if (command->type == Command::Type::Gripper) {
+            if (!ros::ok()) break;
+
             auto* gripper_cmd = static_cast<GripperCommand*>(command.get());
 
             std_msgs::ColorRGBA color;
@@ -170,6 +191,8 @@ bool AnimateTrajectory(
 
             ros::Duration(1.0).sleep();
         } else if (command->type == Command::Type::Trajectory) {
+            if (!ros::ok()) break;
+
             auto* trajectory = static_cast<TrajectoryCommand*>(command.get());
             for (auto i = 0; i < trajectory->trajectory.getWayPointCount(); ++i) {
                 auto dur = trajectory->trajectory.getWayPointDurations()[i];
@@ -391,64 +414,25 @@ int main(int argc, char* argv[])
         return it != end(model.getVariableNames());
     };
 
-#if 0
-    auto start_variables =
-    {
-        std::make_pair( "limb_right_joint2", smpl::to_radians(30.0) ),
-        std::make_pair( "limb_right_joint4", smpl::to_radians(30.0) ),
-        std::make_pair( "limb_right_joint6", smpl::to_radians(30.0) ),
-#if 1
-        std::make_pair( "limb_right_joint7", smpl::to_radians(-90.0) ),
-#else
-        std::make_pair( "limb_right_joint7", smpl::to_radians(0.0) ),
-#endif
-        std::make_pair( "limb_left_joint1",  smpl::to_radians(-90.0) ),
-        std::make_pair( "limb_left_joint2",  smpl::to_radians(90.0) ),
-        std::make_pair( "limb_left_joint3",  smpl::to_radians(90.0) ),
-        std::make_pair( "limb_left_joint4",  smpl::to_radians(180.0) ),
-        std::make_pair( "limb_left_joint5",  smpl::to_radians(-90.0) ),
-        std::make_pair( "limb_left_joint6",  smpl::to_radians(0.0) ),
-        std::make_pair( "limb_left_joint7",  smpl::to_radians(0.0) ),
-
-//        std::make_pair( "world_joint/x", 1.0 ),
-//        std::make_pair( "world_joint/y", 0.4 ),
-//        std::make_pair( "world_joint/theta", smpl::to_radians(90) ),
-
-        std::make_pair( "world_joint/x", 0.0 ),
-        std::make_pair( "world_joint/y", 0.0 ),
-        std::make_pair( "world_joint/theta", smpl::to_radians(0) ),
-    };
-#else
-    auto start_variables =
-    {
-        std::make_pair( "limb_right_joint1", smpl::to_radians(135) ),
-        std::make_pair( "limb_right_joint2", smpl::to_radians(0) ),
-        std::make_pair( "limb_right_joint3", smpl::to_radians(180) ),
-        std::make_pair( "limb_right_joint4", smpl::to_radians(45) ),
-        std::make_pair( "limb_right_joint5", smpl::to_radians(30) ),
-        std::make_pair( "limb_right_joint6", smpl::to_radians(90) ),
-        std::make_pair( "limb_right_joint7", smpl::to_radians(-135) ),
-        std::make_pair( "limb_left_joint1",  smpl::to_radians(-90.0) ),
-        std::make_pair( "limb_left_joint2",  smpl::to_radians(90.0) ),
-        std::make_pair( "limb_left_joint3",  smpl::to_radians(90.0) ),
-        std::make_pair( "limb_left_joint4",  smpl::to_radians(180.0) ),
-        std::make_pair( "limb_left_joint5",  smpl::to_radians(-90.0) ),
-        std::make_pair( "limb_left_joint6",  smpl::to_radians(0.0) ),
-        std::make_pair( "limb_left_joint7",  smpl::to_radians(0.0) ),
-
-//        std::make_pair( "world_joint/x", 1.0 ),
-//        std::make_pair( "world_joint/y", 0.4 ),
-//        std::make_pair( "world_joint/theta", smpl::to_radians(90) ),
-
-        std::make_pair( "world_joint/x", 0.0 ),
-        std::make_pair( "world_joint/y", 0.0 ),
-        std::make_pair( "world_joint/theta", smpl::to_radians(0) ),
-    };
-#endif
+    std::map<std::string, double> start_variables;
+    if (!GetParam(ph, "start_state", &start_variables)) {
+        return -1;
+    }
 
     for (auto& var : start_variables) {
         if (!robot_has_variable(*start_state.getRobotModel(), var.first)) continue;
-        start_state.setVariablePosition(var.first, var.second);
+
+        auto vv = var.first;
+        for (auto i = 0; i < vv.size(); ++i) {
+            if (vv[i] == '\\') vv[i] = '/';
+        }
+
+        auto value = var.second;
+        if (vv != "world_joint/x" && vv != "world_joint/y") {
+            value = smpl::to_radians(value);
+        }
+
+        start_state.setVariablePosition(vv, value);
     }
 
 

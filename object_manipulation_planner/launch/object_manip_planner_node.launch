@@ -42,6 +42,54 @@
         <param name="grid/resolution"   value="0.05"/>
         <param name="grid/max_dist"     value="0.8"/>
 
+        <!-- NOTE: world_joint/* variables specified here using backslashes,
+        since AFAIK ros parameter keys are not allowed to have forward slashes
+        in the name. The backslashes are replaced internally in the node to
+        get the correct variable name
+        -->
+        <rosparam param="start_state">
+            world_joint\\x: 0.0
+            world_joint\\y: 0.0
+            world_joint\\theta: 0.0
+            limb_right_joint1: 135.0
+            limb_right_joint2: 0.0
+            limb_right_joint3: 180.0
+            limb_right_joint4: 45.0
+            limb_right_joint5: 30.0
+            limb_right_joint6: 90.0
+            limb_right_joint7: -135.0
+            limb_left_joint1: -90.0
+            limb_left_joint2: 90.0
+            limb_left_joint3: 90.0
+            limb_left_joint4: 180.0
+            limb_left_joint5: -90.0
+            limb_left_joint6: 0.0
+            limb_left_joint7: 0.0
+        </rosparam>
+
+        <!--
+        <rosparam param="start_state">
+            "world_joint\\x": 0.0
+            "world_joint\\y": 0.0
+            "world_joint\\theta": 0.0
+            #"world_joint\\x": 1.0
+            #"world_joint\\y": 0.4
+            #"world_joint\\theta": 90.0
+            "limb_right_joint2": 30.0
+            "limb_right_joint4": 30.0
+            "limb_right_joint6": 30.0
+            "limb_right_joint7": -90.0
+            "limb_left_joint1":  -90.0
+            "limb_left_joint2":  90.0
+            "limb_left_joint3":  90.0
+            "limb_left_joint4":  180.0
+            "limb_left_joint5":  -90.0
+            "limb_left_joint6":  0.0
+            "limb_left_joint7":  0.0
+        </rosparam>
+        -->
+
+
         <!--
         <param name="heading_thresh" value="0.05"/>
         <param name="rot_db" value="smpl::to_radians(2)"/>
