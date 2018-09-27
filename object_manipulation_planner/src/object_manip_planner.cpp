@@ -294,15 +294,19 @@ bool PlanPath(
         case TransitionType::GraspSucc:             // no
         case TransitionType::PreGraspSucc:          // no
         case TransitionType::ShortcutSucc:          // no
+        {
+            if (!smpl::InterpolatePath(*planner->checker, segment)) {
+                ROS_ERROR("Failed to interpolate path");
+                return false;
+            }
             break;
         }
-    }
-    for (auto& segment : segments) {
+        }
     }
 
-    // TODO(Andrew): shortcut certain types of paths
-
-    // convert to a sequence of interleaved trajectory/gripper commands
+    //////////////////////////////////////////////////////////////////////
+    // Convert to a sequence of interleaved trajectory/gripper commands //
+    //////////////////////////////////////////////////////////////////////
 
     auto MakeRobotTrajectory = [&](const std::vector<smpl::RobotState>& path)
     {

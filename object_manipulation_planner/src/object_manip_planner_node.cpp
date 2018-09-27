@@ -18,6 +18,7 @@
 #include <ros/ros.h>
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
+#include <smpl/distance_map/euclid_distance_map.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
 #include <smpl/occupancy_grid.h>
@@ -167,7 +168,7 @@ bool AnimateTrajectory(
 
             SV_SHOW_INFO(ma);
 
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            ros::Duration(1.0).sleep();
         } else if (command->type == Command::Type::Trajectory) {
             auto* trajectory = static_cast<TrajectoryCommand*>(command.get());
             for (auto i = 0; i < trajectory->trajectory.getWayPointCount(); ++i) {
@@ -184,7 +185,8 @@ bool AnimateTrajectory(
 
                 SV_SHOW_INFO(ma);
 
-                std::this_thread::sleep_for(std::chrono::milliseconds((int64_t)(1e3 * dur)));
+                ros::Duration(dur).sleep();
+//                std::this_thread::sleep_for(std::chrono::milliseconds((int64_t)(1e3 * dur)));
             }
 
             last_wp = trajectory->trajectory.getLastWayPoint();
@@ -304,6 +306,11 @@ int main(int argc, char* argv[])
     {
         return 1;
     }
+
+#if 1
+    auto df = std::make_shared<smpl::EuclidDistanceMap>(origin_x, origin_y, origin_z, size_x, size_y, size_z, resolution, max_dist);
+    auto grid = smpl::OccupancyGrid(df, false);
+#else
     auto grid = smpl::OccupancyGrid(
             size_x,
             size_y,
@@ -313,6 +320,7 @@ int main(int argc, char* argv[])
             origin_y,
             origin_z,
             max_dist);
+#endif
 
     grid.setReferenceFrame(planning_frame);
     SV_SHOW_INFO(grid.getBoundingBoxVisualization());
@@ -338,6 +346,8 @@ int main(int argc, char* argv[])
         ROS_ERROR("Failed to initialize Collision Space");
         return 1;
     }
+
+    SV_SHOW_INFO(cspace.getCollisionWorldVisualization());
 
     ObjectManipChecker ochecker;
     ochecker.parent = &cspace;
