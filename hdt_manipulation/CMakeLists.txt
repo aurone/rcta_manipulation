@@ -26,7 +26,7 @@ find_package(
         roscpp
         rviz
         smpl
-        spellbook_ros
+        spellbook
         tf)
 
 catkin_package()
@@ -47,7 +47,7 @@ target_link_libraries(
     ${leatherman_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${tf_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
@@ -62,7 +62,7 @@ target_link_libraries(
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
 add_executable(stow_arm src/stow_arm/stow_arm.cpp)
@@ -71,7 +71,7 @@ target_link_libraries(
     ${actionlib_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${hdt_kinematics_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
+    ${spellbook_LIBRARIES})
 #add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
 
 #qt4_wrap_cpp(MOC_HEADER_SOURCES src/pick_and_place_panel/PickAndPlacePanel.h)

@@ -41,7 +41,7 @@
     <depend>sensor_msgs</depend>
     <depend>smpl</depend>
     <depend>smpl_ros</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
     <depend>tf</depend>
     <depend>tf_conversions</depend>
     <depend>trajectory_msgs</depend>

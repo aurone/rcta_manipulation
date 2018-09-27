@@ -25,7 +25,7 @@ find_package(
         roscpp
         smpl
         smpl_ros
-        spellbook_ros
+        spellbook
         tf
         tf_conversions)
 find_package(sbpl REQUIRED)
@@ -61,7 +61,7 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${smpl_LIBRARIES}
     ${smpl_ros_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${tf_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${urdf_model_LIBRARIES}
@@ -75,7 +75,7 @@ target_link_libraries(
     ${actionlib_LIBRARIES}
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
+    ${spellbook_LIBRARIES})
 
 install(DIRECTORY config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

@@ -16,7 +16,7 @@ find_package(
         eigen_conversions
         eigen_stl_containers
         roscpp
-        spellbook_ros
+        spellbook
         visualization_msgs)
 
 catkin_package(
@@ -40,7 +40,7 @@ target_link_libraries(
     grasp_planner_interface
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
+    ${spellbook_LIBRARIES})
 
 install(
     DIRECTORY include/grasp_planner_interface/

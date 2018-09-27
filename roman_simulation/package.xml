@@ -21,7 +21,7 @@
     <depend>rospack</depend>
     <depend>sdl2</depend>
     <depend>smpl</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
     <depend>tf</depend>
     <depend>tf_conversions</depend>
 

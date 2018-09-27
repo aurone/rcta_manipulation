@@ -18,7 +18,7 @@
     <depend>roscpp</depend>
     <depend>rviz</depend>
     <depend>smpl</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
     <depend>tf</depend>
 
     <export>

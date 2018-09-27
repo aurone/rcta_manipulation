@@ -18,6 +18,6 @@
     <depend>roscpp</depend>
     <depend>rospack</depend>
     <depend>smpl</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
     <depend>visualization_msgs</depend>
 </package>

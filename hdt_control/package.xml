@@ -29,6 +29,6 @@
     <depend>sbpl_geometry_utils</depend>
     <depend>sbpl_kdl_robot_model</depend>
     <depend>smpl</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
     <depend>tf</depend>
 </package>

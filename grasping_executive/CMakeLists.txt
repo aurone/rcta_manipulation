@@ -36,7 +36,7 @@ find_package(
         sensor_msgs
         smpl
         smpl_ros
-        spellbook_ros
+        spellbook
         tf
         tf_conversions
         trajectory_msgs)
@@ -74,7 +74,7 @@ target_link_libraries(
     costmap_object_detection
     ${leatherman_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
+    ${spellbook_LIBRARIES})
 
 add_executable(
     grasp_object_executor
@@ -90,7 +90,7 @@ target_link_libraries(
     ${pcl_conversions_LIBRARIES}
     ${pcl_ros_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${smpl_ros_LIBRARIES}
     ${tf_conversions_LIBRARIES}
     ${tf_LIBRARIES}
@@ -124,7 +124,7 @@ target_link_libraries(
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${rviz_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${tf_LIBRARIES}
     ${robotiq_controllers_LIBRARIES}
     qwt)

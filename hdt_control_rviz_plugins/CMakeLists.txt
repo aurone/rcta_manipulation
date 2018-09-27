@@ -17,7 +17,7 @@ find_package(
         rcta_manipulation_common
         roscpp
         smpl
-        spellbook_ros
+        spellbook
         tf
         rviz)
 

@@ -27,7 +27,7 @@
     <depend>robotiq_controllers</depend>
     <depend>roscpp</depend>
     <depend>smpl</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
     <depend>tf</depend>
     <depend>tf_conversions</depend>
 </package>

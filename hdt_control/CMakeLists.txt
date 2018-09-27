@@ -26,7 +26,7 @@ find_package(
         tf
         rcta_manipulation_common
         rviz
-        spellbook_ros
+        spellbook
         sbpl_kdl_robot_model
         sbpl_geometry_utils
         smpl
@@ -65,7 +65,7 @@ target_link_libraries(
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${tf_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
 add_executable(
@@ -76,7 +76,7 @@ target_link_libraries(
     ${eigen_conversions_LIBRARIES}
     ${hdt_kinematics_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${tf_LIBRARIES})
 
 add_executable(
@@ -132,7 +132,7 @@ add_executable(
 target_link_libraries(
     joint_position_offset_test
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
 add_executable(
@@ -141,7 +141,7 @@ add_executable(
 target_link_libraries(
     joint_states_filter
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
+    ${spellbook_LIBRARIES})
 
 #add_executable(
 #    repeatability_measure
@@ -151,7 +151,7 @@ target_link_libraries(
 #    ${actionlib_LIBRARIES}
 #    ${eigen_conversions_LIBRARIES}
 #    ${roscpp_LIBRARIES}
-#    ${spellbook_ros_LIBRARIES}
+#    ${spellbook_LIBRARIES}
 #    ${tf_LIBRARIES}
 #    ${hdt_kinematics_LIBRARIES})
 
@@ -188,7 +188,7 @@ target_link_libraries(
 #    ${orocos_kdl_LIBRARIES}
 #    ${sbpl_geometry_utils_LIBRARIES}
 #    ${sbpl_kdl_robot_model_LIBRARIES}
-#    ${spellbook_ros_LIBRARIES}
+#    ${spellbook_LIBRARIES}
 #    ${tf_LIBRARIES}
 #    ${urdf_parser_LIBRARIES}
 #    ${hdt_kinematics_LIBRARIES})

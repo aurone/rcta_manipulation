@@ -9,22 +9,22 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(
-    catkin 
-    REQUIRED 
-    COMPONENTS 
-        eigen_conversions 
+    catkin
+    REQUIRED
+    COMPONENTS
+        eigen_conversions
         eigen_stl_containers
         geometry_msgs
-        roscpp 
+        roscpp
         rospack
         smpl
-        spellbook_ros
+        spellbook
         visualization_msgs)
 
 catkin_package(
     INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIR}
     LIBRARIES gascan_grasp_planner
-    CATKIN_DEPENDS eigen_stl_containers roscpp spellbook_ros visualization_msgs)
+    CATKIN_DEPENDS eigen_stl_containers roscpp spellbook visualization_msgs)
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
@@ -36,22 +36,22 @@ include_directories(include)
 include_directories(src)
 
 add_library(
-    gascan_grasp_planner 
+    gascan_grasp_planner
     src/grasping/gascan_grasp_planner.cpp)
 target_link_libraries(
     gascan_grasp_planner
     ${eigen_conversions_LIBRARIES}
     ${roscpp_LIBRARIES}
-    ${spellbook_ros_LIBRARIES})
+    ${spellbook_LIBRARIES})
 
 add_library(
-    matplotpp 
-    src/matplotpp/matplotpp.cc 
+    matplotpp
+    src/matplotpp/matplotpp.cc
     src/matplotpp/gl2ps.c)
 target_link_libraries(matplotpp ${OPENGL_LIBRARIES} ${GLUT_LIBRARIES})
 
 add_executable(
-    spline_grasp_generator 
+    spline_grasp_generator
     src/spline_grasp_generator/spline_grasp_generator.cpp)
 target_link_libraries(
     spline_grasp_generator
@@ -60,7 +60,7 @@ target_link_libraries(
     ${smpl_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${GLUT_LIBRARIES}
-    ${spellbook_ros_LIBRARIES}
+    ${spellbook_LIBRARIES}
     matplotpp)
 
 install(DIRECTORY include/gascan_grasp_planning/ DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})

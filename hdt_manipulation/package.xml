@@ -22,7 +22,7 @@
     <depend>smpl</depend>
     <depend>tf</depend>
     <depend>hdt_kinematics</depend>
-    <depend>spellbook_ros</depend>
+    <depend>spellbook</depend>
 
     <exec_depend>gascan_grasp_planning</exec_depend>
 

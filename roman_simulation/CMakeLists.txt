@@ -20,7 +20,7 @@ find_package(
         rospack
         smpl
         smpl_urdf_robot_model
-        spellbook_ros
+        spellbook
         tf
         tf_conversions)
 find_package(OpenGL REQUIRED)
@@ -77,7 +77,7 @@ target_link_libraries(
 #    ${eigen_conversions_LIBRARIES}
 #    ${rosbag_LIBRARIES}
 #    ${roscpp_LIBRARIES}
-#    ${spellbook_ros_LIBRARIES}
+#    ${spellbook_LIBRARIES}
 #    ${tf_LIBRARIES})
 
 add_executable(
