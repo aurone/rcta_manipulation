@@ -260,7 +260,7 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(egraph_node_id);
         auto* state = graph->getState(state_id);
 
-        auto phi = graph->getPhiCoord(state->coord);
+        auto phi = graph->m_egraph_phi_coords[egraph_node_id]; //graph->getPhiCoord(state->coord);
         auto pre_phi = graph->m_egraph_pre_phi_coords[egraph_node_id];
 
         // Store the heuristic value of the phi state.
@@ -420,7 +420,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     auto& egraph_nodes = heur->z_to_egraph_node[state->coord[OB_P]];
 
     SMPL_DEBUG_NAMED(H_LOG, "Inspect %zu phi nodes", phis.size());
-    for (int i = 0; i < phis.size(); ++i) {
+    for (auto i = 0; i < phis.size(); ++i) {
         ///////////////////////
         // Compute h_contact //
         ///////////////////////

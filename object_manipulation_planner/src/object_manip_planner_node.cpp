@@ -435,7 +435,6 @@ int main(int argc, char* argv[])
         start_state.setVariablePosition(vv, value);
     }
 
-
     auto& ee_pose = start_state.getGlobalLinkTransform("limb_right_link7");
     ROS_INFO("START EE POSE");
     ROS_INFO("[%f, %f, %f, %f]", ee_pose(0,0), ee_pose(0,1), ee_pose(0,2), ee_pose(0,3));

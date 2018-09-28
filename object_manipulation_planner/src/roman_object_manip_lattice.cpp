@@ -58,7 +58,10 @@ void RomanObjectManipLattice::getEGraphStateZSuccs(
     // but that seems covered by a bridge + orig-z action sequence
 }
 
-// Get successors of actions from E_z where u is not an E-Graph state.
+// Get successors of actions from E_z where u is not an E-Graph state. The
+// successors are determined by applying the original action space and checking
+// whether the endpoints of the action align with any edge in the
+// demonstration.
 void RomanObjectManipLattice::getOrigStateZSuccs(
     smpl::WorkspaceLatticeState* state,
     std::vector<int>* succs,
@@ -133,6 +136,92 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
             }
         }
     }
+}
+
+// Get successors of actions from E_z where u is not an E-Graph state. The
+// successors are determined by attempting an adaptive IK motion to the
+// states adjacent to any demonstration states that are near this state.
+void RomanObjectManipLattice::getOrigStateZSuccs2(
+    smpl::WorkspaceLatticeState* state,
+    std::vector<int>* succs,
+    std::vector<int>* costs)
+{
+    // s_demo states where phi(s) ~ phi(s_demo) and z(s) = z(s_demo)
+    std::vector<smpl::ExperienceGraph::node_id> parent_nearby_nodes;
+    {
+        auto pose_coord = getPhiCoord(state->coord);
+        SMPL_DEBUG_STREAM("parent pose coord = " << pose_coord);
+        auto it = m_phi_to_egraph_nodes.find(pose_coord);
+        if (it != end(m_phi_to_egraph_nodes)) {
+            for (auto node : it->second) {
+                if (m_egraph.state(node)[HINGE] == state->state[HINGE]) {
+                    parent_nearby_nodes.push_back(node);
+                }
+            }
+        }
+    }
+
+    auto old_size = succs->size();
+
+    std::vector<int> these_succs;
+
+    // for all adjacent nodes in the experience graph
+    for (auto neighbor_id : parent_nearby_nodes) {
+        auto adj = m_egraph.adjacent_nodes(neighbor_id);
+        for (auto ait = adj.first; ait != adj.second; ++ait) {
+            // generate successors that have the same z-value and the same
+            // phi coordinate as the adjacent node
+
+            auto a = *ait;
+
+            auto& pose = m_egraph_node_grasps[a];
+
+            // TODO: permissive or restrictive ik?
+            smpl::RobotState solution;
+            if (!m_ik_iface->computeIK(pose, state->state, solution)) continue;
+
+            if (!collisionChecker()->isStateToStateValid(state->state, solution)) {
+                ROS_INFO("IK Failed to adjacent state");
+                continue;
+            }
+
+            solution[HINGE] = m_egraph.state(a)[HINGE];
+
+            // 1. add this to our state table?
+            // 2. check if there is an e-graph state with the same coordinates?
+            // 3. create a new state for this state?
+
+            smpl::WorkspaceCoord succ_coord;
+            stateRobotToCoord(solution, succ_coord);
+
+#if 1
+            auto succ_id = createState(succ_coord);
+            auto* succ_state = getState(succ_id);
+            succ_state->state = solution;
+            these_succs.push_back(succ_id);
+#else
+            auto succ_id = reserveHashEntry();
+            auto* succ_state = getState(succ_id);
+            succ_state->coord = succ_coord;
+            succ_state->state = solution;
+            these_succs.push_back(succ_id);
+#endif
+
+            succs->push_back(succ_id);
+
+#if 0
+            auto edge_cost = computeCost(*state, *succ_state);
+#else
+            auto edge_cost = 1;
+#endif
+            costs->push_back(edge_cost);
+        }
+    }
+
+    if (succs->size() != old_size) {
+        ROS_INFO_STREAM("Generated " << succs->size() - old_size << " z edges: " << these_succs);
+    }
+
 }
 
 // Apply an adaptive motion to a state that moves the end effector to the
@@ -314,8 +403,11 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
-    auto enable_z_edges = true; //false;
-    auto enable_egraph_edges = true; //false; //true
+    auto enable_z_edges = false;
+//    auto enable_z_edges = true;
+
+    auto enable_egraph_edges = true;
+//    auto enable_egraph_edges = false;
 
     if (is_egraph_node) { // expanding an egraph node
         getEGraphStateAdjacentSuccs(state, egraph_node, succs, costs);
@@ -330,6 +422,7 @@ void RomanObjectManipLattice::getUniqueSuccs(
         }
         if (enable_z_edges) {
             getOrigStateZSuccs(state, succs, costs);
+//            getOrigStateZSuccs2(state, succs, costs);
         }
     }
 
@@ -339,8 +432,8 @@ void RomanObjectManipLattice::getUniqueSuccs(
     getPreGraspSuccs(state, phi_coord, succs, costs);
     getPreGraspAmpSucc(state, phi_coord, succs, costs);
 
-//    m_heuristic = NULL;
-    if (m_heuristic != NULL) {
+    auto enable_heuristic_edges = true;
+    if (enable_heuristic_edges && m_heuristic != NULL) {
         std::vector<int> snap_ids;
         m_heuristic->getEquivalentStates(state_id, snap_ids);
         for (auto snap_id : snap_ids) {

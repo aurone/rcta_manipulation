@@ -57,6 +57,11 @@ public:
         std::vector<int>* succs,
         std::vector<int>* costs);
 
+    void getOrigStateZSuccs2(
+        smpl::WorkspaceLatticeState* state,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
     void getEGraphStateZSuccs(
         smpl::WorkspaceLatticeState* state,
         smpl::ExperienceGraph::node_id egraph_node,
