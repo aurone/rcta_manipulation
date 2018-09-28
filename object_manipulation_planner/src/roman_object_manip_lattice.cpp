@@ -233,6 +233,8 @@ void RomanObjectManipLattice::getPreGraspAmpSucc(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
+    // find the closest e-graph node, wrt to phi coordinate positions, that
+    // has the same z-value
     auto closest = smpl::ExperienceGraph::node_id(-1);
     auto best = std::numeric_limits<int>::max();
     auto nodes = m_egraph.nodes();
@@ -253,37 +255,53 @@ void RomanObjectManipLattice::getPreGraspAmpSucc(
 
     if (closest != -1) {
         SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "Attempt adaptive motion to pre-grasp");
+
         auto& pregrasp = m_egraph_node_pregrasps[closest];
 
         SV_SHOW_INFO_NAMED("pregrasp_target", smpl::visual::MakeFrameMarkers(pregrasp, "map", "pregrasp_target"));
 
+#if 0
+        auto& closest_egraph_state = m_egraph.state(closest);
+        smpl::RobotState target_state;
+        if (!m_ik_iface->computeIK(pregrasp, closest_egraph_state, target_state)) return;
+        if (!collisionChecker()->isStateToStateValid(state->state, target_state)) return;
+
+        smpl::WorkspaceState succ_workspace_state;
+        stateRobotToWorkspace(target_state, succ_workspace_state);
+
+        smpl::WorkspaceCoord succ_coord;
+        stateWorkspaceToCoord(succ_workspace_state, succ_coord);
+        auto succ_id = createState(succ_coord);
+        auto* succ_state = getState(succ_id);
+        succ_state->state = target_state;
+
+        succs->push_back(succ_id);
+        costs->push_back(1); // edge cost of one for grasp/pregrasp actions
+#else
         auto seed = state->state;
         smpl::RobotState final_robot_state;
-        if (m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) {
-            SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "  Adaptive motion to pre-grasp succeeded");
+        if (!m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) return;
 
-            // TODO: should do collision checking here
-            if (!collisionChecker()->isStateToStateValid(state->state, final_robot_state)) {
-                return;
-            }
+        SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "  Adaptive motion to pre-grasp succeeded");
 
-            smpl::WorkspaceState succ_workspace_state;
-            stateRobotToWorkspace(final_robot_state, succ_workspace_state);
-
-            smpl::WorkspaceCoord succ_coord;
-            stateWorkspaceToCoord(succ_workspace_state, succ_coord);
-            auto succ_id = createState(succ_coord);
-            auto* succ_state = getState(succ_id);
-            succ_state->state = final_robot_state;
-
-            // TODO: We could check whether this state is a goal state
-            // or not, but we should have found the goal state already if we
-            // are at a state with the goal z-value. This might be an issue if
-            // we run the planner with start = goal?
-
-            succs->push_back(succ_id);
-            costs->push_back(1); // edge cost of one for grasp/pregrasp actions
+        if (!collisionChecker()->isStateToStateValid(
+                state->state, final_robot_state))
+        {
+            return;
         }
+
+        smpl::WorkspaceState succ_workspace_state;
+        stateRobotToWorkspace(final_robot_state, succ_workspace_state);
+
+        smpl::WorkspaceCoord succ_coord;
+        stateWorkspaceToCoord(succ_workspace_state, succ_coord);
+        auto succ_id = createState(succ_coord);
+        auto* succ_state = getState(succ_id);
+        succ_state->state = final_robot_state;
+
+        succs->push_back(succ_id);
+        costs->push_back(1); // edge cost of one for grasp/pregrasp actions
+#endif
     }
 }
 
