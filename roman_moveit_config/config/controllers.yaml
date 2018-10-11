@@ -2,7 +2,7 @@ controller_list:
     # MoveIt will choose this controller for any subgroup of the joints
     # governed by this controller. Miraculously, this also appears to
     # not complain when the extra joints are missing from the arm
-    - name: rcta_joint_trajectory_controller
+    - name: trajectory_dispatcher
       action_ns: follow_joint_trajectory
       type: FollowJointTrajectory
       default: true
