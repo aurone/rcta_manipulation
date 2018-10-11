@@ -1,7 +1,7 @@
 <launch>
     <!-- Actual arguments -->
     <arg name="debug" default="false"/>
-    <arg name="live" default="false"/>
+    <arg name="live" default="true"/>
     <arg name="load_robot_description" default="false"/>
 
     <arg if="$(arg live)" name="follow_joint_trajectory_action_name" default="trajectory_dispatcher/follow_joint_trajectory"/>
