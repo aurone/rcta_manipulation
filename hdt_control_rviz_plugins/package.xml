@@ -14,7 +14,7 @@
     <depend>hdt_control_msgs</depend>
     <depend>hdt_kinematics</depend>
     <depend>libqt4-dev</depend>
-    <depend>rcta_manipulation_command</depend>
+    <depend>rcta_manipulation_common</depend>
     <depend>roscpp</depend>
     <depend>rviz</depend>
     <depend>smpl</depend>
