@@ -1,8 +1,8 @@
 # RCTA Manipulation
 
 RCTA Manipulation is a set of catkin packages compatible with the ROS Indigo
-distribution on Ubuntu 14.04 that provide planning capabilities for object
-manipulation.
+distribution on Ubuntu 14.04 that provide planning capabilities for
+manipulation on RCTA robotic platforms.
 
 ## Building
 
@@ -19,8 +19,10 @@ the root of the workspace, executing the following command will prompt to
 install all required system dependencies:
 
 ```sh
-for d in $(find . -name package.xml); do PKG=$(basename $(dirname $d)); rosdep install -i -y $PKG; done
+rosdep install --from-paths rcta_manipulation -i -y
 ```
 
-Build the workspace as normal with `catkin_make` or `catkin build`.
+The recommended way to build the packages in this repository is to use the
+`catkin` from the `python-catkin-tools` package. A workspace containing these
+packages may be built using the `catkin build` command.
 
