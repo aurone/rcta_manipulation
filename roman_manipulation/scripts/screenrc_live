@@ -8,17 +8,14 @@ screen -t core
 screen -t rviz
 stuff "rosrun rviz rviz -d `rospack find roman_manipulation`/config/rcta.rviz"
 
-screen -t ctrl
-stuff "roslaunch roman_manipulation roman_control.launch live:=true fake:=false --screen"
-
-screen -t pose
-stuff "roslaunch roman_manipulation roman_pose.launch live:=true fake:=false --screen"
-
 screen -t move
-stuff "roslaunch roman_manipulation move_arm_node.launch live:=true fake:=false --screen"
+stuff "roslaunch roman_moveit_config move_group.launch --screen"
+
+screen -t grasp
+stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
 
 screen -t repo
 stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
 
-screen -t grasp
-stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
+screen -t obm
+stuff "roslaunch object_manipulation_planner object_manip_planner_node.launch --screen"

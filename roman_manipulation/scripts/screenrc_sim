@@ -3,7 +3,7 @@
 source screenrc.common
 
 screen -t core
-stuff "roscore^M"
+stuff "roscore"
 
 screen -t rviz
 stuff "rosrun rviz rviz -d `rospack find roman_manipulation`/config/rcta.rviz"
@@ -20,11 +20,11 @@ stuff "rosrun tf static_transform_publisher 0 0 0 0 0 0 map base_footprint 13"
 screen -t move
 stuff "roslaunch roman_moveit_config move_group.launch --screen"
 
-screen -t repo
-stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
-
 screen -t grasp
 stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
 
-screen -t bash
-screen -t bash
+screen -t repo
+stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
+
+screen -t obm
+stuff "roslaunch object_manipulation_planner object_manip_planner_node.launch --screen"

@@ -12,7 +12,7 @@ screen -t sim
 stuff "roslaunch roman_simulation robot_simulator.launch --screen"
 
 screen -t move
-stuff "roslaunch roman_moveit_config move_group.launch fake:=true --screen"
+stuff "roslaunch roman_moveit_config move_group.launch --screen"
 
 screen -t grasp
 stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
