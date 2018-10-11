@@ -18,6 +18,7 @@ struct CabinetModel
     double handle_radius; // how thick is the handle (and its supports)
 };
 
+// Transform the demonstration to align with the cabinet at a different pose.
 int main(int argc, char* argv[])
 {
     if (argc != 5) {
