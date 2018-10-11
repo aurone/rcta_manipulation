@@ -93,6 +93,16 @@ target_include_directories(translate_demo PUBLIC SYSTEM ${smpl_INCLUDE_DIRS})
 target_include_directories(translate_demo PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(translate_demo ${smpl_LIBRARIES})
 
+add_executable(transform_demo src/transform_demo.cpp)
+target_include_directories(transform_demo SYSTEM PRIVATE ${moveit_core_INCLUDE_DIRS})
+target_include_directories(transform_demo SYSTEM PRIVATE ${moveit_ros_planning_INCLUDE_DIRS})
+target_include_directories(transform_demo SYSTEM PRIVATE ${roscpp_INCLUDE_DIRS})
+target_include_directories(transform_demo SYSTEM PRIVATE ${smpl_INCLUDE_DIRS})
+target_link_libraries(transform_demo PRIVATE ${moveit_core_LIBRARIES})
+target_link_libraries(transform_demo PRIVATE ${moveit_ros_planning_LIBRARIES})
+target_link_libraries(transform_demo PRIVATE ${roscpp_LIBRARIES})
+target_link_libraries(transform_demo PRIVATE ${smpl_LIBRARIES})
+
 add_executable(make_cabinet_urdf src/make_cabinet_urdf.cpp src/cabinet_model.cpp)
 target_include_directories(make_cabinet_urdf PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
 
