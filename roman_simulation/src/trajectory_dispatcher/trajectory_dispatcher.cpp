@@ -146,7 +146,7 @@ void execute(
             if (curr_state != NULL) {
                 auto j = index_of(curr_state->name, joint_name);
                 if (j >= 0) {
-                    p.positions.push_back(curr_state->position[index]);
+                    p.positions.push_back(curr_state->position[j]);
                     if (!point.velocities.empty()) {
                         p.velocities.push_back(0.0);
                     }
