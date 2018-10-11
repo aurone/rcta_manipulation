@@ -1,3 +1,5 @@
+#!/usr/bin/screen -c
+
 source screenrc.common
 
 screen -t core
