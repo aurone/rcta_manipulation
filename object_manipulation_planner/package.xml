@@ -9,13 +9,19 @@
 
     <buildtool_depend>catkin</buildtool_depend>
 
+    <build_depend>message_generation</build_depend>
+    <build_export_depend>message_runtime</build_export_depend>
+    <exec_depend>message_runtime</exec_depend>
+
+    <depend>actionlib_msgs</depend>
+    <depend>gperftools</depend>
     <depend>moveit_core</depend>
+    <depend>moveit_msgs</depend>
     <depend>moveit_ros_planning</depend>
     <depend>roscpp</depend>
     <depend>sbpl_collision_checking</depend>
     <depend>smpl</depend>
     <depend>smpl_moveit_interface</depend>
     <depend>smpl_ros</depend>
-    <depend>gperftools</depend>
 </package>
 

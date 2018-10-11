@@ -1,0 +1,12 @@
+moveit_msgs/RobotState  start_state
+string                  object_id
+geometry_msgs/Pose      object_pose
+float64                 object_start
+float64                 object_goal
+float64                 allowed_planning_time
+bool                    plan_only
+---
+int32                   state
+---
+int32                   error_code
+float64                 planning_time

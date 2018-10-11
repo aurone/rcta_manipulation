@@ -1,13 +1,16 @@
 <launch>
+    <!-- Actual arguments -->
     <arg name="debug" default="false"/>
-
     <arg name="live" default="false"/>
-    <arg name="execute" default="false"/>
+    <arg name="load_robot_description" default="false"/>
+
+    <arg if="$(arg live)" name="follow_joint_trajectory_action_name" default="trajectory_dispatcher/follow_joint_trajectory"/>
+    <arg if="$(arg live)" name="gripper_command_action_name" default="rcta_right_robotiq_controller/gripper_action"/>
+    <arg unless="$(arg live)" name="follow_joint_trajectory_action_name" default="follow_joint_trajectory"/>
+    <arg unless="$(arg live)" name="gripper_command_action_name" default="gripper_command"/>
 
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
-
-    <arg name="load_robot_description" default="false"/>
 
     <include file="$(find roman_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="$(arg load_robot_description)"/>
@@ -19,16 +22,12 @@
     <env name="SMPL_VISUALIZE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/smpl_visual.ini"/>
     <env name="ROSCONSOLE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/rosconsole.properties"/>
     <node name="object_manip_planner" pkg="object_manipulation_planner" type="object_manip_planner_node" launch-prefix="$(arg launch_prefix)">
-        <param name="execute" value="$(arg execute)"/>
-
         <param name="group_name" value="right_arm_torso_base"/>
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>
 
-        <param unless="$(arg live)" name="follow_joint_trajectory_action_name" value="follow_joint_trajectory"/>
-        <param unless="$(arg live)" name="gripper_command_action_name" value="gripper_command"/>
-        <param if="$(arg live)" name="follow_joint_trajectory_action_name" value="/roman1/rcta_joint_trajectory_controller/follow_joint_trajectory"/>
-        <param if="$(arg live)" name="gripper_command_action_name" value="/roman1/rcta_right_robotiq_controller/gripper_action"/>
+        <param name="follow_joint_trajectory_action_name" value="$(arg follow_joint_trajectory_action_name)"/>
+        <param name="gripper_command_action_name" value="$(arg gripper_command_action_name)"/>
 
         <param name="planning_frame" value="map"/>
         <param name="demonstrations_path" value="$(find object_manipulation_planner)/data"/>
@@ -41,54 +40,6 @@
         <param name="grid/origin_z"     value="-0.15"/>
         <param name="grid/resolution"   value="0.05"/>
         <param name="grid/max_dist"     value="0.8"/>
-
-        <!-- NOTE: world_joint/* variables specified here using backslashes,
-        since AFAIK ros parameter keys are not allowed to have forward slashes
-        in the name. The backslashes are replaced internally in the node to
-        get the correct variable name
-        -->
-        <rosparam param="start_state">
-            world_joint\\x: 0.0
-            world_joint\\y: 0.0
-            world_joint\\theta: 0.0
-            limb_right_joint1: 135.0
-            limb_right_joint2: 0.0
-            limb_right_joint3: 180.0
-            limb_right_joint4: 45.0
-            limb_right_joint5: 30.0
-            limb_right_joint6: 90.0
-            limb_right_joint7: -135.0
-            limb_left_joint1: -90.0
-            limb_left_joint2: 90.0
-            limb_left_joint3: 90.0
-            limb_left_joint4: 180.0
-            limb_left_joint5: -90.0
-            limb_left_joint6: 0.0
-            limb_left_joint7: 0.0
-        </rosparam>
-
-        <!--
-        <rosparam param="start_state">
-            "world_joint\\x": 0.0
-            "world_joint\\y": 0.0
-            "world_joint\\theta": 0.0
-            #"world_joint\\x": 1.0
-            #"world_joint\\y": 0.4
-            #"world_joint\\theta": 90.0
-            "limb_right_joint2": 30.0
-            "limb_right_joint4": 30.0
-            "limb_right_joint6": 30.0
-            "limb_right_joint7": -90.0
-            "limb_left_joint1":  -90.0
-            "limb_left_joint2":  90.0
-            "limb_left_joint3":  90.0
-            "limb_left_joint4":  180.0
-            "limb_left_joint5":  -90.0
-            "limb_left_joint6":  0.0
-            "limb_left_joint7":  0.0
-        </rosparam>
-        -->
-
 
         <!--
         <param name="heading_thresh" value="0.05"/>
@@ -103,11 +54,6 @@
         <param name="disc_rotation_heuristic" value="true"/>
         <param name="disc_position_heuristic" value="true"/>
         -->
-
-        <param name="allowed_planning_time" value="60.0"/>
-
-        <param name="object_start_position" value="1.0"/>
-        <param name="object_goal_position" value="0.45"/>
 
         <param name="w_heuristic" value="100.0"/>
         <param name="w_egraph" value="5.0"/>
