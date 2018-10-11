@@ -28,14 +28,34 @@
           constraints:
             goal_time: 0.5
             stopped_velocity_tolerance: 0.02
-          allow_partial_joints_goal: True
+          #allow_partial_joints_goal: True
+        rcta_right_robotiq_controller:
+          type: position_controllers/JointGroupPositionController
+          joints:        
+            - limb_right_finger_1_joint_1
+            - limb_right_finger_2_joint_1
+            - limb_right_finger_middle_joint_1
+        rcta_left_robotiq_controller:
+          type: position_controllers/JointGroupPositionController
+          joints:
+            - limb_left_finger_1_joint_1
+            - limb_left_finger_2_joint_1
+            - limb_left_finger_middle_joint_1
     </rosparam>
 
+    <!-- TODO: this appears to be the culprit that won't die on C-c...probably
+    because the controller manager dies way before the controller spawner is
+    able to unload controllers.
+    -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner"
-            args="joint_state_controller rcta_joint_trajectory_controller"/>
+            args="--shutdown-timeout 0.5 joint_state_controller rcta_joint_trajectory_controller rcta_left_robotiq_controller rcta_right_robotiq_controller"/>
 
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 
     <node name="fake_localization" pkg="tf" type="static_transform_publisher"
             args="0 0 0 0 0 0 map base_link 16"/>
+
+    <node name="trajectory_dispatcher" pkg="roman_simulation" type="trajectory_dispatcher"/>
+
+    <node name="gripper_command_action_server" pkg="roman_simulation" type="gripper_command_action_server"/>
 </launch>
