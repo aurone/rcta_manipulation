@@ -23,14 +23,27 @@ struct ControlledRobot : public hardware_interface::RobotHW
     std::vector<double> velocity_commands;
     std::vector<double> effort_commands;
 
+#if ROS_KINETIC
     void read(const ros::Time& time, const ros::Duration& dt) override
     {
     }
+#else
+    void read()
+    {
+    }
+#endif
 
+#if ROS_KINETIC
     void write(const ros::Time& time, const ros::Duration& dt) override
     {
         std::copy(begin(position_commands), end(position_commands), begin(joint_positions));
+    };
+#else
+    void write()
+    {
+        std::copy(begin(position_commands), end(position_commands), begin(joint_positions));
     }
+#endif
 };
 
 bool InitControlledRobot(
@@ -148,9 +161,19 @@ int main(int argc, char* argv[])
         auto dt = now - prev_time;
         prev_time = now;
 
+#if ROS_KINETIC
         robot.read(now, dt);
+#else
+        robot.read();
+#endif
+
         manager.update(now, dt);
+
+#if ROS_KINETIC
         robot.write(now, dt);
+#else
+        robot.write();
+#endif
 
         loop_rate.sleep();
     }
