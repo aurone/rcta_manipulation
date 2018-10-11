@@ -107,6 +107,15 @@ target_link_libraries(
     ${smpl_urdf_robot_model_LIBRARIES}
     ${hardware_interface_LIBRARIES})
 
+add_executable(
+    trajectory_dispatcher
+    src/trajectory_dispatcher/trajectory_dispatcher.cpp)
+target_include_directories(trajectory_dispatcher SYSTEM PRIVATE ${roscpp_INCLUDE_DIRS})
+target_include_directories(trajectory_dispatcher SYSTEM PRIVATE ${actionlib_INCLUDE_DIRS})
+target_include_directories(trajectory_dispatcher SYSTEM PRIVATE ${control_msgs_INCLUDE_DIRS})
+target_link_libraries(trajectory_dispatcher PRIVATE ${actionlib_LIBRARIES})
+target_link_libraries(trajectory_dispatcher PRIVATE ${roscpp_LIBRARIES})
+
 install(
     TARGETS
         depth_sensor_simulator
