@@ -146,8 +146,13 @@ bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_
                 }
                 traj.trajectory.points[i].positions = std::move(positions);
 
+#if ROS_KINETIC
                 traj.trajectory.points[i].time_from_start =
                         ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
+#else
+                traj.trajectory.points[i].time_from_start =
+                        ros::Duration(c->trajectory.getWaypointDurationFromStart(i));
+#endif
 
                 ROS_INFO("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
             }
