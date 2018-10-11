@@ -1,6 +1,4 @@
 <launch>
-    <arg name="live" default="true"/>
-    <arg name="fake" default="false"/>
     <arg name="debug" default="false"/>
 
     <arg name="load_robot_description" default="false"/>
@@ -11,13 +9,15 @@
     <arg name="jiggle_fraction"                     default="0.00694"/>
     <arg name="publish_monitored_planning_scene"    default="true"/>
 
-    <arg name="fake_execution"                      value="$(arg fake)"/>
-
     <!-- Load the URDF, SRDF and other .yaml configuration files on the -->
     <!-- param server -->
     <include file="$(find roman_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     </include>
+
+    <!--+++++++++++++++++++++++++++++++++++-->
+    <!-- Collision Detection Functionality -->
+    <!--+++++++++++++++++++++++++++++++++++-->
 
     <param name="collision_detector" value="collision_detection/CollisionPluginSBPL"/>
     <rosparam command="load" file="$(find roman_moveit_config)/config/collision_model.yaml"/>
@@ -44,20 +44,124 @@
         frame_id: base_link
     </rosparam>
 
+    <!--++++++++++++++++++++++++-->
     <!-- Planning Functionality -->
-    <include ns="move_group" file="$(find roman_moveit_config)/config/planning_pipeline.launch.xml">
-        <arg name="pipeline" value="sbpl"/>
-    </include>
+    <!--++++++++++++++++++++++++-->
 
+    <group ns="move_group">
+        <arg name="planning_plugin" value="sbpl_interface/SBPLPlanner"/>
+
+        <arg name="planning_adapters" value="
+                default_planner_request_adapters/FixWorkspaceBounds
+                default_planner_request_adapters/FixStartStateBounds
+                default_planner_request_adapters/FixStartStateCollision
+                default_planner_request_adapters/FixStartStatePathConstraints
+                default_planner_request_adapters/AddTimeParameterization"/>
+
+        <!-- default_planner_request_adapters/AddTimeParameterization -->
+
+        <arg name="start_state_max_bounds_error" value="0.1"/>
+
+        <param name="planning_plugin" value="$(arg planning_plugin)"/>
+        <param name="request_adapters" value="$(arg planning_adapters)"/>
+        <param name="start_state_max_bounds_error" value="$(arg start_state_max_bounds_error)"/>
+
+        <rosparam command="load" file="$(find roman_moveit_config)/config/sbpl_planning.yaml"/>
+
+        <!-- motion primitives -->
+        <group ns="graph_configs/RightArmManipLatticeConfigDefault">
+            <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm.mprim"/>
+        </group>
+        <group ns="graph_configs/LeftArmManipLatticeConfigDefault">
+            <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm.mprim"/>
+        </group>
+        <group ns="graph_configs/RightArmManipLatticeEgraphConfigDefault">
+            <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm.mprim"/>
+        </group>
+        <group ns="graph_configs/RightArmAndTorsoManipLatticeConfigDefault">
+            <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm_and_torso.mprim"/>
+        </group>
+
+        <!-- directories to read/write e-graphs from for group right_arm -->
+        <group ns="right_arm/planner_configs/right_arm_ARA_BFS_ML">
+            <param name="plan_output_dir" value="$(env HOME)/data/egraphs/roman_right_arm_paths"/>
+        </group>
+        <group ns="graph_configs/RightArmManipLatticeEgraphConfigDefault">
+            <param name="egraph_path" value="$(env HOME)/data/egraphs/roman_right_arm_paths"/>
+        </group>
+
+        <!-- directories to read/write e-graphs from for group right_arm_torso_base -->
+        <group ns="right_arm_torso_base/planner_configs/ARA_BFS_WS">
+            <param name="plan_output_dir" value="$(env HOME)/data/egraphs/roman_right_arm_torso_base_paths"/>
+        </group>
+        <group ns="graph_configs/RightArmTorsoBaseWorkspaceEGraph">
+            <param name="egraph_path" value="$(env HOME)/data/egraphs/roman_right_arm_torso_base_paths"/>
+        </group>
+        <!--
+        <group ns="graph_configs/RightArmTorsoBaseWorkspaceLattice">
+            <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm_torso_base.mprim"/>
+        </group>
+        -->
+    </group>
+
+    <!--++++++++++++++++++++++++++++++++++++-->
     <!-- Trajectory Execution Functionality -->
-    <include if="$(arg allow_trajectory_execution)" ns="move_group" file="$(find roman_moveit_config)/config/trajectory_execution.launch.xml">
-        <arg name="fake_execution" value="$(arg fake_execution)"/>
-    </include>
+    <!--++++++++++++++++++++++++++++++++++++-->
 
+    <group if="$(arg allow_trajectory_execution)" ns="move_group">
+        <!-- This file makes it easy to include the settings for trajectory
+        execution.
+        -->
+
+        <!-- Flag indicating whether MoveIt! is allowed to load/unload or switch
+        controllers. NOTE: This was set to $(arg fake_execution) before fake
+        execution was moved outside of this package. I'm not sure under what
+        circumstances MoveIt! switches controllers, and it seems weird to not allow 
+        it to do that, but we'll keep it false here anyway. - Andrew
+        -->
+        <param name="moveit_manage_controllers" value="false"/>
+
+        <!-- When determining the expected duration of a trajectory, this
+        multiplicative factor is applied to get the allowed duration of execution;
+        default 1.2
+        -->
+        <param name="allowed_execution_duration_scaling" value="1.2"/>
+
+        <!-- Allow more than the expected execution time before triggering a
+        trajectory cancel (applied after scaling); default 0.5.
+        -->
+        <param name="allowed_goal_duration_margin" value="0.5"/>
+
+        <!-- Load the robot specific controller manager. This sets the
+        moveit_controller_manager ROS parameter.
+        -->
+        <param name="moveit_controller_manager" value="moveit_simple_controller_manager/MoveItSimpleControllerManager"/>
+        <rosparam file="$(find roman_moveit_config)/config/controllers.yaml"/>
+    </group>
+
+    <!--+++++++++++++++++++++++-->
     <!-- Sensors Functionality -->
-    <include ns="move_group" file="$(find roman_moveit_config)/config/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
-        <arg name="moveit_sensor_manager" value="rcta_roman"/>
-    </include>
+    <!--+++++++++++++++++++++++-->
+
+    <group if="$(arg allow_trajectory_execution)" ns="move_group">
+        <!-- This file makes it easy to include the settings for sensor managers -->
+
+        <!-- Params for the octomap monitor -->
+        <!--  <param name="octomap_frame" type="string" value="some frame in which the robot moves" /> -->
+        <param name="octomap_resolution" type="double" value="0.025" />
+        <param name="max_range" type="double" value="5.0" />
+
+        <!-- Load the robot specific sensor manager; this sets the moveit_sensor_manager ROS parameter -->
+        <rosparam command="load" file="$(find roman_moveit_config)/config/roman_sensors.yaml"/>
+
+        <param name="octomap_frame" type="string" value="map"/>
+        <param name="octomap_resolution" type="double" value="0.05"/>
+        <param name="max_range" type="double" value="5.0"/>
+    </group>
+
+    <!--+++++++++++++++++++++-->
+    <!-- The move_group Node -->
+    <!--+++++++++++++++++++++-->
 
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
