@@ -12,16 +12,6 @@
     <arg name="start_P" default="0.0"/>
     <arg name="start_Y" default="3.1415"/>
 
-    <group if="$(arg live)">
-        <group if="$(arg fake)">
-            <!-- LIVE/FAKE -->
-            <include file="$(find roman_manipulation)/launch/roman_control_live_fake.launch"/>
-        </group>
-        <group unless="$(arg fake)">
-            <!-- LIVE/REAL -->
-            <include file="$(find roman_manipulation)/launch/roman_control_live_real.launch"/>
-        </group>
-    </group>
     <group unless="$(arg live)">
         <group if="$(arg fake)">
             <!-- SIM/FAKE -->
