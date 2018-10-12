@@ -766,6 +766,128 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
     }
 }
 
+void RomanObjectManipLattice::insertExperienceGraphPath(
+    const std::vector<smpl::RobotState>& path)
+{
+    WorkspaceLatticeEGraph::insertExperienceGraphPath(path);
+
+    // we're only adding one path...but going to clear and recompute all
+    // auxiliary data for the entire e-graph :/
+    m_phi_to_egraph_nodes.clear();
+    m_pregrasp_phi_to_egraph_node.clear();
+    m_grasp_phi_to_egraph_node.clear();
+    m_egraph_phi_coords.clear();
+    m_egraph_pre_phi_coords.clear();
+    m_egraph_node_pregrasps.clear();
+    m_egraph_node_grasps.clear();
+
+    // discrete 3d positions of the end effector throughout the demonstration
+    std::vector<Eigen::Vector3i> phi_points;
+
+    // discrete 3d positions of potential pre-grasp poses for the end effector
+    std::vector<Eigen::Vector3i> pg_phi_points;
+
+    m_egraph_node_pregrasps.resize(m_egraph.num_nodes());
+    m_egraph_node_grasps.resize(m_egraph.num_nodes());
+    m_egraph_phi_coords.resize(m_egraph.num_nodes());
+    m_egraph_pre_phi_coords.resize(m_egraph.num_nodes());
+
+    auto nodes = m_egraph.nodes();
+    for (auto nit = nodes.first; nit != nodes.second; ++nit) {
+        auto node = *nit;
+        auto& egraph_robot_state = m_egraph.state(node);
+
+        smpl::WorkspaceState tmp;
+        stateRobotToWorkspace(egraph_robot_state, tmp);
+
+        Eigen::Affine3d pregrasp_offset(
+                Eigen::Translation3d(this->pregrasp_offset_x, 0.0, 0.0));
+
+        Eigen::Affine3d grasp_pose =
+                Eigen::Translation3d(tmp[0], tmp[1], tmp[2]) *
+                Eigen::AngleAxisd(tmp[5], Eigen::Vector3d::UnitZ()) *
+                Eigen::AngleAxisd(tmp[4], Eigen::Vector3d::UnitY()) *
+                Eigen::AngleAxisd(tmp[3], Eigen::Vector3d::UnitX());
+
+        Eigen::Affine3d pregrasp_pose = grasp_pose * pregrasp_offset;
+
+        // TODO: these are stored in the state now, get them from there
+        smpl::WorkspaceCoord disc_egraph_state(dofCount());
+        stateWorkspaceToCoord(tmp, disc_egraph_state);
+
+        auto adj = m_egraph.adjacent_nodes(node);
+        for (auto ait = adj.first; ait != adj.second; ++ait) {
+            auto anode = *ait;
+            auto& adj_state = m_egraph.state(anode);
+            if (egraph_robot_state[RobotVariableIndex::HINGE] !=
+                adj_state[RobotVariableIndex::HINGE])
+            {
+                // map phi(discrete egraph state) -> egraph node
+                auto phi_coord = getPhiCoord(disc_egraph_state);
+                m_phi_to_egraph_nodes[phi_coord].push_back(node);
+                phi_points.emplace_back(phi_coord[0], phi_coord[1], phi_coord[2]);
+
+                // map phi'(discrete egraph state) -> egraph node
+                auto pre_phi_coord = getPhiCoord(pregrasp_pose);
+                m_pregrasp_phi_to_egraph_node[pre_phi_coord].push_back(node);
+                pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
+                break;
+            }
+        }
+
+        m_egraph_node_grasps[node] = grasp_pose;
+        m_egraph_node_pregrasps[node] = pregrasp_pose;
+        m_egraph_phi_coords[node] = getPhiCoord(grasp_pose);
+        m_egraph_pre_phi_coords[node] = getPhiCoord(pregrasp_pose);
+    }
+
+    std::vector<Eigen::Vector3d> phi_points_cont;
+    phi_points_cont.reserve(phi_points.size());
+    for (auto& point : phi_points) {
+        double pcont[3];
+        posCoordToWorkspace(point.data(), pcont);
+        phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
+    }
+
+    std::vector<Eigen::Vector3d> pre_phi_points_cont;
+    pre_phi_points_cont.reserve(pg_phi_points.size());
+    for (auto& point : pg_phi_points) {
+        double pcont[3];
+        posCoordToWorkspace(point.data(), pcont);
+        pre_phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
+    }
+
+    auto vis_name = "phi";
+    SV_SHOW_INFO_NAMED(
+            vis_name,
+            MakeCubesMarker(
+                    std::move(phi_points_cont),
+                    resolution()[0],
+                    smpl::visual::Color{ 0.5, 0.5, 0.5, 1.0f },
+                    "map",
+                    vis_name));
+    SV_SHOW_INFO_NAMED(
+            "pre_phi",
+            MakeCubesMarker(
+                std::move(pre_phi_points_cont),
+                resolution()[0],
+                smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f },
+                "map",
+                "pre_phi"));
+}
+
+void RomanObjectManipLattice::clearExperienceGraph()
+{
+    m_phi_to_egraph_nodes.clear();
+    m_pregrasp_phi_to_egraph_node.clear();
+    m_grasp_phi_to_egraph_node.clear();
+    m_egraph_phi_coords.clear();
+    m_egraph_pre_phi_coords.clear();
+    m_egraph_node_pregrasps.clear();
+    m_egraph_node_grasps.clear();
+    WorkspaceLatticeEGraph::clearExperienceGraph();
+}
+
 // Attempt to generate a snap motion between two states. The source and
 // destination states are assumed to have the same phi-coordinates, which are
 // the same phi-coordinates as one of the demonstration states. (These are the

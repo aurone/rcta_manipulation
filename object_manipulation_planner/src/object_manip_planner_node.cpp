@@ -10,6 +10,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <control_msgs/GripperCommandAction.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
@@ -65,7 +66,9 @@ bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
     return true;
 }
 
-bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_ptr<Command>>& commands)
+bool ExecuteTrajectory(
+    const ros::NodeHandle& nh,
+    const std::vector<std::unique_ptr<Command>>& commands)
 {
     using GripperCommandActionServer =
             actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
@@ -115,7 +118,11 @@ bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_
 
             ROS_INFO("%s gripper", c->open ? "Open" : "Close");
             auto res = gripper_client.sendGoalAndWait(goal);
-            ROS_INFO("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            if (res.state_ == res.SUCCEEDED) {
+                ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
+            } else {
+                ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            }
         } else if (command->type == Command::Type::Trajectory) {
             auto* c = static_cast<TrajectoryCommand*>(command.get());
 
@@ -141,11 +148,6 @@ bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_
                 for (auto j = 0; j < traj.trajectory.joint_names.size(); ++j) {
                     auto& joint_name = traj.trajectory.joint_names[j];
                     positions[j] = c->trajectory.getWayPoint(i).getVariablePosition(joint_name);
-#if 0
-                    if (joint_name == "limb_right_joint7") {
-                        positions[j] -= M_PI;
-                    }
-#endif
                 }
                 traj.trajectory.points[i].positions = std::move(positions);
 
@@ -157,12 +159,16 @@ bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_
                         ros::Duration(c->trajectory.getWaypointDurationFromStart(i));
 #endif
 
-                ROS_INFO("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
+                ROS_DEBUG("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
             }
 
             ROS_INFO("Execute trajectory");
             auto res = traj_client.sendGoalAndWait(traj);
-            ROS_INFO("traj client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            if (res.state_ == res.SUCCEEDED) {
+                ROS_INFO("traj client returned with state '%s'", res.toString().c_str());
+            } else {
+                ROS_WARN("traj client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            }
         } else {
             ROS_ERROR("Unrecognized command type");
             return false;
@@ -173,7 +179,7 @@ bool ExecuteTrajectory(const ros::NodeHandle& nh, const std::vector<std::unique_
 }
 
 bool AnimateTrajectory(
-    const moveit::core::RobotModelPtr& robot_model,
+    const moveit::core::RobotModelConstPtr& robot_model,
     const std::vector<std::unique_ptr<Command>>& commands)
 {
     auto last_wp = moveit::core::RobotState(robot_model);
@@ -226,6 +232,154 @@ bool AnimateTrajectory(
         }
     }
     return true;
+}
+
+using ManipulateObjectActionServer =
+        actionlib::SimpleActionServer<object_manipulation_planner::ManipulateObjectAction>;
+
+void ManipulateObject(
+    const moveit::core::RobotModelConstPtr& robot_model,
+    const std::string& group_name,
+    smpl::collision::CollisionSpace& cspace,
+    sbpl_interface::MoveItRobotModel& planning_model,
+    ObjectManipPlanner* planner,
+    const ros::Publisher& display_publisher,
+    const ros::NodeHandle& ph,
+    ManipulateObjectActionServer* server,
+    const object_manipulation_planner::ManipulateObjectGoal::ConstPtr& msg)
+{
+    moveit::core::RobotState start_state(robot_model);
+
+    // TODO: initialize to current state values
+    start_state.setToDefaultValues();
+
+    // because fuck you moveit, plz stahp throwing exceptions...unreferenced
+    // but keeping this around in case we explode
+    auto robot_has_variable = [&](
+        const moveit::core::RobotModel& model,
+        const std::string& name)
+    {
+        auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
+        return it != end(model.getVariableNames());
+    };
+
+    // hmmm...is this going to barf when there are superflous joints?
+    if (!moveit::core::robotStateMsgToRobotState(msg->start_state, start_state)) {
+        ROS_ERROR("Failed to update start state");
+        server->setAborted();
+        return;
+    }
+
+    // Visualize the start state
+    {
+        ros::Duration(1.0).sleep();
+        visualization_msgs::MarkerArray ma;
+        std_msgs::ColorRGBA color;
+        color.r = 0.8f;
+        color.g = 0.8f;
+        color.b = 1.0f;
+        color.a = 0.9f;
+        start_state.getRobotMarkers(
+                ma,
+                start_state.getRobotModel()->getLinkModelNames(),
+                color,
+                "start_state",
+                ros::Duration(0.0));
+        ROS_INFO("Visualize %zu markers", ma.markers.size());
+        SV_SHOW_INFO(ma);
+        ros::Duration(1.0).sleep();
+    }
+
+    Eigen::Affine3d object_pose;
+    tf::poseMsgToEigen(msg->object_pose, object_pose);
+
+    auto object_start_state = msg->object_start;
+    auto object_goal_state = msg->object_goal;
+
+    auto allowed_time = msg->allowed_planning_time;
+
+    /////////////
+    // Outputs //
+    /////////////
+
+    std::vector<std::unique_ptr<Command>> commands;
+    robot_trajectory::RobotTrajectory trajectory(robot_model, group_name);
+
+    ///////////
+    // Plan! //
+    ///////////
+
+    ROS_INFO("Update start state in collision model");
+
+    for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
+        auto& name = robot_model->getVariableNames()[i];
+        auto pos = start_state.getVariablePositions()[i];
+        if (!cspace.setJointPosition(name, pos)) {
+            ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
+            server->setAborted();
+            return;
+        }
+    }
+
+    ROS_INFO("Update start state in planning model");
+
+    if (!planning_model.updateReferenceState(start_state)) {
+        ROS_ERROR("Failed to update the planning model reference state");
+        server->setAborted();
+        return;
+    }
+
+    ROS_INFO("Plan path!");
+
+    ProfilerStart("omp");
+    if (!PlanPath(
+            planner,
+            start_state,
+            object_pose,
+            object_start_state,
+            object_goal_state,
+            allowed_time,
+            &commands))
+    {
+        ProfilerStop();
+        ROS_ERROR("Failed to plan path");
+        server->setAborted();
+        return;
+    }
+    ProfilerStop();
+
+    MakeRobotTrajectory(&commands, &trajectory);
+
+    //////////////////////////////
+    // display the planned path //
+    //////////////////////////////
+
+    ROS_INFO("Display trajectory");
+
+    {
+        moveit_msgs::DisplayTrajectory display;
+
+        display.model_id = robot_model->getName();
+
+        display.trajectory.resize(1);
+        trajectory.getRobotTrajectoryMsg(display.trajectory[0]);
+
+        moveit::core::robotStateToRobotStateMsg(
+                trajectory.getFirstWayPoint(),
+                display.trajectory_start);
+
+        display_publisher.publish(display);
+    }
+
+    auto execute = !msg->plan_only;
+
+    if (execute) {
+        ExecuteTrajectory(ph, commands);
+    } else {
+        AnimateTrajectory(robot_model, commands);
+    }
+
+    server->setSucceeded();
 }
 
 // 1. Generate a trajectory using the model of the object
@@ -405,156 +559,21 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    using ManipulateObjectActionServer =
-            actionlib::SimpleActionServer<object_manipulation_planner::ManipulateObjectAction>;
-
-    auto manipulate_object = [&](
-        ManipulateObjectActionServer* server,
-        const object_manipulation_planner::ManipulateObjectGoal::ConstPtr& msg)
-    {
-        moveit::core::RobotState start_state(robot_model);
-
-        // TODO: initialize to current state values
-        start_state.setToDefaultValues();
-
-        // because fuck you moveit, plz stahp throwing exceptions...unreferenced
-        // but keeping this around in case we explode
-        auto robot_has_variable = [&](
-            const moveit::core::RobotModel& model,
-            const std::string& name)
-        {
-            auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
-            return it != end(model.getVariableNames());
-        };
-
-
-        // hmmm...is this going to barf when there are superflous joints?
-        if (!moveit::core::robotStateMsgToRobotState(msg->start_state, start_state)) {
-            ROS_ERROR("Failed to update start state");
-            server->setAborted();
-            return;
-        }
-
-        // Visualize the start state
-        {
-            ros::Duration(1.0).sleep();
-            visualization_msgs::MarkerArray ma;
-            std_msgs::ColorRGBA color;
-            color.r = 0.8f;
-            color.g = 0.8f;
-            color.b = 1.0f;
-            color.a = 0.9f;
-            start_state.getRobotMarkers(
-                    ma,
-                    start_state.getRobotModel()->getLinkModelNames(),
-                    color,
-                    "start_state",
-                    ros::Duration(0.0));
-            ROS_INFO("Visualize %zu markers", ma.markers.size());
-            SV_SHOW_INFO(ma);
-            ros::Duration(1.0).sleep();
-        }
-
-        // Initialize hardcoded object pose
-        Eigen::Affine3d object_pose =
-                Eigen::Translation3d(1.0, 2.0, 0.4) *
-                Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
-
-        auto object_start_state = msg->object_start;
-        auto object_goal_state = msg->object_goal;
-
-        auto allowed_time = msg->allowed_planning_time;
-
-        /////////////
-        // Outputs //
-        /////////////
-
-        std::vector<std::unique_ptr<Command>> commands;
-        robot_trajectory::RobotTrajectory trajectory(robot_model, group_name);
-
-        ///////////
-        // Plan! //
-        ///////////
-
-        ROS_INFO("Update start state in collision model");
-
-        for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
-            auto& name = robot_model->getVariableNames()[i];
-            auto pos = start_state.getVariablePositions()[i];
-            if (!cspace.setJointPosition(name, pos)) {
-                ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
-                server->setAborted();
-                return;
-            }
-        }
-
-        ROS_INFO("Update start state in planning model");
-
-        if (!planning_model.updateReferenceState(start_state)) {
-            ROS_ERROR("Failed to update the planning model reference state");
-            server->setAborted();
-            return;
-        }
-
-        ROS_INFO("Plan path!");
-
-        ProfilerStart("omp");
-        if (!PlanPath(
-                &planner,
-                start_state,
-                object_pose,
-                object_start_state,
-                object_goal_state,
-                allowed_time,
-                &commands))
-        {
-            ProfilerStop();
-            ROS_ERROR("Failed to plan path");
-            server->setAborted();
-            return;
-        }
-        ProfilerStop();
-
-        MakeRobotTrajectory(&commands, &trajectory);
-
-        //////////////////////////////
-        // display the planned path //
-        //////////////////////////////
-
-        ROS_INFO("Display trajectory");
-
-        {
-            moveit_msgs::DisplayTrajectory display;
-
-            display.model_id = robot_model->getName();
-
-            display.trajectory.resize(1);
-            trajectory.getRobotTrajectoryMsg(display.trajectory[0]);
-
-            moveit::core::robotStateToRobotStateMsg(
-                    trajectory.getFirstWayPoint(),
-                    display.trajectory_start);
-
-            display_publisher.publish(display);
-        }
-
-        auto execute = !msg->plan_only;
-
-        if (execute) {
-            ExecuteTrajectory(ph, commands);
-        } else {
-            AnimateTrajectory(robot_model, commands);
-        }
-
-        server->setSucceeded();
-    };
-
     auto autostart = false;
     ManipulateObjectActionServer server(
             "manipulate_object",
             [&](const object_manipulation_planner::ManipulateObjectGoal::ConstPtr& msg)
             {
-                return manipulate_object(&server, msg);
+                return ManipulateObject(
+                        robot_model,
+                        group_name,
+                        cspace,
+                        planning_model,
+                        &planner,
+                        display_publisher,
+                        ph,
+                        &server,
+                        msg);
             },
             autostart);
 

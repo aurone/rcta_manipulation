@@ -150,6 +150,13 @@ void UpdateUserGoal(
     ObjectManipHeuristic* heur,
     const smpl::GoalConstraint& goal)
 {
+    heur->egraph_goal_heuristics.clear();
+    heur->z_to_phi.clear();
+    heur->z_to_pre_phi.clear();
+    heur->z_to_egraph_node.clear();
+    heur->phi_heuristic.clear();
+    heur->pre_phi_heuristic.clear();
+
     auto* graph = static_cast<const RomanObjectManipLattice*>(
             heur->planningSpace());
 

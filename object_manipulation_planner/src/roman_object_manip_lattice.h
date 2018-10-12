@@ -174,6 +174,9 @@ public:
         int& best_cost,
         std::vector<smpl::RobotState>& best_path);
 
+    void insertExperienceGraphPath(const std::vector<smpl::RobotState>& path);
+    void clearExperienceGraph();
+
     /// \name ExperienceGraphExtension Interface
     ///@{
     bool snap(int src_id, int dst_id, int& cost) override;

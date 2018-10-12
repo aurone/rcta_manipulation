@@ -1,6 +1,7 @@
 #include "object_manip_planner.h"
 
 // system includes
+#include <boost/filesystem.hpp>
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
@@ -107,12 +108,24 @@ bool Init(
 
 bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
 {
-    // TODO: store demonstrations in the local frame of the object and transform
-    // demonstration prior to each planning query
-    if (!planner->graph.loadExperienceGraph(path)) {
-        ROS_ERROR("Failed to load experience graph");
+    boost::filesystem::path p(path);
+    if (!boost::filesystem::is_directory(p)) {
+        SMPL_ERROR("'%s' is not a directory", path.c_str());
         return false;
     }
+
+    for (auto dit = boost::filesystem::directory_iterator(p);
+        dit != boost::filesystem::directory_iterator(); ++dit)
+    {
+        auto& filepath = dit->path().generic_string();
+        std::vector<smpl::RobotState> demo_path;
+        if (!smpl::ParseExperienceGraphFile(filepath, planner->model, demo_path)) {
+            continue;
+        }
+
+        planner->demos.push_back(std::move(demo_path));
+    }
+
     return true;
 }
 
@@ -161,7 +174,39 @@ bool PlanPath(
     double allowed_time,
     std::vector<std::unique_ptr<Command>>* commands)
 {
-    // TODO: behavior to level out the end effector
+    // the demonstration (the pose of the robot) is stored in the frame of the
+    // object -> transform the demonstration into the global frame
+    planner->graph.clearExperienceGraph();
+
+    for (auto& demo : planner->demos) {
+        auto transformed_demo = demo;
+        for (auto& point : transformed_demo) {
+            auto T_obj_robot = Eigen::Affine3d(
+                    Eigen::Translation3d(point[0], point[1], 0.0) *
+                    Eigen::AngleAxisd(point[2], Eigen::Vector3d::UnitZ()));
+
+            // TODO: this is obnoxiously sensitive. Transforming the
+            // demonstration to object frame during recording and back to world
+            // frame, even if the relative pose is about the same, causes the
+            // pose of the robot to be slightly off due to precision. This is
+            // causing some of the nominal examples to not work anymore. The
+            // rounding here is a hack to avoid that for now, but the planner
+            // should be made robust to these situations.
+            auto T_world_robot = Eigen::Affine3d(object_pose * T_obj_robot);
+            point[0] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
+            point[1] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
+            point[2] = round(1000.0 * smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
+#if 0
+            printf("point = (%0.12f, %0.12f, %0.12f)\n", point[0], point[1], point[2]);
+#endif
+        }
+
+#if 0
+        planner->graph.insertExperienceGraphPath(demo);
+#else
+        planner->graph.insertExperienceGraphPath(transformed_demo);
+#endif
+    }
 
     auto start = MakeGraphStatePrefix(start_state, planner->model);
     start.push_back(object_start_state);

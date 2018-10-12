@@ -74,6 +74,8 @@ struct ObjectManipPlanner
     ObjectManipHeuristic                    heuristic;
     smpl::ARAStar                           search;
 
+    std::vector<std::vector<smpl::RobotState>>  demos;
+
     ObjectManipPlanner();
 };
 

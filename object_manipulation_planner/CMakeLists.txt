@@ -5,6 +5,8 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+find_package(Boost REQUIRED COMPONENTS filesystem)
+
 find_package(Eigen3 REQUIRED)
 
 find_package(
@@ -47,7 +49,8 @@ add_library(
     src/roman_workspace_lattice_action_space.cpp
     src/roman_object_manip_lattice.cpp)
 
-target_include_directories(object_manip_planner PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})
+target_include_directories(object_manip_planner SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
+target_include_directories(object_manip_planner SYSTEM PUBLIC ${catkin_INCLUDE_DIRS})
 target_include_directories(object_manip_planner PUBLIC include)
 target_link_libraries(
     object_manip_planner
@@ -60,6 +63,8 @@ target_link_libraries(
     ${smpl_ros_LIBRARIES})
 
 add_executable(object_manip_planner_node src/object_manip_planner_node.cpp)
+target_include_directories(object_manip_planner_node SYSTEM PRIVATE ${eigen_conversions_INCLUDE_DIRS})
+target_link_libraries(object_manip_planner_node ${eigen_conversions_LIBRARIES})
 target_link_libraries(object_manip_planner_node object_manip_planner)
 target_link_libraries(object_manip_planner_node profiler)
 add_dependencies(object_manip_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
