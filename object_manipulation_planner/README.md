@@ -14,8 +14,8 @@ Standard catkin build procedure.
 
 ### Object Manipulation Planner Node (`object_manip_planner`)
 
-`object_manip_planner_node` is an example application that, given the state of
-a robot, its environment, demonstrations of how to manipulate an object, and a
+`object_manip_planner_node` provides an action server that, given the state of
+the robot, its environment, demonstrations of how to manipulate an object, and a
 goal configuration for that object (e.g. open or closed), computes a feasible
 motion plan for the robot that manipulates the object to the goal
 configuration.
@@ -34,13 +34,9 @@ The following parameters are explicitly required by this node.
 * robot\_description - The URDF description of the robot
 * ~group\_name - The joint group of the robot being planned for
 * ~tip\_link - The tool frame of the robot that manipulates the object
-* ~allowed\_planning\_time - The maximum allowed time to search for a feasible solution
 * ~planning\_frame - Frame in which all debug visualizations are specified
-* ~object\_start\_position - The starting joint configuration of the target object. Default value is 0.0
-* ~object\_goal\_position - The desired joint configuration of the target object. Default value is 1.0
 * ~follow\_trajectory\_action\_name - The name of an action server that accepts trajectory for the configured joint group
 * ~gripper\_command\_action\_name - The name of an action server that accepts commands for the gripper
-* ~execute - Whether to send the trajectory and gripper command segments for execution
 
 The following parameters are used to configure the collision model:
 
@@ -76,8 +72,32 @@ The following parameters are inherited/required to use a few libraries from Move
 
 #### Required Actions
 
-* $~follow\_trajectory\_action\_name - The namespace of the `control_msgs/FollowJointTrajectory` action server to send trajectories
-* $~gripper\_command\_action\_name  - The namespace of the `control_msgs/GripperCommand` action server to send gripper commands
+* $~follow\_trajectory\_action\_name (`control_msgs/FollowJointTrajectory`) - The action server to send trajectories
+* $~gripper\_command\_action\_name (`control_msgs/GripperCommand`) - The action server to send gripper commands to. A value of 0 is assumed to represent a closed position for the gripper and a value of 0.0841 represents an open position for the gripper.
+
+#### Provided Actions
+
+* manipulate\_object (`object_manipulation_planner/ManipulateObject`) - Accepts requests to manipulate a known object.
+
+### Manipulate Object (`manipulate_object`)
+
+The `manipulate_object` node sends an example query to a `manipulate_object`
+action server. The `manipulate_object.launch` launch file is an available 
+example of how to configure the node.
+
+#### ROS Parameters
+
+* ~allowed\_planning\_time - The maximum allowed time to search for a feasible solution
+* ~object\_start\_position - The starting joint configuration of the target object. Default value is 0.0
+* ~object\_goal\_position - The desired joint configuration of the target object. Default value is 1.0
+* ~execute - Whether to send the trajectory and gripper command segments for execution
+* ~start\_state - Any modifications or overrides to the current state of the robot
+* TODO: ~object\_pose - The pose of the known object
+* TODO: ~object\_id - The name of the object used to associate the object with demonstrations of how to manipulate it
+
+#### Required Actions
+
+* manipulate\_object (`object_manipulation_planner/ManipulateObject) - The server to send the manipulation request to.
 
 ### Door Demonstrator (`door_demonstrator`)
 
