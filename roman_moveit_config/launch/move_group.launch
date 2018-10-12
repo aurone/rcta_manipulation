@@ -163,6 +163,7 @@
     <!-- The move_group Node -->
     <!--+++++++++++++++++++++-->
 
+    <env name="SMPL_VISUALIZE_CONFIG_FILE" value="$(find roman_moveit_config)/config/smpl_visual.ini"/>
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
     <!-- Start the actual move_group node/action server -->
