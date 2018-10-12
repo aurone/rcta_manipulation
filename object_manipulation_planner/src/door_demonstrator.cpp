@@ -506,23 +506,16 @@ int main(int argc, char* argv[])
     }
     SetToDefaultValues(&object_state);
 
+    std::map<std::string, double> object_positions;
+    GetParam(ph, "object_positions", object_positions);
+
     // set the initial positions of the object joints
-    XmlRpc::XmlRpcValue object_positions;
-    if (GetParam(ph, "object_positions", object_positions)) {
-        if (object_positions.getType() == XmlRpc::XmlRpcValue::TypeStruct) {
-            for (auto it = object_positions.begin(); it != object_positions.end(); ++it) {
-                if (it->second.getType() != XmlRpc::XmlRpcValue::TypeDouble) {
-                    continue;
-                }
-
-                auto& key = it->first;
-                auto value = double(it->second);
-
-                auto* var = GetVariable(&object_model, key.c_str());
-                if (var == NULL) continue;
-                SetVariablePosition(&object_state, var, value);
-            }
-        }
+    for (auto& e : object_positions) {
+        auto& variable = e.first;
+        auto pos = e.second;
+        auto* var = GetVariable(&object_model, variable.c_str());
+        if (var == NULL) continue;
+        SetVariablePosition(&object_state, var, pos);
     }
 
     UpdateTransforms(&object_state);

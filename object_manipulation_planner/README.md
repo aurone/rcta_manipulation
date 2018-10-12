@@ -119,3 +119,22 @@ determine contact and object configuration. An RViz plugin and interactive
 marker interface for manipulating the robot can be found in the
 `smpl_moveit_interface` package, which publishes the required robot state.
 
+#### ROS Parameters
+
+* ~demo_filename - The path where to create a file to store the recorded demonstration in
+* ~robot_tip_link (string) - The name of the robot link to check for contact with the object
+* ~object_tip_link (string) - The name of the object link  to check for contact with the robot
+* object_description (string)
+* ~contact_error_z (double)
+* ~contact_error (double)
+* ~object_x (double)
+* ~object_y (double)
+* ~object_z (double)
+* ~object_yaw (double)
+* ~object_pitch (double)
+* ~object_roll (double)
+* ~record (bool)
+* ~object_positions ((string) -> double)
+* ~robot_record_variables ([]string)
+* ~object_variables ([]string)
+* ~normalize (bool)
