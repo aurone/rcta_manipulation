@@ -258,7 +258,7 @@ void RomanObjectManipLattice::getPreGraspAmpSucc(
 
         auto& pregrasp = m_egraph_node_pregrasps[closest];
 
-        SV_SHOW_INFO_NAMED("pregrasp_target", smpl::visual::MakeFrameMarkers(pregrasp, "map", "pregrasp_target"));
+        SV_SHOW_DEBUG_NAMED("pregrasp_target", smpl::visual::MakeFrameMarkers(pregrasp, "map", "pregrasp_target"));
 
 #if 0
         auto& closest_egraph_state = m_egraph.state(closest);
@@ -926,8 +926,8 @@ int RomanObjectManipLattice::getSnapMotion(
 
     // visualize source/destination states
     auto* vis_name = "snap";
-    SV_SHOW_INFO_NAMED(vis_name, color(getStateVisualization(src_state->state, "snap_from"), smpl::visual::Color{ 1.0f, 0.5f, 0.0f, 0.8f }));
-    SV_SHOW_INFO_NAMED(vis_name, color(getStateVisualization(dst_state->state, "snap_to"), smpl::visual::Color{ 0.0f, 0.5f, 1.0f, 0.8f }));
+    SV_SHOW_DEBUG_NAMED(vis_name, color(getStateVisualization(src_state->state, "snap_from"), smpl::visual::Color{ 1.0f, 0.5f, 0.0f, 0.8f }));
+    SV_SHOW_DEBUG_NAMED(vis_name, color(getStateVisualization(dst_state->state, "snap_to"), smpl::visual::Color{ 0.0f, 0.5f, 1.0f, 0.8f }));
 
     auto dx = dst_state->state[WORLD_JOINT_X] - src_state->state[WORLD_JOINT_X];
     auto dy = dst_state->state[WORLD_JOINT_Y] - src_state->state[WORLD_JOINT_Y];
