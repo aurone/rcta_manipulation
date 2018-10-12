@@ -1,3 +1,4 @@
+#include <Eigen/Dense>
 #include <ros/ros.h>
 #include <actionlib/client/simple_action_client.h>
 #include <object_manipulation_planner/ManipulateObjectAction.h>
@@ -45,11 +46,16 @@ int main(int argc, char* argv[])
 
     object_manipulation_planner::ManipulateObjectGoal goal;
     goal.allowed_planning_time = allowed_time;
+
+    goal.object_pose.position.x = 0.85;
+    Eigen::Quaterniond oq(Eigen::AngleAxisd(1.570796, Eigen::Vector3d::UnitZ()));
+    goal.object_pose.orientation.w = oq.w();
+    goal.object_pose.orientation.x = oq.x();
+    goal.object_pose.orientation.y = oq.y();
+    goal.object_pose.orientation.z = oq.z();
+
     goal.object_goal = object_goal_state;
     goal.object_start = object_start_state;
-
-    // TODO:
-    goal.object_pose.orientation.w = 1.0;
 
     // TODO:
     goal.object_id = "crate";
