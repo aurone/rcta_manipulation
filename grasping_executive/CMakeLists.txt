@@ -11,7 +11,6 @@ find_package(
     REQUIRED
     COMPONENTS
         actionlib
-        actionlib_msgs
         cmu_manipulation_msgs
         control_msgs
         eigen_conversions
@@ -38,19 +37,7 @@ find_package(
         tf_conversions
         trajectory_msgs)
 
-find_package(urdfdom REQUIRED)
-find_package(urdfdom_headers REQUIRED)
-find_package(sbpl REQUIRED)
 find_package(smpl REQUIRED)
-
-add_action_files(DIRECTORY action FILES ObjectDetection.action)
-
-generate_messages(
-    DEPENDENCIES
-        actionlib_msgs
-        geometry_msgs
-        sensor_msgs
-        std_msgs)
 
 catkin_package()
 
@@ -120,7 +107,6 @@ target_link_libraries(
     ${tf_conversions_LIBRARIES}
     ${tf_LIBRARIES}
     ${robotiq_controllers_LIBRARIES})
-add_dependencies(grasp_object_executor ${PROJECT_NAME}_generate_messages_cpp)
 
 add_library(
     gascan_grasp_planner_plugin

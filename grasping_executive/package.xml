@@ -14,7 +14,6 @@
     <exec_depend>message_runtime</exec_depend>
 
     <depend>actionlib</depend>
-    <depend>actionlib_msgs</depend>
     <depend>cmu_manipulation_msgs</depend>
     <depend>eigen_conversions</depend>
     <depend>gascan_grasp_planning</depend>
