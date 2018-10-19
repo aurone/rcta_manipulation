@@ -25,6 +25,7 @@
 #include <moveit_msgs/MoveGroupAction.h>
 #include <pluginlib/class_loader.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
+#include <rcta_manipulation_common/MoveGroupGoal.h>
 #include <ros/ros.h>
 #include <smpl/debug/visualizer_ros.h>
 #include <spellbook/geometry/nurb/NURB.h>
@@ -487,7 +488,7 @@ moveit_msgs::CollisionObject CreateGroundPlaneObject()
 
 // TODO: copied from grasping_executive, find a home for this and configure
 // common options for the torso/arm planner somewhere
-auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
+auto BuildMoveGroupGoal(const MoveArmGoal& goal)
     -> moveit_msgs::MoveGroupGoal
 {
     double allowed_planning_time = 10.0;
@@ -557,7 +558,7 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
 
     request.goal_constraints.clear();
     switch (goal.type) {
-    case grasping_executive::MoveArmGoal::JointGoal:
+    case MoveArmGoal::JointGoal:
     {
         moveit_msgs::Constraints goal_constraints;
         goal_constraints.name = "goal_constraints";
@@ -578,8 +579,8 @@ auto BuildMoveGroupGoal(const grasping_executive::MoveArmGoal& goal)
         request.planner_id = joint_goal_planner_id;
         break;
     }
-    case grasping_executive::MoveArmGoal::CartesianGoal:
-    case grasping_executive::MoveArmGoal::EndEffectorGoal:
+    case MoveArmGoal::CartesianGoal:
+    case MoveArmGoal::EndEffectorGoal:
     {
         moveit_msgs::Constraints goal_constraints;
         goal_constraints.name = "goal_constraints";
@@ -2196,8 +2197,8 @@ int RepositionBaseExecutor::checkFeasibleMoveToPregraspTrajectory(
         ROS_INFO("attempt grasp %zu/%zu", gidx, grasp_candidates.size());
         auto& grasp = grasp_candidates[gidx];
 
-        grasping_executive::MoveArmGoal pregrasp_goal;
-        pregrasp_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
+        MoveArmGoal pregrasp_goal;
+        pregrasp_goal.type = MoveArmGoal::EndEffectorGoal;
         tf::poseEigenToMsg(grasp.pose, pregrasp_goal.goal_pose);
 
         // set the pose of the robot

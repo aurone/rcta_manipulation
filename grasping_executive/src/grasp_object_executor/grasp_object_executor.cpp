@@ -28,6 +28,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
 #include <pluginlib/class_loader.h>
+#include <rcta_manipulation_common/MoveGroupGoal.h>
 #include <rcta_manipulation_common/comms/actionlib.h>
 #include <robotiq_controllers/gripper_model.h>
 #include <ros/ros.h>
@@ -39,12 +40,9 @@
 #include <spellbook/random/gaussian.h>
 #include <spellbook/stringifier/stringifier.h>
 #include <spellbook/utils/utils.h>
+#include <tf/message_filter.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
-#include <tf/message_filter.h>
-
-// project includes
-#include <grasping_executive/MoveArmAction.h>
 
 namespace rcta {
 
@@ -78,7 +76,7 @@ template <class T>
 using AlignedVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
 auto BuildMoveGroupGoal(
-    const grasping_executive::MoveArmGoal& goal,
+    const MoveArmGoal& goal,
     AlignedVector<Eigen::Affine3d>* goal_poses = NULL)
     -> moveit_msgs::MoveGroupGoal
 {
@@ -149,7 +147,7 @@ auto BuildMoveGroupGoal(
 
     request.goal_constraints.clear();
     switch (goal.type) {
-    case grasping_executive::MoveArmGoal::JointGoal:
+    case MoveArmGoal::JointGoal:
     {
         moveit_msgs::Constraints goal_constraints;
         goal_constraints.name = "goal_constraints";
@@ -170,8 +168,8 @@ auto BuildMoveGroupGoal(
         request.planner_id = joint_goal_planner_id;
         break;
     }
-    case grasping_executive::MoveArmGoal::CartesianGoal:
-    case grasping_executive::MoveArmGoal::EndEffectorGoal:
+    case MoveArmGoal::CartesianGoal:
+    case MoveArmGoal::EndEffectorGoal:
     {
         if (goal_poses != NULL) {
             for (auto& goal_pose : *goal_poses) {
@@ -687,7 +685,7 @@ struct GraspObjectExecutor
     // shared(MoveArmToPregrasp, ExecuteVisualServoMotionToPregrasp)
     // shared(MoveArmToPregrasp, MoveArmToGrasp)
     // -> to enforce visual servo to the same pose
-    grasping_executive::MoveArmGoal m_last_move_arm_pregrasp_goal;
+    MoveArmGoal m_last_move_arm_pregrasp_goal;
 
     // shared(MoveArmToPregrasp, MoveArmToStow)
     // -> to know how to attach the object to the arm
@@ -1444,8 +1442,8 @@ auto DoMoveArmToPreGrasp(GraspObjectExecutor* ex)
         }
 
         // 4. send a move arm goal for the best grasp
-        grasping_executive::MoveArmGoal goal;
-        goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
+        MoveArmGoal goal;
+        goal.type = MoveArmGoal::EndEffectorGoal;
 
         tf::poseEigenToMsg(pregrasp.pose, goal.goal_pose);
 
@@ -1619,9 +1617,9 @@ auto DoMoveArmToGrasp(GraspObjectExecutor* ex)
         return GraspObjectExecutionStatus::FAULT;
     }
 
-    grasping_executive::MoveArmGoal grasp_goal;
-//      grasp_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
-    grasp_goal.type = grasping_executive::MoveArmGoal::CartesianGoal;
+    MoveArmGoal grasp_goal;
+//      grasp_goal.type = MoveArmGoal::EndEffectorGoal;
+    grasp_goal.type = MoveArmGoal::CartesianGoal;
 
     // compute goal pose for grasping from pregrasp pose
     Eigen::Affine3d pregrasp_pose; // model -> wrist (pregrasp)
@@ -1815,11 +1813,11 @@ auto DoMoveArmToStow(GraspObjectExecutor* ex) -> GraspObjectExecutionStatus
                 return GraspObjectExecutionStatus::FAULT;
             }
 
-            grasping_executive::MoveArmGoal move_arm_stow_goal;
+            MoveArmGoal move_arm_stow_goal;
 
             // fill the appropriate goal type
             if (stow_position.type == "pose") {
-                move_arm_stow_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
+                move_arm_stow_goal.type = MoveArmGoal::EndEffectorGoal;
                 auto rs = ex->currentRobotState();
                 for (auto& entry : stow_position.joint_positions) {
                     rs.setVariablePosition(entry.first, entry.second);
@@ -1829,8 +1827,8 @@ auto DoMoveArmToStow(GraspObjectExecutor* ex) -> GraspObjectExecutionStatus
                         rs.getGlobalLinkTransform(ex->m_manip_group->getOnlyOneEndEffectorTip());
                 tf::poseEigenToMsg(tip_pose, move_arm_stow_goal.goal_pose);
             } else if (stow_position.type == "cart") {
-                move_arm_stow_goal.type = grasping_executive::MoveArmGoal::CartesianGoal;
-                move_arm_stow_goal.type = grasping_executive::MoveArmGoal::EndEffectorGoal;
+                move_arm_stow_goal.type = MoveArmGoal::CartesianGoal;
+                move_arm_stow_goal.type = MoveArmGoal::EndEffectorGoal;
                 auto rs = ex->currentRobotState();
                 for (auto& entry : stow_position.joint_positions) {
                     rs.setVariablePosition(entry.first, entry.second);
@@ -1846,7 +1844,7 @@ auto DoMoveArmToStow(GraspObjectExecutor* ex) -> GraspObjectExecutionStatus
                 std::vector<double> vars(ex->m_manip_group->getVariableCount());
                 rs.copyJointGroupPositions(ex->m_manip_group, vars);
 
-                move_arm_stow_goal.type = grasping_executive::MoveArmGoal::JointGoal;
+                move_arm_stow_goal.type = MoveArmGoal::JointGoal;
                 move_arm_stow_goal.goal_joint_state.name = ex->m_manip_group->getVariableNames();
                 move_arm_stow_goal.goal_joint_state.position = vars;
                 for (auto& entry : stow_position.joint_positions) {

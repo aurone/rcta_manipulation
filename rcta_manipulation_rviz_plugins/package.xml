@@ -1,52 +1,39 @@
 <?xml version="1.0"?>
 <package format="2">
-    <name>grasping_executive</name>
+    <name>rcta_manipulation_rviz_plugins</name>
     <version>0.0.0</version>
-    <description>The grasping_executive package</description>
+    <description>The rcta_manipulation_rviz_plugins package</description>
     <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
     <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
     <license>BSD</license>
 
     <buildtool_depend>catkin</buildtool_depend>
 
-    <build_depend>message_generation</build_depend>
-    <build_export_depend>message_runtime</build_export_depend>
-    <exec_depend>message_runtime</exec_depend>
+    <build_depend>eigen</build_depend>
 
     <depend>actionlib</depend>
-    <depend>actionlib_msgs</depend>
     <depend>cmu_manipulation_msgs</depend>
+    <depend>control_msgs</depend>
     <depend>eigen_conversions</depend>
-    <depend>gascan_grasp_planning</depend>
     <depend>geometric_shapes</depend>
     <depend>geometry_msgs</depend>
-    <depend>grasp_planner_interface</depend>
     <depend>interactive_markers</depend>
-    <depend>leatherman</depend>
-    <depend>liburdfdom-dev</depend>
-    <depend>liburdfdom-headers-dev</depend>
     <depend>moveit_core</depend>
-    <depend>moveit_msgs</depend>
-    <depend>moveit_ros_move_group</depend>
     <depend>moveit_ros_planning</depend>
-    <depend>moveit_ros_planning_interface</depend>
-    <depend>octomap_msgs</depend>
-    <depend>pcl_conversions</depend>
-    <depend>pcl_ros</depend>
-    <depend>pluginlib</depend>
     <depend>rcta_manipulation_common</depend>
     <depend>robotiq_controllers</depend>
     <depend>roscpp</depend>
     <depend>rviz</depend>
     <depend>sensor_msgs</depend>
     <depend>smpl</depend>
-    <depend>smpl_ros</depend>
     <depend>spellbook</depend>
+    <depend>std_msgs</depend>
     <depend>tf</depend>
     <depend>tf_conversions</depend>
-    <depend>trajectory_msgs</depend>
+    <depend>visualization_msgs</depend>
 
     <export>
-        <grasp_planner_interface plugin="${prefix}/plugins/gascan_grasp_planner_plugin.xml"/>
+        <rviz plugin="${prefix}/plugins/grasping_command_panel_plugin_description.xml"/>
+        <rviz plugin="${prefix}/plugins/gripper_command_panel_plugin_description.xml"/>
     </export>
 </package>

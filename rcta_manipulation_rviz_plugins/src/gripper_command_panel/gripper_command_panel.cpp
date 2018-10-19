@@ -1,6 +1,13 @@
 #include "gripper_command_panel.h"
 
 // system includes
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QVBoxLayout>
+
 #include <rcta_manipulation_common/comms/actionlib.h>
 
 // project includes

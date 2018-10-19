@@ -65,15 +65,6 @@ target_link_libraries(
     ${spellbook_LIBRARIES}
     ${hdt_kinematics_LIBRARIES})
 
-add_executable(stow_arm src/stow_arm/stow_arm.cpp)
-target_link_libraries(
-    stow_arm
-    ${actionlib_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${hdt_kinematics_LIBRARIES}
-    ${spellbook_LIBRARIES})
-#add_dependencies(stow_arm ${PROJECT_NAME}_generate_messages_cpp)
-
 #qt4_wrap_cpp(MOC_HEADER_SOURCES src/pick_and_place_panel/PickAndPlacePanel.h)
 #add_library(
 #    hdt_pick_and_place_plugin
@@ -101,7 +92,6 @@ install(
     TARGETS
         hdt_arm_planning
         retrieve_object_simulator
-        stow_arm
 #        hdt_pick_and_place_plugin
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

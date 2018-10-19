@@ -11,7 +11,6 @@
 #include <vector>
 
 // system includes
-#include <QtGui>
 #ifndef Q_MOC_RUN
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/GripperCommandAction.h>
@@ -29,6 +28,12 @@
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #endif
+
+class QDoubleSpinBox;
+class QLabel;
+class QLineEdit;
+class QPushButton;
+class QSpinBox;
 
 namespace rcta {
 

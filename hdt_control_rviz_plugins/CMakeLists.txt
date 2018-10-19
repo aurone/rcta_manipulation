@@ -6,6 +6,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(Qt4 REQUIRED)
+include(${QT_USE_FILE})
+
+find_package(Qt4 REQUIRED)
 find_package(
     catkin
     REQUIRED
@@ -21,8 +24,6 @@ find_package(
         rviz)
 
 find_package(smpl REQUIRED)
-
-include(${QT_USE_FILE})
 
 catkin_package()
 
