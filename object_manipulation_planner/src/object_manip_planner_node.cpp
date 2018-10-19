@@ -26,7 +26,7 @@
 #include <smpl/occupancy_grid.h>
 #include <gperftools/profiler.h>
 
-#include <object_manipulation_planner/ManipulateObjectAction.h>
+#include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 
 // project includes
 #include "assert.h"
@@ -235,7 +235,7 @@ bool AnimateTrajectory(
 }
 
 using ManipulateObjectActionServer =
-        actionlib::SimpleActionServer<object_manipulation_planner::ManipulateObjectAction>;
+        actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 
 void ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
@@ -246,7 +246,7 @@ void ManipulateObject(
     const ros::Publisher& display_publisher,
     const ros::NodeHandle& ph,
     ManipulateObjectActionServer* server,
-    const object_manipulation_planner::ManipulateObjectGoal::ConstPtr& msg)
+    const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
 {
     moveit::core::RobotState start_state(robot_model);
 
@@ -575,7 +575,7 @@ int main(int argc, char* argv[])
     auto autostart = false;
     ManipulateObjectActionServer server(
             "manipulate_object",
-            [&](const object_manipulation_planner::ManipulateObjectGoal::ConstPtr& msg)
+            [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
             {
                 return ManipulateObject(
                         robot_model,

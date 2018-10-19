@@ -13,12 +13,11 @@ find_package(
     catkin
     REQUIRED
     COMPONENTS
-        actionlib_msgs
+        cmu_manipulation_msgs
         eigen_conversions
         leatherman
         moveit_core
         smpl_moveit_interface
-        message_generation
         moveit_msgs
         moveit_ros_planning
         roscpp
@@ -29,11 +28,7 @@ find_package(
 find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
 
-add_action_files(DIRECTORY action FILES ManipulateObject.action)
-
-generate_messages(DEPENDENCIES moveit_msgs)
-
-catkin_package(CATKIN_DEPENDS message_runtime moveit_msgs)
+catkin_package()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
@@ -63,13 +58,14 @@ target_link_libraries(
     ${smpl_ros_LIBRARIES})
 
 add_executable(object_manip_planner_node src/object_manip_planner_node.cpp)
+target_include_directories(object_manip_planner_node SYSTEM PRIVATE ${cmu_manipulation_msgs_INCLUDE_DIRS})
 target_include_directories(object_manip_planner_node SYSTEM PRIVATE ${eigen_conversions_INCLUDE_DIRS})
 target_link_libraries(object_manip_planner_node ${eigen_conversions_LIBRARIES})
 target_link_libraries(object_manip_planner_node object_manip_planner)
 target_link_libraries(object_manip_planner_node profiler)
-add_dependencies(object_manip_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 add_executable(manipulate_object src/manipulate_object.cpp)
+target_include_directories(manipulate_object SYSTEM PRIVATE ${cmu_manipulation_msgs_INCLUDE_DIRS})
 target_include_directories(manipulate_object SYSTEM PRIVATE ${actionlib_INCLUDE_DIRS})
 target_include_directories(manipulate_object SYSTEM PRIVATE ${roscpp_INCLUDE_DIRS})
 target_include_directories(manipulate_object SYSTEM PRIVATE ${object_manip_planner_INCLUDE_DIRS})
@@ -77,13 +73,12 @@ target_include_directories(manipulate_object SYSTEM PRIVATE ${smpl_INCLUDE_DIRS}
 target_link_libraries(manipulate_object PRIVATE ${actionlib_LIBRARIES})
 target_link_libraries(manipulate_object PRIVATE ${roscpp_LIBRARIES})
 target_link_libraries(manipulate_object PRIVATE ${smpl_LIBRARIES})
-add_dependencies(manipulate_object ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 add_executable(door_demonstrator src/door_demonstrator.cpp src/cabinet_model.cpp)
-target_include_directories(door_demonstrator PUBLIC SYSTEM ${catkin_INCLUDE_DIRS})
-target_include_directories(door_demonstrator PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
-target_include_directories(door_demonstrator PUBLIC SYSTEM ${urdfdom_INCLUDE_DIRS})
-target_include_directories(door_demonstrator PUBLIC SYSTEM ${smpl_urdf_robot_model_INCLUDE_DIRS})
+target_include_directories(door_demonstrator SYSTEM PUBLIC ${catkin_INCLUDE_DIRS})
+target_include_directories(door_demonstrator SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR})
+target_include_directories(door_demonstrator SYSTEM PUBLIC ${urdfdom_INCLUDE_DIRS})
+target_include_directories(door_demonstrator SYSTEM PUBLIC ${smpl_urdf_robot_model_INCLUDE_DIRS})
 target_link_libraries(door_demonstrator ${roscpp_LIBRARIES})
 target_link_libraries(door_demonstrator ${eigen_conversions_LIBRARIES})
 target_link_libraries(door_demonstrator ${moveit_core_LIBRARIES})
@@ -94,8 +89,8 @@ target_link_libraries(door_demonstrator ${smpl_urdf_robot_model_LIBRARIES})
 target_link_libraries(door_demonstrator ${urdfdom_LIBRARIES})
 
 add_executable(translate_demo src/translate_demo.cpp)
-target_include_directories(translate_demo PUBLIC SYSTEM ${smpl_INCLUDE_DIRS})
-target_include_directories(translate_demo PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
+target_include_directories(translate_demo SYSTEM PUBLIC ${smpl_INCLUDE_DIRS})
+target_include_directories(translate_demo SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(translate_demo ${smpl_LIBRARIES})
 
 add_executable(transform_demo src/transform_demo.cpp)
@@ -109,10 +104,10 @@ target_link_libraries(transform_demo PRIVATE ${roscpp_LIBRARIES})
 target_link_libraries(transform_demo PRIVATE ${smpl_LIBRARIES})
 
 add_executable(make_cabinet_urdf src/make_cabinet_urdf.cpp src/cabinet_model.cpp)
-target_include_directories(make_cabinet_urdf PUBLIC SYSTEM ${EIGEN3_INCLUDE_DIR})
+target_include_directories(make_cabinet_urdf SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR})
 
 add_executable(echo_display_traj src/echo_display_traj.cpp)
-target_include_directories(echo_display_traj PRIVATE SYSTEM ${catkin_INCLUDE_DIRS})
+target_include_directories(echo_display_traj SYSTEM PRIVATE ${catkin_INCLUDE_DIRS})
 target_link_libraries(echo_display_traj PRIVATE ${roscpp_LIBRARIES})
 target_link_libraries(echo_display_traj PRIVATE ${moveit_core_LIBRARIES})
 target_link_libraries(echo_display_traj PRIVATE ${moveit_ros_planning_LIBRARIES})

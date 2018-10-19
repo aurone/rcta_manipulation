@@ -8,26 +8,27 @@ find_package(
 		actionlib
 		actionlib_msgs
 		geometry_msgs
-		octomap_msgs
+        moveit_msgs
 		nav_msgs
+		octomap_msgs
         trajectory_msgs
 )
 
-# specify action files
 add_action_files(
 	DIRECTORY action
 	FILES
-    GraspObjectCommand.action
-    Manipulate.action
-	RepositionBaseCommand.action
+        GraspObjectCommand.action
+        Manipulate.action
+	    RepositionBaseCommand.action
+        ManipulateObject.action
 )
 
-# generate action messages
 generate_messages(
 	DEPENDENCIES
 	actionlib_msgs
 	geometry_msgs
 	octomap_msgs
+    moveit_msgs
 	nav_msgs
     trajectory_msgs
 )

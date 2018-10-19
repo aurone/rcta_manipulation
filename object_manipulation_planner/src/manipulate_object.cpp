@@ -1,7 +1,7 @@
 #include <Eigen/Dense>
 #include <ros/ros.h>
 #include <actionlib/client/simple_action_client.h>
-#include <object_manipulation_planner/ManipulateObjectAction.h>
+#include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 #include <smpl/angles.h>
 
 int main(int argc, char* argv[])
@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
     ros::NodeHandle ph("~");
 
     using ManipulateObjectActionClient =
-            actionlib::SimpleActionClient<object_manipulation_planner::ManipulateObjectAction>;
+            actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateObjectAction>;
 
     ManipulateObjectActionClient client("manipulate_object");
 
@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
     auto execute = false;
     ph.param("execute", execute, false);
 
-    object_manipulation_planner::ManipulateObjectGoal goal;
+    cmu_manipulation_msgs::ManipulateObjectGoal goal;
     goal.allowed_planning_time = allowed_time;
 
     goal.object_pose.position.x = 0.85;
