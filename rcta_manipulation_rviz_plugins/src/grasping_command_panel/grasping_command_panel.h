@@ -56,14 +56,14 @@ public Q_SLOTS:
     void refresh_global_frame();
 
     void copyCurrentBasePose();
-    void update_base_pose_x(double x);
-    void update_base_pose_y(double y);
-    void update_base_pose_z(double z);
-    void update_base_pose_yaw(double yaw);
-    void update_base_pose_candidate(int index);
+    void updateBasePoseX(double x);
+    void updateBasePoseY(double y);
+    void updateBasePoseZ(double z);
+    void updateBasePoseYaw(double yaw);
+    void updateBasePoseCandidate(int index);
 
-    void send_grasp_object_command();
-    void send_reposition_base_command();
+    void sendGraspObjectCommand();
+    void sendRepositionBaseCommand();
 
 private:
 
@@ -106,17 +106,18 @@ private:
     QPushButton* refresh_global_frame_button_;
 
     // Base Command Widgets
-    QPushButton* copy_current_base_pose_button_ = nullptr;
-    QDoubleSpinBox* teleport_base_command_x_box_ = nullptr;
-    QDoubleSpinBox* teleport_base_command_y_box_ = nullptr;
-    QDoubleSpinBox* teleport_base_command_z_box_ = nullptr;
-    QDoubleSpinBox* teleport_base_command_yaw_box_ = nullptr;
+    QPushButton* copy_current_base_pose_button_ = NULL;
+    QDoubleSpinBox* teleport_base_command_x_box_ = NULL;
+    QDoubleSpinBox* teleport_base_command_y_box_ = NULL;
+    QDoubleSpinBox* teleport_base_command_z_box_ = NULL;
+    QDoubleSpinBox* teleport_base_command_yaw_box_ = NULL;
 
     // Object Interaction Command Widgets
-    QPushButton* send_grasp_object_command_button_ = nullptr;
-    QPushButton* send_reposition_base_command_button_ = nullptr;
-    QSpinBox* update_candidate_spinbox_ = nullptr;
-    QLabel* num_candidates_label_ = nullptr;
+    QPushButton* send_grasp_object_command_button_ = NULL;
+    QPushButton* send_reposition_base_command_button_ = NULL;
+    QPushButton* send_manipulate_object_command_button_ = NULL;
+    QSpinBox* update_candidate_spinbox_ = NULL;
+    QLabel* num_candidates_label_ = NULL;
 
     /// @}
 

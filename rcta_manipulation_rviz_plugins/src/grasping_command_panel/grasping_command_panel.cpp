@@ -200,25 +200,25 @@ void GraspingCommandPanel::copyCurrentBasePose()
     }
 }
 
-void GraspingCommandPanel::update_base_pose_x(double x)
+void GraspingCommandPanel::updateBasePoseX(double x)
 {
     T_world_robot_.translation()(0, 0) = x;
     publishPhantomRobotVisualization();
 }
 
-void GraspingCommandPanel::update_base_pose_y(double y)
+void GraspingCommandPanel::updateBasePoseY(double y)
 {
     T_world_robot_.translation()(1, 0) = y;
     publishPhantomRobotVisualization();
 }
 
-void GraspingCommandPanel::update_base_pose_z(double z)
+void GraspingCommandPanel::updateBasePoseZ(double z)
 {
     T_world_robot_.translation()(2, 0) = z;
     publishPhantomRobotVisualization();
 }
 
-void GraspingCommandPanel::update_base_pose_yaw(double yaw_deg)
+void GraspingCommandPanel::updateBasePoseYaw(double yaw_deg)
 {
     double yaw_rad = smpl::angles::to_radians(yaw_deg);
     T_world_robot_ =
@@ -227,7 +227,7 @@ void GraspingCommandPanel::update_base_pose_yaw(double yaw_deg)
     publishPhantomRobotVisualization();
 }
 
-void GraspingCommandPanel::update_base_pose_candidate(int index)
+void GraspingCommandPanel::updateBasePoseCandidate(int index)
 {
     if (index > 0) {
         base_candidate_idx_ = index - 1;
@@ -236,7 +236,7 @@ void GraspingCommandPanel::update_base_pose_candidate(int index)
     }
 }
 
-void GraspingCommandPanel::send_grasp_object_command()
+void GraspingCommandPanel::sendGraspObjectCommand()
 {
     const std::string gas_can_interactive_marker_name = "gas_canister_fixture";
     visualization_msgs::InteractiveMarker gas_can_interactive_marker;
@@ -296,7 +296,7 @@ void GraspingCommandPanel::send_grasp_object_command()
     updateGUI();
 }
 
-void GraspingCommandPanel::send_reposition_base_command()
+void GraspingCommandPanel::sendRepositionBaseCommand()
 {
     if (!ReconnectActionClient(
             reposition_base_command_client_, "reposition_base_command"))
@@ -339,17 +339,17 @@ void GraspingCommandPanel::setup_gui()
     QVBoxLayout* main_layout = new QVBoxLayout;
 
     // general settings
-    QGroupBox* general_settings_group = new QGroupBox(tr("General Settings"));
-    QVBoxLayout* general_settings_layout = new QVBoxLayout;
-    QHBoxLayout* robot_description_layout = new QHBoxLayout;
-    QLabel* robot_description_label = new QLabel(tr("Robot Description:"));
+    auto* general_settings_group = new QGroupBox(tr("General Settings"));
+    auto* general_settings_layout = new QVBoxLayout;
+    auto* robot_description_layout = new QHBoxLayout;
+    auto* robot_description_label = new QLabel(tr("Robot Description:"));
     robot_description_line_edit_ = new QLineEdit;
     refresh_robot_desc_button_ = new QPushButton(tr("Refresh"));
     robot_description_layout->addWidget(robot_description_label);
     robot_description_layout->addWidget(robot_description_line_edit_);
     robot_description_layout->addWidget(refresh_robot_desc_button_);
-    QHBoxLayout* global_frame_layout = new QHBoxLayout;
-    QLabel* global_frame_label = new QLabel(tr("Global Frame:"));
+    auto* global_frame_layout = new QHBoxLayout;
+    auto* global_frame_label = new QLabel(tr("Global Frame:"));
     global_frame_line_edit_ = new QLineEdit;
     global_frame_line_edit_->setEnabled(false);
     refresh_global_frame_button_ = new QPushButton(tr("Refresh"));
@@ -361,23 +361,23 @@ void GraspingCommandPanel::setup_gui()
     general_settings_group->setLayout(general_settings_layout);
 
     // base commands
-    QGroupBox* base_commands_group = new QGroupBox(tr("Base Commands"));
-    QVBoxLayout* base_commands_layout = new QVBoxLayout;
+    auto* base_commands_group = new QGroupBox(tr("Base Commands"));
+    auto* base_commands_layout = new QVBoxLayout;
     copy_current_base_pose_button_ = new QPushButton(tr("Copy Current Base Pose"));
-    QHBoxLayout* base_pose_spinbox_layout = new QHBoxLayout;
-    QLabel* x_label = new QLabel(tr("X:"));
+    auto* base_pose_spinbox_layout = new QHBoxLayout;
+    auto* x_label = new QLabel(tr("X:"));
     teleport_base_command_x_box_ = new QDoubleSpinBox;
     teleport_base_command_x_box_->setMinimum(-100.0);
     teleport_base_command_x_box_->setMaximum(100.0);
     teleport_base_command_x_box_->setSingleStep(0.05);
-    QLabel* y_label = new QLabel(tr("Y:"));
+    auto* y_label = new QLabel(tr("Y:"));
     teleport_base_command_y_box_ = new QDoubleSpinBox;
     teleport_base_command_y_box_->setMinimum(-100.0);
     teleport_base_command_y_box_->setMaximum(100.0);
     teleport_base_command_y_box_->setSingleStep(0.05);
-    QLabel* z_label = new QLabel(tr("Z:"));
+    auto* z_label = new QLabel(tr("Z:"));
     teleport_base_command_z_box_ = new QDoubleSpinBox;
-    QLabel* yaw_label = new QLabel(tr("Yaw:"));
+    auto* yaw_label = new QLabel(tr("Yaw:"));
     teleport_base_command_yaw_box_ = new QDoubleSpinBox;
     teleport_base_command_yaw_box_->setMinimum(0.0);
     teleport_base_command_yaw_box_->setMaximum(359.0);
@@ -394,11 +394,12 @@ void GraspingCommandPanel::setup_gui()
     base_commands_group->setLayout(base_commands_layout);
 
     // object interaction commands
-    QGroupBox* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
-    QVBoxLayout* object_interaction_commands_layout = new QVBoxLayout;
+    auto* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
+    auto* object_interaction_commands_layout = new QVBoxLayout;
     send_grasp_object_command_button_ = new QPushButton(tr("Grasp Object"));
     send_reposition_base_command_button_ = new QPushButton(tr("Reposition Base"));
-    QHBoxLayout* candidates_layout = new QHBoxLayout;
+    send_manipulate_object_command_button_ = new QPushButton(tr("Manipulate Object"));
+    auto* candidates_layout = new QHBoxLayout;
     update_candidate_spinbox_ = new QSpinBox;
     update_candidate_spinbox_->setEnabled(false);
     num_candidates_label_ = new QLabel(tr("of 0 Candidates"));
@@ -406,6 +407,7 @@ void GraspingCommandPanel::setup_gui()
     candidates_layout->addWidget(num_candidates_label_);
     object_interaction_commands_layout->addWidget(send_grasp_object_command_button_);
     object_interaction_commands_layout->addWidget(send_reposition_base_command_button_);
+    object_interaction_commands_layout->addWidget(send_manipulate_object_command_button_);
     object_interaction_commands_layout->addLayout(candidates_layout);
     object_interaction_commands_group->setLayout(object_interaction_commands_layout);
 
@@ -420,15 +422,15 @@ void GraspingCommandPanel::setup_gui()
 
     // base commands
     connect(copy_current_base_pose_button_, SIGNAL(clicked()), this, SLOT(copyCurrentBasePose()));
-    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
-    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
-    connect(teleport_base_command_z_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_z(double)));
-    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
+    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
+    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
+    connect(teleport_base_command_z_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseZ(double)));
+    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
 
     // object interaction commands
-    connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(send_grasp_object_command()));
-    connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(send_reposition_base_command()));
-    connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(update_base_pose_candidate(int)));
+    connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(sendGraspObjectCommand()));
+    connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(sendRepositionBaseCommand()));
+    connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(updateBasePoseCandidate(int)));
 }
 
 bool GraspingCommandPanel::setRobotDescription(
@@ -464,7 +466,7 @@ bool GraspingCommandPanel::setRobotDescription(
                 tr("Failed to Reinitialize (%1)").arg(QString::fromStdString(why)));
 
         // revert to previous robot_description
-        QString q_robot_desc = QString::fromStdString(robot_description_);
+        auto q_robot_desc = QString::fromStdString(robot_description_);
         robot_description_line_edit_->setText(q_robot_desc);
         return false;
     }
@@ -863,17 +865,17 @@ void GraspingCommandPanel::reposition_base_command_result_cb(
 
 void GraspingCommandPanel::updateBasePoseSpinBoxes()
 {
-    disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
-    disconnect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
-    disconnect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
+    disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
+    disconnect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
+    disconnect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
     teleport_base_command_x_box_->setValue(T_world_robot_.translation()(0, 0));
     teleport_base_command_y_box_->setValue(T_world_robot_.translation()(1, 0));
     double yaw, pitch, roll;
     msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
     teleport_base_command_yaw_box_->setValue(smpl::angles::to_degrees(yaw));
-    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
-    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
-    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
+    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
+    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
+    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
 }
 
 void GraspingCommandPanel::updateGUI()
