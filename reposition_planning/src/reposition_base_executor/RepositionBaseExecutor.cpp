@@ -15,7 +15,6 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <grasp_planner_interface/grasp_planner_plugin.h>
 #include <grasp_planner_interface/grasp_utils.h>
-#include <grasping_executive/MoveArmAction.h>
 #include <hdt_kinematics/RobotModel.h>
 #include <leatherman/utils.h>
 #include <moveit/planning_scene_monitor/current_state_monitor.h>
