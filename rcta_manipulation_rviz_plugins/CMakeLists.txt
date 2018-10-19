@@ -83,8 +83,7 @@ target_link_libraries(
     ${rviz_LIBRARIES}
     ${spellbook_LIBRARIES}
     ${tf_LIBRARIES}
-    ${robotiq_controllers_LIBRARIES}
-    qwt)
+    ${robotiq_controllers_LIBRARIES})
 
 if(SMPL_MOVEIT_INTERFACE_QT5)
     qt5_wrap_cpp(

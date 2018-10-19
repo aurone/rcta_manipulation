@@ -21,6 +21,7 @@
 #include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
 #include <cmu_manipulation_msgs/ManipulateAction.h>
 #include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
+#include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 #include <ros/ros.h>
 #include <rviz/panel.h>
 #include <tf/transform_broadcaster.h>
@@ -80,13 +81,17 @@ private:
     std::unique_ptr<ManipulateActionClient> manipulate_client_;
     bool pending_manipulate_command_ = false;
 
-    typedef actionlib::SimpleActionClient<cmu_manipulation_msgs::GraspObjectCommandAction> GraspObjectCommandActionClient;
+    using GraspObjectCommandActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::GraspObjectCommandAction>;
     std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
     bool pending_grasp_object_command_ = false;
 
-    typedef actionlib::SimpleActionClient<cmu_manipulation_msgs::RepositionBaseCommandAction> RepositionBaseCommandActionClient;
+    using RepositionBaseCommandActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::RepositionBaseCommandAction>;
     std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
     bool pending_reposition_base_command_ = false;
+
+    using ManipulateObjectActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateObjectAction>;
+    std::unique_ptr<ManipulateObjectActionClient> manipulate_object_client_;
+    bool pending_manipulate_object_command_ = false;
 
     interactive_markers::InteractiveMarkerServer server_;
 
@@ -137,29 +142,27 @@ private:
     // The set utilities have the effect of changing the text in the line edit
     // box as well as applying the same action as the corresponding refresh
     // button; the get utilities retrieve the last 'refreshed' value
-    bool set_robot_description(const std::string& robot_description, std::string& why);
-    bool set_global_frame(const std::string& global_frame, std::string& why);
+    bool setRobotDescription(const std::string& robot_description, std::string& why);
+    bool setGlobalFrame(const std::string& global_frame, std::string& why);
 
-    bool valid_global_frame(const std::string& frame) const;
+    bool isValidGlobalFrame(const std::string& frame) const;
 
     bool reinit(const std::string& robot_description, std::string& why);
-    bool reinit_robot_models(const std::string& robot_description, std::string& why);
-    bool reinit_object_interactive_marker();
+    bool reinitRobotModels(const std::string& robot_description, std::string& why);
+    bool reinitObjectInteractiveMarker();
 
     bool initialized() const;
 
     void processGascanMarkerFeedback(
         const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback);
 
-    void publish_phantom_robot_visualizations();
-    void publish_base_pose_candidate_visualization(
+    void publishPhantomRobotVisualization();
+    void publishBasePoseCandidateVisualization(
         const geometry_msgs::PoseStamped& candidate_pose);
 
-    std::vector<visualization_msgs::InteractiveMarkerControl> create_sixdof_controls() const;
+    auto createSixDOFControls() const -> std::vector<visualization_msgs::InteractiveMarkerControl>;
 
-    void joint_states_callback(const sensor_msgs::JointState::ConstPtr& msg);
-    void octomap_callback(const octomap_msgs::Octomap::ConstPtr& msg);
-    void occupancy_grid_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+    void occupancyGridCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 
     void manipulate_active_cb();
     void manipulate_feedback_cb(const cmu_manipulation_msgs::ManipulateFeedback::ConstPtr& feedback);
@@ -179,9 +182,9 @@ private:
         const actionlib::SimpleClientGoalState& state,
         const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
 
-    void update_object_marker_pose();
-    void update_base_pose_spinboxes();
-    void update_gui();
+    void updateObjectMarkerPose();
+    void updateBasePoseSpinBoxes();
+    void updateGUI();
 };
 
 } // namespace rcta

@@ -48,7 +48,7 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
 {
     setup_gui();
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
-    occupancy_grid_sub_ = nh_.subscribe("map", 1, &GraspingCommandPanel::occupancy_grid_callback, this);
+    occupancy_grid_sub_ = nh_.subscribe("map", 1, &GraspingCommandPanel::occupancyGridCallback, this);
 }
 
 GraspingCommandPanel::~GraspingCommandPanel()
@@ -88,7 +88,7 @@ void GraspingCommandPanel::load(const rviz::Config& config)
     if (!robot_description.isEmpty()) {
         // attempt to initalize the robot using this robot description
         std::string why;
-        if (!set_robot_description(robot_description.toStdString(), why)) {
+        if (!setRobotDescription(robot_description.toStdString(), why)) {
             QMessageBox::warning(
                     this,
                     tr("Config Failure"),
@@ -99,7 +99,7 @@ void GraspingCommandPanel::load(const rviz::Config& config)
     if (!global_frame.isEmpty()) {
         // attempt to set the global frame
         std::string why;
-        if (!set_global_frame(global_frame.toStdString(), why)) {
+        if (!setGlobalFrame(global_frame.toStdString(), why)) {
             QMessageBox::warning(
                     this,
                     tr("Config Failure"),
@@ -115,10 +115,10 @@ void GraspingCommandPanel::load(const rviz::Config& config)
             Eigen::Translation3d(object_x, object_y, object_z) *
             Eigen::AngleAxisd(object_yaw, Eigen::Vector3d::UnitZ());
 
-    update_object_marker_pose();
-    update_base_pose_spinboxes();
+    updateObjectMarkerPose();
+    updateBasePoseSpinBoxes();
 
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::save(rviz::Config config) const
@@ -152,7 +152,7 @@ void GraspingCommandPanel::refresh_robot_description()
     }
 
     std::string why;
-    if (!set_robot_description(user_robot_description, why)) {
+    if (!setRobotDescription(user_robot_description, why)) {
         QMessageBox::warning(
                 this,
                 tr("Robot Description"),
@@ -160,7 +160,7 @@ void GraspingCommandPanel::refresh_robot_description()
                     .arg(QString::fromStdString(user_robot_description), QString::fromStdString(why)));
     }
 
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::refresh_global_frame()
@@ -168,7 +168,7 @@ void GraspingCommandPanel::refresh_global_frame()
     std::string user_global_frame = global_frame_line_edit_->text().toStdString();
 
     std::string why;
-    if (!set_global_frame(user_global_frame, why)) {
+    if (!setGlobalFrame(user_global_frame, why)) {
         QMessageBox::warning(
                 this,
                 tr("Global Frame"),
@@ -176,7 +176,7 @@ void GraspingCommandPanel::refresh_global_frame()
                     .arg(QString::fromStdString(user_global_frame), QString::fromStdString(why)));
     }
 
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::copyCurrentBasePose()
@@ -194,7 +194,7 @@ void GraspingCommandPanel::copyCurrentBasePose()
         msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
         teleport_base_command_yaw_box_->setValue(smpl::angles::to_degrees(yaw));
 
-        publish_phantom_robot_visualizations();
+        publishPhantomRobotVisualization();
     } catch (const tf::TransformException& ex) {
         QMessageBox::critical(this, tr("Transform Exception"), tr("%1").arg(QString(ex.what())));
     }
@@ -203,19 +203,19 @@ void GraspingCommandPanel::copyCurrentBasePose()
 void GraspingCommandPanel::update_base_pose_x(double x)
 {
     T_world_robot_.translation()(0, 0) = x;
-    publish_phantom_robot_visualizations();
+    publishPhantomRobotVisualization();
 }
 
 void GraspingCommandPanel::update_base_pose_y(double y)
 {
     T_world_robot_.translation()(1, 0) = y;
-    publish_phantom_robot_visualizations();
+    publishPhantomRobotVisualization();
 }
 
 void GraspingCommandPanel::update_base_pose_z(double z)
 {
     T_world_robot_.translation()(2, 0) = z;
-    publish_phantom_robot_visualizations();
+    publishPhantomRobotVisualization();
 }
 
 void GraspingCommandPanel::update_base_pose_yaw(double yaw_deg)
@@ -224,7 +224,7 @@ void GraspingCommandPanel::update_base_pose_yaw(double yaw_deg)
     T_world_robot_ =
             Eigen::Translation3d(T_world_robot_.translation()) *
             Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d(0.0, 0.0, 1.0));
-    publish_phantom_robot_visualizations();
+    publishPhantomRobotVisualization();
 }
 
 void GraspingCommandPanel::update_base_pose_candidate(int index)
@@ -232,7 +232,7 @@ void GraspingCommandPanel::update_base_pose_candidate(int index)
     if (index > 0) {
         base_candidate_idx_ = index - 1;
         assert(base_candidate_idx_ >= 0 && base_candidate_idx_ < candidate_base_poses_.size());
-        publish_base_pose_candidate_visualization(candidate_base_poses_[base_candidate_idx_]);
+        publishBasePoseCandidateVisualization(candidate_base_poses_[base_candidate_idx_]);
     }
 }
 
@@ -293,7 +293,7 @@ void GraspingCommandPanel::send_grasp_object_command()
     pending_grasp_object_command_ = true;
 #endif
 
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::send_reposition_base_command()
@@ -331,7 +331,7 @@ void GraspingCommandPanel::send_reposition_base_command()
     reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
 
     pending_reposition_base_command_ = true;
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::setup_gui()
@@ -431,7 +431,7 @@ void GraspingCommandPanel::setup_gui()
     connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(update_base_pose_candidate(int)));
 }
 
-bool GraspingCommandPanel::set_robot_description(
+bool GraspingCommandPanel::setRobotDescription(
     const std::string& robot_description,
     std::string& why)
 {
@@ -449,7 +449,7 @@ bool GraspingCommandPanel::set_robot_description(
 
         // set the line edit, since we may have called this function via methods
         // other than the refresh button. note: ok to do this here without
-        // disabling signals since set_robot_description is invoked via refresh
+        // disabling signals since setRobotDescription is invoked via refresh
         // button callback
         QString q_robot_desc = QString::fromStdString(robot_description_);
         robot_description_line_edit_->setText(q_robot_desc);
@@ -470,11 +470,11 @@ bool GraspingCommandPanel::set_robot_description(
     }
 }
 
-bool GraspingCommandPanel::set_global_frame(
+bool GraspingCommandPanel::setGlobalFrame(
     const std::string& global_frame,
     std::string& why)
 {
-    if (!valid_global_frame(global_frame)) {
+    if (!isValidGlobalFrame(global_frame)) {
         why = global_frame + " is not a valid frame";
         global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
         return false;
@@ -490,13 +490,13 @@ bool GraspingCommandPanel::set_global_frame(
     global_frame_ = global_frame;
     global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
 
-    update_object_marker_pose();
+    updateObjectMarkerPose();
 
     ROS_INFO("Global Frame set to %s", global_frame.c_str());
     return true;
 }
 
-bool GraspingCommandPanel::valid_global_frame(const std::string& frame) const
+bool GraspingCommandPanel::isValidGlobalFrame(const std::string& frame) const
 {
     // TODO: remove these...check for existing tf frames that are not part of
     // the robot and refresh periodically?...use a dropdown for this
@@ -542,7 +542,7 @@ void GraspingCommandPanel::processGascanMarkerFeedback(
     }
 }
 
-void GraspingCommandPanel::publish_phantom_robot_visualizations()
+void GraspingCommandPanel::publishPhantomRobotVisualization()
 {
     if (!initialized()) {
         return;
@@ -572,7 +572,7 @@ void GraspingCommandPanel::publish_phantom_robot_visualizations()
     robot_markers_pub_.publish(marker_array);
 }
 
-void GraspingCommandPanel::publish_base_pose_candidate_visualization(
+void GraspingCommandPanel::publishBasePoseCandidateVisualization(
     const geometry_msgs::PoseStamped& candidate_pose)
 {
     if (!initialized()) {
@@ -606,8 +606,8 @@ void GraspingCommandPanel::publish_base_pose_candidate_visualization(
     robot_markers_pub_.publish(marker_array);
 }
 
-std::vector<visualization_msgs::InteractiveMarkerControl>
-GraspingCommandPanel::create_sixdof_controls() const
+auto GraspingCommandPanel::createSixDOFControls() const
+    -> std::vector<visualization_msgs::InteractiveMarkerControl>
 {
     std::vector<visualization_msgs::InteractiveMarkerControl> controls(6);
 
@@ -663,7 +663,7 @@ GraspingCommandPanel::create_sixdof_controls() const
     return controls;
 }
 
-void GraspingCommandPanel::occupancy_grid_callback(
+void GraspingCommandPanel::occupancyGridCallback(
     const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
     occupancy_grid_ = msg;
@@ -673,19 +673,19 @@ bool GraspingCommandPanel::reinit(
     const std::string& robot_description,
     std::string& why)
 {
-    if (!reinit_robot_models(robot_description, why)) {
+    if (!reinitRobotModels(robot_description, why)) {
         return false;
     }
 
-    if (!reinit_object_interactive_marker()) {
+    if (!reinitObjectInteractiveMarker()) {
         return false;
     }
 
-    publish_phantom_robot_visualizations();
+    publishPhantomRobotVisualization();
     return true;
 }
 
-bool GraspingCommandPanel::reinit_robot_models(
+bool GraspingCommandPanel::reinitRobotModels(
     const std::string& robot_description,
     std::string& why)
 {
@@ -739,7 +739,7 @@ bool GraspingCommandPanel::reinit_robot_models(
     return true;
 }
 
-bool GraspingCommandPanel::reinit_object_interactive_marker()
+bool GraspingCommandPanel::reinitObjectInteractiveMarker()
 {
     ROS_INFO("Inserting marker 'gas_canister_fixture'");
 
@@ -756,7 +756,7 @@ bool GraspingCommandPanel::reinit_object_interactive_marker()
     gascan_imarker.menu_entries.clear();
     gascan_imarker.controls.clear();
 
-    gascan_imarker.controls = create_sixdof_controls();
+    gascan_imarker.controls = createSixDOFControls();
 
     // Construct mesh control
     visualization_msgs::InteractiveMarkerControl gas_can_mesh_control;
@@ -813,7 +813,7 @@ void GraspingCommandPanel::manipulate_result_cb(
 {
     ROS_INFO("Received Result from Grasp Object Command Action");
     pending_manipulate_command_ = false;
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::grasp_object_command_active_cb()
@@ -832,7 +832,7 @@ void GraspingCommandPanel::grasp_object_command_result_cb(
 {
     ROS_INFO("Received Result from Grasp Object Command Action");
     pending_grasp_object_command_ = false;
-    update_gui();
+    updateGUI();
 }
 
 void GraspingCommandPanel::reposition_base_command_active_cb()
@@ -858,10 +858,10 @@ void GraspingCommandPanel::reposition_base_command_result_cb(
         ROS_INFO("Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
     }
 
-    update_gui();
+    updateGUI();
 }
 
-void GraspingCommandPanel::update_base_pose_spinboxes()
+void GraspingCommandPanel::updateBasePoseSpinBoxes()
 {
     disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_x(double)));
     disconnect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_y(double)));
@@ -876,7 +876,7 @@ void GraspingCommandPanel::update_base_pose_spinboxes()
     connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(update_base_pose_yaw(double)));
 }
 
-void GraspingCommandPanel::update_gui()
+void GraspingCommandPanel::updateGUI()
 {
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
@@ -919,7 +919,7 @@ void GraspingCommandPanel::update_gui()
     num_candidates_label_->setText(QString::fromStdString(num_candidates_label_text));
 }
 
-void GraspingCommandPanel::update_object_marker_pose()
+void GraspingCommandPanel::updateObjectMarkerPose()
 {
     visualization_msgs::InteractiveMarker object_marker;
     if (server_.get("gas_canister_fixture", object_marker)) {
