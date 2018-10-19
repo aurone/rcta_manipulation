@@ -23,12 +23,12 @@ find_package(
         rcta_manipulation_common
         robotiq_controllers
         roscpp
-        smpl
         smpl_ros
         spellbook
         tf
         tf_conversions)
 find_package(sbpl REQUIRED)
+find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
 find_package(urdfdom_headers REQUIRED)
 

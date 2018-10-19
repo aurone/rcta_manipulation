@@ -34,7 +34,6 @@ find_package(
         roscpp
         rviz
         sensor_msgs
-        smpl
         smpl_ros
         spellbook
         tf
@@ -44,6 +43,7 @@ find_package(
 find_package(urdfdom REQUIRED)
 find_package(urdfdom_headers REQUIRED)
 find_package(sbpl REQUIRED)
+find_package(smpl REQUIRED)
 
 add_action_files(DIRECTORY action FILES MoveArm.action ObjectDetection.action)
 

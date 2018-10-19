@@ -9,6 +9,7 @@ find_package(Boost REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Qt4 REQUIRED)
 find_package(SBPL REQUIRED)
+find_package(smpl REQUIRED)
 find_package(
     catkin
     REQUIRED
@@ -25,7 +26,6 @@ find_package(
         robotiq_controllers
         roscpp
         rviz
-        smpl
         spellbook
         tf)
 

@@ -17,9 +17,10 @@ find_package(
         geometry_msgs
         roscpp
         rospack
-        smpl
         spellbook
         visualization_msgs)
+
+find_package(smpl REQUIRED)
 
 catkin_package(
     INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIR}

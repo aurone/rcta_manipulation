@@ -29,9 +29,9 @@ find_package(
         spellbook
         sbpl_kdl_robot_model
         sbpl_geometry_utils
-        smpl
         hdt_kinematics)
 find_package(orocos_kdl REQUIRED)
+find_package(smpl REQUIRED)
 
 catkin_package()
 

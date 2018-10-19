@@ -13,9 +13,9 @@ find_package(
     COMPONENTS
         leatherman
         roscpp
-        sbpl_geometry_utils
-        smpl)
+        sbpl_geometry_utils)
 find_package(orocos_kdl REQUIRED)
+find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
 find_package(urdfdom_headers REQUIRED)
 
@@ -35,36 +35,37 @@ include_directories(${urdfdom_INCLUDE_DIRS})
 include_directories(include)
 
 set(
-    IKFAST_COMPILE_FLAGS 
+    IKFAST_COMPILE_FLAGS
     "-DIK_FAST_HAS_LIBRARY -DIKFAST_NO_MAIN -Wno-unused-variable -Wno-unused-but-set-variable")
 add_library(
-    hdt_robot_model 
-    src/RobotModel.cpp 
-    src/kinematics.cpp 
+    hdt_robot_model
+    src/RobotModel.cpp
+    src/kinematics.cpp
     src/hdt_arm_transform6d.cpp)
 set_target_properties(
-    hdt_robot_model 
-    PROPERTIES 
-    COMPILE_FLAGS 
+    hdt_robot_model
+    PROPERTIES
+    COMPILE_FLAGS
     "${IKFAST_COMPILE_FLAGS}")
 target_link_libraries(
-    hdt_robot_model 
-    lapack 
-    blas 
-    ${Boost_LIBRARIES} 
-    ${catkin_LIBRARIES} 
+    hdt_robot_model
+    lapack
+    blas
+    smpl::smpl
+    ${Boost_LIBRARIES}
+    ${catkin_LIBRARIES}
     ${urdfdom_headers_LIBRARIES})
 
 add_library(hdt_forward_velocities src/forward_velocities.cpp)
 target_link_libraries(
-    hdt_forward_velocities 
-    ${orocos_kdl_LIBRARIES} 
-    ${roscpp_LIBRARIES} 
-    ${urdfdom_LIBRARIES} 
+    hdt_forward_velocities
+    ${orocos_kdl_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${urdfdom_LIBRARIES}
     hdt_robot_model)
 
 install(
-    DIRECTORY include/hdt_kinematics/ 
+    DIRECTORY include/hdt_kinematics/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 
 install(

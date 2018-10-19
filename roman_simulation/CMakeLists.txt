@@ -18,7 +18,6 @@ find_package(
         rosbag
         roscpp
         rospack
-        smpl
         smpl_urdf_robot_model
         spellbook
         tf
@@ -27,6 +26,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(sdl2 REQUIRED sdl2)
+find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
 
 catkin_package()

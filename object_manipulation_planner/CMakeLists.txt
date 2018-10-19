@@ -23,10 +23,10 @@ find_package(
         moveit_ros_planning
         roscpp
         sbpl_collision_checking
-        smpl
         smpl_urdf_robot_model
         smpl_ros)
 
+find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
 
 add_action_files(DIRECTORY action FILES ManipulateObject.action)

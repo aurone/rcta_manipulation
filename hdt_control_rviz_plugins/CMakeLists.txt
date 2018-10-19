@@ -16,10 +16,11 @@ find_package(
         hdt_kinematics
         rcta_manipulation_common
         roscpp
-        smpl
         spellbook
         tf
         rviz)
+
+find_package(smpl REQUIRED)
 
 include(${QT_USE_FILE})
 
