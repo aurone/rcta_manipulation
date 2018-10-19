@@ -532,6 +532,19 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    smpl::collision::CollisionObject ground_object;
+    ground_object.id = "ground";
+
+    smpl::collision::PlaneShape ground_shape;
+    ground_shape.a = ground_shape.b = 0.0;
+    ground_shape.c = 1.0;
+    ground_shape.d = 0.13613; // annoyingly not 0, because the root frame of the RoMan is not on the ground.
+
+    ground_object.shapes.push_back(&ground_shape);
+    ground_object.shape_poses.push_back(Eigen::Affine3d::Identity());
+
+    cspace.insertObject(&ground_object);
+
     SV_SHOW_INFO(cspace.getCollisionWorldVisualization());
 
     ObjectManipChecker ochecker;

@@ -12,12 +12,12 @@ robot_collision_model:
   spheres_models:
     - link_name: base_link
       spheres:
-        - { name: b0, x: 0.45, y: 0.25, z: -0.05, radius: 0.15 }
-        - { name: b1, x: 0.45, y: -0.25, z: -0.05, radius: 0.15 }
-        - { name: b2, x: -0.45, y: 0.25, z: -0.05, radius: 0.15 }
-        - { name: b3, x: -0.45, y: -0.25, z: -0.05, radius: 0.15 }
-        - { name: b4, x: 0.0, y: 0.25, z: -0.05, radius: 0.15 }
-        - { name: b5, x: 0.0, y: -0.25, z: -0.05, radius: 0.15 }
+        - { name: b0, x:  0.45, y:  0.25, z: 0.05, radius: 0.15 }
+        - { name: b1, x:  0.45, y: -0.25, z: 0.05, radius: 0.15 }
+        - { name: b2, x: -0.45, y:  0.25, z: 0.05, radius: 0.15 }
+        - { name: b3, x: -0.45, y: -0.25, z: 0.05, radius: 0.15 }
+        - { name: b4, x:  0.0,  y:  0.25, z: 0.05, radius: 0.15 }
+        - { name: b5, x:  0.0,  y: -0.25, z: 0.05, radius: 0.15 }
     - link_name: torso_link0
       spheres:
         - { name: t0, x: 0.5, y: 0.0, z: 0.0, radius: 0.15 }
