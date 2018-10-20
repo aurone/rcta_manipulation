@@ -43,8 +43,7 @@ namespace rcta {
 
 GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
-    server_("grasping_commands"),
-    base_candidate_idx_(-1)
+    server_("grasping_commands")
 {
     setup_gui();
     robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
@@ -254,7 +253,7 @@ void GraspingCommandPanel::sendGraspObjectCommand()
 
 #if USE_MANIPULATE_ACTION
     if(!ReconnectActionClient(manipulate_client_, "manipulate")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate (server is not connected)"));
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate (server is not available)"));
         return;
     }
 
@@ -272,7 +271,7 @@ void GraspingCommandPanel::sendGraspObjectCommand()
     pending_manipulate_command_ = true;
 #else
     if (!ReconnectActionClient(grasp_object_command_client_, "grasp_object_command")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not connected)"));
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not available)"));
         return;
     }
 
@@ -304,7 +303,7 @@ void GraspingCommandPanel::sendRepositionBaseCommand()
         QMessageBox::warning(
                 this,
                 tr("Command Failure"),
-                tr("Unable to send Reposition Base Command (server is not connected)"));
+                tr("Unable to send Reposition Base Command (server is not available)"));
         return;
     }
 
@@ -331,6 +330,30 @@ void GraspingCommandPanel::sendRepositionBaseCommand()
     reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
 
     pending_reposition_base_command_ = true;
+    updateGUI();
+}
+
+void GraspingCommandPanel::sendManipulateObjectCommand()
+{
+    if (!ReconnectActionClient(manipulate_object_client_, "manipulate_object")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate Object command (server is not available)"));
+        return;
+    }
+
+    cmu_manipulation_msgs::ManipulateObjectGoal goal;
+
+    static auto goal_id = 0;
+    goal.object_id = "crate";
+    tf::poseEigenToMsg(T_world_object_, goal.object_pose);
+    goal.object_start = 0.0;
+    goal.object_goal = 1.0;
+    goal.allowed_planning_time = 60.0;
+    goal.plan_only = false;
+
+    auto result_callback = boost::bind(&GraspingCommandPanel::manipulateObjectResultCallback, this, _1, _2);
+    manipulate_object_client_->sendGoal(goal, result_callback);
+
+    pending_manipulate_command_ = true;
     updateGUI();
 }
 
@@ -430,6 +453,7 @@ void GraspingCommandPanel::setup_gui()
     // object interaction commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(sendGraspObjectCommand()));
     connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(sendRepositionBaseCommand()));
+    connect(send_manipulate_object_command_button_, SIGNAL(clicked()), this, SLOT(sendManipulateObjectCommand()));
     connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(updateBasePoseCandidate(int)));
 }
 
@@ -848,8 +872,8 @@ void GraspingCommandPanel::reposition_base_command_feedback_cb(const cmu_manipul
 }
 
 void GraspingCommandPanel::reposition_base_command_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result)
+    const actionlib::SimpleClientGoalState& state,
+    const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result)
 {
 
     ROS_INFO("Received Result from Reposition Base Command Action");
@@ -861,6 +885,13 @@ void GraspingCommandPanel::reposition_base_command_result_cb(
     }
 
     updateGUI();
+}
+
+void GraspingCommandPanel::manipulateObjectResultCallback(
+    const actionlib::SimpleClientGoalState& state,
+    const cmu_manipulation_msgs::ManipulateObjectResult::ConstPtr& result)
+{
+    ROS_INFO("Received result from Manipulate Object action");
 }
 
 void GraspingCommandPanel::updateBasePoseSpinBoxes()

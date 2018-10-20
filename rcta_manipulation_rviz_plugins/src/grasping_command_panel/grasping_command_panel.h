@@ -64,6 +64,7 @@ public Q_SLOTS:
 
     void sendGraspObjectCommand();
     void sendRepositionBaseCommand();
+    void sendManipulateObjectCommand();
 
 private:
 
@@ -182,6 +183,10 @@ private:
     void reposition_base_command_result_cb(
         const actionlib::SimpleClientGoalState& state,
         const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
+
+    void manipulateObjectResultCallback(
+            const actionlib::SimpleClientGoalState& state,
+            const cmu_manipulation_msgs::ManipulateObjectResult::ConstPtr& result);
 
     void updateObjectMarkerPose();
     void updateBasePoseSpinBoxes();
