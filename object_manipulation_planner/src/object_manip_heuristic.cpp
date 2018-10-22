@@ -610,6 +610,9 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
             SMPL_DEBUG_NAMED(H_LOG, "h(%d) = %d + %d + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
             break;
         }
+        if (h_min == std::numeric_limits<int>::max()) {
+            return std::numeric_limits<int16_t>::max();
+        }
         return h_min;
     }
 }
