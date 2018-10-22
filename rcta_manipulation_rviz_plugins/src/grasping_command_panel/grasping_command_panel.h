@@ -52,8 +52,9 @@ public:
 
 public Q_SLOTS:
 
-    void refresh_robot_description();
-    void refresh_global_frame();
+    void refreshRobotDescription();
+    void refreshGlobalFrame();
+    void refreshObjectMeshResource();
 
     void copyCurrentBasePose();
     void updateBasePoseX(double x);
@@ -61,6 +62,13 @@ public Q_SLOTS:
     void updateBasePoseZ(double z);
     void updateBasePoseYaw(double yaw);
     void updateBasePoseCandidate(int index);
+
+    void updateMeshScaleX();
+    void updateMeshScaleY();
+    void updateMeshScaleZ();
+
+    void updateObjectStart();
+    void updateObjectGoal();
 
     void sendGraspObjectCommand();
     void sendRepositionBaseCommand();
@@ -101,10 +109,15 @@ private:
     ///@{ GUI Interface
 
     // Global Settings Widgets
-    QLineEdit* robot_description_line_edit_;
-    QPushButton* refresh_robot_desc_button_;
-    QLineEdit* global_frame_line_edit_;
-    QPushButton* refresh_global_frame_button_;
+    QLineEdit* robot_description_line_edit_ = NULL;
+    QPushButton* refresh_robot_desc_button_ = NULL;
+    QLineEdit* global_frame_line_edit_ = NULL;
+    QPushButton* refresh_global_frame_button_ = NULL;
+    QLineEdit* m_obj_mesh_resource_line_edit = NULL;
+    QPushButton* m_refresh_obj_mesh_resource_button = NULL;
+    QLineEdit* m_obj_mesh_scale_x_line_edit = NULL;
+    QLineEdit* m_obj_mesh_scale_y_line_edit = NULL;
+    QLineEdit* m_obj_mesh_scale_z_line_edit = NULL;
 
     // Base Command Widgets
     QPushButton* copy_current_base_pose_button_ = NULL;
@@ -117,6 +130,8 @@ private:
     QPushButton* send_grasp_object_command_button_ = NULL;
     QPushButton* send_reposition_base_command_button_ = NULL;
     QPushButton* send_manipulate_object_command_button_ = NULL;
+    QLineEdit* m_object_start_line_edit = NULL;
+    QLineEdit* m_object_goal_line_edit = NULL;
     QSpinBox* update_candidate_spinbox_ = NULL;
     QLabel* num_candidates_label_ = NULL;
 
@@ -139,7 +154,17 @@ private:
     int base_candidate_idx_ = -1;
     std::vector<geometry_msgs::PoseStamped> candidate_base_poses_;
 
-    void setup_gui();
+    std::string m_gascan_interactive_marker_name = "gas_canister_fixture";
+    std::string m_obj_mesh_resource = "package://gascan_description/meshes/rcta_gastank.ply";
+
+    double m_obj_scale_x = 1.0;
+    double m_obj_scale_y = 1.0;
+    double m_obj_scale_z = 1.0;
+
+    double m_obj_start = 0.0;
+    double m_obj_goal = 0.0;
+
+    void setupGUI();
 
     // The set utilities have the effect of changing the text in the line edit
     // box as well as applying the same action as the corresponding refresh
@@ -153,7 +178,7 @@ private:
     bool reinitRobotModels(const std::string& robot_description, std::string& why);
     bool reinitObjectInteractiveMarker();
 
-    bool initialized() const;
+    bool robotModelLoaded() const;
 
     void processGascanMarkerFeedback(
         const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback);

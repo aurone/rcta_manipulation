@@ -17,6 +17,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
 #include <Eigen/Dense>
@@ -45,9 +46,11 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
     server_("grasping_commands")
 {
-    setup_gui();
-    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_markers", 1);
-    occupancy_grid_sub_ = nh_.subscribe("map", 1, &GraspingCommandPanel::occupancyGridCallback, this);
+    setupGUI();
+    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>(
+            "visualization_markers", 1);
+    occupancy_grid_sub_ = nh_.subscribe(
+            "map", 1, &GraspingCommandPanel::occupancyGridCallback, this);
 }
 
 GraspingCommandPanel::~GraspingCommandPanel()
@@ -60,17 +63,27 @@ void GraspingCommandPanel::load(const rviz::Config& config)
 
     ROS_INFO("Loading config for '%s'", this->getName().toStdString().c_str());
 
-    QString global_frame;
-    QString robot_description;
-    float base_x;
-    float base_y;
-    float base_yaw;
-    float object_x;
-    float object_y;
-    float object_z;
-    float object_yaw;
-    config.mapGetString("global_frame", &global_frame);
+    auto robot_description = QString();
+    auto global_frame = QString();
+    auto obj_mesh_resource = QString();
+    auto obj_scale_x = 0.0f;
+    auto obj_scale_y = 0.0f;
+    auto obj_scale_z = 0.0f;
+    auto base_x = 0.0f;
+    auto base_y = 0.0f;
+    auto base_yaw = 0.0f;
+    auto object_x = 0.0f;
+    auto object_y = 0.0f;
+    auto object_z = 0.0f;
+    auto object_yaw = 0.0f;
+    auto object_start = 0.0f;
+    auto object_goal = 1.0f;
     config.mapGetString("robot_description", &robot_description);
+    config.mapGetString("global_frame", &global_frame);
+    config.mapGetString("object_mesh_resource", &obj_mesh_resource);
+    config.mapGetFloat("object_scale_x", &obj_scale_x);
+    config.mapGetFloat("object_scale_y", &obj_scale_y);
+    config.mapGetFloat("object_scale_z", &obj_scale_z);
     config.mapGetFloat("base_x", &base_x);
     config.mapGetFloat("base_y", &base_y);
     config.mapGetFloat("base_yaw", &base_yaw);
@@ -78,9 +91,20 @@ void GraspingCommandPanel::load(const rviz::Config& config)
     config.mapGetFloat("object_y", &object_y);
     config.mapGetFloat("object_z", &object_z);
     config.mapGetFloat("object_yaw", &object_yaw);
+    config.mapGetFloat("object_start", &object_start);
+    config.mapGetFloat("object_goal", &object_goal);
 
     ROS_INFO("Robot Description: %s", robot_description.toStdString().c_str());
     ROS_INFO("Global Frame: %s", global_frame.toStdString().c_str());
+    ROS_INFO("Object Mesh Resource: %s", obj_mesh_resource.toStdString().c_str());
+
+    m_obj_mesh_resource = obj_mesh_resource.toStdString();
+    m_obj_scale_x = obj_scale_x;
+    m_obj_scale_y = obj_scale_y;
+    m_obj_scale_z = obj_scale_z;
+
+    m_obj_start = object_start;
+    m_obj_goal = object_goal;
 
     // note: set the robot description before the global frame so we don't flag
     // virtual joint parent frames as unacceptable
@@ -128,6 +152,11 @@ void GraspingCommandPanel::save(rviz::Config config) const
 
     config.mapSetValue("robot_description", QString::fromStdString(robot_description_));
     config.mapSetValue("global_frame", QString::fromStdString(global_frame_));
+    config.mapSetValue("object_mesh_resource", QString::fromStdString(m_obj_mesh_resource));
+
+    config.mapSetValue("object_scale_x", m_obj_scale_x);
+    config.mapSetValue("object_scale_y", m_obj_scale_y);
+    config.mapSetValue("object_scale_z", m_obj_scale_z);
 
     config.mapSetValue("base_x", T_world_robot_.translation()(0, 0));
     config.mapSetValue("base_y", T_world_robot_.translation()(1, 0));
@@ -140,11 +169,14 @@ void GraspingCommandPanel::save(rviz::Config config) const
     config.mapSetValue("object_z", T_world_object_.translation()(2, 0));
     msg_utils::get_euler_ypr(T_world_object_, yaw, pitch, roll);
     config.mapSetValue("object_yaw", yaw);
+
+    config.mapSetValue("object_start", m_obj_start);
+    config.mapSetValue("object_goal", m_obj_goal);
 }
 
-void GraspingCommandPanel::refresh_robot_description()
+void GraspingCommandPanel::refreshRobotDescription()
 {
-    std::string user_robot_description = robot_description_line_edit_->text().toStdString();
+    auto user_robot_description = robot_description_line_edit_->text().toStdString();
     if (user_robot_description.empty()) {
         QMessageBox::information(this, tr("Robot Description"), tr("Please enter a valid ROS parameter for the URDF"));
         return;
@@ -162,9 +194,9 @@ void GraspingCommandPanel::refresh_robot_description()
     updateGUI();
 }
 
-void GraspingCommandPanel::refresh_global_frame()
+void GraspingCommandPanel::refreshGlobalFrame()
 {
-    std::string user_global_frame = global_frame_line_edit_->text().toStdString();
+    auto user_global_frame = global_frame_line_edit_->text().toStdString();
 
     std::string why;
     if (!setGlobalFrame(user_global_frame, why)) {
@@ -176,6 +208,13 @@ void GraspingCommandPanel::refresh_global_frame()
     }
 
     updateGUI();
+}
+
+void GraspingCommandPanel::refreshObjectMeshResource()
+{
+    QMessageBox::warning(this, tr("Object Mesh Resource"), tr("You set the object mesh resource"));
+    m_obj_mesh_resource = m_obj_mesh_resource_line_edit->text().toStdString();
+    reinitObjectInteractiveMarker();
 }
 
 void GraspingCommandPanel::copyCurrentBasePose()
@@ -235,12 +274,63 @@ void GraspingCommandPanel::updateBasePoseCandidate(int index)
     }
 }
 
+void GraspingCommandPanel::updateMeshScaleX()
+{
+    auto ok = false;
+    auto scale = m_obj_mesh_scale_x_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_scale_x = scale;
+        reinitObjectInteractiveMarker();
+    }
+}
+
+void GraspingCommandPanel::updateMeshScaleY()
+{
+    auto ok = false;
+    auto scale = m_obj_mesh_scale_y_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_scale_y = scale;
+        reinitObjectInteractiveMarker();
+    }
+}
+
+void GraspingCommandPanel::updateMeshScaleZ()
+{
+    auto ok = false;
+    auto scale = m_obj_mesh_scale_z_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_scale_z = scale;
+        reinitObjectInteractiveMarker();
+    }
+}
+
+void GraspingCommandPanel::updateObjectStart()
+{
+    auto ok = false;
+    auto start = m_object_start_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_start = start;
+    }
+}
+
+void GraspingCommandPanel::updateObjectGoal()
+{
+    auto ok = false;
+    auto goal = m_object_goal_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_goal = goal;
+    }
+}
+
 void GraspingCommandPanel::sendGraspObjectCommand()
 {
-    const std::string gas_can_interactive_marker_name = "gas_canister_fixture";
     visualization_msgs::InteractiveMarker gas_can_interactive_marker;
-    if (!server_.get(gas_can_interactive_marker_name, gas_can_interactive_marker)) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (no interactive marker named 'gas_canister_fixture'"));
+    if (!server_.get(m_gascan_interactive_marker_name, gas_can_interactive_marker)) {
+        QMessageBox::warning(
+                this,
+                tr("Command Failure"),
+                tr("Unable to send Grasp Object Command (no interactive marker named '%1'")
+                    .arg(QString::fromStdString(m_gascan_interactive_marker_name)));
         return;
     }
 
@@ -345,10 +435,11 @@ void GraspingCommandPanel::sendManipulateObjectCommand()
     static auto goal_id = 0;
     goal.object_id = "crate";
     tf::poseEigenToMsg(T_world_object_, goal.object_pose);
-    goal.object_start = 0.0;
-    goal.object_goal = 1.0;
+    goal.object_start = m_obj_start;
+    goal.object_goal = m_obj_goal;
     goal.allowed_planning_time = 60.0;
     goal.plan_only = false;
+    goal.start_state.is_diff = true;
 
     auto result_callback = boost::bind(&GraspingCommandPanel::manipulateObjectResultCallback, this, _1, _2);
     manipulate_object_client_->sendGoal(goal, result_callback);
@@ -357,13 +448,17 @@ void GraspingCommandPanel::sendManipulateObjectCommand()
     updateGUI();
 }
 
-void GraspingCommandPanel::setup_gui()
+void GraspingCommandPanel::setupGUI()
 {
-    QVBoxLayout* main_layout = new QVBoxLayout;
+    auto* parent_layout = new QVBoxLayout;
+    auto* scroll_area = new QScrollArea;
+    auto* scroll_area_widget = new QWidget;
+    auto* main_layout = new QVBoxLayout;
 
     // general settings
     auto* general_settings_group = new QGroupBox(tr("General Settings"));
     auto* general_settings_layout = new QVBoxLayout;
+
     auto* robot_description_layout = new QHBoxLayout;
     auto* robot_description_label = new QLabel(tr("Robot Description:"));
     robot_description_line_edit_ = new QLineEdit;
@@ -371,6 +466,7 @@ void GraspingCommandPanel::setup_gui()
     robot_description_layout->addWidget(robot_description_label);
     robot_description_layout->addWidget(robot_description_line_edit_);
     robot_description_layout->addWidget(refresh_robot_desc_button_);
+
     auto* global_frame_layout = new QHBoxLayout;
     auto* global_frame_label = new QLabel(tr("Global Frame:"));
     global_frame_line_edit_ = new QLineEdit;
@@ -379,8 +475,26 @@ void GraspingCommandPanel::setup_gui()
     global_frame_layout->addWidget(global_frame_label);
     global_frame_layout->addWidget(global_frame_line_edit_);
     global_frame_layout->addWidget(refresh_global_frame_button_);
+
+    auto* obj_mesh_resource_layout = new QHBoxLayout;
+    auto* obj_mesh_resource_label = new QLabel(tr("Object Mesh Resource:"));
+    m_obj_mesh_resource_line_edit = new QLineEdit;
+    m_refresh_obj_mesh_resource_button = new QPushButton(tr("Refresh"));
+
+    m_obj_mesh_scale_x_line_edit = new QLineEdit;
+    m_obj_mesh_scale_y_line_edit = new QLineEdit;
+    m_obj_mesh_scale_z_line_edit = new QLineEdit;
+
+    obj_mesh_resource_layout->addWidget(obj_mesh_resource_label);
+    obj_mesh_resource_layout->addWidget(m_obj_mesh_resource_line_edit);
+    obj_mesh_resource_layout->addWidget(m_refresh_obj_mesh_resource_button);
+    obj_mesh_resource_layout->addWidget(m_obj_mesh_scale_x_line_edit);
+    obj_mesh_resource_layout->addWidget(m_obj_mesh_scale_y_line_edit);
+    obj_mesh_resource_layout->addWidget(m_obj_mesh_scale_z_line_edit);
+
     general_settings_layout->addLayout(robot_description_layout);
     general_settings_layout->addLayout(global_frame_layout);
+    general_settings_layout->addLayout(obj_mesh_resource_layout);
     general_settings_group->setLayout(general_settings_layout);
 
     // base commands
@@ -419,29 +533,49 @@ void GraspingCommandPanel::setup_gui()
     // object interaction commands
     auto* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
     auto* object_interaction_commands_layout = new QVBoxLayout;
+
     send_grasp_object_command_button_ = new QPushButton(tr("Grasp Object"));
+
     send_reposition_base_command_button_ = new QPushButton(tr("Reposition Base"));
-    send_manipulate_object_command_button_ = new QPushButton(tr("Manipulate Object"));
     auto* candidates_layout = new QHBoxLayout;
     update_candidate_spinbox_ = new QSpinBox;
     update_candidate_spinbox_->setEnabled(false);
     num_candidates_label_ = new QLabel(tr("of 0 Candidates"));
     candidates_layout->addWidget(update_candidate_spinbox_);
     candidates_layout->addWidget(num_candidates_label_);
+
+    send_manipulate_object_command_button_ = new QPushButton(tr("Manipulate Object"));
+    m_object_start_line_edit = new QLineEdit;
+    m_object_goal_line_edit = new QLineEdit;
+    auto* manip_object_settings_layout = new QHBoxLayout;
+    manip_object_settings_layout->addWidget(new QLabel(tr("Object Start:")));
+    manip_object_settings_layout->addWidget(m_object_start_line_edit);
+    manip_object_settings_layout->addWidget(new QLabel(tr("Object Goal:")));
+    manip_object_settings_layout->addWidget(m_object_goal_line_edit);
+
     object_interaction_commands_layout->addWidget(send_grasp_object_command_button_);
     object_interaction_commands_layout->addWidget(send_reposition_base_command_button_);
-    object_interaction_commands_layout->addWidget(send_manipulate_object_command_button_);
     object_interaction_commands_layout->addLayout(candidates_layout);
+    object_interaction_commands_layout->addWidget(send_manipulate_object_command_button_);
+    object_interaction_commands_layout->addLayout(manip_object_settings_layout);
+
     object_interaction_commands_group->setLayout(object_interaction_commands_layout);
 
     main_layout->addWidget(general_settings_group);
     main_layout->addWidget(base_commands_group);
     main_layout->addWidget(object_interaction_commands_group);
-    setLayout(main_layout);
+    main_layout->addStretch();
+
+    scroll_area_widget->setLayout(main_layout);
+    scroll_area->setWidget(scroll_area_widget);
+    scroll_area->setWidgetResizable(true);
+    parent_layout->addWidget(scroll_area);
+    setLayout(parent_layout);
 
     // note: do not connect any outgoing signals from general settings line edits; force users to use refresh button
-    connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refresh_robot_description()));
-    connect(refresh_global_frame_button_, SIGNAL(clicked()), this, SLOT(refresh_global_frame()));
+    connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refreshRobotDescription()));
+    connect(refresh_global_frame_button_, SIGNAL(clicked()), this, SLOT(refreshGlobalFrame()));
+    connect(m_refresh_obj_mesh_resource_button, SIGNAL(clicked()), this, SLOT(refreshObjectMeshResource()));
 
     // base commands
     connect(copy_current_base_pose_button_, SIGNAL(clicked()), this, SLOT(copyCurrentBasePose()));
@@ -455,6 +589,13 @@ void GraspingCommandPanel::setup_gui()
     connect(send_reposition_base_command_button_, SIGNAL(clicked()), this, SLOT(sendRepositionBaseCommand()));
     connect(send_manipulate_object_command_button_, SIGNAL(clicked()), this, SLOT(sendManipulateObjectCommand()));
     connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(updateBasePoseCandidate(int)));
+
+    connect(m_obj_mesh_scale_x_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleX()));
+    connect(m_obj_mesh_scale_y_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleY()));
+    connect(m_obj_mesh_scale_z_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleZ()));
+
+    connect(m_object_start_line_edit, SIGNAL(returnPressed()), this, SLOT(updateObjectStart()));
+    connect(m_object_goal_line_edit, SIGNAL(returnPressed()), this, SLOT(updateObjectGoal()));
 }
 
 bool GraspingCommandPanel::setRobotDescription(
@@ -482,8 +623,7 @@ bool GraspingCommandPanel::setRobotDescription(
 
         ROS_INFO("Robot Description set to '%s'", robot_description.c_str());
         return true;
-    }
-    else {
+    } else {
         QMessageBox::warning(
                 this,
                 tr("Refresh Robot Description"),
@@ -555,7 +695,7 @@ bool GraspingCommandPanel::isValidGlobalFrame(const std::string& frame) const
     return fit != valid_global_frames.end();
 }
 
-bool GraspingCommandPanel::initialized() const
+bool GraspingCommandPanel::robotModelLoaded() const
 {
     return (bool)(robot_model_);
 }
@@ -570,7 +710,7 @@ void GraspingCommandPanel::processGascanMarkerFeedback(
 
 void GraspingCommandPanel::publishPhantomRobotVisualization()
 {
-    if (!initialized()) {
+    if (!robotModelLoaded()) {
         return;
     }
 
@@ -601,7 +741,7 @@ void GraspingCommandPanel::publishPhantomRobotVisualization()
 void GraspingCommandPanel::publishBasePoseCandidateVisualization(
     const geometry_msgs::PoseStamped& candidate_pose)
 {
-    if (!initialized()) {
+    if (!robotModelLoaded()) {
         return;
     }
 
@@ -767,7 +907,7 @@ bool GraspingCommandPanel::reinitRobotModels(
 
 bool GraspingCommandPanel::reinitObjectInteractiveMarker()
 {
-    ROS_INFO("Inserting marker 'gas_canister_fixture'");
+    ROS_INFO("Inserting marker '%s'", m_gascan_interactive_marker_name.c_str());
 
     // TODO: grab the gas canister mesh and scale from the parameter server
     // (does this mean those parameters have to be global?)
@@ -775,10 +915,13 @@ bool GraspingCommandPanel::reinitObjectInteractiveMarker()
     // initializer an interactive marker for the gas canister object
     visualization_msgs::InteractiveMarker gascan_imarker;
     gascan_imarker.header.frame_id = global_frame_;
-    gascan_imarker.pose = geometry_msgs::IdentityPose();     // TODO: object pose?
-    gascan_imarker.name = "gas_canister_fixture";
+    tf::poseEigenToMsg(T_world_object_, gascan_imarker.pose);
+//    gascan_imarker.pose = geometry_msgs::IdentityPose();     // TODO: object pose?
+    gascan_imarker.name = m_gascan_interactive_marker_name;
     gascan_imarker.description = "Gas Canister Positioning";
-    gascan_imarker.scale = 0.25f;
+
+    // the scale defines the inner diameter of the interactive marker circle
+    gascan_imarker.scale = 2.0 * 0.3; //1.0f; //0.25f;
     gascan_imarker.menu_entries.clear();
     gascan_imarker.controls.clear();
 
@@ -800,13 +943,12 @@ bool GraspingCommandPanel::reinitObjectInteractiveMarker()
     mesh_marker.type = visualization_msgs::Marker::MESH_RESOURCE;
     mesh_marker.action = visualization_msgs::Marker::ADD;
     mesh_marker.pose = geometry_msgs::IdentityPose();
-    const double gas_can_mesh_scale = 1.0; //0.12905;
-    mesh_marker.scale = geometry_msgs::CreateVector3(gas_can_mesh_scale, gas_can_mesh_scale, gas_can_mesh_scale);
+    mesh_marker.scale = geometry_msgs::CreateVector3(m_obj_scale_x, m_obj_scale_y, m_obj_scale_z);
     mesh_marker.color = std_msgs::WhiteColorRGBA(0.5f);
     mesh_marker.lifetime = ros::Duration(0);
     mesh_marker.frame_locked = false;
 
-    mesh_marker.mesh_resource = "package://gascan_description/meshes/rcta_gastank.ply";
+    mesh_marker.mesh_resource = m_obj_mesh_resource;
     mesh_marker.mesh_use_embedded_materials = false;
     gas_can_mesh_control.markers.push_back(mesh_marker);
 
@@ -818,7 +960,7 @@ bool GraspingCommandPanel::reinitObjectInteractiveMarker()
     server_.insert(gascan_imarker);
     auto gascan_feedback_cb = boost::bind(&GraspingCommandPanel::processGascanMarkerFeedback, this, _1);
     server_.setCallback(gascan_imarker.name, gascan_feedback_cb);
-    ROS_INFO("Inserted marker 'gas_canister_fixture'");
+    ROS_INFO("Inserted marker '%s'", m_gascan_interactive_marker_name.c_str());
 
     server_.applyChanges();
     return true;
@@ -909,32 +1051,45 @@ void GraspingCommandPanel::updateBasePoseSpinBoxes()
     connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
 }
 
+// Update GUI elements to reflect the current model:
+//  0. Whether a robot model has been loaded yet
+//  1. State of each commands (pending or not)
+//  2. Result of most recent reposition base command.
 void GraspingCommandPanel::updateGUI()
 {
     ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
     ROS_INFO("    Pending Manipulate: %s", pending_manipulate_command_ ? "TRUE" : "FALSE");
 
-    bool pending_motion_command =
-        pending_grasp_object_command_      ||
-        pending_reposition_base_command_ ||
-        pending_manipulate_command_;
+    auto pending_motion_command =
+            pending_grasp_object_command_       ||
+            pending_reposition_base_command_    ||
+            pending_manipulate_command_         ||
+            pending_manipulate_object_command_;
 
     // because actionlib isn't always as friendly as you might think
     pending_motion_command = false;
 
+    m_obj_mesh_resource_line_edit->setText(QString::fromStdString(m_obj_mesh_resource));
+    m_obj_mesh_scale_x_line_edit->setText(tr("%1").arg(m_obj_scale_x));
+    m_obj_mesh_scale_y_line_edit->setText(tr("%1").arg(m_obj_scale_y));
+    m_obj_mesh_scale_z_line_edit->setText(tr("%1").arg(m_obj_scale_z));
+
+    m_object_start_line_edit->setText(tr("%1").arg(m_obj_start));
+    m_object_goal_line_edit->setText(tr("%1").arg(m_obj_goal));
+
     global_frame_line_edit_->setEnabled(true);
 
-    copy_current_base_pose_button_->setEnabled(initialized());
-    teleport_base_command_x_box_->setEnabled(initialized());
-    teleport_base_command_y_box_->setEnabled(initialized());
-    teleport_base_command_z_box_->setEnabled(initialized());
-    teleport_base_command_yaw_box_->setEnabled(initialized());
+    copy_current_base_pose_button_->setEnabled(robotModelLoaded());
+    teleport_base_command_x_box_->setEnabled(robotModelLoaded());
+    teleport_base_command_y_box_->setEnabled(robotModelLoaded());
+    teleport_base_command_z_box_->setEnabled(robotModelLoaded());
+    teleport_base_command_yaw_box_->setEnabled(robotModelLoaded());
 
-    send_grasp_object_command_button_->setEnabled(initialized() && !pending_motion_command);
-    send_reposition_base_command_button_->setEnabled(initialized() && !pending_motion_command);
+    send_grasp_object_command_button_->setEnabled(robotModelLoaded() && !pending_motion_command);
+    send_reposition_base_command_button_->setEnabled(robotModelLoaded() && !pending_motion_command);
 
-    std::string num_candidates_label_text =
+    auto num_candidates_label_text =
             "of " + std::to_string((int)candidate_base_poses_.size()) + " Candidates";
 
     if (candidate_base_poses_.empty()) {
@@ -952,17 +1107,18 @@ void GraspingCommandPanel::updateGUI()
     num_candidates_label_->setText(QString::fromStdString(num_candidates_label_text));
 }
 
+// Update the pose of the interactive marker to reflect T_world_object_;
 void GraspingCommandPanel::updateObjectMarkerPose()
 {
     visualization_msgs::InteractiveMarker object_marker;
-    if (server_.get("gas_canister_fixture", object_marker)) {
+    if (server_.get(m_gascan_interactive_marker_name, object_marker)) {
         std_msgs::Header header;
         header.seq = 0;
         header.stamp = ros::Time(0);
         header.frame_id = global_frame_;
         geometry_msgs::Pose new_pose;
         tf::poseEigenToMsg(T_world_object_, new_pose);
-        server_.setPose("gas_canister_fixture", new_pose, header);
+        server_.setPose(m_gascan_interactive_marker_name, new_pose, header);
         server_.applyChanges();
     }
 }
