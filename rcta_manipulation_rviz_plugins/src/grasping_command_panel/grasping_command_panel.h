@@ -135,6 +135,13 @@ private:
     QSpinBox* update_candidate_spinbox_ = NULL;
     QLabel* num_candidates_label_ = NULL;
 
+    QDoubleSpinBox* m_obj_pose_x_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_y_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_z_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_Y_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_P_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_R_spinbox = NULL;
+
     /// @}
 
     // TODO: can this be maintained via the transform of the root joint or is

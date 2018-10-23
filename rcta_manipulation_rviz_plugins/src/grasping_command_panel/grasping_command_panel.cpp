@@ -19,6 +19,7 @@
 #include <QSpinBox>
 #include <QScrollArea>
 #include <QVBoxLayout>
+#include <QGridLayout>
 
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
@@ -455,7 +456,10 @@ void GraspingCommandPanel::setupGUI()
     auto* scroll_area_widget = new QWidget;
     auto* main_layout = new QVBoxLayout;
 
-    // general settings
+    //////////////////////
+    // general settings //
+    //////////////////////
+
     auto* general_settings_group = new QGroupBox(tr("General Settings"));
     auto* general_settings_layout = new QVBoxLayout;
 
@@ -497,10 +501,16 @@ void GraspingCommandPanel::setupGUI()
     general_settings_layout->addLayout(obj_mesh_resource_layout);
     general_settings_group->setLayout(general_settings_layout);
 
-    // base commands
-    auto* base_commands_group = new QGroupBox(tr("Base Commands"));
-    auto* base_commands_layout = new QVBoxLayout;
+    ////////////////////////////////
+    // reposition planner command //
+    ////////////////////////////////
+
+    auto* reposition_planner_group = new QGroupBox(tr("Reposition Base"));
+
+    auto* reposition_planner_group_layout = new QVBoxLayout;
+
     copy_current_base_pose_button_ = new QPushButton(tr("Copy Current Base Pose"));
+
     auto* base_pose_spinbox_layout = new QHBoxLayout;
     auto* x_label = new QLabel(tr("X:"));
     teleport_base_command_x_box_ = new QDoubleSpinBox;
@@ -526,17 +536,9 @@ void GraspingCommandPanel::setupGUI()
     base_pose_spinbox_layout->addWidget(teleport_base_command_y_box_);
     base_pose_spinbox_layout->addWidget(yaw_label);
     base_pose_spinbox_layout->addWidget(teleport_base_command_yaw_box_);
-    base_commands_layout->addWidget(copy_current_base_pose_button_);
-    base_commands_layout->addLayout(base_pose_spinbox_layout);
-    base_commands_group->setLayout(base_commands_layout);
-
-    // object interaction commands
-    auto* object_interaction_commands_group = new QGroupBox(tr("Object Interaction Commands"));
-    auto* object_interaction_commands_layout = new QVBoxLayout;
-
-    send_grasp_object_command_button_ = new QPushButton(tr("Grasp Object"));
 
     send_reposition_base_command_button_ = new QPushButton(tr("Reposition Base"));
+
     auto* candidates_layout = new QHBoxLayout;
     update_candidate_spinbox_ = new QSpinBox;
     update_candidate_spinbox_->setEnabled(false);
@@ -544,26 +546,57 @@ void GraspingCommandPanel::setupGUI()
     candidates_layout->addWidget(update_candidate_spinbox_);
     candidates_layout->addWidget(num_candidates_label_);
 
+    reposition_planner_group_layout->addWidget(copy_current_base_pose_button_);
+    reposition_planner_group_layout->addLayout(base_pose_spinbox_layout);
+    reposition_planner_group_layout->addWidget(send_reposition_base_command_button_);
+    reposition_planner_group_layout->addLayout(candidates_layout);
+
+    reposition_planner_group->setLayout(reposition_planner_group_layout);
+
+    ///////////////////////////////////////
+    // manipulate object planner command //
+    ///////////////////////////////////////
+
+    auto* manip_object_command_group = new QGroupBox(tr("Manipulate Object"));
+
+    auto* manip_object_command_layout = new QVBoxLayout;
+
     send_manipulate_object_command_button_ = new QPushButton(tr("Manipulate Object"));
+
+    auto* manip_object_settings_layout = new QHBoxLayout;
     m_object_start_line_edit = new QLineEdit;
     m_object_goal_line_edit = new QLineEdit;
-    auto* manip_object_settings_layout = new QHBoxLayout;
     manip_object_settings_layout->addWidget(new QLabel(tr("Object Start:")));
     manip_object_settings_layout->addWidget(m_object_start_line_edit);
     manip_object_settings_layout->addWidget(new QLabel(tr("Object Goal:")));
     manip_object_settings_layout->addWidget(m_object_goal_line_edit);
+    manip_object_command_layout->addWidget(send_manipulate_object_command_button_);
+    manip_object_command_layout->addLayout(manip_object_settings_layout);
 
-    object_interaction_commands_layout->addWidget(send_grasp_object_command_button_);
-    object_interaction_commands_layout->addWidget(send_reposition_base_command_button_);
-    object_interaction_commands_layout->addLayout(candidates_layout);
-    object_interaction_commands_layout->addWidget(send_manipulate_object_command_button_);
-    object_interaction_commands_layout->addLayout(manip_object_settings_layout);
+    manip_object_command_group->setLayout(manip_object_command_layout);
 
-    object_interaction_commands_group->setLayout(object_interaction_commands_layout);
+    //////////////////////////////
+    // grasping object executor //
+    //////////////////////////////
+
+    auto* grasp_object_command_group = new QGroupBox(tr("Grasp Object"));
+
+    auto* grasp_object_command_layout = new QVBoxLayout;
+
+    send_grasp_object_command_button_ = new QPushButton(tr("Grasp Object"));
+
+    grasp_object_command_layout->addWidget(send_grasp_object_command_button_);
+
+    grasp_object_command_group->setLayout(grasp_object_command_layout);
+
+    ///////////////////////////
+    // Build the main layout //
+    ///////////////////////////
 
     main_layout->addWidget(general_settings_group);
-    main_layout->addWidget(base_commands_group);
-    main_layout->addWidget(object_interaction_commands_group);
+    main_layout->addWidget(reposition_planner_group);
+    main_layout->addWidget(manip_object_command_group);
+    main_layout->addWidget(grasp_object_command_group);
     main_layout->addStretch();
 
     scroll_area_widget->setLayout(main_layout);
