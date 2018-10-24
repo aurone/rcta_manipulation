@@ -305,6 +305,57 @@ void GraspingCommandPanel::updateMeshScaleZ()
     }
 }
 
+void GraspingCommandPanel::updateObjectPoseX(double val)
+{
+    T_world_object_.translation().x() = val;
+    updateObjectMarkerPose();
+}
+
+void GraspingCommandPanel::updateObjectPoseY(double val)
+{
+    T_world_object_.translation().y() = val;
+    updateObjectMarkerPose();
+}
+
+void GraspingCommandPanel::updateObjectPoseZ(double val)
+{
+    T_world_object_.translation().z() = val;
+    updateObjectMarkerPose();
+}
+
+void GraspingCommandPanel::updateObjectPoseYaw(double val)
+{
+    double yaw, pitch, roll;
+    smpl::get_euler_zyx(T_world_object_.rotation(), yaw, pitch, roll);
+    yaw = smpl::to_radians(val);
+    Eigen::Matrix3d new_rot;
+    smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
+    T_world_object_ = Eigen::Translation3d(T_world_object_.translation()) * Eigen::Quaterniond(new_rot);
+    updateObjectMarkerPose();
+}
+
+void GraspingCommandPanel::updateObjectPosePitch(double val)
+{
+    double yaw, pitch, roll;
+    smpl::get_euler_zyx(T_world_object_.rotation(), yaw, pitch, roll);
+    pitch = smpl::to_radians(val);
+    Eigen::Matrix3d new_rot;
+    smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
+    T_world_object_ = Eigen::Translation3d(T_world_object_.translation()) * Eigen::Quaterniond(new_rot);
+    updateObjectMarkerPose();
+}
+
+void GraspingCommandPanel::updateObjectPoseRoll(double val)
+{
+    double yaw, pitch, roll;
+    smpl::get_euler_zyx(T_world_object_.rotation(), yaw, pitch, roll);
+    roll = smpl::to_radians(val);
+    Eigen::Matrix3d new_rot;
+    smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
+    T_world_object_ = Eigen::Translation3d(T_world_object_.translation()) * Eigen::Quaterniond(new_rot);
+    updateObjectMarkerPose();
+}
+
 void GraspingCommandPanel::updateObjectStart()
 {
     auto ok = false;
@@ -496,9 +547,31 @@ void GraspingCommandPanel::setupGUI()
     obj_mesh_resource_layout->addWidget(m_obj_mesh_scale_y_line_edit);
     obj_mesh_resource_layout->addWidget(m_obj_mesh_scale_z_line_edit);
 
+    auto* obj_pose_layout = new QGridLayout;
+    m_obj_pose_x_spinbox = new QDoubleSpinBox;
+    m_obj_pose_y_spinbox = new QDoubleSpinBox;
+    m_obj_pose_z_spinbox = new QDoubleSpinBox;
+    m_obj_pose_Y_spinbox = new QDoubleSpinBox;
+    m_obj_pose_P_spinbox = new QDoubleSpinBox;
+    m_obj_pose_R_spinbox = new QDoubleSpinBox;
+    m_obj_pose_x_spinbox->setSingleStep(0.01);
+    m_obj_pose_y_spinbox->setSingleStep(0.01);
+    m_obj_pose_z_spinbox->setSingleStep(0.01);
+    m_obj_pose_Y_spinbox->setMaximum(359.0);
+    m_obj_pose_P_spinbox->setMinimum(-90.0);
+    m_obj_pose_P_spinbox->setMaximum(90.0);
+    m_obj_pose_R_spinbox->setMaximum(359.0);
+    obj_pose_layout->addWidget(m_obj_pose_x_spinbox, 0, 0);
+    obj_pose_layout->addWidget(m_obj_pose_y_spinbox, 0, 1);
+    obj_pose_layout->addWidget(m_obj_pose_z_spinbox, 0, 2);
+    obj_pose_layout->addWidget(m_obj_pose_Y_spinbox, 1, 0);
+    obj_pose_layout->addWidget(m_obj_pose_P_spinbox, 1, 1);
+    obj_pose_layout->addWidget(m_obj_pose_R_spinbox, 1, 2);
+
     general_settings_layout->addLayout(robot_description_layout);
     general_settings_layout->addLayout(global_frame_layout);
     general_settings_layout->addLayout(obj_mesh_resource_layout);
+    general_settings_layout->addLayout(obj_pose_layout);
     general_settings_group->setLayout(general_settings_layout);
 
     ////////////////////////////////
@@ -626,6 +699,15 @@ void GraspingCommandPanel::setupGUI()
     connect(m_obj_mesh_scale_x_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleX()));
     connect(m_obj_mesh_scale_y_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleY()));
     connect(m_obj_mesh_scale_z_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleZ()));
+
+#if 1
+    connect(m_obj_pose_x_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseX(double)));
+    connect(m_obj_pose_y_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseY(double)));
+    connect(m_obj_pose_z_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseZ(double)));
+    connect(m_obj_pose_Y_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseYaw(double)));
+    connect(m_obj_pose_P_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPosePitch(double)));
+    connect(m_obj_pose_R_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseRoll(double)));
+#endif
 
     connect(m_object_start_line_edit, SIGNAL(returnPressed()), this, SLOT(updateObjectStart()));
     connect(m_object_goal_line_edit, SIGNAL(returnPressed()), this, SLOT(updateObjectGoal()));

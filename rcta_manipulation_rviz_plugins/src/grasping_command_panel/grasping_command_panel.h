@@ -67,6 +67,13 @@ public Q_SLOTS:
     void updateMeshScaleY();
     void updateMeshScaleZ();
 
+    void updateObjectPoseX(double val);
+    void updateObjectPoseY(double val);
+    void updateObjectPoseZ(double val);
+    void updateObjectPoseYaw(double val);
+    void updateObjectPosePitch(double val);
+    void updateObjectPoseRoll(double val);
+
     void updateObjectStart();
     void updateObjectGoal();
 
