@@ -13,3 +13,4 @@ bindkey ^[[1;5C next
 
 term "screen-256color"
 
+shell "/bin/bash"
