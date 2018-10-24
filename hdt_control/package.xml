@@ -31,4 +31,5 @@
     <depend>smpl</depend>
     <depend>spellbook</depend>
     <depend>tf</depend>
+    <depend>lua5.2-dev</depend>
 </package>
