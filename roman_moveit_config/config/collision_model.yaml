@@ -178,6 +178,11 @@ robot_collision_model:
     - name: lower_body
       links:
         - name: base_link
+    - name: both_arms_and_torso
+      groups:
+        - right_arm
+        - left_arm
+        - torso
     - name: body
       groups:
         - right_arm

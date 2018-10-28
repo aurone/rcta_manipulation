@@ -102,6 +102,9 @@
             <param name="mprim_filename" value="$(find roman_moveit_config)/config/right_arm_torso_base.mprim"/>
         </group>
         -->
+        <group ns="graph_configs/BothArmsAndTorsoManipLatticeConfigDefault">
+            <param name="mprim_filename" value="$(find roman_moveit_config)/config/both_arms_and_torso.mprim"/>
+        </group>
     </group>
 
     <!--++++++++++++++++++++++++++++++++++++-->

@@ -1,3 +1,5 @@
+one_degree: &one_degree 0.017453292519943
+
 right_arm:
   planner_configs:
     right_arm_ARA_BFS_ML:
@@ -69,6 +71,14 @@ right_arm_torso_base:
       graph_config: RightArmTorsoBaseWorkspaceEGraph
       shortcut_config: NoShortcutting
 
+both_arms_and_torso:
+  planner_configs:
+    ARA_JD_ML:
+      search_config: ARAConfigDefault
+      heuristic_config: JointDistConfigDefault
+      graph_config: BothArmsAndTorsoManipLatticeConfigDefault
+      shortcut_config: PVJointConfigDefault
+
 search_configs:
   ARAConfigDefault:
     search: arastar
@@ -125,13 +135,13 @@ graph_configs:
   RightArmManipLatticeConfigDefault:
     graph: manip
     discretization:
-      limb_right_joint1: 0.017453292519943
-      limb_right_joint2: 0.017453292519943
-      limb_right_joint3: 0.017453292519943
-      limb_right_joint4: 0.017453292519943
-      limb_right_joint5: 0.017453292519943
-      limb_right_joint6: 0.017453292519943
-      limb_right_joint7: 0.017453292519943
+      limb_right_joint1: *one_degree
+      limb_right_joint2: *one_degree
+      limb_right_joint3: *one_degree
+      limb_right_joint4: *one_degree
+      limb_right_joint5: *one_degree
+      limb_right_joint6: *one_degree
+      limb_right_joint7: *one_degree
     # mprim_filename: uploaded via roslaunch
     use_xyz_snap_mprim: false
     use_rpy_snap_mprim: false
@@ -144,13 +154,13 @@ graph_configs:
   RightArmManipLatticeEgraphConfigDefault:
     graph: manip_lattice_egraph
     discretization:
-      limb_right_joint1: 0.017453292519943
-      limb_right_joint2: 0.017453292519943
-      limb_right_joint3: 0.017453292519943
-      limb_right_joint4: 0.017453292519943
-      limb_right_joint5: 0.017453292519943
-      limb_right_joint6: 0.017453292519943
-      limb_right_joint7: 0.017453292519943
+      limb_right_joint1: *one_degree
+      limb_right_joint2: *one_degree
+      limb_right_joint3: *one_degree
+      limb_right_joint4: *one_degree
+      limb_right_joint5: *one_degree
+      limb_right_joint6: *one_degree
+      limb_right_joint7: *one_degree
     # mprim_filename: uploaded via roslaunch
     use_xyz_snap_mprim: false
     use_rpy_snap_mprim: false
@@ -182,9 +192,9 @@ graph_configs:
         fk_pos_x: 0.05
         fk_pos_y: 0.05
         fk_pos_z: 0.05
-        fk_rot_r: 0.0174532             # 1 degree = 360 angles
+        fk_rot_r: *one_degree
 #        fk_rot_p: 0.0698132             # 4 degree = 46 angles #181 angles
-        fk_rot_p: 0.0174532             # 4 degree = 46 angles #181 angles
+        fk_rot_p: *one_degree
         fk_rot_y: 0.0872664             # 5 degrees = 72 angles
         limb_right_joint3: 0.0872664    # 5 degrees
         torso_joint1: 0.0872664         # 5 degrees
@@ -195,13 +205,40 @@ graph_configs:
   LeftArmManipLatticeConfigDefault:
     graph: manip
     discretization:
-      limb_left_joint1: 0.017453292519943
-      limb_left_joint2: 0.017453292519943
-      limb_left_joint3: 0.017453292519943
-      limb_left_joint4: 0.017453292519943
-      limb_left_joint5: 0.017453292519943
-      limb_left_joint6: 0.017453292519943
-      limb_left_joint7: 0.017453292519943
+      limb_left_joint1: *one_degree
+      limb_left_joint2: *one_degree
+      limb_left_joint3: *one_degree
+      limb_left_joint4: *one_degree
+      limb_left_joint5: *one_degree
+      limb_left_joint6: *one_degree
+      limb_left_joint7: *one_degree
+    # mprim_filename: uploaded via roslaunch
+    use_xyz_snap_mprim: false
+    use_rpy_snap_mprim: false
+    use_xyzrpy_snap_mprim: true
+    use_short_dist_mprims: true
+    xyz_snap_dist_thresh: 0.0
+    rpy_snap_dist_thresh: 0.04
+    xyzrpy_snap_dist_thresh: 0.04 #0.2
+    short_dist_mprims_thresh: 0.4
+  BothArmsAndTorsoManipLatticeConfigDefault:
+    graph: manip
+    discretization:
+      torso_joint1: *one_degree
+      limb_left_joint1: *one_degree
+      limb_left_joint2: *one_degree
+      limb_left_joint3: *one_degree
+      limb_left_joint4: *one_degree
+      limb_left_joint5: *one_degree
+      limb_left_joint6: *one_degree
+      limb_left_joint7: *one_degree
+      limb_right_joint1: *one_degree
+      limb_right_joint2: *one_degree
+      limb_right_joint3: *one_degree
+      limb_right_joint4: *one_degree
+      limb_right_joint5: *one_degree
+      limb_right_joint6: *one_degree
+      limb_right_joint7: *one_degree
     # mprim_filename: uploaded via roslaunch
     use_xyz_snap_mprim: false
     use_rpy_snap_mprim: false
@@ -215,14 +252,14 @@ graph_configs:
     graph: manip
     # angular resolution of each active joint variable
     discretization:
-      limb_right_joint1: 0.017453292519943
-      limb_right_joint2: 0.017453292519943
-      limb_right_joint3: 0.017453292519943
-      limb_right_joint4: 0.017453292519943
-      limb_right_joint5: 0.017453292519943
-      limb_right_joint6: 0.017453292519943
-      limb_right_joint7: 0.017453292519943
-      torso_joint1: 0.017453292519943
+      limb_right_joint1: *one_degree
+      limb_right_joint2: *one_degree
+      limb_right_joint3: *one_degree
+      limb_right_joint4: *one_degree
+      limb_right_joint5: *one_degree
+      limb_right_joint6: *one_degree
+      limb_right_joint7: *one_degree
+      torso_joint1: *one_degree
     # mprim_filename: uploaded via roslaunch
     use_xyz_snap_mprim: false
     use_rpy_snap_mprim: false
