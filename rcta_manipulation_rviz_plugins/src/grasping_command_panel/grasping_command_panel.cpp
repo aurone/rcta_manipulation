@@ -554,9 +554,17 @@ void GraspingCommandPanel::setupGUI()
     m_obj_pose_Y_spinbox = new QDoubleSpinBox;
     m_obj_pose_P_spinbox = new QDoubleSpinBox;
     m_obj_pose_R_spinbox = new QDoubleSpinBox;
+
+    m_obj_pose_x_spinbox->setMinimum(-100.0);
+    m_obj_pose_y_spinbox->setMinimum(-100.0);
+    m_obj_pose_z_spinbox->setMinimum(-100.0);
+    m_obj_pose_x_spinbox->setMaximum(100.0);
+    m_obj_pose_y_spinbox->setMaximum(100.0);
+    m_obj_pose_z_spinbox->setMaximum(100.0);
     m_obj_pose_x_spinbox->setSingleStep(0.01);
     m_obj_pose_y_spinbox->setSingleStep(0.01);
     m_obj_pose_z_spinbox->setSingleStep(0.01);
+
     m_obj_pose_Y_spinbox->setMaximum(359.0);
     m_obj_pose_P_spinbox->setMinimum(-90.0);
     m_obj_pose_P_spinbox->setMaximum(90.0);
