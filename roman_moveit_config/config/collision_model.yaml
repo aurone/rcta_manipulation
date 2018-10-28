@@ -20,8 +20,10 @@ robot_collision_model:
         - { name: b5, x:  0.0,  y: -0.25, z: 0.05, radius: 0.15 }
     - link_name: torso_link0
       spheres:
+        # main body
         - { name: t0, x: 0.5, y: 0.0, z: 0.0, radius: 0.15 }
         - { name: t1, x: 0.42, y: 0.0, z: 0.0, radius: 0.15 }
+        # hokuyo guards
         - { name: t2, x: 0.35, y: 0.16, z: 0.05, radius: 0.08 }
         - { name: t3, x: 0.35, y: 0.16, z: -0.05, radius: 0.08 }
     - link_name: chest
