@@ -179,15 +179,12 @@ void Write(ControlledRobot* robot)
 
     for (auto i = 0; i < robot->variable_count; ++i) {
         if (robot->position_commands[i] != robot->prev_position_commands[i]) {
-            printf("Control position %d\n", i);
             robot->control_modes[i] = ControlledRobot::Position;
             robot->prev_position_commands[i] = robot->position_commands[i];
         } else if (robot->velocity_commands[i] != robot->prev_velocity_commands[i]) {
-            printf("Control velocity %d\n", i);
             robot->control_modes[i] = ControlledRobot::Velocity;
             robot->prev_velocity_commands[i] = robot->velocity_commands[i];
         } else if (robot->effort_commands[i] != robot->prev_effort_commands[i]) {
-            printf("Control effort %d\n", i);
             robot->control_modes[i] = ControlledRobot::Effort;
             robot->prev_effort_commands[i] = robot->effort_commands[i];
         }
