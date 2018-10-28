@@ -1,12 +1,12 @@
 #include <algorithm>
 #include <ros/ros.h>
+#include <controller_manager/controller_manager.h>
+#include <hardware_interface/joint_command_interface.h>
+#include <hardware_interface/joint_state_interface.h>
+#include <hardware_interface/robot_hw.h>
 #include <smpl_urdf_robot_model/robot_model.h>
 #include <smpl_urdf_robot_model/robot_state.h>
 #include <urdf_parser/urdf_parser.h>
-#include <hardware_interface/robot_hw.h>
-#include <hardware_interface/joint_state_interface.h>
-#include <hardware_interface/joint_command_interface.h>
-#include <controller_manager/controller_manager.h>
 
 struct ControlledRobot : public hardware_interface::RobotHW
 {
@@ -15,34 +15,38 @@ struct ControlledRobot : public hardware_interface::RobotHW
     hardware_interface::VelocityJointInterface  i_velocity_command;
     hardware_interface::EffortJointInterface    i_effort_command;
 
+    int variable_count = 0;
+
+    enum Mode {
+        Position,
+        Velocity,
+        Effort
+    };
+
+    std::vector<int> control_modes;
+
     std::vector<double> joint_positions;
     std::vector<double> joint_velocities;
     std::vector<double> joint_efforts;
+
+    std::vector<double> prev_position_commands;
+    std::vector<double> prev_velocity_commands;
+    std::vector<double> prev_effort_commands;
 
     std::vector<double> position_commands;
     std::vector<double> velocity_commands;
     std::vector<double> effort_commands;
 
 #if ROS_KINETIC
-    void read(const ros::Time& time, const ros::Duration& dt) override
-    {
-    }
+    void read(const ros::Time& time, const ros::Duration& dt) override;
 #else
-    void read()
-    {
-    }
+    void read();
 #endif
 
 #if ROS_KINETIC
-    void write(const ros::Time& time, const ros::Duration& dt) override
-    {
-        std::copy(begin(position_commands), end(position_commands), begin(joint_positions));
-    };
+    void write(const ros::Time& time, const ros::Duration& dt) override;
 #else
-    void write()
-    {
-        std::copy(begin(position_commands), end(position_commands), begin(joint_positions));
-    }
+    void write();
 #endif
 };
 
@@ -56,12 +60,21 @@ bool InitControlledRobot(
             GetVariableCount(smpl::urdf::GetRootJoint(model));
 
     // TODO: non-mimic joints?
-    robot->joint_positions.resize(internal_variable_count);
-    robot->joint_velocities.resize(internal_variable_count);
-    robot->joint_efforts.resize(internal_variable_count);
-    robot->position_commands.resize(internal_variable_count);
-    robot->velocity_commands.resize(internal_variable_count);
-    robot->effort_commands.resize(internal_variable_count);
+    robot->variable_count = internal_variable_count;
+
+    robot->control_modes.resize(internal_variable_count, ControlledRobot::Position);
+
+    robot->joint_positions.resize(internal_variable_count, 0.0);
+    robot->joint_velocities.resize(internal_variable_count, 0.0);
+    robot->joint_efforts.resize(internal_variable_count, 0.0);
+
+    robot->position_commands.resize(internal_variable_count, 0.0);
+    robot->velocity_commands.resize(internal_variable_count, 0.0);
+    robot->effort_commands.resize(internal_variable_count, 0.0);
+
+    robot->prev_position_commands.resize(internal_variable_count, 0.0);
+    robot->prev_velocity_commands.resize(internal_variable_count, 0.0);
+    robot->prev_effort_commands.resize(internal_variable_count, 0.0);
 
     // create and register handles to joint states and joint commands
     auto ii = 0;
@@ -97,6 +110,113 @@ bool InitControlledRobot(
 
     return true;
 }
+
+constexpr auto dt = 1.0 / 500.0;
+constexpr auto odt = 500.0;
+
+void Read(ControlledRobot* robot)
+{
+    for (auto i = 0; i < robot->variable_count; ++i) {
+        switch (robot->control_modes[i]) {
+        case ControlledRobot::Position:
+        {
+            auto prev_position = robot->joint_positions[i];
+            auto prev_velocity = robot->joint_velocities[i];
+
+            robot->joint_positions[i] = robot->position_commands[i];
+            robot->joint_velocities[i] = (robot->joint_positions[i] - prev_position) * odt;
+            robot->joint_efforts[i] = (robot->joint_velocities[i] - prev_velocity) * odt;
+            break;
+        }
+        case ControlledRobot::Velocity:
+        {
+            auto prev_velocity = robot->joint_velocities[i];
+
+            robot->joint_velocities[i] = robot->velocity_commands[i];
+            robot->joint_positions[i] += robot->joint_velocities[i] * dt;
+            robot->joint_efforts[i] = (robot->joint_velocities[i] - prev_velocity) * odt;
+            break;
+        }
+        case ControlledRobot::Effort:
+        {
+            break;
+        }
+        }
+    }
+}
+
+void Write(ControlledRobot* robot)
+{
+#if 0
+    printf("position command: [");
+    for (auto i = 0; i < robot->variable_count; ++i) {
+        if (i != 0) {
+            printf(", %f", robot->position_commands[i]);
+        } else {
+            printf("%f", robot->position_commands[i]);
+        }
+    }
+    printf("]\n");
+    printf("velocity command: [");
+    for (auto i = 0; i < robot->variable_count; ++i) {
+        if (i != 0) {
+            printf(", %f", robot->velocity_commands[i]);
+        } else {
+            printf("%f", robot->velocity_commands[i]);
+        }
+    }
+    printf("]\n");
+    printf("  effort command: [");
+    for (auto i = 0; i < robot->variable_count; ++i) {
+        if (i != 0) {
+            printf(", %f", robot->effort_commands[i]);
+        } else {
+            printf("%f", robot->effort_commands[i]);
+        }
+    }
+    printf("]\n");
+#endif
+
+    for (auto i = 0; i < robot->variable_count; ++i) {
+        if (robot->position_commands[i] != robot->prev_position_commands[i]) {
+            printf("Control position %d\n", i);
+            robot->control_modes[i] = ControlledRobot::Position;
+            robot->prev_position_commands[i] = robot->position_commands[i];
+        } else if (robot->velocity_commands[i] != robot->prev_velocity_commands[i]) {
+            printf("Control velocity %d\n", i);
+            robot->control_modes[i] = ControlledRobot::Velocity;
+            robot->prev_velocity_commands[i] = robot->velocity_commands[i];
+        } else if (robot->effort_commands[i] != robot->prev_effort_commands[i]) {
+            printf("Control effort %d\n", i);
+            robot->control_modes[i] = ControlledRobot::Effort;
+            robot->prev_effort_commands[i] = robot->effort_commands[i];
+        }
+    }
+}
+
+#if ROS_KINETIC
+void ControlledRobot::read(const ros::Time& time, const ros::Duration& dt) override
+{
+    Read(this);
+}
+#else
+void ControlledRobot::read()
+{
+    Read(this);
+}
+#endif
+
+#if ROS_KINETIC
+void ControlledRobot::write(const ros::Time& time, const ros::Duration& dt) override
+{
+    Write(this);
+};
+#else
+void ControlledRobot::write()
+{
+    Write(this);
+}
+#endif
 
 int main(int argc, char* argv[])
 {
