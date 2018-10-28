@@ -26,6 +26,7 @@ robot_collision_model:
         - { name: t3, x: 0.35, y: 0.16, z: -0.05, radius: 0.08 }
     - link_name: chest
       spheres:
+        # majority of the sensor shelf
         - { name: c01, x: 0.00, y: -0.12, z: -0.12, radius: 0.08 }
         - { name: c02, x: 0.00, y:  0.00, z: -0.12, radius: 0.08 }
         - { name: c03, x: 0.00, y:  0.12, z: -0.12, radius: 0.08 }
@@ -35,16 +36,37 @@ robot_collision_model:
         - { name: c07, x: 0.00, y: -0.12, z:  0.12, radius: 0.08 }
         - { name: c08, x: 0.00, y:  0.00, z:  0.12, radius: 0.08 }
         - { name: c09, x: 0.00, y:  0.12, z:  0.12, radius: 0.08 }
+        # right edge of the sensor shelf
         - { name: c10, x: 0.00, y: -0.19, z:  0.185, radius: 0.02 }
-        - { name: c10, x: 0.00, y: -0.16, z:  0.185, radius: 0.02 }
-        - { name: c10, x: 0.00, y: -0.13, z:  0.185, radius: 0.02 }
-        - { name: c10, x: 0.00, y: -0.10, z:  0.185, radius: 0.02 }
-        - { name: c10, x: 0.00, y: -0.07, z:  0.185, radius: 0.02 }
-        - { name: c10, x: 0.00, y: -0.04, z:  0.185, radius: 0.02 }
-        - { name: c12, x: 0.00, y: -0.19, z: -0.185, radius: 0.02 }
-        - { name: h00, x: 0.20, y:  0.03, z:  0.13, radius: 0.08 }
-        - { name: h01, x: 0.20, y:  0.03, z: -0.13, radius: 0.08 }
-        - { name: h02, x: 0.20, y:  0.03, z:  0.00, radius: 0.08 }
+        - { name: c11, x: 0.00, y: -0.16, z:  0.185, radius: 0.02 }
+        - { name: c12, x: 0.00, y: -0.13, z:  0.185, radius: 0.02 }
+        - { name: c13, x: 0.00, y: -0.10, z:  0.185, radius: 0.02 }
+        - { name: c14, x: 0.00, y: -0.07, z:  0.185, radius: 0.02 }
+        - { name: c15, x: 0.00, y: -0.04, z:  0.185, radius: 0.02 }
+        # left edge of the sensor shelf
+        - { name: c16, x: 0.00, y: -0.19, z: -0.185, radius: 0.02 }
+        - { name: c17, x: 0.00, y: -0.16, z: -0.185, radius: 0.02 }
+        - { name: c18, x: 0.00, y: -0.13, z: -0.185, radius: 0.02 }
+        - { name: c19, x: 0.00, y: -0.10, z: -0.185, radius: 0.02 }
+        - { name: c20, x: 0.00, y: -0.07, z: -0.185, radius: 0.02 }
+        - { name: c21, x: 0.00, y: -0.04, z: -0.185, radius: 0.02 }
+        # middle of the arm mount
+        - { name: h01, x: 0.20, y:  0.03, z:  0.13, radius: 0.08 }
+        - { name: h02, x: 0.20, y:  0.03, z: -0.13, radius: 0.08 }
+        - { name: h03, x: 0.20, y:  0.03, z:  0.00, radius: 0.08 }
+        # right corner of the arm mount
+        - { name: h04, x: 0.20, y:  -0.045, z:  0.185, radius: 0.02 }
+        - { name: h05, x: 0.18, y:  -0.045, z:  0.185, radius: 0.02 }
+        - { name: h06, x: 0.22, y:  -0.045, z:  0.185, radius: 0.02 }
+        - { name: h07, x: 0.16, y:  -0.045, z:  0.185, radius: 0.02 }
+        - { name: h08, x: 0.24, y:  -0.045, z:  0.185, radius: 0.02 }
+        # left corner of the arm mount
+        - { name: h09, x: 0.20, y:  -0.045, z: -0.185, radius: 0.02 }
+        - { name: h10, x: 0.18, y:  -0.045, z: -0.185, radius: 0.02 }
+        - { name: h11, x: 0.22, y:  -0.045, z: -0.185, radius: 0.02 }
+        - { name: h12, x: 0.16, y:  -0.045, z: -0.185, radius: 0.02 }
+        - { name: h13, x: 0.24, y:  -0.045, z: -0.185, radius: 0.02 }
+        # sensor area
         - { name: a01, x: 0.05, y: -0.16, z:  0.04, radius: 0.11 }
 
 #    - link_name: limb_left_link0
