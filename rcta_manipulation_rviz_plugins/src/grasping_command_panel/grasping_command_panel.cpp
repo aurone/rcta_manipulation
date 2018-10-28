@@ -696,9 +696,9 @@ void GraspingCommandPanel::setupGUI()
     connect(send_manipulate_object_command_button_, SIGNAL(clicked()), this, SLOT(sendManipulateObjectCommand()));
     connect(update_candidate_spinbox_, SIGNAL(valueChanged(int)), this, SLOT(updateBasePoseCandidate(int)));
 
-    connect(m_obj_mesh_scale_x_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleX()));
-    connect(m_obj_mesh_scale_y_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleY()));
-    connect(m_obj_mesh_scale_z_line_edit, SIGNAL(returnPressed()), this, SLOT(updateMeshScaleZ()));
+    connect(m_obj_mesh_scale_x_line_edit, SIGNAL(editingFinished()), this, SLOT(updateMeshScaleX()));
+    connect(m_obj_mesh_scale_y_line_edit, SIGNAL(editingFinished()), this, SLOT(updateMeshScaleY()));
+    connect(m_obj_mesh_scale_z_line_edit, SIGNAL(editingFinished()), this, SLOT(updateMeshScaleZ()));
 
 #if 1
     connect(m_obj_pose_x_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseX(double)));
@@ -709,8 +709,8 @@ void GraspingCommandPanel::setupGUI()
     connect(m_obj_pose_R_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseRoll(double)));
 #endif
 
-    connect(m_object_start_line_edit, SIGNAL(returnPressed()), this, SLOT(updateObjectStart()));
-    connect(m_object_goal_line_edit, SIGNAL(returnPressed()), this, SLOT(updateObjectGoal()));
+    connect(m_object_start_line_edit, SIGNAL(editingFinished()), this, SLOT(updateObjectStart()));
+    connect(m_object_goal_line_edit, SIGNAL(editingFinished()), this, SLOT(updateObjectGoal()));
 }
 
 bool GraspingCommandPanel::setRobotDescription(
