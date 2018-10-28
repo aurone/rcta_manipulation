@@ -116,7 +116,7 @@
         <!-- Flag indicating whether MoveIt! is allowed to load/unload or switch
         controllers. NOTE: This was set to $(arg fake_execution) before fake
         execution was moved outside of this package. I'm not sure under what
-        circumstances MoveIt! switches controllers, and it seems weird to not allow 
+        circumstances MoveIt! switches controllers, and it seems weird to not allow
         it to do that, but we'll keep it false here anyway. - Andrew
         -->
         <param name="moveit_manage_controllers" value="false"/>
