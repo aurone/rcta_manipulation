@@ -55,32 +55,43 @@ bool InitControlledRobot(
     const smpl::urdf::RobotModel* model,
     const smpl::urdf::RobotState* state)
 {
+    // number of variables, not including those for the root joint
     auto internal_variable_count =
-            smpl::urdf::GetVariableCount(model) -
-            GetVariableCount(smpl::urdf::GetRootJoint(model));
+            GetVariableCount(model) - GetVariableCount(GetRootJoint(model));
+
+    ROS_INFO("Root joint has %zu variables", GetVariableCount(GetRootJoint(model)));
+    ROS_INFO("Robot Model contains %zu variables", GetVariableCount(model));
+    ROS_INFO("Robot Model contains %zu internal variables", internal_variable_count);
 
     // TODO: non-mimic joints?
     robot->variable_count = internal_variable_count;
 
     robot->control_modes.resize(internal_variable_count, ControlledRobot::Position);
 
-    robot->joint_positions.resize(internal_variable_count, 0.0);
+    // HACK! known that root joint variables come first
+    auto* positions_begin = GetVariablePositions(state) + GetVariableCount(GetRootJoint(model));
+    auto* positions_end = GetVariablePositions(state) + GetVariableCount(model);
+    printf("set from %td variables [%p, %p]\n", positions_end - positions_begin, positions_begin, positions_end);
+    robot->joint_positions.assign(positions_begin, positions_end);
+
     robot->joint_velocities.resize(internal_variable_count, 0.0);
     robot->joint_efforts.resize(internal_variable_count, 0.0);
 
-    robot->position_commands.resize(internal_variable_count, 0.0);
+    robot->position_commands = robot->joint_positions;
     robot->velocity_commands.resize(internal_variable_count, 0.0);
     robot->effort_commands.resize(internal_variable_count, 0.0);
 
-    robot->prev_position_commands.resize(internal_variable_count, 0.0);
+    robot->prev_position_commands = robot->joint_positions;
     robot->prev_velocity_commands.resize(internal_variable_count, 0.0);
     robot->prev_effort_commands.resize(internal_variable_count, 0.0);
 
     // create and register handles to joint states and joint commands
     auto ii = 0;
-    for (auto i = 0; i < smpl::urdf::GetVariableCount(model); ++i) {
-        auto* var = smpl::urdf::GetVariable(model, i);
-        if (var->joint == smpl::urdf::GetRootJoint(model)) continue;
+    for (auto i = 0; i < GetVariableCount(model); ++i) {
+        auto* var = GetVariable(model, i);
+
+        // skip root joint variables
+        if (var->joint == GetRootJoint(model)) continue;
 
         ROS_INFO("Make joint state interface for joint variable '%s'", var->name.c_str());
 
