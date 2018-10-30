@@ -7,6 +7,7 @@ right_arm:
       heuristic_config: BFSConfigDefault
       graph_config: RightArmManipLatticeConfigDefault
       shortcut_config: PVJointConfigDefault
+      plan_output_dir: $(env HOME)/data/egraphs/roman_right_arm_paths
     right_arm_ARA_JD_ML:
       search_config: ARAConfigDefault
       heuristic_config: JointDistConfigDefault
@@ -60,6 +61,7 @@ right_arm_torso_base:
       heuristic_config: BFSConfigDefault
       graph_config: RightArmTorsoBaseWorkspace
       shortcut_config: PVJointConfigDefault
+      plan_output_dir: $(env HOME)/data/egraphs/roman_right_arm_torso_base_paths
     EGWA_BFSEG_WSEG:
       search_config: EGWAConfigDefault
       heuristic_config: BFSEGraphConfig
@@ -151,6 +153,7 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
+    mprim_filename: $(find roman_moveit_config)/config/right_arm.mprim
   RightArmManipLatticeEgraphConfigDefault:
     graph: manip_lattice_egraph
     discretization:
@@ -170,6 +173,8 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
+    mprim_filename: $(find roman_moveit_config)/config/right_arm.mprim
+    egraph_path: $(env HOME)/data/egraphs/roman_right_arm_paths
   RightArmWorkspaceConfigDefault:
     graph: workspace
   RightArmTorsoBaseWorkspace:
@@ -189,19 +194,20 @@ graph_configs:
   RightArmTorsoBaseWorkspaceEGraph:
     graph: workspace_egraph
     discretization:
-        fk_pos_x: 0.05
-        fk_pos_y: 0.05
-        fk_pos_z: 0.05
-        fk_rot_r: *one_degree
-#        fk_rot_p: 0.0698132             # 4 degree = 46 angles #181 angles
-        fk_rot_p: *one_degree
-        fk_rot_y: 0.0872664             # 5 degrees = 72 angles
-        limb_right_joint3: 0.0872664    # 5 degrees
-        torso_joint1: 0.0872664         # 5 degrees
-        world_joint_x: 0.05
-        world_joint_y: 0.05
-        world_joint_theta: 0.392699     # 22.5 degrees = 16 angles
-        hinge: 0.00001
+      fk_pos_x: 0.05
+      fk_pos_y: 0.05
+      fk_pos_z: 0.05
+      fk_rot_r: *one_degree
+#      fk_rot_p: 0.0698132             # 4 degree = 46 angles #181 angles
+      fk_rot_p: *one_degree
+      fk_rot_y: 0.0872664             # 5 degrees = 72 angles
+      limb_right_joint3: 0.0872664    # 5 degrees
+      torso_joint1: 0.0872664         # 5 degrees
+      world_joint_x: 0.05
+      world_joint_y: 0.05
+      world_joint_theta: 0.392699     # 22.5 degrees = 16 angles
+      hinge: 0.00001
+    egraph_path: $(env HOME)/data/egraphs/roman_right_arm_torso_base_paths
   LeftArmManipLatticeConfigDefault:
     graph: manip
     discretization:
@@ -221,6 +227,7 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
+    mprim_filename: $(find roman_moveit_config)/config/right_arm.mprim
   BothArmsAndTorsoManipLatticeConfigDefault:
     graph: manip
     discretization:
@@ -248,6 +255,7 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
+    mprim_filename: $(find roman_moveit_config)/config/both_arms_and_torso.mprim
   RightArmAndTorsoManipLatticeConfigDefault:
     graph: manip
     # angular resolution of each active joint variable
@@ -269,6 +277,7 @@ graph_configs:
     rpy_snap_dist_thresh: 0.04
     xyzrpy_snap_dist_thresh: 0.04 #0.2
     short_dist_mprims_thresh: 0.4
+    mprim_filename: $(find roman_moveit_config)/config/right_arm_and_torso.mprim
 
 shortcut_configs:
   PVJointConfigDefault:
