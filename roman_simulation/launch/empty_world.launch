@@ -42,4 +42,7 @@ should probably be factored out to a common location. -->
   <group if="$(arg gui)">
     <node name="gazebo_gui" pkg="gazebo_ros" type="gzclient" respawn="false"/>
   </group>
+
+  <include file="$(find roman_model)/robots/upload_rcta_roman.launch"/>
+  <node name="spawn_roman" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -model rcta_roman"/>
 </launch>
