@@ -1,6 +1,9 @@
 #include <algorithm>
 #include <ros/ros.h>
+#define private public
 #include <controller_manager/controller_manager.h>
+#undef private
+#define private private
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
@@ -283,8 +286,22 @@ int main(int argc, char* argv[])
 
     ros::Rate loop_rate(500.0);
 
+    auto empty = [&]()
+    {
+#if 1
+        // someone please explain to me how to prevent a controller manager from
+        // dying until all externally-loaded controllers have been unloaded if
+        // there is no way to query how many controllers exist, without
+        // hijacking these private members.
+        boost::unique_lock<boost::recursive_mutex> lock(manager.controllers_lock_);
+        return manager.controllers_lists_[manager.current_controllers_list_].empty();
+#else
+        return false;
+#endif
+    };
+
     auto prev_time = ros::Time::now();
-    while (ros::ok()) {
+    while (ros::ok() && !empty()) {
         auto now = ros::Time::now();
         auto dt = now - prev_time;
         prev_time = now;
