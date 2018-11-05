@@ -1,63 +1,16 @@
 <launch>
     <include file="$(find roman_model)/robots/upload_rcta_roman.launch"/>
     <node name="robot_simulator" pkg="roman_simulation" type="robot_simulator"/>
-    <rosparam>
-        # JOINT STATE CONTROLLER
-        joint_state_controller:
-          type: joint_state_controller/JointStateController
-          publish_rate: 50
-        # TORSO + RIGHT ARM TRAJECTORY CONTROLLER
-        rcta_joint_trajectory_controller:
-          type: position_controllers/JointTrajectoryController
-          joints:
-            - torso_joint1
-            - limb_right_joint1
-            - limb_right_joint2
-            - limb_right_joint3
-            - limb_right_joint4
-            - limb_right_joint5
-            - limb_right_joint6
-            - limb_right_joint7
-            - limb_left_joint1
-            - limb_left_joint2
-            - limb_left_joint3
-            - limb_left_joint4
-            - limb_left_joint5
-            - limb_left_joint6
-            - limb_left_joint7
-          constraints:
-            goal_time: 0.5
-            stopped_velocity_tolerance: 0.02
-          #allow_partial_joints_goal: True
-        rcta_right_robotiq_controller:
-          type: position_controllers/JointGroupPositionController
-          joints:
-            - limb_right_finger_1_joint_1
-            - limb_right_finger_2_joint_1
-            - limb_right_finger_middle_joint_1
-        rcta_left_robotiq_controller:
-          type: position_controllers/JointGroupPositionController
-          joints:
-            - limb_left_finger_1_joint_1
-            - limb_left_finger_2_joint_1
-            - limb_left_finger_middle_joint_1
-        rcta_velocity_controller:
-          type: "diff_drive_controller/DiffDriveController"
-          left_wheel: ['front_left_wheel', 'rear_left_wheel']
-          right_wheel: ['front_right_wheel', 'rear_right_wheel']
-          pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.03]
-          twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.03]
-          pose_covariance_diagonal: [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 0.03]
-          twist_covariance_diagonal: [0.001, 0.001, 0.001, 1000000.0, 1000000.0, 0.03]
-          cmd_vel_timeout: 0.25
-    </rosparam>
+    <rosparam command="load" file="$(find roman_simulation)/config/roman_control_sim.yaml"/>
 
-    <!-- TODO: this appears to be the culprit that won't die on C-c...probably
-    because the controller manager dies way before the controller spawner is
-    able to unload controllers.
+    <!-- This node is the culprit that won't die on C-c (at least in indigo)
+    since it attempts to unload the controllers after the controller manager
+    has already died. The shutdown-timeout argument makes this less terrible,
+    but it is deprecated in xenial/kinetic.
     -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner"
-            args="--shutdown-timeout 0.5 joint_state_controller rcta_joint_trajectory_controller rcta_left_robotiq_controller rcta_right_robotiq_controller rcta_velocity_controller"/>
+            args="--shutdown-timeout 0.5 joint_state_controller rcta_joint_trajectory_controller
+                  rcta_left_robotiq_controller rcta_right_robotiq_controller rcta_velocity_controller"/>
 
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 
