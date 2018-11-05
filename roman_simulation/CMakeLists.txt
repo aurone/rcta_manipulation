@@ -13,8 +13,10 @@ find_package(
         actionlib
         controller_manager
         eigen_conversions
+        gazebo_ros_control
         hardware_interface
         nav_msgs
+        pluginlib
         rosbag
         roscpp
         rospack
@@ -25,6 +27,7 @@ find_package(
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(gazebo REQUIRED)
 pkg_check_modules(sdl2 REQUIRED sdl2)
 find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
@@ -57,6 +60,33 @@ target_link_libraries(
     ${sdl2_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${GLEW_LIBRARIES})
+
+# A gazebo_ros_control::RobotHWSim plugin for kinematic control of a robot
+# within Gazebo
+add_library(
+    kinematic_robot_hw_sim
+    src/kinematic_robot_hw_sim/kinematic_robot_hw_sim.cpp)
+target_compile_options(kinematic_robot_hw_sim PRIVATE -std=c++11)
+target_include_directories(
+    kinematic_robot_hw_sim
+    SYSTEM
+    PRIVATE
+    ${GAZEBO_INCLUDE_DIRS}
+    ${pluginlib_INCLUDE_DIRS}
+    ${gazebo_ros_control_INCLUDE_DIRS}
+    ${roscpp_INCLUDE_DIRS}
+    ${smpl_urdf_robot_model_INCLUDE_DIRS}
+    ${hardware_interface_INCLUDE_DIRS})
+target_link_libraries(
+    kinematic_robot_hw_sim
+    PRIVATE
+    ${GAZEBO_LIBRARIES}
+    ${pluginlib_LIBRARIES}
+    ${gazebo_ros_control_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${smpl_urdf_robot_model_LIBRARIES}
+    ${hardware_interface_LIBRARIES})
+target_compile_options(kinematic_robot_hw_sim PRIVATE ${GAZEBO_CXX_FLAGS})
 
 add_executable(
     ground_truth_publisher
