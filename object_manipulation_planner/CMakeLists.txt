@@ -20,6 +20,7 @@ find_package(
         smpl_moveit_interface
         moveit_msgs
         moveit_ros_planning
+        moveit_ros_planning_interface
         roscpp
         sbpl_collision_checking
         smpl_urdf_robot_model
@@ -63,6 +64,35 @@ target_include_directories(object_manip_planner_node SYSTEM PRIVATE ${eigen_conv
 target_link_libraries(object_manip_planner_node ${eigen_conversions_LIBRARIES})
 target_link_libraries(object_manip_planner_node object_manip_planner)
 target_link_libraries(object_manip_planner_node profiler)
+
+add_executable(simple_crate_planner src/simple_crate_planner.cpp)
+target_compile_options(simple_crate_planner PRIVATE -std=c++11)
+target_include_directories(
+    simple_crate_planner
+    SYSTEM PRIVATE
+    ${EIGEN3_INCLUDE_DIR}
+    ${actionlib_INCLUDE_DIRS}
+    ${cmu_manipulation_msgs_INCLUDE_DIRS}
+    ${control_msgs_INCLUDE_DIRS}
+    ${eigen_conversions_INCLUDE_DIRS}
+    ${moveit_ros_planning_interface_INCLUDE_DIRS}
+    ${roscpp_INCLUDE_DIRS}
+    ${smpl_urdf_robot_model_INCLUDE_DIRS}
+    ${smpl_ros_INCLUDE_DIRS}
+    ${urdfdom_INCLUDE_DIRS})
+target_link_libraries(
+    simple_crate_planner
+    PRIVATE
+    ${actionlib_LIBRARIES}
+    ${moveit_ros_planning_interface_LIBRARIES}
+    ${cmu_manipulation_msgs_LIBRARIES}
+    ${control_msgs_LIBRARIES}
+    ${eigen_conversions_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${smpl_urdf_robot_model_LIBRARIES}
+    ${smpl_ros_LIBRARIES}
+    ${urdfdom_LIBRARIES}
+    smpl::smpl)
 
 add_executable(manipulate_object src/manipulate_object.cpp)
 target_include_directories(manipulate_object SYSTEM PRIVATE ${cmu_manipulation_msgs_INCLUDE_DIRS})

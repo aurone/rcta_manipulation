@@ -70,10 +70,10 @@ bool ExecuteTrajectory(
     const ros::NodeHandle& nh,
     const std::vector<std::unique_ptr<Command>>& commands)
 {
-    using GripperCommandActionServer =
+    using GripperCommandActionClient =
             actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
 
-    using FollowJointTrajectoryActionServer =
+    using FollowJointTrajectoryActionClient =
             actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
     std::string traj_client_name;
@@ -85,14 +85,14 @@ bool ExecuteTrajectory(
     }
 
     ROS_INFO("Wait for action server '%s'", traj_client_name.c_str());
-    FollowJointTrajectoryActionServer traj_client(traj_client_name);
+    FollowJointTrajectoryActionClient traj_client(traj_client_name);
     if (!traj_client.waitForServer()) {
         ROS_WARN("Failed to wait for action server '%s'", traj_client_name.c_str());
         return 1;
     }
 
     ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
-    GripperCommandActionServer gripper_client(gripper_client_name);
+    GripperCommandActionClient gripper_client(gripper_client_name);
     if (!gripper_client.waitForServer()) {
         ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
         return 1;

@@ -500,7 +500,7 @@ int main(int argc, char* argv[])
 
     // initialize object state...
     smpl::urdf::RobotState object_state;
-    if (!Init(&object_state, &object_model)) {
+    if (!InitRobotState(&object_state, &object_model)) {
         SMPL_ERROR("Failed to initialize object state");
         return 1;
     }

@@ -1,0 +1,7 @@
+<launch>
+    <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
+    <node name="simple_crate_planner" pkg="object_manipulation_planner"
+            type="simple_crate_planner">
+        <!-- TODO object_description -->
+    </node>
+</launch>

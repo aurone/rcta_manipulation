@@ -266,7 +266,7 @@ int main(int argc, char* argv[])
     smpl::urdf::RobotState robot_state;
     auto with_velocities = true;
     auto with_accelerations = true;
-    if (!Init(&robot_state, &robot_model, with_velocities, with_accelerations)) {
+    if (!InitRobotState(&robot_state, &robot_model, with_velocities, with_accelerations)) {
         ROS_ERROR("Failed to initialize Robot State");
         return -3;
     }
@@ -301,7 +301,7 @@ int main(int argc, char* argv[])
     };
 
     auto prev_time = ros::Time::now();
-    while (ros::ok() && !empty()) {
+    while (ros::ok() || !empty()) {
         auto now = ros::Time::now();
         auto dt = now - prev_time;
         prev_time = now;
