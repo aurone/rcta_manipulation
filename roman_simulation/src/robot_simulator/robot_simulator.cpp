@@ -319,21 +319,21 @@ int main(int argc, char* argv[])
 
     ROS_INFO("ready");
 
-    ros::AsyncSpinner spinner(2);
+    ros::AsyncSpinner spinner(1);
     spinner.start();
 
     ros::Rate loop_rate(500.0);
-
-    auto list_controllers = ph.serviceClient<controller_manager_msgs::ListControllers>("/controller_manager/list_controllers");
 
     auto prev_time = ros::Time::now();
     ros::WallTime shutdown_time;
     while (ros::ok()) {
         if (g_request_shutdown) {
-            // after shutdown is requested, we expect a service call to come in
-            // on a separate thread to unload the controllers. unloading the
-            // controllers will lock the controllers mutex, and the main thread
-            // is supposed to unload the controllers during manager.update()
+            // After shutdown is requested, we expect multiple service calls to
+            // come in on the spinner thread to unload the controllers. Each
+            // service call will lock the controllers until manager.update is
+            // called to properly unload them. We'll keep checking here for
+            // when those services have terminated and there are no more
+            // running controllers.
             if (ros::WallTime::now() > g_request_shutdown_time + ros::WallDuration(5.0)) {
                 ROS_WARN("Timed out waiting for someone to unload controllers...");
                 ros::shutdown();
