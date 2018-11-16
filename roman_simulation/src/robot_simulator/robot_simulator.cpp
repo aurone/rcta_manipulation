@@ -1,4 +1,7 @@
+#include <signal.h>
+#include <atomic>
 #include <algorithm>
+#include <mutex>
 #include <ros/ros.h>
 #define private public
 #include <controller_manager/controller_manager.h>
@@ -229,6 +232,37 @@ void ControlledRobot::write()
 }
 #endif
 
+bool HasControllers(controller_manager::ControllerManager* manager)
+{
+#if 1
+    // someone please explain to me how to prevent a controller manager from
+    // dying until all externally-loaded controllers have been unloaded if
+    // there is no way to query how many controllers exist, without
+    // hijacking these private members.
+    ROS_WARN("lock");
+    boost::unique_lock<boost::recursive_mutex> lock(manager->controllers_lock_);
+//    return !manager->controller_loaders_.empty();
+//    return !manager->controllers_lists_[manager->current_controllers_list_].empty();
+
+    return !manager->controllers_lists_[0].empty() ||
+            !manager->controllers_lists_[1].empty();
+#else
+    return false;
+#endif
+};
+
+
+std::atomic<bool> g_request_shutdown(false);
+ros::WallTime g_request_shutdown_time;
+void HandleInterrupt(int signal)
+{
+    ROS_WARN("Received SIGINT");
+
+    g_request_shutdown = true;
+    g_request_shutdown_time = ros::WallTime::now();
+    return;
+}
+
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "robot_simulator");
@@ -279,29 +313,44 @@ int main(int argc, char* argv[])
 
     controller_manager::ControllerManager manager(&robot);
 
+    // Register is our SIGINT Handler so that we can delay shutdown until
+    // after controllers are unloaded.
+    signal(SIGINT, HandleInterrupt);
+
     ROS_INFO("ready");
 
-    ros::AsyncSpinner spinner(1);
+    ros::AsyncSpinner spinner(2);
     spinner.start();
 
     ros::Rate loop_rate(500.0);
 
-    auto empty = [&]()
-    {
-#if 1
-        // someone please explain to me how to prevent a controller manager from
-        // dying until all externally-loaded controllers have been unloaded if
-        // there is no way to query how many controllers exist, without
-        // hijacking these private members.
-        boost::unique_lock<boost::recursive_mutex> lock(manager.controllers_lock_);
-        return manager.controllers_lists_[manager.current_controllers_list_].empty();
-#else
-        return false;
-#endif
-    };
+    auto list_controllers = ph.serviceClient<controller_manager_msgs::ListControllers>("/controller_manager/list_controllers");
 
     auto prev_time = ros::Time::now();
-    while (ros::ok() || !empty()) {
+    ros::WallTime shutdown_time;
+    while (ros::ok()) {
+        if (g_request_shutdown) {
+            // after shutdown is requested, we expect a service call to come in
+            // on a separate thread to unload the controllers. unloading the
+            // controllers will lock the controllers mutex, and the main thread
+            // is supposed to unload the controllers during manager.update()
+            if (ros::WallTime::now() > g_request_shutdown_time + ros::WallDuration(5.0)) {
+                ROS_WARN("Timed out waiting for someone to unload controllers...");
+                ros::shutdown();
+                break;
+            }
+
+            if (manager.controllers_lock_.try_lock()) {
+                bool empty = manager.controllers_lists_[manager.current_controllers_list_].empty();
+                manager.controllers_lock_.unlock();
+                if (empty) {
+                    ROS_WARN("controllers empty -> trigger shutdown");
+                    ros::shutdown();
+                    break;
+                }
+            }
+        }
+
         auto now = ros::Time::now();
         auto dt = now - prev_time;
         prev_time = now;
