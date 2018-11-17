@@ -241,7 +241,9 @@ bool PlanManipulationTrajectory(
         auto robot_model = interm_state.getRobotModel();
         auto* group = robot_model->getJointModelGroup(group_name);
 
-        if (interm_state.setFromIK(group, contact_pose, tool_link_name)) {
+        auto consistency_limits = std::vector<double>(group->getVariableCount(), smpl::to_radians(22.5));
+
+        if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
             visualization_msgs::MarkerArray ma;
             std_msgs::ColorRGBA color;
             color.r = 1.0f;
@@ -430,6 +432,15 @@ bool ManipulateObject(
     {
         auto sample_manifold = [&](double alpha) -> Eigen::Affine3d
         {
+            auto* contact_link = GetLink(object_model, "tool");
+            if (contact_link == NULL) {
+                ROS_ERROR("No 'tool' link");
+                return Eigen::Affine3d::Identity();
+            }
+
+            SetVariablePosition(&object_state, lid_var, lid_limits->max_position);
+            auto default_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
+
             auto s = interp(
                     get_lid_pos_from_pct(goal->object_start),
                     get_lid_pos_from_pct(goal->object_goal),
@@ -437,14 +448,9 @@ bool ManipulateObject(
             ROS_DEBUG("set lid to %f", s);
 
             SetVariablePosition(&object_state, lid_var, s);
-
-            auto* contact_link = GetLink(object_model, "tool");
-            if (contact_link == NULL) {
-                ROS_ERROR("No 'tool' link");
-                return Eigen::Affine3d::Identity();
-            }
-
             auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
+            contact_pose = smpl::Translation3(contact_pose.translation()) *
+                    smpl::Quaternion(default_pose.rotation());
             contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
             return contact_pose;
         };
