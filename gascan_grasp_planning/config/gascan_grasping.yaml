@@ -20,8 +20,8 @@ wrist_to_tool_transform:
     y: -0.05
     z: 0.0
   orientation:
-    w: -0.707
-    x: 0.707
+    w: 1.0
+    x: 0.0
     y: 0.0
     z: 0.0
 
