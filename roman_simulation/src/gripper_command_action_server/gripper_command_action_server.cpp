@@ -29,7 +29,10 @@ void Execute(
 
     command_pub->publish(command);
 
-    server->setSucceeded();
+    control_msgs::GripperCommandResult result;
+    result.reached_goal = true;
+    result.position = goal->command.position;
+    server->setSucceeded(result);
 }
 
 int main(int argc, char* argv[])
