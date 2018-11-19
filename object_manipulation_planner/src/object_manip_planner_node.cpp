@@ -15,15 +15,18 @@
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
+#include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit_msgs/DisplayTrajectory.h>
 #include <smpl_moveit_interface/planner/moveit_robot_model.h>
 #include <ros/ros.h>
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
+#include <smpl/stl/memory.h>
 #include <smpl/distance_map/euclid_distance_map.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
 #include <smpl/occupancy_grid.h>
+#include <tf/transform_listener.h>
 #include <gperftools/profiler.h>
 
 #include <cmu_manipulation_msgs/ManipulateObjectAction.h>
@@ -240,6 +243,7 @@ using ManipulateObjectActionServer =
 void ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
     const std::string& group_name,
+    const moveit::core::RobotState* real_start_state,
     smpl::collision::CollisionSpace& cspace,
     sbpl_interface::MoveItRobotModel& planning_model,
     ObjectManipPlanner* planner,
@@ -248,10 +252,10 @@ void ManipulateObject(
     ManipulateObjectActionServer* server,
     const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
 {
-    moveit::core::RobotState start_state(robot_model);
+    moveit::core::RobotState start_state(*real_start_state);
 
     // TODO: initialize to current state values
-    start_state.setToDefaultValues();
+//    start_state.setToDefaultValues();
 
     // because fuck you moveit, plz stahp throwing exceptions...unreferenced
     // but keeping this around in case we explode
@@ -395,7 +399,8 @@ int main(int argc, char* argv[])
     ros::NodeHandle nh;
     ros::NodeHandle ph("~");
 
-    auto display_publisher = ph.advertise<moveit_msgs::DisplayTrajectory>("planned_path", 1);
+    auto display_publisher =
+            ph.advertise<moveit_msgs::DisplayTrajectory>("planned_path", 1);
 
     smpl::VisualizerROS visualizer;
     smpl::visual::set_visualizer(&visualizer);
@@ -463,7 +468,13 @@ int main(int argc, char* argv[])
     auto object_min_position = 0.0;
     auto object_max_position = 1.0;
     ObjectManipModel omanip;
-    if (!Init(&omanip, &planning_model, "hinge", object_min_position, object_max_position)) {
+    if (!Init(
+            &omanip,
+            &planning_model,
+            "hinge",
+            object_min_position,
+            object_max_position))
+    {
         ROS_ERROR("Failed to initialize Object Manipulation Model");
         return 1;
     }
@@ -492,20 +503,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-#if 1
     auto df = std::make_shared<smpl::EuclidDistanceMap>(origin_x, origin_y, origin_z, size_x, size_y, size_z, resolution, max_dist);
     auto grid = smpl::OccupancyGrid(df, false);
-#else
-    auto grid = smpl::OccupancyGrid(
-            size_x,
-            size_y,
-            size_z,
-            resolution,
-            origin_x,
-            origin_y,
-            origin_z,
-            max_dist);
-#endif
 
     grid.setReferenceFrame(planning_frame);
     SV_SHOW_INFO(grid.getBoundingBoxVisualization());
@@ -572,14 +571,26 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    ////////////////////////////////////////
+    // Fire up planning/execution service //
+    ////////////////////////////////////////
+
+    auto listener = boost::make_shared<tf::TransformListener>();
+    auto state_monitor =
+            smpl::make_unique<planning_scene_monitor::CurrentStateMonitor>(
+                    robot_model, listener);
+    state_monitor->startStateMonitor();
+
     auto autostart = false;
     ManipulateObjectActionServer server(
             "manipulate_object",
             [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
             {
+                auto curr_state = state_monitor->getCurrentState();
                 return ManipulateObject(
                         robot_model,
                         group_name,
+                        curr_state.get(),
                         cspace,
                         planning_model,
                         &planner,
