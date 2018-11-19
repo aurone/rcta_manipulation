@@ -24,7 +24,8 @@ find_package(
         roscpp
         sbpl_collision_checking
         smpl_urdf_robot_model
-        smpl_ros)
+        smpl_ros
+        tf)
 
 find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
@@ -45,25 +46,42 @@ add_library(
     src/roman_workspace_lattice_action_space.cpp
     src/roman_object_manip_lattice.cpp)
 
-target_include_directories(object_manip_planner SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
-target_include_directories(object_manip_planner SYSTEM PUBLIC ${catkin_INCLUDE_DIRS})
-target_include_directories(object_manip_planner PUBLIC include)
+target_include_directories(
+    object_manip_planner
+    SYSTEM PUBLIC
+    ${Boost_INCLUDE_DIRS}
+    ${catkin_INCLUDE_DIRS}
+    include)
 target_link_libraries(
     object_manip_planner
+    PUBLIC
     ${smpl_moveit_interface_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${sbpl_collision_checking_LIBRARIES}
-    ${smpl_LIBRARIES}
+    smpl::smpl
     ${smpl_ros_LIBRARIES})
 
 add_executable(object_manip_planner_node src/object_manip_planner_node.cpp)
-target_include_directories(object_manip_planner_node SYSTEM PRIVATE ${cmu_manipulation_msgs_INCLUDE_DIRS})
-target_include_directories(object_manip_planner_node SYSTEM PRIVATE ${eigen_conversions_INCLUDE_DIRS})
-target_link_libraries(object_manip_planner_node ${eigen_conversions_LIBRARIES})
-target_link_libraries(object_manip_planner_node object_manip_planner)
-target_link_libraries(object_manip_planner_node profiler)
+target_include_directories(
+    object_manip_planner_node
+    SYSTEM PRIVATE
+    ${actionlib_INCLUDE_DIRS}
+    ${cmu_manipulation_msgs_INCLUDE_DIRS}
+    ${control_msgs_INCLUDE_DIRS}
+    ${eigen_conversions_INCLUDE_DIRS}
+    ${tf_INCLUDE_DIRS})
+target_link_libraries(
+    object_manip_planner_node
+    PRIVATE
+    ${actionlib_LIBRARIES}
+    ${cmu_manipulation_msgs_LIBRARIES}
+    ${control_msgs_LIBRARIES}
+    ${eigen_conversions_LIBRARIES}
+    ${tf_LIBRARIES}
+    object_manip_planner
+    profiler)
 
 add_executable(simple_crate_planner src/simple_crate_planner.cpp)
 target_compile_options(simple_crate_planner PRIVATE -std=c++11)
