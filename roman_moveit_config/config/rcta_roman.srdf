@@ -91,6 +91,16 @@
         <joint name="limb_right_joint7" value="-1.57079"/>
     </group_state>
 
+    <group_state name="premanip_2" group="right_arm">
+        <joint name="limb_right_joint1" value="-2.356194490192343"/>
+        <joint name="limb_right_joint2" value="-0.7853981633974494"/>
+        <joint name="limb_right_joint3" value="-4.163336342344337e-17"/>
+        <joint name="limb_right_joint4" value="-1.5707963267948977"/>
+        <joint name="limb_right_joint5" value="-1.047197551196599"/>
+        <joint name="limb_right_joint6" value="-2.094395102393197"/>
+        <joint name="limb_right_joint7" value="-2.3561944901923413"/>
+    </group_state>
+
     <group_state name="calibration" group="left_arm">
         <joint name="limb_left_joint1" value="1.57079"/>
         <joint name="limb_left_joint2" value="0.0"/>
