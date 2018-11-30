@@ -377,6 +377,110 @@ auto MakePoseTransform(double x, double y, double theta) -> Eigen::Affine3d
     return Eigen::Translation3d(x, y, 0.0) * Eigen::AngleAxisd(theta, Eigen::Vector3d::Zero());
 }
 
+auto ComputeRotationHeuristic(
+    int disc_src_theta,     // discrete source orientation
+    int disc_dst_theta,     // discrete destination orientation
+    double src_theta,       // continuous source orientation
+    double dst_theta,       // continuous destination orientation
+    double dx,              // continuous base delta
+    double dy,
+    double dtheta,
+    int disc_dx,            // discrete base delta
+    int disc_dy,
+    int disc_dtheta,
+    int heading_condition,  // type of condition to determine if heading is considered
+    double heading_thresh,
+    int num_angles,         // number of discrete angles
+    double angle_res,       // resolution of each discrete angle
+    bool discretize)        // whether to discrete the result
+    -> double
+{
+    // determine whether to include a heading term
+    auto add_heading = false;
+    switch (heading_condition) {
+    case ObjectManipHeuristic::HeadingCondition::Discrete:
+        add_heading = (disc_dx != 0 || disc_dy != 0);
+        break;
+    case ObjectManipHeuristic::HeadingCondition::Continuous:
+        add_heading = (dx * dx + dy * dy) > heading_thresh * heading_thresh;
+        break;
+    case ObjectManipHeuristic::HeadingCondition::None:
+        add_heading = false;
+        break;
+    }
+
+    // compute heading term if required
+    auto heading = 0.0;
+    if (add_heading) {
+        heading = atan2(dy, dx);
+    }
+
+    if (add_heading) {
+        if (discretize) {
+            auto disc_heading = discretize_angle(heading, angle_res, num_angles);
+            // heading pointing in the opposite direction
+            auto disc_heading_back = disc_heading + (num_angles >> 1);
+            if (shortest_angle_dist(disc_src_theta, disc_heading, num_angles) <
+                shortest_angle_dist(disc_src_theta, disc_heading_back, num_angles))
+            {
+                auto disc_angle_dist =
+                        shortest_angle_dist(
+                                disc_src_theta, disc_heading, num_angles) +
+                        shortest_angle_dist(
+                                disc_heading, disc_dst_theta, num_angles);
+                return angle_res * (double)disc_angle_dist;
+            } else {
+                auto disc_angle_dist =
+                        shortest_angle_dist(
+                                disc_heading_back, disc_src_theta, num_angles) +
+                        shortest_angle_dist(
+                                disc_heading_back, disc_dst_theta, num_angles);
+                return angle_res * (double)disc_angle_dist;
+            }
+        } else {
+            auto heading_back = heading + M_PI;
+            // rotate to face the target base position forwards or backwards
+            if (smpl::shortest_angle_dist(src_theta, heading) <
+                smpl::shortest_angle_dist(src_theta, heading_back))
+            {
+                // face towards the target base position
+                return smpl::shortest_angle_dist(src_theta, heading) +
+                        smpl::shortest_angle_dist(heading, dst_theta);
+            } else {
+                // face away from the target base position
+                return smpl::shortest_angle_dist(src_theta, heading_back) +
+                        smpl::shortest_angle_dist(heading_back, dst_theta);
+            }
+        }
+    } else {
+        if (discretize) {
+            return angle_res * double(disc_dtheta);
+        } else {
+            // return nominal rotation term
+            return dtheta;
+        }
+    }
+
+    assert(0);
+    return 0.0;
+}
+
+auto ComputePositionHeuristic(
+    double dx, double dy,
+    double disc_dx, double disc_dy,
+    double x_res, double y_res,
+    bool discretize)
+    -> double
+{
+    if (discretize) {
+        auto cdx = x_res * disc_dx;
+        auto cdy = y_res * disc_dy;
+        return std::sqrt(cdx * cdx + cdy * cdy);
+    } else {
+        return std::sqrt(dx * dx + dy * dy);
+    }
+}
+
 int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
 {
     SMPL_DEBUG_NAMED(H_LOG, "GetGoalHeuristic(%d)", state_id);
@@ -384,7 +488,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     auto* graph = static_cast<RomanObjectManipLattice*>(heur->planningSpace());
 
     if (state_id == graph->getGoalStateID()) {
-        SMPL_DEBUG_NAMED(H_LOG, "h(goal) = 0");
+        SMPL_DEBUG_NAMED(H_LOG, "  h(goal) = 0");
         return 0;
     }
 
@@ -401,11 +505,15 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
             "map",
             "state_base"));
 
-    SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state->state);
+//    SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state->state);
 
     auto phi = graph->getPhiCoord(state->coord);
+
+    // Test whether the task-space projection of this state is coincident with
+    // any state on the demonstration
     auto on_demo = heur->phi_heuristic.find(phi) != end(heur->phi_heuristic);
-    SMPL_DEBUG_NAMED(H_LOG, "on-demo(state) = %s", on_demo ? "true" : "false");
+
+    SMPL_DEBUG_NAMED(H_LOG, "  on-demo(state) = %s", on_demo ? "true" : "false");
 
     SMPL_DEBUG_NAMED(H_LOG, "  phi(state) = (%d, %d, %d)", phi[0], phi[1], phi[2]);
 
@@ -421,12 +529,17 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     heur->eg->getExperienceGraphNodes(state_id, the_nodes);
     auto is_egraph = !the_nodes.empty();
 
+    // If our projected state is coincident with any state on the projected
+    // e-graph, we'll consider the state on the projected e-graph, otherwise
+    // we'll consider offsets from the projected e-graph, to bias the search
+    // towards pre-grasps.
     auto& phis = on_demo ?
             heur->z_to_phi[state->coord[OB_P]] :
             heur->z_to_pre_phi[state->coord[OB_P]];
+
     auto& egraph_nodes = heur->z_to_egraph_node[state->coord[OB_P]];
 
-    SMPL_DEBUG_NAMED(H_LOG, "Inspect %zu phi nodes", phis.size());
+    SMPL_DEBUG_NAMED(H_LOG, "  Inspect %zu phi nodes", phis.size());
     for (auto i = 0; i < phis.size(); ++i) {
         ///////////////////////
         // Compute h_contact //
@@ -481,87 +594,43 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
                 "egraph_base"));
 
         // pose delta in discrete space
-        auto ddx = graph_state->coord[BD_PX] - egraph_graph_state->coord[BD_PX];
-        auto ddy = graph_state->coord[BD_PY] - egraph_graph_state->coord[BD_PY];
-        auto ddtheta = shortest_angle_dist(graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH], graph->m_val_count[BD_TH]);
+        auto disc_dx = graph_state->coord[BD_PX] - egraph_graph_state->coord[BD_PX];
+        auto disc_dy = graph_state->coord[BD_PY] - egraph_graph_state->coord[BD_PY];
+        auto disc_dtheta = shortest_angle_dist(graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH], graph->m_val_count[BD_TH]);
 
-        SMPL_DEBUG_NAMED(HV_LOG, "    disc delta base = (%d, %d, %d)", ddx, ddy, ddtheta);
+        SMPL_DEBUG_NAMED(HV_LOG, "    disc delta base = (%d, %d, %d)", disc_dx, disc_dy, disc_dtheta);
 
         // pose delta in continuous space
-        auto dbx = egraph_state[WORLD_JOINT_X] - state->state[WORLD_JOINT_X];
-        auto dby = egraph_state[WORLD_JOINT_Y] - state->state[WORLD_JOINT_Y];
-        auto dbtheta = smpl::shortest_angle_dist(
+        auto dx = egraph_state[WORLD_JOINT_X] - state->state[WORLD_JOINT_X];
+        auto dy = egraph_state[WORLD_JOINT_Y] - state->state[WORLD_JOINT_Y];
+        auto dtheta = smpl::shortest_angle_dist(
                 egraph_state[WORLD_JOINT_THETA], state->state[WORLD_JOINT_THETA]);
 
         auto rot_dist = 0.0;
         if (heur->use_rotation) {
-            auto heading = atan2(dby, dbx);
-
-            // determine whether to add heading information
-            auto add_heading = false;
-            switch (heur->heading_condition) {
-            case 0:
-                add_heading = (ddx != 0 || ddy != 0);
-                break;
-            case 1:
-                add_heading = dbx * dbx + dby * dby > heur->heading_thresh * heur->heading_thresh;
-                break;
-            case 2:
-                break;
-            }
-
-            auto num_angles = graph->m_val_count[BD_TH];
-
-            if (add_heading) {
-                if (heur->disc_rotation_heuristic) {
-                    auto disc_heading = discretize_angle(
-                            heading,
-                            graph->resolution()[BD_TH],
-                            graph->m_val_count[BD_TH]);
-                    auto disc_theta = graph_state->coord[BD_TH];
-                    auto egraph_theta = egraph_graph_state->coord[BD_TH];
-                    if (shortest_angle_dist(disc_heading, disc_theta, num_angles) <
-                        shortest_angle_dist(disc_heading + (num_angles >> 1), disc_theta, num_angles))
-                    {
-                        rot_dist =
-                                2.0 * M_PI / num_angles *
-                                double(shortest_angle_dist(disc_heading, disc_theta, num_angles) +
-                                shortest_angle_dist(disc_heading, egraph_theta, num_angles));
-                    } else {
-                        rot_dist =
-                                2.0 * M_PI / num_angles *
-                                double(shortest_angle_dist(disc_heading + (num_angles >> 1), disc_theta, num_angles) +
-                                shortest_angle_dist(disc_heading + (num_angles >> 1), egraph_theta, num_angles));
-                    }
-                } else {
-                    // closer to face the e-graph state's base position
-                    if (smpl::shortest_angle_dist(heading, state->state[WORLD_JOINT_THETA]) <
-                        smpl::shortest_angle_dist(heading + M_PI, state->state[WORLD_JOINT_THETA]))
-                    {
-                        rot_dist =
-                                smpl::shortest_angle_dist(heading, state->state[WORLD_JOINT_THETA]) +
-                                smpl::shortest_angle_dist(heading, egraph_state[WORLD_JOINT_THETA]);
-                    } else { // close to face away from the e-graph state's base position
-                        rot_dist =
-                                smpl::shortest_angle_dist(heading + M_PI, state->state[WORLD_JOINT_THETA]) +
-                                smpl::shortest_angle_dist(heading + M_PI, egraph_state[WORLD_JOINT_THETA]);
-                    }
-                }
-            } else {
-                // return nominal rotation term
-                if (heur->disc_rotation_heuristic) {
-                    rot_dist = 2.0 * M_PI / num_angles * double(ddtheta);
-                } else {
-                    rot_dist = deadband(dbtheta, heur->theta_db);
-                }
+            rot_dist = ComputeRotationHeuristic(
+                    graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH],
+                    graph_state->state[BD_TH], egraph_graph_state->coord[BD_TH],
+                    dx, dy, dtheta,
+                    disc_dx, disc_dy, disc_dtheta,
+                    heur->heading_condition,
+                    heur->heading_thresh,
+                    graph->m_val_count[BD_TH],
+                    graph->resolution()[BD_TH],
+                    heur->disc_rotation_heuristic);
+            if (!heur->disc_rotation_heuristic) {
+                rot_dist = deadband(rot_dist, heur->theta_db);
             }
         }
 
-        auto pos_dist = 0.0;
-        if (heur->disc_position_heuristic) {
-            pos_dist = graph->resolution()[BD_PX] * std::sqrt((double)(ddx * ddx + ddy * ddy));
-        } else {
-            pos_dist = deadband(std::sqrt(dbx * dbx + dby * dby), heur->pos_db);
+        auto pos_dist = ComputePositionHeuristic(
+                dx, dy,
+                disc_dx, disc_dy,
+                graph->resolution()[BD_PX],
+                graph->resolution()[BD_PY],
+                heur->disc_position_heuristic);
+        if (!heur->disc_position_heuristic) {
+            pos_dist = deadband(pos_dist, heur->pos_db);
         }
 
         SMPL_DEBUG_NAMED(HV_LOG, "    pos dist = %f", pos_dist);
@@ -604,10 +673,10 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     } else {
         switch (heur->combination) {
         case ObjectManipHeuristic::CombinationMethod::Max:
-            SMPL_DEBUG_NAMED(H_LOG, "h(%d) = max(%d, %d) + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
+            SMPL_DEBUG_NAMED(H_LOG, "  h(%d) = max(base, contact) + manip = max(%d, %d) + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
             break;
         case ObjectManipHeuristic::CombinationMethod::Sum:
-            SMPL_DEBUG_NAMED(H_LOG, "h(%d) = %d + %d + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
+            SMPL_DEBUG_NAMED(H_LOG, "  h(%d) = base + contact + manip = %d + %d + %d = %d", state_id, h_base_min, h_contact_min, h_manipulate_min, h_min);
             break;
         }
         if (h_min == std::numeric_limits<int>::max()) {

@@ -64,8 +64,14 @@ public:
         Max = 1
     } combination = CombinationMethod::Max;
 
+    enum HeadingCondition {
+        Discrete = 0,
+        Continuous,
+        None,
+    };
+
     bool use_rotation = false;
-    int heading_condition = 0; // 0 = discrete, or 1 = continuous + threshold, 2 = none
+    int heading_condition = HeadingCondition::Discrete;
     bool disc_rotation_heuristic = true;
     bool disc_position_heuristic = true;
 
