@@ -25,7 +25,8 @@ enum Type
     GraspSucc               = 7,
     PreGraspSucc            = 8,
     SnapSucc                = 9,
-    ShortcutSucc            = 10
+    ShortcutSucc            = 10,
+    Unknown
 };
 
 auto to_cstring(Type) -> const char*;
@@ -115,6 +116,12 @@ public:
         std::vector<smpl::RobotState>& best_path);
 
     void updateBestTransitionOrigZ(
+        smpl::WorkspaceLatticeState* state,
+        int dst_id,
+        int& best_cost,
+        std::vector<smpl::RobotState>& best_path);
+
+    void updateBestTransitionOrigZ2(
         smpl::WorkspaceLatticeState* state,
         int dst_id,
         int& best_cost,

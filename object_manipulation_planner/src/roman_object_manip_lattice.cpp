@@ -5,6 +5,7 @@
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/graph/workspace_lattice_action_space.h>
+#include <smpl/spatial.h>
 
 #include "assert.h"
 #include "object_manip_heuristic.h"
@@ -17,18 +18,18 @@ namespace TransitionType
 auto to_cstring(Type t) -> const char*
 {
     switch (t) {
-    case OrigStateOrigSucc: return "OrigStateOrigSucc";
-    case OrigStateBridgeSucc: return "OrigStateBridgeSucc";
-    case OrigStateZSucc: return "OrigStateZSucc";
-    case EGraphStateAdjSucc: return "EGraphStateAdjSucc";
-    case EGraphStateBridgeSucc: return "EGraphStateBridgeSucc";
-    case EGraphStateZSucc: return "EGraphStateZSucc";
-    case PreGraspAmpSucc: return "PreGraspAmpSucc";
-    case GraspSucc: return "GraspSucc";
-    case PreGraspSucc: return "PreGraspSucc";
-    case SnapSucc: return "SnapSucc";
-    case ShortcutSucc: return "ShortcutSucc";
-    default: return "<UNKONWN>";
+    case OrigStateOrigSucc:         return "OrigStateOrigSucc";
+    case OrigStateBridgeSucc:       return "OrigStateBridgeSucc";
+    case OrigStateZSucc:            return "OrigStateZSucc";
+    case EGraphStateAdjSucc:        return "EGraphStateAdjSucc";
+    case EGraphStateBridgeSucc:     return "EGraphStateBridgeSucc";
+    case EGraphStateZSucc:          return "EGraphStateZSucc";
+    case PreGraspAmpSucc:           return "PreGraspAmpSucc";
+    case GraspSucc:                 return "GraspSucc";
+    case PreGraspSucc:              return "PreGraspSucc";
+    case SnapSucc:                  return "SnapSucc";
+    case ShortcutSucc:              return "ShortcutSucc";
+    default:                        return "<UNKNOWN>";
     }
 }
 }
@@ -67,8 +68,11 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Apply Z actions");
+    auto orig_succ_count = succs->size();
+
     // s_demo states where phi(s) ~ phi(s_demo) and z(s) = z(s_demo)
-    std::vector<smpl::ExperienceGraph::node_id> parent_nearby_nodes;
+    auto parent_nearby_nodes = std::vector<smpl::ExperienceGraph::node_id>();
     {
         auto pose_coord = getPhiCoord(state->coord);
         SMPL_DEBUG_STREAM("parent pose coord = " << pose_coord);
@@ -82,37 +86,57 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
         }
     }
 
-    if (parent_nearby_nodes.empty()) return;
+    if (parent_nearby_nodes.empty()) {
+        SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  -> off demonstration");
+        return;
+    }
 
-    std::vector<smpl::WorkspaceAction> actions;
+    auto actions = std::vector<smpl::WorkspaceAction>();
     m_actions->apply(*state, actions);
 
-    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  actions: %zu", actions.size());
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  base actions: %zu", actions.size());
+
+    auto invalid_count = 0;
+    auto off_demo_count = 0;
+    auto disconnected_count = 0;
+
+    auto marker_id = 0;
 
     // iterate through successors of source state
-    for (size_t i = 0; i < actions.size(); ++i) {
+    for (auto i = 0; i < actions.size(); ++i) {
         auto& action = actions[i];
 
         SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    action %zu", i);
         SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "      waypoints: %zu", action.size());
 
-        smpl::RobotState final_robot_state;
-        if (!checkAction(state->state, action, &final_robot_state)) continue;
+        auto final_robot_state = smpl::RobotState();
+        if (!checkAction(state->state, action, &final_robot_state)) {
+            ++invalid_count;
+            SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "      -> invalid");
+            continue;
+        }
 
         auto& final_state = action.back();
-        smpl::WorkspaceCoord succ_coord;
+        auto succ_coord = smpl::WorkspaceCoord();
         stateWorkspaceToCoord(final_state, succ_coord);
 
         // E_z from V_orig
         auto pose_coord = getPhiCoord(succ_coord);
         auto it = m_phi_to_egraph_nodes.find(pose_coord);
-        if (it == end(m_phi_to_egraph_nodes)) continue;
+        if (it == end(m_phi_to_egraph_nodes)) {
+            ++off_demo_count;
+            SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "      -> off demonstration");
+            continue;
+        }
 
         // for each demonstration state s_demo' where phi(s_demo') = phi(s')
         for (auto node : it->second) {
             // is there any edge between S_demo and S_demo'?
-            for (auto nn : parent_nearby_nodes) {
-                if (!m_egraph.edge(nn, node)) continue;
+            // for (auto nn : parent_nearby_nodes)
+            {
+                // if (!m_egraph.edge(nn, node)) continue;
+
+                SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "      -> found successor");
 
                 // overwrite the z value of the destination state
                 auto& egraph_state = m_egraph.state(node);
@@ -123,7 +147,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
                 this_final_state[OB_P] = z;
                 this_final_robot_state[HINGE] = z;
 
-                smpl::WorkspaceCoord succ_coord;
+                auto succ_coord = smpl::WorkspaceCoord();
                 stateWorkspaceToCoord(this_final_state, succ_coord);
                 auto succ_id = createState(succ_coord);
                 auto* succ_state = getState(succ_id);
@@ -135,7 +159,29 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
                 costs->push_back(edge_cost);
             }
         }
+
+        ++disconnected_count;
+
+        auto color = [](std::vector<smpl::visual::Marker> markers) {
+            for (auto& marker : markers) {
+                marker.color = smpl::visual::Color{ 1.0f, 0.0f, 0.5f, 0.9f };
+            }
+            return markers;
+        };
+
+        auto label = [&](std::vector<smpl::visual::Marker> markers) {
+            for (auto& marker : markers) {
+                marker.id = marker_id++;
+            }
+            return markers;
+        };
+
+        auto vis_name = "candidate_z_successor";
+        SV_SHOW_DEBUG_NAMED(vis_name, label(color(getStateVisualization(final_robot_state, vis_name))));
     }
+
+    auto succ_count = succs->size();
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Found %zu/%zu z successors (%d invalid, %d off demo, %d disconnected)", succ_count - orig_succ_count, actions.size(), invalid_count, off_demo_count, disconnected_count);
 }
 
 // Get successors of actions from E_z where u is not an E-Graph state. The
@@ -146,82 +192,109 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Apply Z actions");
+
     // s_demo states where phi(s) ~ phi(s_demo) and z(s) = z(s_demo)
-    std::vector<smpl::ExperienceGraph::node_id> parent_nearby_nodes;
+    auto parent_nearby_nodes = std::vector<smpl::ExperienceGraph::node_id>();
     {
         auto pose_coord = getPhiCoord(state->coord);
-        SMPL_DEBUG_STREAM("parent pose coord = " << pose_coord);
+        SMPL_DEBUG_STREAM("  parent pose coord = " << pose_coord);
         auto it = m_phi_to_egraph_nodes.find(pose_coord);
         if (it != end(m_phi_to_egraph_nodes)) {
+            SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  check z-values of " << it->second.size() << " e-graph states at " << pose_coord);
             for (auto node : it->second) {
-                if (m_egraph.state(node)[HINGE] == state->state[HINGE]) {
+                if (std::fabs(m_egraph.state(node)[HINGE] - state->state[HINGE] < 1e-3)) {
+                    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    matching z == %f!", m_egraph.state(node)[HINGE]);
                     parent_nearby_nodes.push_back(node);
+                } else {
+                    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    %f != %f", m_egraph.state(node)[HINGE], state->state[HINGE]);
                 }
             }
         }
     }
 
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  %zu equivalent e-graph states", parent_nearby_nodes.size());
+
     auto old_size = succs->size();
 
-    std::vector<int> these_succs;
+    auto these_succs = std::vector<int>();
+
+    auto marker_id = 0;
+
+    auto candidate_succ_count = 0;
+    auto ik_failure_count = 0;
+    auto collision_count = 0;
 
     // for all adjacent nodes in the experience graph
     for (auto neighbor_id : parent_nearby_nodes) {
-        auto adj = m_egraph.adjacent_nodes(neighbor_id);
-        for (auto ait = adj.first; ait != adj.second; ++ait) {
+        auto adj_nodes = m_egraph.adjacent_nodes(neighbor_id);
+        for (auto ait = adj_nodes.first; ait != adj_nodes.second; ++ait) {
+            ++candidate_succ_count;
+
             // generate successors that have the same z-value and the same
             // phi coordinate as the adjacent node
 
-            auto a = *ait;
+            auto adj_id = *ait;
 
-            auto& pose = m_egraph_node_grasps[a];
+            auto& pose = m_egraph_node_grasps[adj_id];
 
             // TODO: permissive or restrictive ik?
-            smpl::RobotState solution;
-            if (!m_ik_iface->computeIK(pose, state->state, solution)) continue;
-
-            if (!collisionChecker()->isStateToStateValid(state->state, solution)) {
-                ROS_INFO("IK Failed to adjacent state");
+            // probably want restrictive but with a mini-search over free angles
+            // for the arm/torso
+            auto solution = smpl::RobotState();
+            if (!m_ik_iface->computeIK(pose, state->state, solution)) {
+                ++ik_failure_count;
+                SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, " -> IK Failure");
                 continue;
             }
 
-            solution[HINGE] = m_egraph.state(a)[HINGE];
+            if (!collisionChecker()->isStateToStateValid(state->state, solution)) {
+                ++collision_count;
+                SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, " -> In collision");
+                continue;
+            }
+
+            solution[HINGE] = m_egraph.state(adj_id)[HINGE];
 
             // 1. add this to our state table?
             // 2. check if there is an e-graph state with the same coordinates?
             // 3. create a new state for this state?
 
-            smpl::WorkspaceCoord succ_coord;
+            auto succ_coord = smpl::WorkspaceCoord();
             stateRobotToCoord(solution, succ_coord);
 
-#if 1
             auto succ_id = createState(succ_coord);
             auto* succ_state = getState(succ_id);
             succ_state->state = solution;
             these_succs.push_back(succ_id);
-#else
-            auto succ_id = reserveHashEntry();
-            auto* succ_state = getState(succ_id);
-            succ_state->coord = succ_coord;
-            succ_state->state = solution;
-            these_succs.push_back(succ_id);
-#endif
 
             succs->push_back(succ_id);
 
-#if 0
             auto edge_cost = computeCost(*state, *succ_state);
-#else
-            auto edge_cost = 1;
-#endif
             costs->push_back(edge_cost);
+
+            auto color = [](std::vector<smpl::visual::Marker> markers) {
+                for (auto& marker : markers) {
+                    marker.color = smpl::visual::Color{ 1.0f, 0.0f, 0.5f, 0.9f };
+                }
+                return markers;
+            };
+
+            auto label = [&](std::vector<smpl::visual::Marker> markers) {
+                for (auto& marker : markers) {
+                    marker.id = marker_id++;
+                }
+                return markers;
+            };
+
+            auto vis_name = "candidate_z_successor";
+            SV_SHOW_DEBUG_NAMED(vis_name, label(color(getStateVisualization(solution, vis_name))));
         }
     }
 
-    if (succs->size() != old_size) {
-        ROS_INFO_STREAM("Generated " << succs->size() - old_size << " z edges: " << these_succs);
-    }
-
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Generated %zu/%d z successors (%d ik failures, %d invalid states)",
+            succs->size() - old_size, candidate_succ_count, ik_failure_count, collision_count);
+    SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  successors: " << these_succs);
 }
 
 // Apply an adaptive motion to a state that moves the end effector to the
@@ -280,7 +353,10 @@ void RomanObjectManipLattice::getPreGraspAmpSucc(
 #else
         auto seed = state->state;
         smpl::RobotState final_robot_state;
-        if (!m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) return;
+        if (!m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) {
+            SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "  Failed to move to pre-grasp");
+            return;
+        }
 
         SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "  Adaptive motion to pre-grasp succeeded");
 
@@ -421,8 +497,8 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
-    auto enable_z_edges = false;
-//    auto enable_z_edges = true;
+//    auto enable_z_edges = false;
+    auto enable_z_edges = true;
 
     auto enable_egraph_edges = true;
 //    auto enable_egraph_edges = false;
@@ -439,8 +515,8 @@ void RomanObjectManipLattice::getUniqueSuccs(
             getOrigStateBridgeSuccs(state, succs, costs);
         }
         if (enable_z_edges) {
-            getOrigStateZSuccs(state, succs, costs);
-//            getOrigStateZSuccs2(state, succs, costs);
+            // getOrigStateZSuccs(state, succs, costs);
+            getOrigStateZSuccs2(state, succs, costs);
         }
     }
 
@@ -497,11 +573,11 @@ bool RomanObjectManipLattice::extractTransition(
     if (is_egraph_node) { // expanding an egraph node
         updateBestTransitionEGraphBridge(state, egraph_node, dst_id, best_cost, best_path);
         updateBestTransitionEGraphAdjacent(state, egraph_node, dst_id, best_cost, best_path);
-//        updateBestTransitionEGraphZ(state, egraph_node, dst_id, best_cost, best_path);
+        updateBestTransitionEGraphZ(state, egraph_node, dst_id, best_cost, best_path);
     } else {
         updateBestTransitionOrig(state, dst_id, best_cost, best_path);
         updateBestTransitionOrigBridge(state, dst_id, best_cost, best_path);
-//        updateBestTransitionOrigZ(state, dst_id, best_cost, best_path);
+        updateBestTransitionOrigZ2(state, dst_id, best_cost, best_path);
     }
 
     auto phi_coord = getPhiCoord(state->coord);
@@ -534,7 +610,8 @@ bool RomanObjectManipLattice::isGoal(
 // Loop through a set of successor transitions and, if a transition is found
 // that is cheaper than the best_cost so far, update the best_cost and the
 // associated path segment. The path segment consists only of the destination
-// waypoint. Return true if a cheaper transition was found.
+// waypoint. Return true if a cheaper transition was found. The transition type
+// is added as an additional variable to end of the appended waypoint.
 bool RomanObjectManipLattice::updateBestTransitionSimple(
     const std::vector<int>& succs,
     const std::vector<int>& costs,
@@ -589,7 +666,20 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ(
     int& best_cost,
     std::vector<smpl::RobotState>& best_path)
 {
-    // TODO:
+    std::vector<int> succs, costs;
+    getOrigStateZSuccs(state, &succs, &costs);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
+}
+
+void RomanObjectManipLattice::updateBestTransitionOrigZ2(
+    smpl::WorkspaceLatticeState* state,
+    int dst_id,
+    int& best_cost,
+    std::vector<smpl::RobotState>& best_path)
+{
+    std::vector<int> succs, costs;
+    getOrigStateZSuccs2(state, &succs, &costs);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionEGraphBridge(
@@ -623,7 +713,9 @@ void RomanObjectManipLattice::updateBestTransitionEGraphZ(
     int& best_cost,
     std::vector<smpl::RobotState>& best_path)
 {
-    // TODO:
+    std::vector<int> succs, costs;
+    getEGraphStateZSuccs(state, egraph_node, &succs, &costs);
+    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateZSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionGrasp(
@@ -782,10 +874,10 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     m_egraph_node_grasps.clear();
 
     // discrete 3d positions of the end effector throughout the demonstration
-    std::vector<Eigen::Vector3i> phi_points;
+    auto phi_points = std::vector<Eigen::Vector3i>();
 
     // discrete 3d positions of potential pre-grasp poses for the end effector
-    std::vector<Eigen::Vector3i> pg_phi_points;
+    auto pg_phi_points = std::vector<Eigen::Vector3i>();
 
     m_egraph_node_pregrasps.resize(m_egraph.num_nodes());
     m_egraph_node_grasps.resize(m_egraph.num_nodes());
@@ -797,22 +889,17 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         auto node = *nit;
         auto& egraph_robot_state = m_egraph.state(node);
 
-        smpl::WorkspaceState tmp;
+        auto tmp = smpl::WorkspaceState();
         stateRobotToWorkspace(egraph_robot_state, tmp);
 
-        Eigen::Affine3d pregrasp_offset(
-                Eigen::Translation3d(this->pregrasp_offset_x, 0.0, 0.0));
+        auto pregrasp_offset = smpl::MakeAffine(this->pregrasp_offset_x, 0.0, 0.0);
 
-        Eigen::Affine3d grasp_pose =
-                Eigen::Translation3d(tmp[0], tmp[1], tmp[2]) *
-                Eigen::AngleAxisd(tmp[5], Eigen::Vector3d::UnitZ()) *
-                Eigen::AngleAxisd(tmp[4], Eigen::Vector3d::UnitY()) *
-                Eigen::AngleAxisd(tmp[3], Eigen::Vector3d::UnitX());
+        auto grasp_pose = smpl::MakeAffine(tmp[0], tmp[1], tmp[2], tmp[5], tmp[4], tmp[3]);
 
-        Eigen::Affine3d pregrasp_pose = grasp_pose * pregrasp_offset;
+        auto pregrasp_pose = smpl::Affine3(grasp_pose * pregrasp_offset);
 
         // TODO: these are stored in the state now, get them from there
-        smpl::WorkspaceCoord disc_egraph_state(dofCount());
+        auto disc_egraph_state = smpl::WorkspaceCoord(dofCount());
         stateWorkspaceToCoord(tmp, disc_egraph_state);
 
         auto adj = m_egraph.adjacent_nodes(node);
@@ -841,7 +928,15 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         m_egraph_pre_phi_coords[node] = getPhiCoord(pregrasp_pose);
     }
 
-    std::vector<Eigen::Vector3d> phi_points_cont;
+    auto phi_markers = std::vector<smpl::visual::Marker>();
+    for (auto& grasp_pose : m_egraph_node_grasps) {
+        auto vis_name = "phi";
+        auto more_markers = smpl::visual::MakeFrameMarkers(grasp_pose, "map", vis_name, phi_markers.size());
+        phi_markers.insert(end(phi_markers), begin(more_markers), end(more_markers));
+    }
+    SV_SHOW_INFO_NAMED("phi", std::move(phi_markers));
+
+    auto phi_points_cont = std::vector<smpl::Vector3>();
     phi_points_cont.reserve(phi_points.size());
     for (auto& point : phi_points) {
         double pcont[3];
@@ -849,7 +944,7 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
     }
 
-    std::vector<Eigen::Vector3d> pre_phi_points_cont;
+    auto pre_phi_points_cont = std::vector<smpl::Vector3>();
     pre_phi_points_cont.reserve(pg_phi_points.size());
     for (auto& point : pg_phi_points) {
         double pcont[3];
@@ -857,7 +952,7 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         pre_phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
     }
 
-    auto vis_name = "phi";
+    auto vis_name = "phi_points";
     SV_SHOW_INFO_NAMED(
             vis_name,
             MakeCubesMarker(
@@ -867,13 +962,13 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
                     "map",
                     vis_name));
     SV_SHOW_INFO_NAMED(
-            "pre_phi",
+            "pre_phi_points",
             MakeCubesMarker(
                 std::move(pre_phi_points_cont),
                 resolution()[0],
                 smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f },
                 "map",
-                "pre_phi"));
+                "pre_phi_points"));
 }
 
 void RomanObjectManipLattice::clearExperienceGraph()
@@ -1137,10 +1232,10 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
     }
 
     // discrete 3d positions of the end effector throughout the demonstration
-    std::vector<Eigen::Vector3i> phi_points;
+    auto phi_points = std::vector<Eigen::Vector3i>();
 
     // discrete 3d positions of potential pre-grasp poses for the end effector
-    std::vector<Eigen::Vector3i> pg_phi_points;
+    auto pg_phi_points = std::vector<Eigen::Vector3i>();
 
     m_egraph_node_pregrasps.resize(m_egraph.num_nodes());
     m_egraph_node_grasps.resize(m_egraph.num_nodes());
@@ -1152,22 +1247,18 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
         auto node = *nit;
         auto& egraph_robot_state = m_egraph.state(node);
 
-        smpl::WorkspaceState tmp;
+        auto tmp = smpl::WorkspaceState();
         stateRobotToWorkspace(egraph_robot_state, tmp);
 
-        Eigen::Affine3d pregrasp_offset(
-                Eigen::Translation3d(this->pregrasp_offset_x, 0.0, 0.0));
+        auto pregrasp_offset = smpl::MakeAffine(this->pregrasp_offset_x, 0.0, 0.0);
 
-        Eigen::Affine3d grasp_pose =
-                Eigen::Translation3d(tmp[0], tmp[1], tmp[2]) *
-                Eigen::AngleAxisd(tmp[5], Eigen::Vector3d::UnitZ()) *
-                Eigen::AngleAxisd(tmp[4], Eigen::Vector3d::UnitY()) *
-                Eigen::AngleAxisd(tmp[3], Eigen::Vector3d::UnitX());
+        auto grasp_pose = smpl::MakeAffine(
+                tmp[0], tmp[1], tmp[2], tmp[5], tmp[4], tmp[3]);
 
-        Eigen::Affine3d pregrasp_pose = grasp_pose * pregrasp_offset;
+        auto pregrasp_pose = smpl::Affine3(grasp_pose * pregrasp_offset);
 
         // TODO: these are stored in the state now, get them from there
-        smpl::WorkspaceCoord disc_egraph_state(dofCount());
+        auto disc_egraph_state = smpl::WorkspaceCoord(dofCount());
         stateWorkspaceToCoord(tmp, disc_egraph_state);
 
         auto adj = m_egraph.adjacent_nodes(node);
@@ -1196,7 +1287,15 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
         m_egraph_pre_phi_coords[node] = getPhiCoord(pregrasp_pose);
     }
 
-    std::vector<Eigen::Vector3d> phi_points_cont;
+    auto phi_markers = std::vector<smpl::visual::Marker>();
+    for (auto& grasp_pose : m_egraph_node_grasps) {
+        auto vis_name = "phi";
+        auto more_markers = smpl::visual::MakeFrameMarkers(grasp_pose, "map", vis_name, phi_markers.size());
+        phi_markers.insert(end(phi_markers), begin(more_markers), end(more_markers));
+    }
+    SV_SHOW_INFO_NAMED("phi", std::move(phi_markers));
+
+    auto phi_points_cont = std::vector<smpl::Vector3>();
     phi_points_cont.reserve(phi_points.size());
     for (auto& point : phi_points) {
         double pcont[3];
@@ -1204,7 +1303,7 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
         phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
     }
 
-    std::vector<Eigen::Vector3d> pre_phi_points_cont;
+    auto pre_phi_points_cont = std::vector<smpl::Vector3>();
     pre_phi_points_cont.reserve(pg_phi_points.size());
     for (auto& point : pg_phi_points) {
         double pcont[3];
@@ -1212,7 +1311,7 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
         pre_phi_points_cont.emplace_back(pcont[0], pcont[1], pcont[2]);
     }
 
-    auto vis_name = "phi";
+    auto vis_name = "phi_points";
     SV_SHOW_INFO_NAMED(
             vis_name,
             MakeCubesMarker(
@@ -1222,13 +1321,13 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
                     "map",
                     vis_name));
     SV_SHOW_INFO_NAMED(
-            "pre_phi",
+            "pre_phi_points",
             MakeCubesMarker(
                 std::move(pre_phi_points_cont),
                 resolution()[0],
                 smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f },
                 "map",
-                "pre_phi"));
+                "pre_phi_points"));
 
     return true;
 }
@@ -1293,7 +1392,9 @@ bool RomanObjectManipLattice::extractPath(
             SMPL_ERROR_NAMED(G_LOG, "Failed to find valid action to successor during path extraction");
         }
 
-        ROS_INFO("Found transition %d -> %d with %zu points", prev_id, curr_id, motion.size());
+        auto type = !motion.empty() ? (TransitionType::Type)(motion.back().back()) : TransitionType::Unknown;
+        ROS_INFO("Found transition %d -> %d of type %s with %zu points", prev_id, curr_id, to_cstring(type), motion.size());
+        ROS_INFO_STREAM("  motion: " << motion);
 
         for (auto& point : motion) {
             opath.push_back(std::move(point));
