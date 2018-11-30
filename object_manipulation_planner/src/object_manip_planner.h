@@ -63,6 +63,9 @@ struct ObjectManipPlannerParams
 
     double base_weight = 10.0;
     enum CombinationMethod{ Sum = 0, Max = 1 } combination = CombinationMethod::Max;
+
+    double w_egraph = 5.0;
+    double w_heuristic = 100.0;
 };
 
 struct ObjectManipPlanner
@@ -83,7 +86,8 @@ bool Init(
     ObjectManipPlanner* planner,
     ObjectManipModel* model,
     smpl::CollisionChecker* checker,
-    smpl::OccupancyGrid* grid);
+    smpl::OccupancyGrid* grid,
+    const ObjectManipPlannerParams* params);
 
 bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path);
 

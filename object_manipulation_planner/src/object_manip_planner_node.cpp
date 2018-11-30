@@ -383,6 +383,7 @@ void ManipulateObject(
         AnimateTrajectory(robot_model, commands);
     }
 
+    ROS_INFO("Crate manipulation successful");
     server->setSucceeded();
 }
 
@@ -555,8 +556,28 @@ int main(int argc, char* argv[])
 
     ROS_INFO("Initialize Object Manipulation Planner");
 
+    ObjectManipPlannerParams params;
+    {
+        ph.param("use_rotation", params.use_rotation, true);
+        ph.param("disc_rotation_heuristic", params.disc_rotation_heuristic, true);
+        ph.param("rot_db", params.rot_db, smpl::to_radians(2));
+        int heading_condition;
+        ph.param("heading_condition", heading_condition, (int)ObjectManipPlannerParams::HeadingCondition::Discrete);
+        params.heading_condition = (ObjectManipPlannerParams::HeadingCondition)heading_condition;
+        ph.param("heading_thresh", params.heading_thresh, 0.05); // 0.35, 0.1, 0.15
+        ph.param("disc_position_heuristic", params.disc_position_heuristic, true);
+        ph.param("pos_db", params.pos_db, 0.1);
+        ph.param("rot_weight", params.rot_weight, 0.45 / smpl::to_radians(45));
+        ph.param("base_weight", params.base_weight, 10.0);
+        int combination;
+        ph.param("combination", combination, (int)ObjectManipPlannerParams::CombinationMethod::Max);
+        params.combination = (ObjectManipPlannerParams::CombinationMethod)combination;
+        ph.param("w_egraph", params.w_egraph, 5.0);
+        ph.param("w_heuristic", params.w_heuristic, 100.0);
+    }
+
     ObjectManipPlanner planner;
-    if (!Init(&planner, &omanip, &ochecker, &grid)) {
+    if (!Init(&planner, &omanip, &ochecker, &grid, &params)) {
         ROS_ERROR("Failed to initialize Object Manipulation Planner");
         return 1;
     }

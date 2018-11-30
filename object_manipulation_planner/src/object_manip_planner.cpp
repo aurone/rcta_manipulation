@@ -21,7 +21,8 @@ bool Init(
     ObjectManipPlanner* planner,
     ObjectManipModel* model,
     smpl::CollisionChecker* checker,
-    smpl::OccupancyGrid* grid)
+    smpl::OccupancyGrid* grid,
+    const ObjectManipPlannerParams* params)
 {
     planner->model = model;
     planner->checker = checker;
@@ -61,37 +62,16 @@ bool Init(
         return false;
     }
 
-    // TODO: factor out config
-
-    ros::NodeHandle ph("~");
-    ph.param("w_egraph", planner->heuristic.w_egraph, 5.0);
-
-    // define parameters here for now, TODO: configurate
-    ObjectManipPlannerParams params;
-    params.use_rotation = true; //false;
-    params.disc_rotation_heuristic = true;
-    params.rot_db = smpl::to_radians(2);
-    params.heading_condition = ObjectManipPlannerParams::HeadingCondition::Discrete;
-    params.heading_thresh = 0.05; // 0.35, 0.1, 0.15
-
-    params.disc_position_heuristic = true;
-    params.pos_db = 0.1;
-
-    params.rot_weight = 0.45 / smpl::to_radians(45);
-
-    params.base_weight = 10.0;
-    params.combination = ObjectManipPlannerParams::CombinationMethod::Max;
-
     // any necessary conversions should go here
-    planner->heuristic.heading_thresh = params.heading_thresh;
-    planner->heuristic.theta_db = params.rot_db;
-    planner->heuristic.pos_db = params.pos_db;
-    planner->heuristic.theta_normalizer = params.rot_weight;
-    planner->heuristic.h_base_weight = params.base_weight;
-    planner->heuristic.use_rotation = params.use_rotation;
-    planner->heuristic.heading_condition = (int)params.heading_condition;
-    planner->heuristic.disc_rotation_heuristic = params.disc_rotation_heuristic;
-    planner->heuristic.disc_position_heuristic = params.disc_position_heuristic;
+    planner->heuristic.heading_thresh = params->heading_thresh;
+    planner->heuristic.theta_db = params->rot_db;
+    planner->heuristic.pos_db = params->pos_db;
+    planner->heuristic.theta_normalizer = params->rot_weight;
+    planner->heuristic.h_base_weight = params->base_weight;
+    planner->heuristic.use_rotation = params->use_rotation;
+    planner->heuristic.heading_condition = (int)params->heading_condition;
+    planner->heuristic.disc_rotation_heuristic = params->disc_rotation_heuristic;
+    planner->heuristic.disc_position_heuristic = params->disc_position_heuristic;
 
     planner->search.allowPartialSolutions(false);
     planner->search.setTargetEpsilon(1.0);
@@ -99,10 +79,7 @@ bool Init(
     planner->search.setImproveSolution(true);
     planner->search.setBoundExpansions(true);
 
-    auto epsilon = 100.0;
-    ph.param("w_heuristic", epsilon, 100.0);
-    ROS_INFO("epsilon = %f", epsilon);
-    planner->search.set_initialsolution_eps(epsilon);
+    planner->search.set_initialsolution_eps(params->w_heuristic);
     return true;
 }
 
