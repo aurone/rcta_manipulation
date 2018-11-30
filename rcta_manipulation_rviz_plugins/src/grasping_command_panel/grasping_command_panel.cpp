@@ -489,8 +489,8 @@ void GraspingCommandPanel::sendManipulateObjectCommand()
     tf::poseEigenToMsg(T_world_object_, goal.object_pose);
     goal.object_start = m_obj_start;
     goal.object_goal = m_obj_goal;
-    goal.allowed_planning_time = 60.0;
     goal.plan_only = false;
+    goal.allowed_planning_time = 15.0;
     goal.start_state.is_diff = true;
 
     auto result_callback = boost::bind(&GraspingCommandPanel::manipulateObjectResultCallback, this, _1, _2);
