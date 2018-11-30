@@ -41,12 +41,12 @@
         <param name="grid/resolution"   value="0.05"/>
         <param name="grid/max_dist"     value="0.8"/>
 
+        <param name="base_weight" value="0.0"/>
         <!--
         <param name="heading_thresh" value="0.05"/>
         <param name="rot_db" value="smpl::to_radians(2)"/>
         <param name="pos_db" value="0.1"/>
         <param name="rot_weight" value="0.45 / smpl::to_radians(45)"/>
-        <param name="base_weight" value="10.0"/>
         <param name="combination" value="max"/>
         <param name="use_rotation" value="false"/>
         <param name="use_heading" value="false"/>
