@@ -225,3 +225,6 @@ target_link_libraries(
         ${moveit_ros_planning_LIBRARIES})
 install(TARGETS echo_display_traj RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
+add_executable(rpy_to_quat src/rpy_to_quat.cpp)
+target_include_directories(rpy_to_quat SYSTEM PRIVATE ${EIGEN3_INCLUDE_DIR})
+install(TARGETS rpy_to_quat RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
