@@ -62,6 +62,11 @@ target_link_libraries(
     ${sbpl_collision_checking_LIBRARIES}
     smpl::smpl
     ${smpl_ros_LIBRARIES})
+install(
+    TARGETS object_manip_planner
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
 
 # object_manip_planner_node
 add_executable(object_manip_planner_node src/object_manip_planner_node.cpp)
@@ -87,6 +92,7 @@ target_link_libraries(
         ${smpl_urdf_robot_model_LIBRARIES}
         ${urdfdom_LIBRARIES}
         profiler)
+install(TARGETS object_manip_planner_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # test_object_manip_planner
 add_executable(test_object_manip_planner src/test_object_manip_planner.cpp)
@@ -100,6 +106,7 @@ target_link_libraries(
         object_manip_planner
         ${Boost_LIBRARIES}
         smpl::smpl)
+install(TARGETS test_object_manip_planner RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # simple_crate_planner
 add_executable(simple_crate_planner src/simple_crate_planner.cpp)
@@ -130,6 +137,7 @@ target_link_libraries(
         ${smpl_ros_LIBRARIES}
         ${urdfdom_LIBRARIES}
         smpl::smpl)
+install(TARGETS simple_crate_planner RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # manipulate_object
 add_executable(manipulate_object src/manipulate_object.cpp)
@@ -147,6 +155,7 @@ target_link_libraries(
         ${actionlib_LIBRARIES}
         ${roscpp_LIBRARIES}
         ${smpl_LIBRARIES})
+install(TARGETS manipulate_object RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # door_demonstrator
 add_executable(door_demonstrator src/door_demonstrator.cpp src/cabinet_model.cpp)
@@ -168,6 +177,7 @@ target_link_libraries(
         ${smpl_ros_LIBRARIES}
         ${smpl_urdf_robot_model_LIBRARIES}
         ${urdfdom_LIBRARIES})
+install(TARGETS door_demonstrator RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # translate_demo
 add_executable(translate_demo src/translate_demo.cpp)
@@ -177,6 +187,7 @@ target_include_directories(
         ${smpl_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(translate_demo ${smpl_LIBRARIES})
+install(TARGETS translate_demo RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # transform_demo
 add_executable(transform_demo src/transform_demo.cpp)
@@ -194,6 +205,7 @@ target_link_libraries(
         ${moveit_ros_planning_LIBRARIES}
         ${roscpp_LIBRARIES}
         ${smpl_LIBRARIES})
+install(TARGETS transform_demo RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # make_cabinet_urdf
 add_executable(make_cabinet_urdf src/make_cabinet_urdf.cpp src/cabinet_model.cpp)
@@ -211,4 +223,5 @@ target_link_libraries(
         ${roscpp_LIBRARIES}
         ${moveit_core_LIBRARIES}
         ${moveit_ros_planning_LIBRARIES})
+install(TARGETS echo_display_traj RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
