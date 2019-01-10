@@ -4,5 +4,6 @@
     <node name="manipulate_object" pkg="object_manipulation_planner" type="manipulate_object" clear_params="true">
         <param name="execute" value="$(arg execute)"/>
         <rosparam command="load" file="$(arg scenario)"/>
+        <param name="allowed_planning_time" value="15.0"/>
     </node>
 </launch>
