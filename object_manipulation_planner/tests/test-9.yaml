@@ -1,0 +1,30 @@
+# NOTE: world_joint/* variables specified here using backslashes,
+# since AFAIK ros parameter keys are not allowed to have forward slashes
+# in the name. The backslashes are replaced internally in the node to
+# get the correct variable name
+start_state:
+    world_joint\\x: 0.0
+    world_joint\\y: 0.0
+    world_joint\\theta: 0.0
+
+    limb_right_joint1: 135.0
+    limb_right_joint2: 0.0
+    limb_right_joint3: 180.0
+    limb_right_joint4: 45.0
+    limb_right_joint5: 30.0
+    limb_right_joint6: 90.0
+    limb_right_joint7: -135.0
+
+    limb_left_joint1: -90.0
+    limb_left_joint2: 90.0
+    limb_left_joint3: 90.0
+    limb_left_joint4: 180.0
+    limb_left_joint5: -90.0
+    limb_left_joint6: 0.0
+    limb_left_joint7: 0.0
+
+object_start_position: 1.0
+object_goal_position: 0.45
+object_pose: [ 0.85, 0, 0, 80, 0, 0 ]
+
+allowed_planning_time: 60.0

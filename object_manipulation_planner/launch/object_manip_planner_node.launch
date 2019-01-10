@@ -1,4 +1,6 @@
 <launch>
+    <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
+
     <!-- Actual arguments -->
     <arg name="debug" default="false"/>
     <arg name="live" default="true"/>

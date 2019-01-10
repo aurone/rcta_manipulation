@@ -18,6 +18,9 @@
 #include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit_msgs/DisplayTrajectory.h>
 #include <smpl_moveit_interface/planner/moveit_robot_model.h>
+#include <smpl_urdf_robot_model/robot_model.h>
+#include <smpl_urdf_robot_model/robot_state.h>
+#include <smpl_urdf_robot_model/robot_state_visualization.h>
 #include <ros/ros.h>
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
@@ -28,6 +31,7 @@
 #include <smpl/occupancy_grid.h>
 #include <tf/transform_listener.h>
 #include <gperftools/profiler.h>
+#include <urdf_parser/urdf_parser.h>
 
 #include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 
@@ -183,8 +187,10 @@ bool ExecuteTrajectory(
 
 bool AnimateTrajectory(
     const moveit::core::RobotModelConstPtr& robot_model,
-    const std::vector<std::unique_ptr<Command>>& commands)
+    const std::vector<std::unique_ptr<Command>>& commands,
+    double speedup = 1.0)
 {
+    auto factor = speedup == 0.0 ? 0.0 : 1.0 / speedup;
     auto last_wp = moveit::core::RobotState(robot_model);
     for (auto& command : commands) {
         if (command->type == Command::Type::Gripper) {
@@ -192,7 +198,7 @@ bool AnimateTrajectory(
 
             auto* gripper_cmd = static_cast<GripperCommand*>(command.get());
 
-            std_msgs::ColorRGBA color;
+            auto color = std_msgs::ColorRGBA();
             if (gripper_cmd->open) {
                 color.g = 0.5f;
                 color.a = 0.9f;
@@ -201,12 +207,17 @@ bool AnimateTrajectory(
                 color.a = 0.9f;
             }
 
-            visualization_msgs::MarkerArray ma;
-            last_wp.getRobotMarkers(ma, last_wp.getRobotModel()->getLinkModelNames(), color, "trajectory", ros::Duration(0));
+            auto ma = visualization_msgs::MarkerArray();
+            last_wp.getRobotMarkers(
+                    ma,
+                    last_wp.getRobotModel()->getLinkModelNames(),
+                    color,
+                    "trajectory",
+                    ros::Duration(0));
 
             SV_SHOW_INFO(ma);
 
-            ros::Duration(1.0).sleep();
+            ros::Duration(factor * 1.0).sleep();
         } else if (command->type == Command::Type::Trajectory) {
             if (!ros::ok()) break;
 
@@ -216,21 +227,26 @@ bool AnimateTrajectory(
 
                 auto& wp = trajectory->trajectory.getWayPoint(i);
 
-                std_msgs::ColorRGBA color;
+                auto color = std_msgs::ColorRGBA();
                 color.r = color.g = color.b = 0.5f;
                 color.a = 0.9f;
 
-                visualization_msgs::MarkerArray ma;
-                wp.getRobotMarkers(ma, wp.getRobotModel()->getLinkModelNames(), color, "trajectory", ros::Duration(0));
+                auto ma = visualization_msgs::MarkerArray();
+                wp.getRobotMarkers(
+                        ma,
+                        wp.getRobotModel()->getLinkModelNames(),
+                        color,
+                        "trajectory",
+                        ros::Duration(0));
 
                 SV_SHOW_INFO(ma);
 
-                ros::Duration(dur).sleep();
-//                std::this_thread::sleep_for(std::chrono::milliseconds((int64_t)(1e3 * dur)));
+                ros::Duration(factor * dur).sleep();
             }
 
             last_wp = trajectory->trajectory.getLastWayPoint();
         } else {
+            ROS_ERROR("Unrecognized trajectoy command type");
             return false;
         }
     }
@@ -240,19 +256,50 @@ bool AnimateTrajectory(
 using ManipulateObjectActionServer =
         actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 
+// \param robot_model
+// \param group_name needed to create final trajectory
 void ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
     const std::string& group_name,
-    const moveit::core::RobotState* real_start_state,
-    smpl::collision::CollisionSpace& cspace,
-    sbpl_interface::MoveItRobotModel& planning_model,
+    const smpl::urdf::RobotModel* object_model,
+    smpl::collision::CollisionSpace* cspace,
+    sbpl_interface::MoveItRobotModel* planning_model,
     ObjectManipPlanner* planner,
+    const moveit::core::RobotState* real_start_state,
     const ros::Publisher& display_publisher,
     const ros::NodeHandle& ph,
     ManipulateObjectActionServer* server,
     const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
 {
-    moveit::core::RobotState start_state(*real_start_state);
+    auto start_state = moveit::core::RobotState(*real_start_state);
+
+    auto* obj_root_joint = GetRootJoint(object_model);
+    if (obj_root_joint->type == smpl::urdf::JointType::Floating) {
+        auto obj_state = smpl::urdf::RobotState();
+        if (InitRobotState(&obj_state, object_model, false, false)) {
+            double positions[7];
+            positions[0] = msg->object_pose.position.x;
+            positions[1] = msg->object_pose.position.y;
+            positions[2] = msg->object_pose.position.z;
+            positions[3] = msg->object_pose.orientation.x; // blech
+            positions[4] = msg->object_pose.orientation.y; // blech
+            positions[5] = msg->object_pose.orientation.z; // blech
+            positions[6] = msg->object_pose.orientation.w; // blech
+            SetJointPositions(&obj_state, obj_root_joint, positions);
+            UpdateVisualBodyTransforms(&obj_state);
+            SV_SHOW_INFO_NAMED(
+                    "object_state",
+                    MakeRobotVisualization(
+                            &obj_state,
+                            smpl::visual::Color{ 1.0f, 0.5f, 0.0f, 1.0f },
+                            "map", // TODO: @planning frame
+                            "object_state"));
+        } else {
+            ROS_ERROR("failed to initialize object state?");
+        }
+    } else {
+        ROS_ERROR("expected object model to have a floating joint at the root");
+    }
 
     // TODO: initialize to current state values
 //    start_state.setToDefaultValues();
@@ -306,8 +353,8 @@ void ManipulateObject(
     // Outputs //
     /////////////
 
-    std::vector<std::unique_ptr<Command>> commands;
-    robot_trajectory::RobotTrajectory trajectory(robot_model, group_name);
+    auto commands = std::vector<std::unique_ptr<Command>>();
+    auto trajectory = robot_trajectory::RobotTrajectory(robot_model, group_name);
 
     ///////////
     // Plan! //
@@ -318,7 +365,7 @@ void ManipulateObject(
     for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
         auto& name = robot_model->getVariableNames()[i];
         auto pos = start_state.getVariablePositions()[i];
-        if (!cspace.setJointPosition(name, pos)) {
+        if (!cspace->setJointPosition(name, pos)) {
             ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
             server->setAborted();
             return;
@@ -327,7 +374,7 @@ void ManipulateObject(
 
     ROS_INFO("Update start state in planning model");
 
-    if (!planning_model.updateReferenceState(start_state)) {
+    if (!planning_model->updateReferenceState(start_state)) {
         ROS_ERROR("Failed to update the planning model reference state");
         server->setAborted();
         return;
@@ -380,7 +427,7 @@ void ManipulateObject(
     if (execute) {
         ExecuteTrajectory(ph, commands);
     } else {
-        AnimateTrajectory(robot_model, commands);
+        AnimateTrajectory(robot_model, commands, 5.0);
     }
 
     ROS_INFO("Crate manipulation successful");
@@ -397,20 +444,20 @@ void ManipulateObject(
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "object_manip_planner");
-    ros::NodeHandle nh;
-    ros::NodeHandle ph("~");
+    auto nh = ros::NodeHandle();
+    auto ph = ros::NodeHandle("~");
 
     auto display_publisher =
             ph.advertise<moveit_msgs::DisplayTrajectory>("planned_path", 1);
 
-    smpl::VisualizerROS visualizer;
+    auto visualizer = smpl::VisualizerROS();
     smpl::visual::set_visualizer(&visualizer);
 
     ros::Duration(0.5).sleep(); // let publisher set up
 
-    std::string group_name;
-    std::string tip_link;
-    std::string ik_group_name;
+    auto group_name = std::string();
+    auto tip_link = std::string();
+    auto ik_group_name = std::string();
     if (!GetParam(ph, "group_name", &group_name) ||
         !GetParam(ph, "tip_link", &tip_link) ||
         !GetParam(ph, "ik_group_name", &ik_group_name))
@@ -424,14 +471,14 @@ int main(int argc, char* argv[])
 
     ROS_INFO("Load Robot Model");
 
-    robot_model_loader::RobotModelLoader loader;
+    auto loader = robot_model_loader::RobotModelLoader();
     auto robot_model = loader.getModel();
     if (robot_model == NULL) {
         ROS_ERROR("Failed to load Robot Model");
         return 1;
     }
 
-    std::vector<std::string> redundant_joints;
+    auto redundant_joints = std::vector<std::string>();
     if (ik_group_name == "right_arm") {
         redundant_joints = { "limb_right_joint3" };
     } else if (ik_group_name == "right_arm_and_torso") {
@@ -444,6 +491,40 @@ int main(int argc, char* argv[])
     auto* ik_group = robot_model->getJointModelGroup(ik_group_name);
     if (!ik_group->setRedundantJoints(redundant_joints)) {
         ROS_ERROR("Failed to set redundant joints");
+        return 1;
+    }
+
+    /////////////////////////////////////////////////////////
+    // Load the object model from URDF (for visualization) //
+    /////////////////////////////////////////////////////////
+
+    auto obj_description_key = "object_description";
+    auto obj_description_abs_key = std::string();
+    if (!ph.searchParam(obj_description_key, obj_description_abs_key)) {
+        ROS_ERROR("Failed to find 'object_description' on the param server");
+        return 1;
+    }
+
+    auto object_description = std::string();
+    if (!GetParam(ph, obj_description_abs_key, &object_description)) {
+        ROS_ERROR("Failed to retrieve '%s' from the param server", obj_description_abs_key.c_str());
+        return 1;
+    }
+
+    auto object_urdf = urdf::parseURDF(object_description);
+    if (object_urdf == NULL) {
+        ROS_ERROR("Failed to parse object URDF");
+        return 1;
+    }
+
+    auto object_model = smpl::urdf::RobotModel();
+    auto j_object_world = smpl::urdf::JointSpec();
+    j_object_world.origin = smpl::Affine3::Identity();
+    j_object_world.axis = smpl::Vector3::Zero();
+    j_object_world.name = "world_joint";
+    j_object_world.type = smpl::urdf::JointType::Floating;
+    if (!InitRobotModel(&object_model, object_urdf.get())) {
+        ROS_ERROR("Failed to initialize object model");
         return 1;
     }
 
@@ -468,7 +549,7 @@ int main(int argc, char* argv[])
 
     auto object_min_position = 0.0;
     auto object_max_position = 1.0;
-    ObjectManipModel omanip;
+    auto omanip = ObjectManipModel();
     if (!Init(
             &omanip,
             &planning_model,
@@ -487,11 +568,11 @@ int main(int argc, char* argv[])
     ROS_INFO("Initialize Collision Checker");
 
     // frame of the planning/collision model, for visualization
-    std::string planning_frame;
+    auto planning_frame = std::string();
     ph.param<std::string>("planning_frame", planning_frame, "map");
 
     double size_x, size_y, size_z, origin_x, origin_y, origin_z, resolution, max_dist;
-    ros::NodeHandle gh(ph, "grid");
+    auto gh = ros::NodeHandle(ph, "grid");
     if (!GetParam(gh, "size_x", &size_x) ||
         !GetParam(gh, "size_y", &size_y) ||
         !GetParam(gh, "size_z", &size_z) ||
@@ -520,7 +601,7 @@ int main(int argc, char* argv[])
     // (non-object) model, since the CollisionSpace has no knowledge of the
     // object joint. Also, it's pure luck that the CollisionSpace ignores "too
     // large" vectors.
-    smpl::collision::CollisionSpace cspace;
+    auto cspace = smpl::collision::CollisionSpace();
     if (!cspace.init(
             &grid,
             *robot_model->getURDF(),
@@ -556,7 +637,7 @@ int main(int argc, char* argv[])
 
     ROS_INFO("Initialize Object Manipulation Planner");
 
-    ObjectManipPlannerParams params;
+    auto params = ObjectManipPlannerParams();
     {
         ph.param("use_rotation", params.use_rotation, true);
         ph.param("disc_rotation_heuristic", params.disc_rotation_heuristic, true);
@@ -582,7 +663,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::string demos;
+    auto demos = std::string();
     if (!GetParam(ph, "demonstrations_path", &demos)) {
         return 1;
     }
@@ -611,10 +692,11 @@ int main(int argc, char* argv[])
                 return ManipulateObject(
                         robot_model,
                         group_name,
-                        curr_state.get(),
-                        cspace,
-                        planning_model,
+                        &object_model,
+                        &cspace,
+                        &planning_model,
                         &planner,
+                        curr_state.get(),
                         display_publisher,
                         ph,
                         &server,

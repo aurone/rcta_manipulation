@@ -7,20 +7,46 @@
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "manipulate_object");
-    ros::NodeHandle nh;
-    ros::NodeHandle ph("~");
+    auto nh = ros::NodeHandle();
+    auto ph = ros::NodeHandle("~");
 
-    using ManipulateObjectActionClient =
-            actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateObjectAction>;
+    //////////////////////////////
+    // Parse Test Configuration //
+    //////////////////////////////
 
-    ManipulateObjectActionClient client("manipulate_object");
-
-    ros::Duration(1.0).sleep();
-
-    std::map<std::string, double> start_variables;
+    auto start_variables = std::map<std::string, double>();
     (void)ph.getParam("start_state", start_variables);
 
-    std::vector<std::pair<std::string, double>> wtf;
+    auto object_start_state = 0.0;
+    (void)ph.getParam("object_start_position", object_start_state);
+
+    auto object_goal_state = 1.0;
+    (void)ph.getParam("object_goal_position", object_goal_state);
+
+    auto allowed_time = 10.0;
+    (void)ph.getParam("allowed_planning_time", allowed_time);
+
+    auto execute = false;
+    ph.param("execute", execute, false);
+
+    auto object_pose = std::vector<double>();
+    (void)ph.getParam("object_pose", object_pose);
+
+    /////////////////////////////////
+    // Build ManipulateObject Goal //
+    /////////////////////////////////
+
+    auto goal = cmu_manipulation_msgs::ManipulateObjectGoal();
+
+    goal.start_state.is_diff = true;
+
+    goal.start_state.multi_dof_joint_state.header.frame_id = "map";
+    goal.start_state.multi_dof_joint_state.joint_names = { "world_joint" };
+
+    goal.start_state.multi_dof_joint_state.transforms.resize(1);
+    goal.start_state.multi_dof_joint_state.transforms[0].rotation.w = 1.0;
+
+    auto wtf = std::vector<std::pair<std::string, double>>();
 
     for (auto& var : start_variables) {
         auto vv = var.first;
@@ -36,44 +62,6 @@ int main(int argc, char* argv[])
         wtf.emplace_back(vv, value);
     }
 
-    auto object_start_state = 0.0;
-    (void)ph.getParam("object_start_position", object_start_state);
-
-    auto object_goal_state = 1.0;
-    (void)ph.getParam("object_goal_position", object_goal_state);
-
-    auto allowed_time = 0.0;
-    (void)ph.getParam("allowed_planning_time", allowed_time);
-
-    auto execute = false;
-    ph.param("execute", execute, false);
-
-    cmu_manipulation_msgs::ManipulateObjectGoal goal;
-    goal.allowed_planning_time = allowed_time;
-
-    goal.object_pose.position.x = 0.85;
-    Eigen::Quaterniond oq(Eigen::AngleAxisd(1.570796, Eigen::Vector3d::UnitZ()));
-    goal.object_pose.orientation.w = oq.w();
-    goal.object_pose.orientation.x = oq.x();
-    goal.object_pose.orientation.y = oq.y();
-    goal.object_pose.orientation.z = oq.z();
-
-    goal.object_goal = object_goal_state;
-    goal.object_start = object_start_state;
-
-    // TODO:
-    goal.object_id = "crate";
-
-    goal.plan_only = !execute;
-
-    goal.start_state.is_diff = true;
-
-    goal.start_state.multi_dof_joint_state.header.frame_id = "map";
-    goal.start_state.multi_dof_joint_state.joint_names = { "world_joint" };
-
-    goal.start_state.multi_dof_joint_state.transforms.resize(1);
-    goal.start_state.multi_dof_joint_state.transforms[0].rotation.w = 1.0;
-
     for (auto& var : wtf) {
         auto pos = var.first.find("world_joint");
         if (pos == std::string::npos) {
@@ -86,7 +74,7 @@ int main(int argc, char* argv[])
             } else if (local == "/y") {
                 goal.start_state.multi_dof_joint_state.transforms[0].translation.y = var.second;
             } else if (local == "/theta") {
-                Eigen::Quaterniond q(Eigen::AngleAxisd(var.second, Eigen::Vector3d::UnitZ()));
+                auto q = Eigen::Quaterniond(Eigen::AngleAxisd(var.second, Eigen::Vector3d::UnitZ()));
                 goal.start_state.multi_dof_joint_state.transforms[0].rotation.w = q.w();
                 goal.start_state.multi_dof_joint_state.transforms[0].rotation.x = q.x();
                 goal.start_state.multi_dof_joint_state.transforms[0].rotation.y = q.y();
@@ -95,6 +83,53 @@ int main(int argc, char* argv[])
         }
     }
 
+    goal.object_id = "crate"; // TODO:
+
+    if (object_pose.size() > 0) {
+        goal.object_pose.position.x = object_pose[0];
+    }
+    if (object_pose.size() > 1) {
+        goal.object_pose.position.y = object_pose[1];
+    }
+    if (object_pose.size() > 2) {
+        goal.object_pose.position.z = object_pose[2];
+    }
+    auto goal_qz = 0.0;
+    auto goal_qy = 0.0;
+    auto goal_qx = 0.0;
+    if (object_pose.size() > 3) {
+        goal_qz = smpl::to_radians(object_pose[3]);
+    }
+    if (object_pose.size() > 4) {
+        goal_qy = smpl::to_radians(object_pose[4]);
+    }
+    if (object_pose.size() > 5) {
+        goal_qx = smpl::to_radians(object_pose[5]);
+    }
+
+    auto oq = Eigen::Quaterniond(
+        Eigen::AngleAxisd(goal_qz, Eigen::Vector3d::UnitZ()) *
+        Eigen::AngleAxisd(goal_qy, Eigen::Vector3d::UnitY()) *
+        Eigen::AngleAxisd(goal_qx, Eigen::Vector3d::UnitX()));
+    goal.object_pose.orientation.w = oq.w();
+    goal.object_pose.orientation.x = oq.x();
+    goal.object_pose.orientation.y = oq.y();
+    goal.object_pose.orientation.z = oq.z();
+
+    goal.object_start = object_start_state;
+    goal.object_goal = object_goal_state;
+
+    goal.allowed_planning_time = allowed_time;
+
+    goal.plan_only = !execute;
+
+    ///////////////
+    // Send Goal //
+    ///////////////
+
+    using cmu_manipulation_msgs::ManipulateObjectAction;
+    using ManipulateObjectActionClient = actionlib::SimpleActionClient<ManipulateObjectAction>;
+    ManipulateObjectActionClient client("manipulate_object");
     client.waitForServer();
 
     auto state = client.sendGoalAndWait(goal);

@@ -15,6 +15,7 @@
 #include <smpl_urdf_robot_model/robot_model.h>
 #include <smpl_urdf_robot_model/robot_state.h>
 #include <urdf_parser/urdf_parser.h>
+#include <moveit_msgs/GetStateValidity.h>
 
 static
 auto to_cstring(moveit_msgs::MoveItErrorCodes code) -> const char*
@@ -230,8 +231,13 @@ bool PlanManipulationTrajectory(
     Sampler sampler,
     moveit::planning_interface::MoveGroupInterface::Plan* oplan)
 {
+    auto nh = ros::NodeHandle();
+    auto check_state_validity = nh.serviceClient<moveit_msgs::GetStateValidity>(
+            "check_state_validity");
+
     auto interm_state = *move_group->getCurrentState();
-    auto manip_traj = robot_trajectory::RobotTrajectory(interm_state.getRobotModel(), group_name);
+    auto manip_traj = robot_trajectory::RobotTrajectory(
+            interm_state.getRobotModel(), group_name);
     auto ids = (int32_t)0;
 
     for (auto i = 0; i < samples; ++i) {
@@ -242,6 +248,10 @@ bool PlanManipulationTrajectory(
         auto* group = robot_model->getJointModelGroup(group_name);
 
         auto consistency_limits = std::vector<double>(group->getVariableCount(), smpl::to_radians(22.5));
+
+        // TODO: Why don't we require a feasible ik solution at all intermediate
+        // waypoints? This could be worse, if we weren't using consistency
+        // limits, but it's still pretty bad.
 
         if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
             visualization_msgs::MarkerArray ma;
@@ -256,17 +266,32 @@ bool PlanManipulationTrajectory(
             }
             SV_SHOW_INFO(ma);
             manip_traj.addSuffixWayPoint(interm_state, 1.0);
+
+            // TODO: interpolate path since for lack of an interface for CCD.
+
+            moveit_msgs::GetStateValidity::Request req;
+            moveit_msgs::GetStateValidity::Response res;
+            robotStateToRobotStateMsg(interm_state, req.robot_state);
+            if (!check_state_validity.call(req, res)) {
+                ROS_WARN("Failed to call check_state_validity service for waypoint %d", i);
+                return false;
+            }
+
+            if (!res.valid) {
+                ROS_WARN("Waypoint %d on manipulation trajectory is invalid", i);
+                return false;
+            }
         }
     }
 
     // timestamp waypoint
-    trajectory_processing::IterativeParabolicTimeParameterization itp;
+    auto itp = trajectory_processing::IterativeParabolicTimeParameterization();
     if (!itp.computeTimeStamps(manip_traj)) {
         ROS_ERROR("Failed to compute timestamps");
         return false;
     }
 
-    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    auto plan = moveit::planning_interface::MoveGroupInterface::Plan();
     robotStateToRobotStateMsg(*move_group->getCurrentState(), plan.start_state_);
     manip_traj.getRobotTrajectoryMsg(plan.trajectory_);
 
