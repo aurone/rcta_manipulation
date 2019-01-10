@@ -83,7 +83,7 @@ void GetShortcutSuccs(
     auto* egraph = heur->eg->getExperienceGraph();
     SMPL_ASSERT(egraph != NULL);
 
-    std::vector<smpl::ExperienceGraph::node_id> egraph_nodes;
+    auto egraph_nodes = std::vector<smpl::ExperienceGraph::node_id>();
     heur->eg->getExperienceGraphNodes(state_id, egraph_nodes);
 
     for (auto node : egraph_nodes) {
@@ -122,8 +122,8 @@ auto MakeManipulateHeuristicVisualization(
         max_h_manipulate = std::max(max_h_manipulate, e.second);
     }
 
-    std::vector<Eigen::Vector3d> points;
-    std::vector<smpl::visual::Color> colors;
+    auto points = std::vector<Eigen::Vector3d>();
+    auto colors = std::vector<smpl::visual::Color>();
     points.reserve(h.size());
     colors.reserve(h.size());
     for (auto& e : h) {
@@ -137,7 +137,7 @@ auto MakeManipulateHeuristicVisualization(
         colors.push_back(color);
     }
 
-    smpl::visual::Marker m;
+    auto m = smpl::visual::Marker();
     m.pose = Eigen::Affine3d::Identity();
     m.shape = smpl::visual::CubeList{ std::move(points), graph->resolution()[0] };
     m.color = std::move(colors);

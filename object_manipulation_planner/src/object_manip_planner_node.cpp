@@ -324,8 +324,8 @@ void ManipulateObject(
     // Visualize the start state
     {
         ros::Duration(1.0).sleep();
-        visualization_msgs::MarkerArray ma;
-        std_msgs::ColorRGBA color;
+        auto ma = visualization_msgs::MarkerArray();
+        auto color = std_msgs::ColorRGBA();
         color.r = 0.8f;
         color.g = 0.8f;
         color.b = 1.0f;
@@ -341,7 +341,7 @@ void ManipulateObject(
         ros::Duration(1.0).sleep();
     }
 
-    Eigen::Affine3d object_pose;
+    auto object_pose = Eigen::Affine3d();
     tf::poseMsgToEigen(msg->object_pose, object_pose);
 
     auto object_start_state = msg->object_start;
@@ -506,7 +506,8 @@ int main(int argc, char* argv[])
     }
 
     auto object_description = std::string();
-    if (!GetParam(ph, obj_description_abs_key, &object_description)) {
+
+    if (!ph.getParam(obj_description_abs_key, object_description)) {
         ROS_ERROR("Failed to retrieve '%s' from the param server", obj_description_abs_key.c_str());
         return 1;
     }
@@ -591,8 +592,8 @@ int main(int argc, char* argv[])
     grid.setReferenceFrame(planning_frame);
     SV_SHOW_INFO(grid.getBoundingBoxVisualization());
 
-    smpl::collision::CollisionModelConfig config;
-    if (!smpl::collision::CollisionModelConfig::Load(nh, config)) {
+    auto config = smpl::collision::CollisionModelConfig();
+    if (!smpl::collision::CollisionModelConfig::Load(ph, config)) {
         ROS_ERROR("Failed to load Collision Model Configuration");
         return 1;
     }
