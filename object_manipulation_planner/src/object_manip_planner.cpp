@@ -85,7 +85,7 @@ bool Init(
 
 bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
 {
-    boost::filesystem::path p(path);
+    auto p = boost::filesystem::path(path);
     if (!boost::filesystem::is_directory(p)) {
         SMPL_ERROR("'%s' is not a directory", path.c_str());
         return false;
@@ -95,7 +95,7 @@ bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
         dit != boost::filesystem::directory_iterator(); ++dit)
     {
         auto& filepath = dit->path().generic_string();
-        std::vector<smpl::RobotState> demo_path;
+        auto demo_path = std::vector<smpl::RobotState>();
         if (!smpl::ParseExperienceGraphFile(filepath, planner->model, demo_path)) {
             continue;
         }
@@ -111,7 +111,7 @@ auto MakeGraphStatePrefix(
     ObjectManipModel* model)
     -> smpl::RobotState
 {
-    smpl::RobotState s;
+    auto s = smpl::RobotState();
     for (auto& var : model->parent_model->getPlanningJoints()) {
         auto pos = state.getVariablePosition(var);
         s.push_back(pos);
@@ -205,6 +205,8 @@ bool PlanPath(
     planner->graph.setGoal(goal);
 
     planner->heuristic.updateGoal(goal);
+
+    planner->search.force_planning_from_scratch();
 
     auto start_id = planner->graph.getStartStateID();
     auto goal_id = planner->graph.getGoalStateID();
