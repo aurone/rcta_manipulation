@@ -42,6 +42,7 @@
 #include "object_manip_checker.h"
 #include "roman_robot_model.h"
 
+// A necessary evil
 namespace std {
 template <class Key, class Value>
 auto operator<<(std::ostream& o, const std::map<Key, Value>& m) -> std::ostream&
@@ -58,10 +59,10 @@ auto operator<<(std::ostream& o, const std::map<Key, Value>& m) -> std::ostream&
 
     return o;
 }
-
 } // namespace
 
-// Little helper for uniform success/error logging
+// Downloads a parameter from the parameter server. If the downloaded succeeds,
+// log the parameter's value, otherwise log an error message.
 template <class T>
 bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
 {
@@ -74,6 +75,7 @@ bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
     return true;
 }
 
+// Execute a sequence of trajectory/gripper commands.
 bool ExecuteTrajectory(
     const ros::NodeHandle& nh,
     const std::vector<std::unique_ptr<Command>>& commands)
@@ -84,8 +86,8 @@ bool ExecuteTrajectory(
     using FollowJointTrajectoryActionClient =
             actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
-    std::string traj_client_name;
-    std::string gripper_client_name;
+    auto traj_client_name = std::string();
+    auto gripper_client_name = std::string();
     if (!GetParam(nh, "follow_joint_trajectory_action_name", &traj_client_name) ||
         !GetParam(nh, "gripper_command_action_name", &gripper_client_name))
     {
@@ -181,6 +183,9 @@ bool ExecuteTrajectory(
     return true;
 }
 
+// Animate a sequence of trajectory/gripper commands. Gripper commands are
+// displayed a short pause, with the robot colored in green for an open command
+// and red for a close command.
 bool AnimateTrajectory(
     const moveit::core::RobotModelConstPtr& robot_model,
     const std::vector<std::unique_ptr<Command>>& commands,
@@ -252,9 +257,11 @@ bool AnimateTrajectory(
 using ManipulateObjectActionServer =
         actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 
+// Plan and execute (or animate) a sequence of trajectory/gripper commands to
+// manipulate the state of an object.
 // \param robot_model
 // \param group_name needed to create final trajectory
-void ManipulateObject(
+bool ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
     const std::string& group_name,
     const smpl::urdf::RobotModel* object_model,
@@ -264,10 +271,11 @@ void ManipulateObject(
     const moveit::core::RobotState* real_start_state,
     const ros::Publisher& display_publisher,
     const ros::NodeHandle& ph,
-    ManipulateObjectActionServer* server,
     const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
 {
-    auto start_state = moveit::core::RobotState(*real_start_state);
+    ///////////////////////////////////////
+    // Visualize the state of the object //
+    ///////////////////////////////////////
 
     auto* obj_root_joint = GetRootJoint(object_model);
     if (obj_root_joint->type == smpl::urdf::JointType::Floating) {
@@ -297,6 +305,12 @@ void ManipulateObject(
         ROS_ERROR("expected object model to have a floating joint at the root");
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Initialize the start state from the current state and apply overrides //
+    ///////////////////////////////////////////////////////////////////////////
+
+    auto start_state = moveit::core::RobotState(*real_start_state);
+
     // TODO: initialize to current state values
 //    start_state.setToDefaultValues();
 
@@ -313,11 +327,13 @@ void ManipulateObject(
     // hmmm...is this going to barf when there are superflous joints?
     if (!moveit::core::robotStateMsgToRobotState(msg->start_state, start_state)) {
         ROS_ERROR("Failed to update start state");
-        server->setAborted();
-        return;
+        return false;
     }
 
-    // Visualize the start state
+    ///////////////////////////////
+    // Visualize the start state //
+    ///////////////////////////////
+
     {
         ros::Duration(1.0).sleep();
         auto ma = visualization_msgs::MarkerArray();
@@ -337,6 +353,34 @@ void ManipulateObject(
         ros::Duration(1.0).sleep();
     }
 
+    ///////////////////////////////
+    // Update the Planning Scene //
+    ///////////////////////////////
+
+    ROS_INFO("Update reference state in collision model to the start state");
+
+    for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
+        auto& name = robot_model->getVariableNames()[i];
+        auto pos = start_state.getVariablePositions()[i];
+        if (!cspace->setJointPosition(name, pos)) {
+            ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
+            return false;
+        }
+    }
+
+    ROS_INFO("Update reference state in planning model to the start state");
+
+    if (!planning_model->updateReferenceState(start_state)) {
+        ROS_ERROR("Failed to update the planning model reference state");
+        return false;
+    }
+
+    ////////////////////////////
+    // Finally, plan the path //
+    ////////////////////////////
+
+    ROS_INFO("Plan path!");
+
     auto object_pose = Eigen::Affine3d();
     tf::poseMsgToEigen(msg->object_pose, object_pose);
 
@@ -345,38 +389,7 @@ void ManipulateObject(
 
     auto allowed_time = msg->allowed_planning_time;
 
-    /////////////
-    // Outputs //
-    /////////////
-
     auto commands = std::vector<std::unique_ptr<Command>>();
-    auto trajectory = robot_trajectory::RobotTrajectory(robot_model, group_name);
-
-    ///////////
-    // Plan! //
-    ///////////
-
-    ROS_INFO("Update start state in collision model");
-
-    for (auto i = 0; i < robot_model->getVariableCount(); ++i) {
-        auto& name = robot_model->getVariableNames()[i];
-        auto pos = start_state.getVariablePositions()[i];
-        if (!cspace->setJointPosition(name, pos)) {
-            ROS_ERROR("Failed to set position of joint '%s' to %f in the collision model", name.c_str(), pos);
-            server->setAborted();
-            return;
-        }
-    }
-
-    ROS_INFO("Update start state in planning model");
-
-    if (!planning_model->updateReferenceState(start_state)) {
-        ROS_ERROR("Failed to update the planning model reference state");
-        server->setAborted();
-        return;
-    }
-
-    ROS_INFO("Plan path!");
 
     ProfilerStart("omp");
     if (!PlanPath(
@@ -390,11 +403,11 @@ void ManipulateObject(
     {
         ProfilerStop();
         ROS_ERROR("Failed to plan path");
-        server->setAborted();
-        return;
+        return false;
     }
     ProfilerStop();
 
+    auto trajectory = robot_trajectory::RobotTrajectory(robot_model, group_name);
     MakeRobotTrajectory(&commands, &trajectory);
 
     //////////////////////////////
@@ -418,6 +431,10 @@ void ManipulateObject(
         display_publisher.publish(display);
     }
 
+    /////////////////////////////////////////////
+    // Execute (or animate) the resulting plan //
+    /////////////////////////////////////////////
+
     auto execute = !msg->plan_only;
 
     if (execute) {
@@ -427,7 +444,7 @@ void ManipulateObject(
     }
 
     ROS_INFO("Crate manipulation successful");
-    server->setSucceeded();
+    return true;
 }
 
 // 1. Generate a trajectory using the model of the object
@@ -759,7 +776,7 @@ int main(int argc, char* argv[])
             [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
             {
                 auto curr_state = state_monitor->getCurrentState();
-                return ManipulateObject(
+                if (ManipulateObject(
                         robot_model,
                         group_name,
                         &object_model,
@@ -769,8 +786,12 @@ int main(int argc, char* argv[])
                         curr_state.get(),
                         display_publisher,
                         ph,
-                        &server,
-                        msg);
+                        msg))
+                {
+                    server.setSucceeded();
+                } else {
+                    server.setAborted();
+                }
             },
             autostart);
 
