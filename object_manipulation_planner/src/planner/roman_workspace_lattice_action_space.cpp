@@ -11,7 +11,7 @@
 #include <smpl/graph/workspace_lattice.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
-#include "assert.h"
+#include "smpl_assert.h"
 #include "variables.h"
 
 bool InitRomanWorkspaceLatticeActions(

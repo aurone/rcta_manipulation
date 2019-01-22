@@ -7,7 +7,7 @@
 #include <smpl/graph/workspace_lattice_action_space.h>
 #include <smpl/spatial.h>
 
-#include "assert.h"
+#include "smpl_assert.h"
 #include "object_manip_heuristic.h"
 #include "variables.h"
 

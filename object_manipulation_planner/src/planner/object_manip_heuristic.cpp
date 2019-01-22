@@ -10,7 +10,7 @@
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/visualize.h>
 
-#include "assert.h"
+#include "smpl_assert.h"
 #include "variables.h"
 
 static const double FixedPointRatio = 1000.0;

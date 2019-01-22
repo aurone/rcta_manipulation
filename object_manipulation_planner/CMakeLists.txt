@@ -40,23 +40,14 @@ add_definitions(-DSV_PACKAGE_NAME="object_manipulation_planner")
 # object_manip_planner
 add_library(
     object_manip_planner
-    STATIC
     src/planner/object_manip_checker.cpp
     src/planner/object_manip_heuristic.cpp
     src/planner/object_manip_planner.cpp
     src/planner/object_manip_model.cpp
     src/planner/roman_workspace_lattice_action_space.cpp
     src/planner/roman_object_manip_lattice.cpp)
-target_include_directories(
-    object_manip_planner
-    SYSTEM PUBLIC
-    ${Boost_INCLUDE_DIRS}
-    ${catkin_INCLUDE_DIRS}
-    include)
-target_include_directories(
-    object_manip_planner
-    INTERFACE
-    src/planner)
+target_include_directories(object_manip_planner PUBLIC src/planner)
+target_include_directories(object_manip_planner SYSTEM PUBLIC ${Boost_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
 target_link_libraries(
     object_manip_planner
     PUBLIC
@@ -100,18 +91,10 @@ target_link_libraries(
 install(TARGETS object_manip_planner_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # test_object_manip_planner
-add_executable(test_object_manip_planner src/test/test_object_manip_planner.cpp)
-target_include_directories(
-    test_object_manip_planner
-    SYSTEM PRIVATE
-        ${Boost_INCLUDE_DIRS})
-target_link_libraries(
-    test_object_manip_planner
-    PRIVATE
-        object_manip_planner
-        ${Boost_LIBRARIES}
-        smpl::smpl)
-install(TARGETS test_object_manip_planner RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+#add_executable(test_object_manip_planner src/test/test_object_manip_planner.cpp)
+#target_include_directories(test_object_manip_planner SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
+#target_link_libraries(test_object_manip_planner PRIVATE object_manip_planner ${Boost_LIBRARIES} smpl::smpl)
+#install(TARGETS test_object_manip_planner RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # simple_crate_planner
 add_executable(simple_crate_planner src/nodes/simple_crate_planner.cpp)
@@ -152,14 +135,8 @@ target_include_directories(
         ${cmu_manipulation_msgs_INCLUDE_DIRS}
         ${actionlib_INCLUDE_DIRS}
         ${roscpp_INCLUDE_DIRS}
-        ${object_manip_planner_INCLUDE_DIRS}
-        ${smpl_INCLUDE_DIRS})
-target_link_libraries(
-    manipulate_object
-    PRIVATE
-        ${actionlib_LIBRARIES}
-        ${roscpp_LIBRARIES}
-        ${smpl_LIBRARIES})
+        ${object_manip_planner_INCLUDE_DIRS})
+target_link_libraries(manipulate_object PRIVATE ${actionlib_LIBRARIES} ${roscpp_LIBRARIES} smpl::smpl)
 install(TARGETS manipulate_object RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # door_demonstrator
@@ -178,20 +155,16 @@ target_link_libraries(
         ${eigen_conversions_LIBRARIES}
         ${moveit_core_LIBRARIES}
         ${moveit_ros_planning_LIBRARIES}
-        ${smpl_LIBRARIES}
         ${smpl_ros_LIBRARIES}
         ${smpl_urdf_robot_model_LIBRARIES}
-        ${urdfdom_LIBRARIES})
+        ${urdfdom_LIBRARIES}
+        smpl::smpl)
 install(TARGETS door_demonstrator RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # translate_demo
 add_executable(translate_demo src/tools/translate_demo.cpp)
-target_include_directories(
-    translate_demo
-    SYSTEM PUBLIC
-        ${smpl_INCLUDE_DIRS}
-        ${EIGEN3_INCLUDE_DIR})
-target_link_libraries(translate_demo ${smpl_LIBRARIES})
+target_include_directories(translate_demo SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(translate_demo smpl::smpl)
 install(TARGETS translate_demo RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # transform_demo
@@ -201,15 +174,14 @@ target_include_directories(
     SYSTEM PRIVATE
         ${moveit_core_INCLUDE_DIRS}
         ${moveit_ros_planning_INCLUDE_DIRS}
-        ${roscpp_INCLUDE_DIRS}
-        ${smpl_INCLUDE_DIRS})
+        ${roscpp_INCLUDE_DIRS})
 target_link_libraries(
     transform_demo
     PRIVATE
         ${moveit_core_LIBRARIES}
         ${moveit_ros_planning_LIBRARIES}
         ${roscpp_LIBRARIES}
-        ${smpl_LIBRARIES})
+        smpl::smpl)
 install(TARGETS transform_demo RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # make_cabinet_urdf
@@ -218,10 +190,7 @@ target_include_directories(make_cabinet_urdf SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR}
 
 # echo_display_traj
 add_executable(echo_display_traj src/tools/echo_display_traj.cpp)
-target_include_directories(
-    echo_display_traj
-    SYSTEM PRIVATE
-        ${catkin_INCLUDE_DIRS})
+target_include_directories(echo_display_traj SYSTEM PRIVATE ${catkin_INCLUDE_DIRS})
 target_link_libraries(
     echo_display_traj
     PRIVATE
