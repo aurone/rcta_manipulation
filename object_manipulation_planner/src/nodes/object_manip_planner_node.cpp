@@ -40,7 +40,7 @@
 #include "object_manip_planner.h"
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
-#include "roman_robot_model.h"
+//#include "roman_robot_model.h"
 
 // A necessary evil
 namespace std {
