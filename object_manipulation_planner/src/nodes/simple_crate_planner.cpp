@@ -272,6 +272,7 @@ bool PlanManipulationTrajectory(
             moveit_msgs::GetStateValidity::Request req;
             moveit_msgs::GetStateValidity::Response res;
             robotStateToRobotStateMsg(interm_state, req.robot_state);
+            req.group_name = "right_arm_and_torso";
             if (!check_state_validity.call(req, res)) {
                 ROS_WARN("Failed to call check_state_validity service for waypoint %d", i);
                 return false;
@@ -329,6 +330,13 @@ bool ManipulateObject(
     }
 
     auto start_state = *curr_state;
+
+    // Move to the start state, if one is specified
+    moveit::core::robotStateMsgToRobotState(goal->start_state, start_state);
+    move_group->setJointValueTarget(start_state);
+    move_group->setGoalJointTolerance(smpl::to_radians(1.0));
+    move_group->setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]");
+    auto err = move_group->move();
 
     //////////////////////////
     // Determine grasp pose //
