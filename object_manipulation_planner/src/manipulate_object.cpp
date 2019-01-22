@@ -135,8 +135,10 @@ int main(int argc, char* argv[])
     auto state = client.sendGoalAndWait(goal);
     if (state.state_ == state.SUCCEEDED) {
         ROS_INFO("Success!");
+        return 0;
     } else {
         ROS_WARN("Failure!");
+        return 1;
     }
 
     return 0;
