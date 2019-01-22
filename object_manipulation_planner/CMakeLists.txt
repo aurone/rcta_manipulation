@@ -91,10 +91,10 @@ target_link_libraries(
 install(TARGETS object_manip_planner_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # test_object_manip_planner
-#add_executable(test_object_manip_planner src/test/test_object_manip_planner.cpp)
-#target_include_directories(test_object_manip_planner SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
-#target_link_libraries(test_object_manip_planner PRIVATE object_manip_planner ${Boost_LIBRARIES} smpl::smpl)
-#install(TARGETS test_object_manip_planner RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+add_executable(test_object_manip_planner src/test/test_object_manip_planner.cpp)
+target_include_directories(test_object_manip_planner SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(test_object_manip_planner PRIVATE object_manip_planner ${Boost_LIBRARIES} smpl::smpl)
+install(TARGETS test_object_manip_planner RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # simple_crate_planner
 add_executable(simple_crate_planner src/nodes/simple_crate_planner.cpp)
