@@ -14,6 +14,7 @@
 // project includes
 #include "object_manip_model.h"
 #include "object_manip_heuristic.h"
+#include "variables.h"
 
 ObjectManipPlanner::ObjectManipPlanner() : search(&graph, &heuristic) { }
 
@@ -32,6 +33,7 @@ bool Init(
     p.free_angle_res =
     {
         smpl::to_radians(5),        // arm free angle
+        0.05,                       // base z
         smpl::to_radians(5),        // torso joint
         smpl::to_radians(22.5),     // base theta
         0.05,                       // base x
@@ -96,9 +98,18 @@ bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
     {
         auto& filepath = dit->path().generic_string();
         auto demo_path = std::vector<smpl::RobotState>();
+        // TODO: maybe this function should rearrange the variables in the
+        // waypoint if they are not identical...oh well...we'll modify
+        // the data for now
         if (!smpl::ParseExperienceGraphFile(filepath, planner->model, demo_path)) {
             continue;
         }
+
+        // TODO: We may want to parse the demonstration file ourselves here, so
+        // the header information is available to match up the joint variables
+        // with their order in the planning model. We get lucky in most cases
+        // because the order of the variables recorded in the demonstration
+        // happens to match the order in the planning model.
 
         planner->demos.push_back(std::move(demo_path));
     }
@@ -159,8 +170,13 @@ bool PlanPath(
         auto transformed_demo = demo;
         for (auto& point : transformed_demo) {
             auto T_obj_robot = Eigen::Affine3d(
-                    Eigen::Translation3d(point[0], point[1], 0.0) *
-                    Eigen::AngleAxisd(point[2], Eigen::Vector3d::UnitZ()));
+                    Eigen::Translation3d(
+                            point[WORLD_JOINT_X],
+                            point[WORLD_JOINT_Y],
+                            point[WORLD_JOINT_Z]) *
+                    Eigen::AngleAxisd(
+                            point[WORLD_JOINT_THETA],
+                            Eigen::Vector3d::UnitZ()));
 
             // TODO: this is obnoxiously sensitive. Transforming the
             // demonstration to object frame during recording and back to world
@@ -170,19 +186,13 @@ bool PlanPath(
             // rounding here is a hack to avoid that for now, but the planner
             // should be made robust to these situations.
             auto T_world_robot = Eigen::Affine3d(object_pose * T_obj_robot);
-            point[0] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
-            point[1] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
-            point[2] = round(1000.0 * smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
-#if 0
-            printf("point = (%0.12f, %0.12f, %0.12f)\n", point[0], point[1], point[2]);
-#endif
+            point[WORLD_JOINT_X] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
+            point[WORLD_JOINT_Y] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
+            point[WORLD_JOINT_THETA] = round(1000.0 * smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
+            point[WORLD_JOINT_Z] = round(1000.0 * T_world_robot.translation().z()) / 1000.0;
         }
 
-#if 0
-        planner->graph.insertExperienceGraphPath(demo);
-#else
         planner->graph.insertExperienceGraphPath(transformed_demo);
-#endif
     }
 
     auto start = MakeGraphStatePrefix(start_state, planner->model);
@@ -198,6 +208,9 @@ bool PlanPath(
 
     smpl::GoalConstraint goal;
     goal.type = smpl::GoalType::USER_GOAL_CONSTRAINT_FN;
+
+    // Hijacking the goal state/tolerance vectors to store the goal position
+    // of the object
     goal.angles.push_back(object_goal_state);
     goal.angle_tolerances.push_back(0.05);
     goal.check_goal = IsGoal;
@@ -250,10 +263,10 @@ bool PlanPath(
 
     // partition the path into several path segments based on the action
     // type
-    std::vector<RobotPath> segments;
-    std::vector<TransitionType::Type> segment_types;
+    auto segments = std::vector<RobotPath>();
+    auto segment_types = std::vector<TransitionType::Type>();
     auto segment_type = TransitionType::Type(path.front().back());
-    RobotPath segment;
+    auto segment = RobotPath();
     for (auto i = 0; i < path.size(); ++i) {
         auto& point = path[i];
         auto type = TransitionType::Type(point.back());

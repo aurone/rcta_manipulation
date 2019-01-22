@@ -1,0 +1,9 @@
+<launch>
+    <arg name="execute" default="false"/>
+    <arg name="scenario" default="$(find object_manipulation_planner)/tests/test-1.yaml"/>
+    <group ns="manipulate_object">
+        <param name="execute" value="$(arg execute)"/>
+        <rosparam command="load" file="$(arg scenario)"/>
+        <param name="allowed_planning_time" value="15.0"/>
+    </group>
+</launch>

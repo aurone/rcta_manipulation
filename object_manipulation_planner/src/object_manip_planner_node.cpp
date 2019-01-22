@@ -5,41 +5,42 @@
 #include <vector>
 
 // system includes
-#include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
+#include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <control_msgs/GripperCommandAction.h>
+#include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
+#include <gperftools/profiler.h>
+#include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
-#include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit_msgs/DisplayTrajectory.h>
+#include <ros/ros.h>
+#include <sbpl_collision_checking/collision_model_config.h>
+#include <sbpl_collision_checking/collision_space.h>
+#include <smpl/console/nonstd.h>
+#include <smpl/debug/visualize.h>
+#include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
+#include <smpl/distance_map/euclid_distance_map.h>
+#include <smpl/occupancy_grid.h>
+#include <smpl/stl/memory.h>
 #include <smpl_moveit_interface/planner/moveit_robot_model.h>
 #include <smpl_urdf_robot_model/robot_model.h>
 #include <smpl_urdf_robot_model/robot_state.h>
 #include <smpl_urdf_robot_model/robot_state_visualization.h>
-#include <ros/ros.h>
-#include <sbpl_collision_checking/collision_model_config.h>
-#include <sbpl_collision_checking/collision_space.h>
-#include <smpl/stl/memory.h>
-#include <smpl/distance_map/euclid_distance_map.h>
-#include <smpl/debug/visualize.h>
-#include <smpl/debug/visualizer_ros.h> // NOTE: actually smpl_ros
-#include <smpl/occupancy_grid.h>
 #include <tf/transform_listener.h>
-#include <gperftools/profiler.h>
 #include <urdf_parser/urdf_parser.h>
-
-#include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 
 // project includes
 #include "assert.h"
 #include "object_manip_planner.h"
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
+#include "roman_robot_model.h"
 
 namespace std {
 template <class Key, class Value>
@@ -158,13 +159,8 @@ bool ExecuteTrajectory(
                 }
                 traj.trajectory.points[i].positions = std::move(positions);
 
-#if ROS_KINETIC
                 traj.trajectory.points[i].time_from_start =
                         ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
-#else
-                traj.trajectory.points[i].time_from_start =
-                        ros::Duration(c->trajectory.getWaypointDurationFromStart(i));
-#endif
 
                 ROS_DEBUG("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
             }
@@ -471,12 +467,55 @@ int main(int argc, char* argv[])
 
     ROS_INFO("Load Robot Model");
 
+    // get the nominal urdf/srdf
     auto loader = robot_model_loader::RobotModelLoader();
     auto robot_model = loader.getModel();
     if (robot_model == NULL) {
         ROS_ERROR("Failed to load Robot Model");
         return 1;
     }
+
+#if 0
+    auto urdf_copy = boost::make_shared<urdf::ModelInterface>(*orig_robot_model->getURDF());
+    {
+        auto z_link = boost::make_shared<::urdf::Link>();
+        auto z_joint = boost::make_shared<::urdf::Joint>();
+
+        z_link->name = "world_link";
+        z_link->parent_joint;
+        z_link->child_joints = { z_joint };
+        z_link->child_links = std::vector<boost::shared_ptr<::urdf::Link>>{
+            urdf_copy->links_[urdf_copy->getRoot()->name]
+        };
+        // TODO: no way to remap urdf.getRoot()'s weak_ptr, do we need that?
+
+        z_joint->name = "world_z";
+        z_joint->type = ::urdf::Joint::PRISMATIC;
+        z_joint->axis = ::urdf::Vector3(0, 0, 1);
+        z_joint->child_link_name = urdf_copy->getRoot()->name;
+        z_joint->parent_link_name = z_link->name;
+        z_joint->parent_to_joint_origin_transform.clear();
+
+        urdf_copy->root_link_->parent_joint = z_joint;
+
+        urdf_copy->links_[z_link->name] = z_link;
+        urdf_copy->joints_[z_joint->name] = z_joint;
+        urdf_copy->root_link_ = z_link;
+    }
+
+    for (auto& e : urdf_copy->joints_) {
+        ROS_INFO("joint: %s", e.first.c_str());
+    }
+    for (auto& e : urdf_copy->links_) {
+        ROS_INFO("link: %s", e.first.c_str());
+    }
+
+    auto srdf_copy = orig_robot_model->getSRDF();
+    srdf_copy->virtual_joints_[0].child_link_ = "world_link";
+    auto robot_model = std::make_shared<moveit::core::RobotModel>(
+            urdf_copy,
+            orig_robot_model->getSRDF());
+#endif
 
     auto redundant_joints = std::vector<std::string>();
     if (ik_group_name == "right_arm") {
@@ -548,19 +587,36 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+#if 0
+    // Create a wrapper around MoveItRobotModel so we can add an additional
+    // degree-of-freedom for the z position.
+    auto roman_model = RomanRobotModel();
+    if (!Init(&roman_model, &planning_model)) {
+        ROS_ERROR("Failed to initialize Roman Robot Model");
+        return 1;
+    }
+#endif
+
+    auto omanip = ObjectManipModel();
     auto object_min_position = 0.0;
     auto object_max_position = 1.0;
-    auto omanip = ObjectManipModel();
+    auto object_variable_name = "hinge";
     if (!Init(
             &omanip,
+#if 0
+            &roman_model,
+#else
             &planning_model,
-            "hinge",
+#endif
+            object_variable_name,
             object_min_position,
             object_max_position))
     {
         ROS_ERROR("Failed to initialize Object Manipulation Model");
         return 1;
     }
+
+    ROS_INFO_STREAM("Planning Model Variables: " << omanip.getPlanningJoints());
 
     //////////////////////////////////////
     // Initialize the Collision Checker //
@@ -603,6 +659,7 @@ int main(int argc, char* argv[])
     // object joint. Also, it's pure luck that the CollisionSpace ignores "too
     // large" vectors.
     auto cspace = smpl::collision::CollisionSpace();
+#if 1
     if (!cspace.init(
             &grid,
             *robot_model->getURDF(),
@@ -613,6 +670,18 @@ int main(int argc, char* argv[])
         ROS_ERROR("Failed to initialize Collision Space");
         return 1;
     }
+#else
+    if (!cspace.init(
+            &grid,
+            *urdf_copy,
+            config,
+            group_name,
+            omanip.parent_model->getPlanningJoints()))
+    {
+        ROS_ERROR("Failed to initialize Collision Space");
+        return 1;
+    }
+#endif
 
     smpl::collision::CollisionObject ground_object;
     ground_object.id = "ground";

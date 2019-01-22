@@ -160,8 +160,8 @@ void UpdateUserGoal(
     auto* graph = static_cast<const RomanObjectManipLattice*>(
             heur->planningSpace());
 
-    auto goal_z = goal.angles.back();
-    auto goal_thresh = goal.angle_tolerances.back();
+    auto goal_z = goal.angles[0];
+    auto goal_thresh = goal.angle_tolerances[0];
 
     SMPL_INFO_NAMED(H_LOG, "Goal Z: %f @ %f", goal_z, goal_thresh);
 

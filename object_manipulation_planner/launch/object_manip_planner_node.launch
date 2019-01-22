@@ -4,7 +4,11 @@
     <!-- Actual arguments -->
     <arg name="debug" default="false"/>
     <arg name="live" default="true"/>
-    <arg name="load_robot_description" default="false"/>
+
+    <!-- We're loading the URDF/SRDF/etc into the node's private namespace, so
+    avoiding overwriting the URDF is no longer an issue.
+    -->
+    <arg name="load_robot_description" default="true"/>
 
     <arg if="$(arg live)" name="follow_joint_trajectory_action_name" default="trajectory_dispatcher/follow_joint_trajectory"/>
     <arg if="$(arg live)" name="gripper_command_action_name" default="rcta_right_robotiq_controller/gripper_action"/>
@@ -14,11 +18,16 @@
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
 
-    <include file="$(find roman_moveit_config)/launch/planning_context.launch">
+    <include ns="object_manip_planner" file="$(find object_manipulation_planner)/launch/planning_context.launch.xml">
         <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     </include>
 
-    <rosparam command="load" file="$(find roman_moveit_config)/config/collision_model.yaml"/>
+    <!-- Same deal as above...using a custom collision model configuration
+    solely for the purposes of modeling the root joint as a floating joint.
+    TODO: is it worth it to find a way to reasonably share the actual
+    description of the collision model
+    -->
+    <rosparam ns="object_manip_planner" command="load" file="$(find object_manipulation_planner)/config/collision_model.yaml"/>
 
     <!--env name="CPUPROFILE" value="/home/aurone/omp.prof"/-->
     <env name="SMPL_VISUALIZE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/smpl_visual.ini"/>

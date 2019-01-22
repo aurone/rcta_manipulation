@@ -1076,6 +1076,7 @@ int RomanObjectManipLattice::getSnapMotion(
         auto t = (double)i / (double)(num_waypoints - 1);
         // interpolate torso, theta, x, y
         interm_workspace_state[TR_JP] = interp(start_state[TR_JP], finish_state[TR_JP], t);
+        interm_workspace_state[BD_PZ] = interp(start_state[BD_PZ], finish_state[BD_PZ], t);
         interm_workspace_state[BD_TH] = interp(start_state[BD_TH], finish_state[BD_TH], t);
         interm_workspace_state[BD_PX] = interp(start_state[BD_PX], finish_state[BD_PX], t);
         interm_workspace_state[BD_PY] = interp(start_state[BD_PY], finish_state[BD_PY], t);

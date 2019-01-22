@@ -71,6 +71,8 @@ bool InitRomanWorkspaceLatticeActions(
         // handle translational base motions later
         if (a == BD_PX || a == BD_PY) continue;
 
+        if (a == BD_PZ) continue;
+
         if (!enable_base_rotations && a == BD_TH) continue;
 
         // don't move the object, what are you doing?

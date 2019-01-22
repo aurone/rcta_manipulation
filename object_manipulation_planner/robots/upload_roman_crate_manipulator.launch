@@ -1,0 +1,3 @@
+<launch>
+    <param name="robot_description" command="$(find xacro)/xacro.py '$(find object_manipulation_planner)/robots/roman_crate_manipulator.urdf.xacro'"/>
+</launch>
