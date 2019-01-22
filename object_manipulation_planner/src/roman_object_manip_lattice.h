@@ -211,6 +211,9 @@ public:
             std::vector<smpl::ExperienceGraph::node_id>,
             smpl::VectorHash<int>>;
 
+    std::vector<bool> m_egraph_node_validity;
+    std::vector<bool> m_egraph_edge_validity;
+
     // map discrete (x, y, z, yaw) poses to e-graph states whose discrete state
     // is within some tolerance. The tolerance is defined as lying within the
     // same discrete bin, i.e. discrete(phi(s)) = (x, y, z, yaw). This is

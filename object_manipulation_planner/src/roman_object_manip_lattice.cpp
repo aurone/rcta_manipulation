@@ -884,7 +884,45 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     m_egraph_phi_coords.resize(m_egraph.num_nodes());
     m_egraph_pre_phi_coords.resize(m_egraph.num_nodes());
 
+    m_egraph_node_validity.resize(m_egraph.num_nodes(), true);
+    m_egraph_edge_validity.resize(m_egraph.num_edges(), true);
+
     auto nodes = m_egraph.nodes();
+
+    auto num_invalid_nodes = 0;
+    auto num_invalid_edges = 0;
+
+    for (auto nit = nodes.first; nit != nodes.second; ++nit) {
+        auto node = *nit;
+        auto* checker = this->collisionChecker();
+        auto state = m_egraph.state(node);
+        if (!checker->isStateValid(state)) {
+            m_egraph_node_validity[node] = false;
+            ++num_invalid_nodes;
+        }
+    }
+
+    auto edges = m_egraph.edges();
+
+    for (auto eit = edges.first; eit != edges.second; ++eit) {
+        auto e = *eit;
+        auto src = m_egraph.source(e);
+        auto dst = m_egraph.target(e);
+        auto src_state = m_egraph.state(src);
+        auto dst_state = m_egraph.state(dst);
+        auto* checker = this->collisionChecker();
+        if (!checker->isStateToStateValid(src_state, dst_state)) {
+            m_egraph_edge_validity[e] = false;
+            ++num_invalid_edges;
+        }
+    }
+
+    ROS_INFO("Num valid egraph nodes: %d/%zu, Num valid egraph edges: %d/%zu",
+            m_egraph.num_nodes() - num_invalid_nodes,
+            m_egraph.num_nodes(),
+            m_egraph.num_edges() - num_invalid_edges,
+            m_egraph.num_edges());
+
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = *nit;
         auto& egraph_robot_state = m_egraph.state(node);
@@ -980,6 +1018,8 @@ void RomanObjectManipLattice::clearExperienceGraph()
     m_egraph_pre_phi_coords.clear();
     m_egraph_node_pregrasps.clear();
     m_egraph_node_grasps.clear();
+    m_egraph_node_validity.clear();
+    m_egraph_edge_validity.clear();
     WorkspaceLatticeEGraph::clearExperienceGraph();
 }
 
