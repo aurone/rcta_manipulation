@@ -44,8 +44,6 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    auto use_rosrun = true;
-
     auto num_tests = 0;
     auto num_successes = 0;
 
@@ -53,51 +51,37 @@ int main(int argc, char* argv[])
         it != bfs::directory_iterator();
         ++it)
     {
-        if (use_rosrun) {
-            auto err = 0;
-            std::stringstream ss;
-            auto cmd = std::string();
+        // We're doing a two-step (1) roslaunch to upload parameters, (2) rosrun
+        // to run the executable. This is so we can grab the return code from
+        // the executable, which roslaunch will hide from us.
+        auto err = 0;
+        std::stringstream ss;
+        auto cmd = std::string();
 
-            ss << "roslaunch --disable-title object_manipulation_planner manipulate_object_params.launch scenario:=" << it->path().generic_string() << " > /dev/null";
-            cmd = ss.str();
-            printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
-            err = system(cmd.c_str());
-            if (err != 0) {
-                fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
-            } else {
-                printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
-            }
-
-            ss.str("");
-            ss << "rosrun object_manipulation_planner manipulate_object > /dev/null";
-            cmd = ss.str();
-            printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
-            err = system(cmd.c_str());
-
-            if (err != 0) {
-                fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
-            } else {
-                printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
-                ++num_successes;
-            }
-            ++num_tests;
-        } else {
-            auto cmd = std::string("roslaunch");
-            cmd += " --disable-title";
-//        cmd += " --screen";
-            cmd += " object_manipulation_planner manipulate_object.launch";
-            cmd += std::string(" scenario:=") + it->path().generic_string();
-            cmd += " > /dev/null";
-            printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
-            auto err = system(cmd.c_str());
-            if (err != 0) {
-                fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
-            } else {
-                printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
-                ++num_successes;
-            }
-            ++num_tests;
+        ss << "roslaunch --disable-title object_manipulation_planner manipulate_object_params.launch scenario:=" << it->path().generic_string() << " > /dev/null";
+        cmd = ss.str();
+        printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
+        err = system(cmd.c_str());
+        if (err != 0) {
+            fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
         }
+//        else {
+//            printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
+//        }
+
+        ss.str("");
+        ss << "rosrun object_manipulation_planner manipulate_object > /dev/null";
+        cmd = ss.str();
+        printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
+        err = system(cmd.c_str());
+
+        if (err != 0) {
+            fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
+        } else {
+            printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
+            ++num_successes;
+        }
+        ++num_tests;
     }
 
     printf("%d/%d tests succeeded\n", num_successes, num_tests);
