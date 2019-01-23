@@ -46,6 +46,9 @@ int main(int argc, char* argv[])
 
     auto use_rosrun = true;
 
+    auto num_tests = 0;
+    auto num_successes = 0;
+
     for (auto it = bfs::directory_iterator(path);
         it != bfs::directory_iterator();
         ++it)
@@ -75,7 +78,9 @@ int main(int argc, char* argv[])
                 fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
             } else {
                 printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
+                ++num_successes;
             }
+            ++num_tests;
         } else {
             auto cmd = std::string("roslaunch");
             cmd += " --disable-title";
@@ -89,9 +94,13 @@ int main(int argc, char* argv[])
                 fprintf(stderr, "%s -> command returned exit status (%d)%s\n", smpl::console::codes::red, err, smpl::console::codes::reset);
             } else {
                 printf("%s -> command returned exit status (%d)%s\n", smpl::console::codes::green, err, smpl::console::codes::reset);
+                ++num_successes;
             }
+            ++num_tests;
         }
     }
+
+    printf("%d/%d tests succeeded\n", num_successes, num_tests);
 
     return 0;
 }
