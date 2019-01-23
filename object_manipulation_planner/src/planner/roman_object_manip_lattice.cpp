@@ -320,6 +320,20 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
     SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  successors: " << these_succs);
 }
 
+static
+bool IsManipulating(const RomanObjectManipLattice* graph, const smpl::RobotState& state)
+{
+    auto& start_state = graph->startState();
+    auto& goal = graph->goal();
+
+    auto start_z = start_state.back();
+    auto goal_z = goal.angles.back();
+
+    auto z = state.back();
+
+    return ((z > start_z) & (z < goal_z)) | ((z < start_z) & (z > goal_z));
+}
+
 // Apply an adaptive motion to a state that moves the end effector to the
 // nearest pre-grasp pose of any state in the demonstration with the same
 // z-value.
@@ -329,6 +343,8 @@ void RomanObjectManipLattice::getPreGraspAmpSucc(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
+    if (IsManipulating(this, state->state)) return;
+
     // find the closest e-graph node, wrt to phi coordinate positions, that
     // has the same z-value
     auto closest = smpl::ExperienceGraph::node_id(-1);
@@ -415,6 +431,8 @@ void RomanObjectManipLattice::getPreGraspSuccs(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
+    if (IsManipulating(this, state->state)) return;
+
     auto it = m_phi_to_egraph_nodes.find(phi_coord);
     if (it != end(m_phi_to_egraph_nodes)) {
         for (auto node : it->second) {
@@ -428,7 +446,7 @@ void RomanObjectManipLattice::getPreGraspSuccs(
             // allowed to move the torso and right arm, but not the base...so the
             // ik group
             auto seed = state->state;
-            smpl::RobotState final_robot_state;
+            auto final_robot_state = smpl::RobotState();
             if (m_ik_iface->computeIK(pregrasp, seed, final_robot_state)) {
                 // TODO: no collision checking here. We explicitly don't want to
                 // run nominal collision checking, because it is expected that
@@ -436,16 +454,16 @@ void RomanObjectManipLattice::getPreGraspSuccs(
                 // the object is grasped. It might be worthwhile to at least check
                 // the post-grasp endpoint for collisions.
 
-                smpl::WorkspaceState succ_workspace_state;
+                auto succ_workspace_state = smpl::WorkspaceState();
                 stateRobotToWorkspace(final_robot_state, succ_workspace_state);
 
-                smpl::WorkspaceCoord succ_coord;
+                auto succ_coord = smpl::WorkspaceCoord();
                 stateWorkspaceToCoord(succ_workspace_state, succ_coord);
                 auto succ_id = createState(succ_coord);
                 auto* succ_state = getState(succ_id);
                 succ_state->state = final_robot_state;
 
-                SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "Pre-grasp motion succeeded");
+                SMPL_DEBUG_STREAM_NAMED(G_SUCCESSORS_LOG, "Pre-grasp motion succeeded to state " << final_robot_state);
                 succs->push_back(succ_id);
                 costs->push_back(1); // edge cost of one for grasp/pregrasp actions
             }
@@ -463,6 +481,8 @@ void RomanObjectManipLattice::getGraspSuccs(
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
+    if (IsManipulating(this, state->state)) return;
+
     // If the contact coordinates are the same as the pregrasp coordinates of
     // some state in the demonstration, then an action is available to "grasp"
     // the object by moving the end effector to the grasp pose.
@@ -474,19 +494,19 @@ void RomanObjectManipLattice::getGraspSuccs(
             SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "Attempt grasp motion");
             auto& grasp = m_egraph_node_grasps[node];
             auto seed = state->state;
-            smpl::RobotState final_robot_state;
+            auto final_robot_state = smpl::RobotState();
             if (m_ik_iface->computeIK(grasp, seed, final_robot_state)) {
-                smpl::WorkspaceState succ_workspace_state;
+                auto succ_workspace_state = smpl::WorkspaceState();
                 stateRobotToWorkspace(final_robot_state, succ_workspace_state);
 
-                smpl::WorkspaceCoord succ_coord;
+                auto succ_coord = smpl::WorkspaceCoord();
                 stateWorkspaceToCoord(succ_workspace_state, succ_coord);
 
                 auto succ_id = createState(succ_coord);
                 auto* succ_state = getState(succ_id);
                 succ_state->state = final_robot_state;
 
-                SMPL_DEBUG_NAMED(G_SUCCESSORS_LOG, "Grasp motion succeeded");
+                SMPL_DEBUG_STREAM_NAMED(G_SUCCESSORS_LOG, "Grasp motion succeeded to state " << final_robot_state);
                 succs->push_back(succ_id);
                 costs->push_back(1);
             }
@@ -572,8 +592,8 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
-//    auto enable_z_edges = false;
     auto enable_z_edges = true;
+//    auto enable_z_edges = false;
 
     auto enable_egraph_edges = true;
 //    auto enable_egraph_edges = false;
@@ -607,7 +627,7 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     auto enable_heuristic_edges = true;
     if (enable_heuristic_edges && m_heuristic != NULL) {
-        std::vector<int> snap_ids;
+        auto snap_ids = std::vector<int>();
         m_heuristic->getEquivalentStates(state_id, snap_ids);
         for (auto snap_id : snap_ids) {
             int cost;
@@ -617,7 +637,7 @@ void RomanObjectManipLattice::getUniqueSuccs(
             }
         }
 
-        std::vector<int> shortcut_ids;
+        auto shortcut_ids = std::vector<int>();
         m_heuristic->getShortcutSuccs(state_id, shortcut_ids);
         for (auto shortcut_id : shortcut_ids) {
             int cost;
