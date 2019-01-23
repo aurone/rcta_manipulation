@@ -471,6 +471,58 @@ void RomanObjectManipLattice::getGraspSuccs(
     }
 }
 
+// TODO:
+void GetEGraphStateAdjacentSuccs(
+    RomanObjectManipLattice* graph,
+    smpl::WorkspaceLatticeState* state,
+    smpl::ExperienceGraph::node_id egraph_node,
+    std::vector<int>* succs,
+    std::vector<int>* costs)
+{
+    auto& egraph_state = graph->m_egraph.state(egraph_node);
+
+#if 0
+    // original logic from WorkspaceLatticeEGraph
+    // E_demo from V_demo
+    auto adj = m_egraph.adjacent_nodes(egraph_node);
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  %td adjacent experience graph edges", std::distance(adj.first, adj.second));
+    for (auto ait = adj.first; ait != adj.second; ++ait) {
+        auto& adj_egraph_state = m_egraph.state(*ait);
+        WorkspaceState workspace_state;
+        stateRobotToWorkspace(adj_egraph_state, workspace_state);
+        succs->push_back(m_egraph_node_to_state[*ait]);
+        costs->push_back(10);
+    }
+#else
+    auto edges = graph->m_egraph.edges(egraph_node);
+    for (auto eit = edges.first; eit != edges.second; ++eit) {
+        auto edge = *eit;
+        if (graph->m_egraph_edge_validity[edge]) {
+            // can't remember if edges are shared or directional in
+            // ExperienceGraph...test both here
+            auto n1 = graph->m_egraph.source(edge);
+            auto n2 = graph->m_egraph.target(edge);
+            if (n1 != egraph_node) {
+                auto& adj_egraph_state = graph->m_egraph.state(n1);
+                auto workspace_state = smpl::WorkspaceState();
+                graph->stateRobotToWorkspace(adj_egraph_state, workspace_state);
+                succs->push_back(graph->m_egraph_node_to_state[n1]);
+                costs->push_back(10);
+            }
+
+            if (n2 != egraph_node) {
+                auto& adj_egraph_state = graph->m_egraph.state(n2);
+                auto workspace_state = smpl::WorkspaceState();
+                graph->stateRobotToWorkspace(adj_egraph_state, workspace_state);
+                succs->push_back(graph->m_egraph_node_to_state[n2]);
+                costs->push_back(10);
+            }
+        }
+    }
+#endif
+}
+
+
 void RomanObjectManipLattice::getUniqueSuccs(
     int state_id,
     std::vector<int>* succs,
@@ -504,8 +556,12 @@ void RomanObjectManipLattice::getUniqueSuccs(
 //    auto enable_egraph_edges = false;
 
     if (is_egraph_node) { // expanding an egraph node
-        getEGraphStateAdjacentSuccs(state, egraph_node, succs, costs);
+        GetEGraphStateAdjacentSuccs(this, state, egraph_node, succs, costs);
+
+        // TODO: it should be ok to use WorkspaceLatticeEGraph's variant, but
+        // it should check for collisions, which it doesn't currently
         getEGraphStateBridgeSuccs(state, egraph_node, succs, costs);
+
         if (enable_z_edges) {
             getEGraphStateZSuccs(state, egraph_node, succs, costs);
         }

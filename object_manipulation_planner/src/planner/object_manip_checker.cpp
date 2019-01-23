@@ -1,5 +1,7 @@
 #include "object_manip_checker.h"
 
+#include "variables.h"
+
 auto ExtractState(const smpl::RobotState& state) -> smpl::RobotState
 {
     auto s = state;
@@ -7,10 +9,15 @@ auto ExtractState(const smpl::RobotState& state) -> smpl::RobotState
     return s;
 }
 
+constexpr auto z_thresh = 0.03;
+
 bool ObjectManipChecker::isStateValid(
     const smpl::RobotState& state,
     bool verbose)
 {
+    if (state[WORLD_JOINT_Z] * state[WORLD_JOINT_Z] > z_thresh * z_thresh) {
+        return false;
+    }
     return parent->isStateValid(ExtractState(state), verbose);
 }
 
@@ -19,6 +26,12 @@ bool ObjectManipChecker::isStateToStateValid(
     const smpl::RobotState& finish,
     bool verbose)
 {
+    if (start[WORLD_JOINT_Z] * start[WORLD_JOINT_Z] > z_thresh * z_thresh) {
+        return false;
+    }
+    if (finish[WORLD_JOINT_Z] * finish[WORLD_JOINT_Z] > z_thresh * z_thresh) {
+        return false;
+    }
     return parent->isStateToStateValid(ExtractState(start), ExtractState(finish), verbose);
 }
 
