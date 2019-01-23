@@ -14,6 +14,7 @@
 #include <smpl/console/nonstd.h>
 #include <smpl_urdf_robot_model/robot_model.h>
 #include <smpl_urdf_robot_model/robot_state.h>
+#include <smpl_urdf_robot_model/robot_state_visualization.h>
 #include <urdf_parser/urdf_parser.h>
 #include <moveit_msgs/GetStateValidity.h>
 
@@ -128,6 +129,19 @@ auto interp(const T& src, const T& dst, double t) -> T
     return (1.0 - t) * src + t * dst;
 }
 
+bool MoveToPose(
+    moveit::planning_interface::MoveGroupInterface* move_group,
+    const Eigen::Affine3d& pose,
+    const std::string& tool_link_name)
+{
+    move_group->setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+    move_group->setGoalPositionTolerance(0.02);
+    move_group->setGoalOrientationTolerance(smpl::to_radians(2.0));
+    move_group->setPoseTarget(pose, tool_link_name);
+    auto err = move_group->move();
+    return err == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+}
+
 bool MoveCartesian(
     moveit::planning_interface::MoveGroupInterface* move_group,
     const Eigen::Affine3d& dst_pose,
@@ -235,19 +249,21 @@ bool PlanManipulationTrajectory(
     auto check_state_validity = nh.serviceClient<moveit_msgs::GetStateValidity>(
             "check_state_validity");
 
+//    ros::Duration(1.0).sleep();
     auto interm_state = *move_group->getCurrentState();
     auto manip_traj = robot_trajectory::RobotTrajectory(
             interm_state.getRobotModel(), group_name);
+    manip_traj.addSuffixWayPoint(interm_state, 0.0);
     auto ids = (int32_t)0;
 
-    for (auto i = 0; i < samples; ++i) {
+    for (auto i = 1; i < samples; ++i) { // skip the first waypoint, assume we have at least two samples
         auto alpha = (double)i / (double)(samples - 1);
         auto contact_pose = sampler(alpha);
 
         auto robot_model = interm_state.getRobotModel();
         auto* group = robot_model->getJointModelGroup(group_name);
 
-        auto consistency_limits = std::vector<double>(group->getVariableCount(), smpl::to_radians(22.5));
+        auto consistency_limits = std::vector<double>(group->getVariableCount(), smpl::to_radians(10));
 
         // TODO: Why don't we require a feasible ik solution at all intermediate
         // waypoints? This could be worse, if we weren't using consistency
@@ -305,7 +321,9 @@ bool ManipulateObject(
     moveit::planning_interface::MoveGroupInterface* move_group,
     const std::string* group_name,
     GripperCommandActionClient* gripper_client,
-    const smpl::urdf::RobotModel* object_model)
+    const smpl::urdf::RobotModel* object_model,
+    double pregrasp_offset,
+    double release_offset)
 {
     ROS_INFO("Received manipulate object request");
     ROS_INFO("  start_state");
@@ -380,6 +398,9 @@ bool ManipulateObject(
     SetVariablePosition(&object_state, handle_var, 0.0);
     SetJointPositions(&object_state, root_joint, &object_pose);
 
+    UpdateVisualBodyTransforms(&object_state);
+    SV_SHOW_INFO_NAMED("object_state", MakeRobotVisualization(&object_state, smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f }, "map", "object_state"));
+
     auto* contact_link = GetLink(object_model, "tool");
     if (contact_link == NULL) {
         ROS_ERROR("No 'tool' link");
@@ -387,6 +408,10 @@ bool ManipulateObject(
     }
 
     auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
+
+    // move up in the world frame a little bit to avoid jamming the fingers
+    // on the lid
+    contact_pose = Eigen::Translation3d(0.0, 0.0, 0.02) * contact_pose;
 
     auto print_pose = [](const char* prefix, const smpl::Affine3& pose)
     {
@@ -408,7 +433,6 @@ bool ManipulateObject(
     print_pose("grasp pose", contact_pose);
 
     // pre-grasp = straight back by some offset
-    auto pregrasp_offset = -0.25;
     auto pregrasp_pose = smpl::Affine3(
             contact_pose *
             smpl::Translation3(pregrasp_offset, 0.0, 0.0));
@@ -445,9 +469,13 @@ bool ManipulateObject(
     // move to grasp //
     ///////////////////
 
-    if (!MoveCartesian(move_group, contact_pose, *group_name, tool_link_name, 0.9)) {
+    if (!MoveToPose(move_group, contact_pose, tool_link_name)) {
         return false;
     }
+
+//    if (!MoveCartesian(move_group, contact_pose, *group_name, tool_link_name, 0.9)) {
+//        return false;
+//    }
 
     ///////////////////////
     // close the gripper //
@@ -531,8 +559,11 @@ bool ManipulateObject(
     {
         auto curr_state = *move_group->getCurrentState();
         auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
-        auto prerelease_pose = tool_transform * Eigen::Translation3d(-0.15, 0.0, 0.0);
-        MoveCartesian(move_group, prerelease_pose, *group_name, tool_link_name, 0.0);
+        auto prerelease_pose =
+                tool_transform *
+                Eigen::Translation3d(release_offset, 0.0, 0.0);
+//        MoveCartesian(move_group, prerelease_pose, *group_name, tool_link_name, 0.0);
+        MoveToPose(move_group, prerelease_pose, tool_link_name);
     }
 
     //////////////////////////////////
@@ -605,6 +636,8 @@ int main(int argc, char* argv[])
     auto move_group =
             moveit::planning_interface::MoveGroupInterface(group_name);
 
+    move_group.setPlanningTime(10.0);
+
     // TODO: ugh of course this is only settable in the planning frame
     move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
 
@@ -623,12 +656,25 @@ int main(int argc, char* argv[])
 
     auto spinner = ros::AsyncSpinner(2);
 
+    auto pregrasp_offset = -0.1;
+    auto release_offset = -0.1;
+    if (!GetParam(ph, "pregrasp_offset", pregrasp_offset)) return 1;
+    if (!GetParam(ph, "release_offset", pregrasp_offset)) return 1;
+
     auto autostart = false;
     ManipulateObjectActionServer server(
             "manipulate_object",
             [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
             {
-                if (!ManipulateObject(msg.get(), &move_group, &group_name, &gripper_client, &object_model)) {
+                if (!ManipulateObject(
+                        msg.get(),
+                        &move_group,
+                        &group_name,
+                        &gripper_client,
+                        &object_model,
+                        pregrasp_offset,
+                        release_offset))
+                {
                     ROS_ERROR("Action server aborted");
                     server.setAborted();
                 } else {

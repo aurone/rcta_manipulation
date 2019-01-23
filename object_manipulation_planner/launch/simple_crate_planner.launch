@@ -1,7 +1,8 @@
 <launch>
     <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
-    <node name="simple_crate_planner" pkg="object_manipulation_planner"
-            type="simple_crate_planner">
+    <node name="simple_crate_planner" pkg="object_manipulation_planner" type="simple_crate_planner">
+        <param name="pregrasp_offset" value="-0.1"/>
+        <param name="release_offset" value="-0.1"/>
         <!-- TODO object_description -->
     </node>
 </launch>
