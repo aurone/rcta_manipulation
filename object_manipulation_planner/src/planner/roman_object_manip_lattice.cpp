@@ -203,6 +203,19 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
         if (it != end(m_phi_to_egraph_nodes)) {
             SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  check z-values of " << it->second.size() << " e-graph states at " << pose_coord);
             for (auto node : it->second) {
+                // The reason for this tolerance check...
+                //
+                // The z-value of a state is unfortunately discretized (even
+                // though there are already a finite number of known values
+                // taken directly from the demonstration). This means if
+                // there are multiple states within the same bin, but with
+                // slightly different z-values, we'll end up only retaining
+                // one of them and either discarding the new continuous z-value
+                // or overwriting it with the new continuous z-value.
+                //
+                // Ideally, for each z-value we would create new special states
+                // with the same phi coordinates and only discretize the free
+                // angles.
                 if (std::fabs(m_egraph.state(node)[HINGE] - state->state[HINGE] < 1e-3)) {
                     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    matching z == %f!", m_egraph.state(node)[HINGE]);
                     parent_nearby_nodes.push_back(node);
