@@ -254,12 +254,22 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
             // TODO: permissive or restrictive ik?
             // probably want restrictive but with a mini-search over free angles
             // for the arm/torso
+#define RESTRICTIVE_Z_EDGES 0
+#if RESTRICTIVE_Z_EDGES
+            auto solution = smpl::RobotState();
+            if (!m_rm_iface->computeFastIK(pose, state->state, solution)) {
+                ++ik_failure_count;
+                SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, " -> IK Failure");
+                continue;
+            }
+#else
             auto solution = smpl::RobotState();
             if (!m_ik_iface->computeIK(pose, state->state, solution)) {
                 ++ik_failure_count;
                 SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, " -> IK Failure");
                 continue;
             }
+#endif
 
             if (!collisionChecker()->isStateToStateValid(state->state, solution)) {
                 ++collision_count;
