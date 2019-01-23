@@ -249,7 +249,6 @@ bool PlanManipulationTrajectory(
     auto check_state_validity = nh.serviceClient<moveit_msgs::GetStateValidity>(
             "check_state_validity");
 
-//    ros::Duration(1.0).sleep();
     auto interm_state = *move_group->getCurrentState();
     auto manip_traj = robot_trajectory::RobotTrajectory(
             interm_state.getRobotModel(), group_name);
@@ -313,6 +312,49 @@ bool PlanManipulationTrajectory(
     manip_traj.getRobotTrajectoryMsg(plan.trajectory_);
 
     *oplan = std::move(plan);
+    return true;
+}
+
+bool WritePlan(
+    const robot_trajectory::RobotTrajectory* traj,
+    double object_start,
+    double object_goal)
+{
+    // TODO: configurate filename
+    auto* f = fopen("manipulation.csv", "w");
+    if (f == NULL) return false;
+
+    // TODO: configurate...grabbed from door_demonstrator.launch
+    auto record_variables = std::vector<const char*>{
+        "world_joint/x",
+        "world_joint/y",
+        "world_joint/theta",
+        "torso_joint1",
+        "limb_right_joint1",
+        "limb_right_joint2",
+        "limb_right_joint3",
+        "limb_right_joint4",
+        "limb_right_joint5",
+        "limb_right_joint6",
+        "limb_right_joint7",
+    };
+
+    for (auto i = 0; i < record_variables.size(); ++i) {
+        if (i != 0) fputs(",", f);
+        fputs(record_variables[i], f);
+    }
+    fputs("\n", f);
+
+    for (auto i = 0; i < traj->getWayPointCount(); ++i) {
+        auto& wp = traj->getWayPoint(i);
+        for (auto j = 0; j < record_variables.size(); ++j) {
+            if (j != 0) fputs(",", f);
+            fprintf(f, "%f", wp.getVariablePosition(record_variables[j]));
+        }
+        fputs("\n", f);
+    }
+
+    fclose(f);
     return true;
 }
 
@@ -534,6 +576,20 @@ bool ManipulateObject(
                 &plan))
         {
             return false;
+        }
+
+        auto write_manip_trajectory = false;
+        if (write_manip_trajectory) {
+
+            auto traj = robot_trajectory::RobotTrajectory(
+                    move_group->getRobotModel(), *group_name);
+            traj.setRobotTrajectoryMsg(
+                    *move_group->getCurrentState(),
+                    plan.start_state_,
+                    plan.trajectory_);
+            if (!WritePlan(&traj, goal->object_start, goal->object_start)) {
+                ROS_ERROR("Failed to write manipulation trajectory");
+            }
         }
 
         auto err = move_group->execute(plan);
