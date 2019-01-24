@@ -9,6 +9,7 @@
 #include <ros/ros.h>
 #include <smpl/angles.h>
 #include <smpl/spatial.h>
+#include <smpl/angles.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h>
 #include <smpl/console/nonstd.h>
@@ -317,6 +318,7 @@ bool PlanManipulationTrajectory(
 
 bool WritePlan(
     const robot_trajectory::RobotTrajectory* traj,
+    const geometry_msgs::Pose& object_pose,
     double object_start,
     double object_goal)
 {
@@ -325,10 +327,11 @@ bool WritePlan(
     if (f == NULL) return false;
 
     // TODO: configurate...grabbed from door_demonstrator.launch
-    auto record_variables = std::vector<const char*>{
+    auto variables = std::vector<const char*>{
         "world_joint/x",
         "world_joint/y",
         "world_joint/theta",
+        "base_link_z_joint",
         "torso_joint1",
         "limb_right_joint1",
         "limb_right_joint2",
@@ -337,19 +340,48 @@ bool WritePlan(
         "limb_right_joint5",
         "limb_right_joint6",
         "limb_right_joint7",
+        "hinge",                // TODO: where does this name come from?
     };
 
-    for (auto i = 0; i < record_variables.size(); ++i) {
+    for (auto i = 0; i < variables.size(); ++i) {
         if (i != 0) fputs(",", f);
-        fputs(record_variables[i], f);
+        fputs(variables[i], f);
     }
     fputs("\n", f);
 
+    auto object_transform = Eigen::Affine3d();
+    tf::poseMsgToEigen(object_pose, object_transform);
+
     for (auto i = 0; i < traj->getWayPointCount(); ++i) {
+        auto alpha = (double)i / (double)(traj->getWayPointCount() - 1);
+        auto object_pos = (1.0 - alpha) * object_start + alpha * object_goal;
         auto& wp = traj->getWayPoint(i);
-        for (auto j = 0; j < record_variables.size(); ++j) {
+
+        auto* root_joint = wp.getRobotModel()->getRootJoint();
+        auto j_root_transform = wp.getJointTransform(root_joint);
+
+        auto T_object_robot = object_transform.inverse() * j_root_transform;
+
+        for (auto j = 0; j < variables.size(); ++j) {
             if (j != 0) fputs(",", f);
-            fprintf(f, "%f", wp.getVariablePosition(record_variables[j]));
+
+            auto& var = variables[j];
+
+            // get the pose of the robot with respect to the object
+            if (var == "world_joint/x") {
+                fprintf(f, "%f", T_object_robot.translation().x());
+            } else if (var == "world_joint/y") {
+                fprintf(f, "%f", T_object_robot.translation().y());
+            } else if (var == "world_joint/theta") {
+                auto theta = smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_object_robot.rotation()));
+                fprintf(f, "%f", theta);
+            } else if (var == "base_link_z_joint") {
+                fprintf(f, "%f", -object_pose.position.z);
+            } else if (var == "hinge") { // TODO: where does this variable name come from?
+                fprintf(f, "%f", object_pos);
+            } else {
+                fprintf(f, "%f", wp.getVariablePosition(variables[j]));
+            }
         }
         fputs("\n", f);
     }
@@ -578,7 +610,7 @@ bool ManipulateObject(
             return false;
         }
 
-        auto write_manip_trajectory = false;
+        auto write_manip_trajectory = false; // TODO: configurate this
         if (write_manip_trajectory) {
 
             auto traj = robot_trajectory::RobotTrajectory(
@@ -587,7 +619,7 @@ bool ManipulateObject(
                     *move_group->getCurrentState(),
                     plan.start_state_,
                     plan.trajectory_);
-            if (!WritePlan(&traj, goal->object_start, goal->object_start)) {
+            if (!WritePlan(&traj, goal->object_pose, goal->object_start, goal->object_goal)) {
                 ROS_ERROR("Failed to write manipulation trajectory");
             }
         }
