@@ -13,6 +13,12 @@
 
 #define G_SNAP_LOG G_SUCCESSORS_LOG ".snap"
 
+#define ENABLE_Z_EDGES 1
+
+#define ENABLE_EGRAPH_EDGES 1
+//    auto enable_egraph_edges = false;
+
+
 namespace TransitionType
 {
 auto to_cstring(Type t) -> const char*
@@ -565,6 +571,18 @@ void GetEGraphStateAdjacentSuccs(
 #endif
 }
 
+// Check if a state is an experience graph state and return its experience graph
+// ID if so.
+static
+auto GetEGraphNode(RomanObjectManipLattice* graph, int state_id)
+    -> std::pair<bool, smpl::ExperienceGraph::node_id>
+{
+    auto it = graph->m_state_to_egraph_node.find(state_id);
+    if (it == end(graph->m_state_to_egraph_node)) {
+        return std::make_pair(false, smpl::ExperienceGraph::node_id());
+    }
+    return std::make_pair(true, it->second);
+}
 
 void RomanObjectManipLattice::getUniqueSuccs(
     int state_id,
@@ -582,21 +600,9 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     auto is_egraph_node = false;
     smpl::ExperienceGraph::node_id egraph_node;
-    {
-        auto it = m_state_to_egraph_node.find(state_id);
-        if (it != end(m_state_to_egraph_node)) {
-            is_egraph_node = true;
-            egraph_node = it->second;
-        }
-    }
+    std::tie(is_egraph_node, egraph_node) = GetEGraphNode(this, state_id);
 
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
-
-    auto enable_z_edges = true;
-//    auto enable_z_edges = false;
-
-    auto enable_egraph_edges = true;
-//    auto enable_egraph_edges = false;
 
     if (is_egraph_node) { // expanding an egraph node
         GetEGraphStateAdjacentSuccs(this, state, egraph_node, succs, costs);
@@ -605,18 +611,20 @@ void RomanObjectManipLattice::getUniqueSuccs(
         // it should check for collisions, which it doesn't currently
         getEGraphStateBridgeSuccs(state, egraph_node, succs, costs);
 
-        if (enable_z_edges) {
-            getEGraphStateZSuccs(state, egraph_node, succs, costs);
-        }
+#if ENABLE_Z_EDGES
+        getEGraphStateZSuccs(state, egraph_node, succs, costs);
+#endif
     } else {
         getOrigStateOrigSuccs(state, succs, costs);
-        if (enable_egraph_edges) {
-            getOrigStateBridgeSuccs(state, succs, costs);
-        }
-        if (enable_z_edges) {
-            // getOrigStateZSuccs(state, succs, costs);
-            getOrigStateZSuccs2(state, succs, costs);
-        }
+
+#if ENABLE_EGRAPH_EDGES
+        getOrigStateBridgeSuccs(state, succs, costs);
+#endif
+
+#if ENABLE_Z_EDGES
+        // getOrigStateZSuccs(state, succs, costs);
+        getOrigStateZSuccs2(state, succs, costs);
+#endif
     }
 
     auto phi_coord = getPhiCoord(state->coord);
@@ -658,25 +666,23 @@ bool RomanObjectManipLattice::extractTransition(
 
     auto is_egraph_node = false;
     smpl::ExperienceGraph::node_id egraph_node;
-    {
-        auto it = m_state_to_egraph_node.find(src_id);
-        if (it != end(m_state_to_egraph_node)) {
-            is_egraph_node = true;
-            egraph_node = it->second;
-        }
-    }
+    std::tie(is_egraph_node, egraph_node) = GetEGraphNode(this, src_id);
 
     auto best_cost = std::numeric_limits<int>::max();
-    std::vector<smpl::RobotState> best_path;
+    auto best_path = std::vector<smpl::RobotState>();
 
     if (is_egraph_node) { // expanding an egraph node
-        updateBestTransitionEGraphBridge(state, egraph_node, dst_id, best_cost, best_path);
         updateBestTransitionEGraphAdjacent(state, egraph_node, dst_id, best_cost, best_path);
+        updateBestTransitionEGraphBridge(state, egraph_node, dst_id, best_cost, best_path);
+#if ENABLE_Z_EDGES
         updateBestTransitionEGraphZ(state, egraph_node, dst_id, best_cost, best_path);
+#endif
     } else {
         updateBestTransitionOrig(state, dst_id, best_cost, best_path);
         updateBestTransitionOrigBridge(state, dst_id, best_cost, best_path);
+#if ENABLE_Z_EDGES
         updateBestTransitionOrigZ2(state, dst_id, best_cost, best_path);
+#endif
     }
 
     auto phi_coord = getPhiCoord(state->coord);
@@ -745,7 +751,8 @@ void RomanObjectManipLattice::updateBestTransitionOrig(
 {
     std::vector<int> succs, costs;
     getOrigStateOrigSuccs(state, &succs, &costs);
-    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateOrigSucc);
+    updateBestTransitionSimple(
+            succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateOrigSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrigBridge(
@@ -756,7 +763,8 @@ void RomanObjectManipLattice::updateBestTransitionOrigBridge(
 {
     std::vector<int> succs, costs;
     getOrigStateBridgeSuccs(state, &succs, &costs);
-    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateBridgeSucc);
+    updateBestTransitionSimple(
+            succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateBridgeSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrigZ(
@@ -767,7 +775,8 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ(
 {
     std::vector<int> succs, costs;
     getOrigStateZSuccs(state, &succs, &costs);
-    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
+    updateBestTransitionSimple(
+            succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrigZ2(
@@ -778,7 +787,8 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ2(
 {
     std::vector<int> succs, costs;
     getOrigStateZSuccs2(state, &succs, &costs);
-    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
+    updateBestTransitionSimple(
+            succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionEGraphBridge(
@@ -790,7 +800,8 @@ void RomanObjectManipLattice::updateBestTransitionEGraphBridge(
 {
     std::vector<int> succs, costs;
     getEGraphStateBridgeSuccs(state, egraph_node, &succs, &costs);
-    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateBridgeSucc);
+    updateBestTransitionSimple(
+            succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateBridgeSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionEGraphAdjacent(
@@ -801,8 +812,9 @@ void RomanObjectManipLattice::updateBestTransitionEGraphAdjacent(
     std::vector<smpl::RobotState>& best_path)
 {
     std::vector<int> succs, costs;
-    getEGraphStateBridgeSuccs(state, egraph_node, &succs, &costs);
-    updateBestTransitionSimple(succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateAdjSucc);
+    GetEGraphStateAdjacentSuccs(this, state, egraph_node, &succs, &costs);
+    updateBestTransitionSimple(
+            succs, costs, dst_id, best_cost, best_path, TransitionType::EGraphStateAdjSucc);
 }
 
 void RomanObjectManipLattice::updateBestTransitionEGraphZ(
@@ -1505,7 +1517,7 @@ bool RomanObjectManipLattice::extractPath(
         return false;
     }
 
-    std::vector<smpl::RobotState> opath;
+    auto opath = std::vector<smpl::RobotState>();
 
     // grab the first point
     {
@@ -1527,7 +1539,7 @@ bool RomanObjectManipLattice::extractPath(
             return false;
         }
 
-        std::vector<smpl::RobotState> motion;
+        auto motion = std::vector<smpl::RobotState>();
         if (!extractTransition(prev_id, curr_id, motion)) {
             SMPL_ERROR_NAMED(G_LOG, "Failed to find valid action to successor during path extraction");
         }
