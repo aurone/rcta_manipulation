@@ -1,9 +1,9 @@
 <launch>
-    <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
-
     <!-- Actual arguments -->
     <arg name="debug" default="false"/>
     <arg name="live" default="true"/>
+
+    <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
 
     <!-- We're loading the URDF/SRDF/etc into the node's private namespace, so
     avoiding overwriting the URDF is no longer an issue.
