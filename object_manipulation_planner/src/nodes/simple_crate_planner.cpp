@@ -711,7 +711,7 @@ int main(int argc, char* argv[])
     world_joint.axis = smpl::Vector3::Zero();
     world_joint.name = "world_joint";
     world_joint.type = smpl::urdf::JointType::Floating;
-    if (!InitRobotModel(&object_model, object_urdf.get())) {
+    if (!InitRobotModel(&object_model, object_urdf.get(), &world_joint)) {
         ROS_ERROR("Failed to initialize object model");
         return 1;
     }
