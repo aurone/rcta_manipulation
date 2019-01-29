@@ -5,6 +5,10 @@
     local-name: leatherman
     uri: https://github.com/aurone/leatherman.git
 - git:
+    local-name: robotiq
+    uri: https://github.com/ros-industrial/robotiq.git
+    version: jade-devel
+- git:
     local-name: roman_model
     uri: https://github.com/aurone/roman_model.git
 - git:
@@ -16,8 +20,4 @@
 - git:
     local-name: spellbook_ros
     uri: https://github.com/aurone/spellbook_ros.git
-- git:
-    local-name: robotiq
-    uri: https://github.com/ros-industrial/robotiq.git
-    version: indigo-devel
 
