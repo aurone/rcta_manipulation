@@ -26,3 +26,20 @@ The recommended way to build the packages in this repository is to use the
 `catkin` from the `python-catkin-tools` package. A workspace containing these
 packages may be built using the `catkin build` command.
 
+## Running
+
+There are multiple GNU screen configuration scripts in the `roman_manipulation`
+package for running the system under a few configurations. The system can be
+run under any configuration using rosrun. For example,
+
+```sh
+rosrun roman_manipulation screenrc_fake
+```
+
+will run the complete system with an offline (fake) simulation of the RoMan
+robot.
+
+Executing a configuration script will start a screen session with tabs preloaded
+with the required commands. Launch the system by executing the command within
+each tab. Note that the default screen accelerator key C-a is modified to C-x.
+Ctrl + the arrow keys can be used to cycle through tabs.
