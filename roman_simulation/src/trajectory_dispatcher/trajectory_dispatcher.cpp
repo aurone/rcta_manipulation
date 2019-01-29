@@ -68,7 +68,7 @@ void execute(
             }
         }
 
-        if (!all) break;
+        if (!all) continue;
 
         traj_server_index = i;
     }
