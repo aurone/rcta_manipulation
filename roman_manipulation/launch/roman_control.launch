@@ -22,4 +22,11 @@
             <include file="$(find roman_manipulation)/launch/roman_control_sim_real.launch"/>
         </group>
     </group>
+    <group if="$(arg live)">
+        <group ns="roman1">
+            <node name="trajectory_dispatcher" pkg="roman_simulation" type="trajectory_dispatcher">
+                <param name="follow_joint_trajectory_action_name" value="rcta_joint_trajectory_controllers"/>
+            </node>
+        </group>
+    </group>
 </launch>
