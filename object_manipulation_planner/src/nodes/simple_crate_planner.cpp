@@ -133,13 +133,23 @@ auto interp(const T& src, const T& dst, double t) -> T
 bool MoveToPose(
     moveit::planning_interface::MoveGroupInterface* move_group,
     const Eigen::Affine3d& pose,
-    const std::string& tool_link_name)
+    const std::string& tool_link_name,
+    double allowed_planning_time = 0.0)
 {
+    auto old_allowed_planning_time = move_group->getPlanningTime();
+    if (allowed_planning_time != 0.0) {
+        move_group->setPlanningTime(allowed_planning_time);
+    }
     move_group->setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
     move_group->setGoalPositionTolerance(0.02);
     move_group->setGoalOrientationTolerance(smpl::to_radians(2.0));
     move_group->setPoseTarget(pose, tool_link_name);
     auto err = move_group->move();
+
+    if (allowed_planning_time != 0.0) {
+        move_group->setPlanningTime(old_allowed_planning_time);
+    }
+
     return err == moveit::planning_interface::MoveItErrorCode::SUCCESS;
 }
 
@@ -651,7 +661,7 @@ bool ManipulateObject(
                 tool_transform *
                 Eigen::Translation3d(release_offset, 0.0, 0.0);
 //        MoveCartesian(move_group, prerelease_pose, *group_name, tool_link_name, 0.0);
-        MoveToPose(move_group, prerelease_pose, tool_link_name);
+        MoveToPose(move_group, prerelease_pose, tool_link_name, 1.0);
     }
 
     //////////////////////////////////
