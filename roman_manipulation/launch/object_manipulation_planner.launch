@@ -1,0 +1,10 @@
+<launch>
+    <arg name="debug" default="false"/>
+    <arg name="live" default="true"/>
+    <group ns="roman1">
+        <include file="$(find object_manipulation_planner)/launch/object_manip_planner_node.launch">
+            <arg name="debug" value="$(arg debug)"/>
+            <arg name="live" value="$(arg live)"/>
+        </include>
+    </group>
+</launch>
