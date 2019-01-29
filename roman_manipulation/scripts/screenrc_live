@@ -6,10 +6,16 @@ screen -t core
 #stuff "roscore^M"
 
 screen -t rviz
-stuff "rosrun rviz rviz -d `rospack find roman_manipulation`/config/rcta.rviz"
+stuff "rosrun rviz rviz __ns:=roman1 -d `rospack find roman_manipulation`/config/rcta.rviz"
+
+screen -t ctrl
+stuff "roslaunch roman_manipulation roman_control.launch live:=true --screen"
+
+screen -t pose
+stuff "roslaunch roman_manipulation roman_pose.launch live:=true fake:=true"
 
 screen -t move
-stuff "roslaunch roman_moveit_config move_group.launch --screen"
+stuff "roslaunch roman_manipulation move_group.launch --screen"
 
 screen -t grasp
 stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
@@ -18,4 +24,4 @@ screen -t repo
 stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
 
 screen -t obm
-stuff "roslaunch object_manipulation_planner object_manip_planner_node.launch --screen"
+stuff "roslaunch roman_manipulation object_manip_planner_node.launch --screen"
