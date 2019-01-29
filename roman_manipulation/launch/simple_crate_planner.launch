@@ -1,0 +1,5 @@
+<launch>
+    <group ns="roman1">
+        <include file="$(find object_manipulation_planner)/launch/simple_crate_planner.launch"/>
+    </group>
+</launch>
