@@ -15,7 +15,7 @@ screen -t move
 stuff "roslaunch roman_moveit_config move_group.launch --screen"
 
 screen -t grasp
-stuff "roslaunch roman_manipulation grasp_object_executor.launch --screen"
+stuff "roslaunch grasping_executive grasp_object_executor.launch --screen"
 
 screen -t repo
 stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
