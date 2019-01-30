@@ -17,7 +17,27 @@
     <node name="fake_localization" pkg="tf" type="static_transform_publisher"
             args="0 0 0 0 0 0 map odom 16"/>
 
-    <node name="trajectory_dispatcher" pkg="roman_simulation" type="trajectory_dispatcher"/>
+    <node name="trajectory_dispatcher" pkg="roman_simulation" type="trajectory_dispatcher">
+        <rosparam param="clients">
+            - name: rcta_joint_trajectory_controller/follow_joint_trajectory
+              joints:
+                - torso_joint1
+                - limb_right_joint1
+                - limb_right_joint2
+                - limb_right_joint3
+                - limb_right_joint4
+                - limb_right_joint5
+                - limb_right_joint6
+                - limb_right_joint7
+                - limb_left_joint1
+                - limb_left_joint2
+                - limb_left_joint3
+                - limb_left_joint4
+                - limb_left_joint5
+                - limb_left_joint6
+                - limb_left_joint7
+        </rosparam>
+    </node>
 
     <node name="gripper_command_action_server" pkg="roman_simulation" type="gripper_command_action_server"/>
 </launch>

@@ -90,7 +90,7 @@ void execute(
     // figure out which output joints are required but are missing from the
     // input trajectory
 
-    std::vector<std::string> missing;
+    auto missing = std::vector<std::string>();
     for (auto& joint_name : srv_desc.input_joint_names) {
         if (!contains(msg->trajectory.joint_names, joint_name)) {
             missing.push_back(joint_name);
@@ -197,9 +197,13 @@ void execute(
     }
 }
 
-// The idea is to dipatch input trajectories to available trajectory servers,
-// where the set of provided joints differs from those specified in the
-// trajectory servers.
+// This node serves as a bridge between control_msgs::FollowTrajectoryAction
+// clients and servers which send and receive different lists of joints. When
+// a trajectory is received, it is relayed to one of a set of available action
+// servers, specified via configuration, which accepts the same or more
+// input joints. If joints are missing from the client's output, they are
+// initialized to their current positions at each point throughout the
+// trajectory.
 
 // parameters:
 // * configuration of each available trajectory server (no way to query this?)
@@ -213,31 +217,60 @@ int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "trajectory_dispatcher");
     ros::NodeHandle nh;
+    ros::NodeHandle ph("~");
 
-    // define available trajectory servers
-    std::vector<TrajectoryServerConfig> traj_server_configs;
-    traj_server_configs = {
-        {
-            "rcta_joint_trajectory_controller/follow_joint_trajectory",
-            {
-                "torso_joint1",
-                "limb_right_joint1",
-                "limb_right_joint2",
-                "limb_right_joint3",
-                "limb_right_joint4",
-                "limb_right_joint5",
-                "limb_right_joint6",
-                "limb_right_joint7",
-                "limb_left_joint1",
-                "limb_left_joint2",
-                "limb_left_joint3",
-                "limb_left_joint4",
-                "limb_left_joint5",
-                "limb_left_joint6",
-                "limb_left_joint7",
-            }
+    auto traj_server_configs = std::vector<TrajectoryServerConfig>();
+
+    XmlRpc::XmlRpcValue clients;
+    if (!ph.getParam("clients", clients)) {
+        ROS_ERROR("Failed to retrieve 'clients' from the param server");
+        return 1;
+    }
+
+    if (clients.getType() != XmlRpc::XmlRpcValue::Type::TypeArray) {
+        ROS_ERROR("'clients' must be an array");
+        return 1;
+    }
+
+    for (auto i = 0; i < clients.size(); ++i) {
+        auto config = TrajectoryServerConfig();
+        auto& value = clients[i];
+        if (value.getType() != XmlRpc::XmlRpcValue::Type::TypeStruct) {
+            ROS_WARN("Skipping 'clients' element. Expected a struct");
+            continue;
         }
-    };
+        if (!value.hasMember("name") || !value.hasMember("joints")) {
+            ROS_WARN("Skipping 'clients' elements. Expected 'name' and 'joints' fields");
+            continue;
+        }
+
+        auto& name = (std::string&)value["name"];
+        auto& joints = value["joints"];
+
+        if (value["name"].getType() != XmlRpc::XmlRpcValue::Type::TypeString) {
+            ROS_WARN("Expected string");
+            continue;
+        }
+
+        config.name = name;
+
+        if (value["joints"].getType() != XmlRpc::XmlRpcValue::Type::TypeArray) {
+            ROS_WARN("Expected array");
+            continue;
+        }
+
+        config.input_joint_names.reserve(joints.size());
+        for (auto j = 0; j < joints.size(); ++j) {
+            auto& v = joints[j];
+            if (v.getType() != XmlRpc::XmlRpcValue::Type::TypeString) {
+                ROS_WARN("Expected string");
+                continue;
+            }
+            config.input_joint_names.push_back((std::string&)v);
+        }
+
+        traj_server_configs.push_back(std::move(config));
+    }
 
     // Subscribe to and maintain the current joint state
     sensor_msgs::JointState::ConstPtr curr_state;

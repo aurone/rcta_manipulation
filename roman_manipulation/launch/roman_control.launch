@@ -25,6 +25,18 @@
     <group if="$(arg live)">
         <group ns="roman1">
             <node name="trajectory_dispatcher" pkg="roman_simulation" type="trajectory_dispatcher">
+                <rosparam param="clients">
+                    - name: rcta_joint_trajectory_controller/follow_joint_trajectory
+                      joints:
+                        - torso_joint1
+                        - limb_right_joint1
+                        - limb_right_joint2
+                        - limb_right_joint3
+                        - limb_right_joint4
+                        - limb_right_joint5
+                        - limb_right_joint6
+                        - limb_right_joint7
+                </rosparam>
                 <param name="follow_joint_trajectory_action_name" value="rcta_joint_trajectory_controllers"/>
             </node>
         </group>
