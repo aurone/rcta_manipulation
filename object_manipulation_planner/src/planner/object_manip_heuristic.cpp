@@ -13,7 +13,8 @@
 #include "smpl_assert.h"
 #include "variables.h"
 
-static const double FixedPointRatio = 1000.0;
+//static const double FixedPointRatio = 1000.0;
+static const double FixedPointRatio = 500.0;
 
 #define HV_LOG H_LOG ".verbose"
 
@@ -175,12 +176,13 @@ void UpdateUserGoal(
     {
         int                g        = std::numeric_limits<int>::max();
         bool               closed   = false;
+        // TODO: we really don't need these backpointers
         EGraphSearchNode*  bp       = NULL;
     };
 
     // search data for e-graph nodes
 //    std::vector<EGraphSearchNode> search_nodes(2 * egraph->num_nodes());
-    std::vector<EGraphSearchNode> search_nodes(egraph->num_nodes());
+    auto search_nodes = std::vector<EGraphSearchNode>(egraph->num_nodes());
 
     struct NodeCompare
     {
@@ -272,7 +274,9 @@ void UpdateUserGoal(
 
         // Store the heuristic value of the phi state.
         heur->phi_heuristic[phi] = min->g;
-        heur->pre_phi_heuristic[pre_phi] = min->g + 1;
+
+        // TODO: substitute 0.10 for fabs(pregrasp_offset)
+        heur->pre_phi_heuristic[pre_phi] = min->g + (int)(FixedPointRatio * 0.10);
 
         // store the heuristic value of each e-graph state
         heur->egraph_goal_heuristics[egraph_node_id] = min->g;
@@ -294,7 +298,7 @@ void UpdateUserGoal(
             auto dy = graph->resolution()[1] * double(succ_phi[1] - phi[1]);
             auto dz = graph->resolution()[2] * double(succ_phi[2] - phi[2]);
 
-            auto cost = (int)std::round(
+            auto cost = (int)(
                     FixedPointRatio *
                     std::sqrt(dx * dx + dy * dy + dz * dz));
 
@@ -536,6 +540,11 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     auto& phis = on_demo ?
             heur->z_to_phi[state->coord[OB_P]] :
             heur->z_to_pre_phi[state->coord[OB_P]];
+
+    // TODO: might be a slight optimization to favor the common case
+    // of looking up the heuristic for a state which coincides
+    // with a phi or pre-phi node, since we'll likely create local
+    // minima in those areas
 
     auto& egraph_nodes = heur->z_to_egraph_node[state->coord[OB_P]];
 
