@@ -252,7 +252,7 @@ bool PlanPath(
         return false;
     }
 
-    ROS_INFO("Found path through %zu states", solution.size());
+    ROS_INFO("Found path through %zu states with cost %d in %d expansions", solution.size(), solution_cost, planner->search.get_n_expands());
 
     using RobotPath = std::vector<smpl::RobotState>;
     RobotPath path;
