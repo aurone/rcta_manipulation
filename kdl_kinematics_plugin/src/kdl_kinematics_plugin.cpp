@@ -498,15 +498,13 @@ bool KDLKinematicsPlugin::searchPositionIK(
     }
 
     if (ik_seed_state.size() != dimension_) {
-        ROS_ERROR_STREAM_NAMED("kdl", "Seed state must have size " << dimension_ << " instead of size "
-        << ik_seed_state.size());
+        ROS_ERROR_STREAM_NAMED("kdl", "Seed state must have size " << dimension_ << " instead of size "<< ik_seed_state.size());
         error_code.val = error_code.NO_IK_SOLUTION;
         return false;
     }
 
     if (!consistency_limits.empty() && consistency_limits.size() != dimension_) {
-        ROS_ERROR_STREAM_NAMED("kdl", "Consistency limits be empty or must have size " << dimension_ << " instead of size "
-        << consistency_limits.size());
+        ROS_ERROR_STREAM_NAMED("kdl", "Consistency limits be empty or must have size " << dimension_ << " instead of size "<< consistency_limits.size());
         error_code.val = error_code.NO_IK_SOLUTION;
         return false;
     }
@@ -550,23 +548,13 @@ bool KDLKinematicsPlugin::searchPositionIK(
     ROS_DEBUG_NAMED("kdl", "Attempt %d CartToJnt's", max_attempts);
 
     auto attempt = 0;
-    auto n1 = ros::WallTime::now();
     while (1) {
-#if 0
-        if (timedOut(n1, timeout)) {
-            ROS_DEBUG_NAMED("kdl", "IK timed out");
-            error_code.val = error_code.TIMED_OUT;
-            ik_solver_vel.unlockRedundantJoints();
-            return false;
-        }
-#else
         if (attempt >= max_attempts) {
             ROS_DEBUG_NAMED("kdl", "IK timed out");
             error_code.val = error_code.TIMED_OUT;
             ik_solver_vel.unlockRedundantJoints();
             return false;
         }
-#endif
 
         // sample a new random configuration on successive attempts
         if (attempt != 0) {
@@ -581,8 +569,6 @@ bool KDLKinematicsPlugin::searchPositionIK(
         for (auto j = 0; j < dimension_; j++) {
             ROS_DEBUG_NAMED("kdl", "%d %f", j, jnt_pos_in(j));
         }
-
-//        ROS_DEBUG_NAMED("kdl","Iteration: %d, time: %f, Timeout: %f",attempt,(ros::WallTime::now()-n1).toSec(),timeout);
 
         attempt++;
         auto ik_valid = ik_solver_pos.CartToJnt(jnt_pos_in, pose_desired, jnt_pos_out);
