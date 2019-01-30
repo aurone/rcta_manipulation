@@ -1,6 +1,6 @@
 <launch>
+    <arg name="scenario"/>
     <arg name="execute" default="false"/>
-    <arg name="scenario" default="$(find object_manipulation_planner)/tests/test-1.yaml"/>
     <node name="manipulate_object" pkg="object_manipulation_planner" type="manipulate_object" clear_params="true">
         <param name="execute" value="$(arg execute)"/>
         <rosparam command="load" file="$(arg scenario)"/>
