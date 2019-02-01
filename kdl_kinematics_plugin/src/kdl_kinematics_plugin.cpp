@@ -490,6 +490,7 @@ bool KDLKinematicsPlugin::searchPositionIK(
 {
     // always good to have non-copyable, non-movable objects
     this->rng_.reset(new random_numbers::RandomNumberGenerator(0));
+    srand(1);
 
     if (!active_) {
         ROS_ERROR_NAMED("kdl", "kinematics not active");
@@ -515,8 +516,7 @@ bool KDLKinematicsPlugin::searchPositionIK(
 
     KDL::ChainFkSolverPos_recursive fk_solver(kdl_chain_);
     KDL::ChainIkSolverVel_pinv_mimic ik_solver_vel(kdl_chain_, joint_model_group_->getMimicJointModels().size(), redundant_joint_indices_.size(), position_ik_);
-    KDL::ChainIkSolverPos_NR_JL_Mimic ik_solver_pos(kdl_chain_, joint_min_, joint_max_, fk_solver, ik_solver_vel,
-    max_solver_iterations_, epsilon_, position_ik_);
+    KDL::ChainIkSolverPos_NR_JL_Mimic ik_solver_pos(kdl_chain_, joint_min_, joint_max_, fk_solver, ik_solver_vel, max_solver_iterations_, epsilon_, position_ik_);
     ik_solver_vel.setMimicJoints(mimic_joints_);
     ik_solver_pos.setMimicJoints(mimic_joints_);
 
@@ -527,6 +527,8 @@ bool KDLKinematicsPlugin::searchPositionIK(
 
     if (options.lock_redundant_joints) {
         ik_solver_vel.lockRedundantJoints();
+    } else {
+        ik_solver_vel.unlockRedundantJoints();
     }
 
     solution.resize(dimension_);
@@ -534,14 +536,14 @@ bool KDLKinematicsPlugin::searchPositionIK(
     KDL::Frame pose_desired;
     tf::poseMsgToKDL(ik_pose, pose_desired);
 
-    ROS_DEBUG_STREAM_NAMED("kdl", "searchPositionIK2: Position request pose is "<< ik_pose.position.x << " " << ik_pose.position.y << " " << ik_pose.position.z << " " << ik_pose.orientation.x << " " << ik_pose.orientation.y << " "<< ik_pose.orientation.z << " " << ik_pose.orientation.w);
+    ROS_DEBUG_STREAM_NAMED("kdl", "searchPositionIK: Position request pose is "<< ik_pose.position.x << " " << ik_pose.position.y << " " << ik_pose.position.z << " " << ik_pose.orientation.x << " " << ik_pose.orientation.y << " "<< ik_pose.orientation.z << " " << ik_pose.orientation.w);
     // Do the IK
     for (auto i = 0; i < dimension_; i++) {
         jnt_seed_state(i) = ik_seed_state[i];
     }
     jnt_pos_in = jnt_seed_state;
 
-    // for every millisecond that we're allowed to run, do 100 iterations
+    // for every millisecond that we're allowed to run, do 1 iterations
     constexpr auto timeout_to_iterations = 1.0 / 0.001;
     auto max_attempts = (int)(timeout * timeout_to_iterations);
 
@@ -552,7 +554,6 @@ bool KDLKinematicsPlugin::searchPositionIK(
         if (attempt >= max_attempts) {
             ROS_DEBUG_NAMED("kdl", "IK timed out");
             error_code.val = error_code.TIMED_OUT;
-            ik_solver_vel.unlockRedundantJoints();
             return false;
         }
 
@@ -567,7 +568,7 @@ bool KDLKinematicsPlugin::searchPositionIK(
 
         ROS_DEBUG_NAMED("kdl", "Start configuration on attempt %d", attempt);
         for (auto j = 0; j < dimension_; j++) {
-            ROS_DEBUG_NAMED("kdl", "%d %f", j, jnt_pos_in(j));
+            ROS_DEBUG_NAMED("kdl", "%d %0.12f", j, jnt_pos_in(j));
         }
 
         attempt++;
@@ -602,13 +603,11 @@ bool KDLKinematicsPlugin::searchPositionIK(
 
         if (error_code.val == error_code.SUCCESS) {
             ROS_DEBUG_STREAM_NAMED("kdl", "Solved after " << attempt << " iterations");
-            ik_solver_vel.unlockRedundantJoints();
             return true;
         }
     }
     ROS_DEBUG_NAMED("kdl", "An IK that satisifes the constraints and is collision free could not be found");
     error_code.val = error_code.NO_IK_SOLUTION;
-    ik_solver_vel.unlockRedundantJoints();
     return false;
 }
 
