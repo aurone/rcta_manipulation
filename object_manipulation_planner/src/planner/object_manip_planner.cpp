@@ -219,6 +219,7 @@ bool PlanPath(
 
     planner->heuristic.updateGoal(goal);
 
+    ClearActionCache(&planner->graph);
     planner->search.force_planning_from_scratch();
 
     auto start_id = planner->graph.getStartStateID();
