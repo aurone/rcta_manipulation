@@ -47,10 +47,14 @@ int main(int argc, char* argv[])
     auto num_tests = 0;
     auto num_successes = 0;
 
-    for (auto it = bfs::directory_iterator(path);
-        it != bfs::directory_iterator();
-        ++it)
-    {
+    auto filepaths = std::vector<std::string>();
+    for (auto it = bfs::directory_iterator(path); it != bfs::directory_iterator(); ++it) {
+        filepaths.push_back(it->path().generic_string());
+    }
+
+    sort(begin(filepaths), end(filepaths));
+
+    for (auto& p : filepaths) {
         // We're doing a two-step (1) roslaunch to upload parameters, (2) rosrun
         // to run the executable. This is so we can grab the return code from
         // the executable, which roslaunch will hide from us.
@@ -58,7 +62,7 @@ int main(int argc, char* argv[])
         std::stringstream ss;
         auto cmd = std::string();
 
-        ss << "roslaunch --disable-title object_manipulation_planner manipulate_object_params.launch scenario:=" << it->path().generic_string() << " > /dev/null";
+        ss << "roslaunch --disable-title object_manipulation_planner manipulate_object_params.launch scenario:=" << p << " > /dev/null";
         cmd = ss.str();
         printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
         err = system(cmd.c_str());
