@@ -18,6 +18,7 @@
 #define ENABLE_PREGRASP_AMP_EDGES 1
 #define CACHE_ACTIONS 1
 
+#define ENABLE_BASE_IN_SNAP_MOTIONS 0
 #define ENABLE_EGRAPH_EDGES 1
 //    auto enable_egraph_edges = false;
 
@@ -211,20 +212,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
         if (it != end(m_phi_to_egraph_nodes)) {
             SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  check z-values of " << it->second.size() << " e-graph states at " << pose_coord);
             for (auto node : it->second) {
-                // The reason for this tolerance check...
-                //
-                // The z-value of a state is unfortunately discretized (even
-                // though there are already a finite number of known values
-                // taken directly from the demonstration). This means if
-                // there are multiple states within the same bin, but with
-                // slightly different z-values, we'll end up only retaining
-                // one of them and either discarding the new continuous z-value
-                // or overwriting it with the new continuous z-value.
-                //
-                // Ideally, for each z-value we would create new special states
-                // with the same phi coordinates and only discretize the free
-                // angles.
-                if (std::fabs(m_egraph.state(node)[HINGE] - state->state[HINGE] < 1e-3)) {
+                if ((int)m_egraph.state(node)[HINGE] == (int)state->state[HINGE]) {
                     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    matching z == %f!", m_egraph.state(node)[HINGE]);
                     parent_nearby_nodes.push_back(node);
                 } else {
@@ -832,7 +820,7 @@ bool RomanObjectManipLattice::updateBestTransitionSimple(
         if ((dst_id == getGoalStateID() && isGoal(succ_state)) ||
             dst_id == succs[i])
         {
-            ROS_INFO("Found transition to state %d with cost %d", dst_id, costs[i]);
+            ROS_DEBUG_NAMED(G_LOG, "Found transition to state %d with cost %d", dst_id, costs[i]);
             auto wp = getState(succs[i])->state;
             wp.push_back(double(type));
             best_path = { std::move(wp) };
@@ -1093,17 +1081,62 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
 void RomanObjectManipLattice::insertExperienceGraphPath(
     const std::vector<smpl::RobotState>& path)
 {
-    WorkspaceLatticeEGraph::insertExperienceGraphPath(path);
+    ROS_INFO("Original Path Size: %zu", path.size());
+
+    auto modpath = path;
+
+#if 0
+    for (auto i = 0; i < modpath.size() / 2; ++i) {
+        modpath[i] = modpath[2 * i];
+    }
+    modpath.resize(modpath.size() / 2);
+    modpath.push_back(path.back());
+#else
+#if 1
+    auto mod_to_orig_indices = std::vector<int>();
+    mod_to_orig_indices.push_back(0);
+    {
+        auto rem_count = 0;
+        auto last_index = 0; // index of the last element to compare against
+        for (auto i = 1; i < modpath.size(); ++i) {
+            auto& last = modpath[last_index];
+            auto& curr = modpath[i];
+            if (curr[HINGE] != last[HINGE]) {
+                ++last_index;
+                mod_to_orig_indices.push_back(i);
+                modpath[last_index] = curr;
+            } else {
+                ++rem_count;
+            }
+        }
+        ROS_INFO("Removed %d vertices from the demonstration", rem_count);
+        modpath.resize(last_index + 1);
+    }
+
+    ROS_INFO("Modified Path Size: %zu", modpath.size());
+    ROS_INFO("Modified Path to Original Path Indices: %zu", mod_to_orig_indices.size());
+#endif
+#endif
+
+    m_demo_z_values.resize(modpath.size(), -1.0);
+    for (auto i = 0; i < modpath.size(); ++i) {
+        m_demo_z_values[i] = path[mod_to_orig_indices[i]][HINGE];
+        modpath[i][HINGE] = (double)i;
+    }
+    WorkspaceLatticeEGraph::insertExperienceGraphPath(modpath);
 
     // we're only adding one path...but going to clear and recompute all
     // auxiliary data for the entire e-graph :/
-    m_phi_to_egraph_nodes.clear();
-    m_pregrasp_phi_to_egraph_node.clear();
-    m_grasp_phi_to_egraph_node.clear();
+    m_egraph_node_validity.clear();
     m_egraph_phi_coords.clear();
     m_egraph_pre_phi_coords.clear();
     m_egraph_node_pregrasps.clear();
     m_egraph_node_grasps.clear();
+    m_phi_to_egraph_nodes.clear();
+    m_pregrasp_phi_to_egraph_node.clear();
+#if 0
+    m_demo_z_values.clear();
+#endif
 
     // discrete 3d positions of the end effector throughout the demonstration
     auto phi_points = std::vector<Eigen::Vector3i>();
@@ -1119,7 +1152,13 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     m_egraph_node_validity.resize(m_egraph.num_nodes(), true);
     m_egraph_edge_validity.resize(m_egraph.num_edges(), true);
 
+#if 0
+    m_demo_z_values.resize(m_egraph.num_nodes(), -1.0);
+#endif
+
     auto nodes = m_egraph.nodes();
+
+    // validity check experience graph nodes and edges
 
     auto num_invalid_nodes = 0;
     auto num_invalid_edges = 0;
@@ -1155,6 +1194,19 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
             m_egraph.num_edges() - num_invalid_edges,
             m_egraph.num_edges());
 
+#if 0
+    for (auto nit = nodes.first; nit != nodes.second; ++nit) {
+        auto node = *nit;
+        auto& egraph_robot_state = m_egraph.state(node);
+        m_demo_z_values[node] = egraph_robot_state[HINGE];
+    }
+#endif
+
+    // compute grasps, pregrasps, phi coordinates, and pre-phi coordinates for
+    // all experience graph states. create an inverse mapping for phi and
+    // pre-phi coordinates, but discard states where the object is not being
+    // manipulated.
+
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         auto node = *nit;
         auto& egraph_robot_state = m_egraph.state(node);
@@ -1176,8 +1228,10 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         for (auto ait = adj.first; ait != adj.second; ++ait) {
             auto anode = *ait;
             auto& adj_state = m_egraph.state(anode);
-            if (egraph_robot_state[RobotVariableIndex::HINGE] !=
-                adj_state[RobotVariableIndex::HINGE])
+#if 0
+            if (m_demo_z_values[egraph_robot_state[HINGE]] !=
+                m_demo_z_values[adj_state[HINGE]])
+#endif
             {
                 // map phi(discrete egraph state) -> egraph node
                 auto phi_coord = getPhiCoord(disc_egraph_state);
@@ -1197,6 +1251,8 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         m_egraph_phi_coords[node] = getPhiCoord(grasp_pose);
         m_egraph_pre_phi_coords[node] = getPhiCoord(pregrasp_pose);
     }
+
+    // create visualizations of the down-projected demonstration
 
     auto phi_markers = std::vector<smpl::visual::Marker>();
     for (auto& grasp_pose : m_egraph_node_grasps) {
@@ -1243,15 +1299,18 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
 
 void RomanObjectManipLattice::clearExperienceGraph()
 {
-    m_phi_to_egraph_nodes.clear();
-    m_pregrasp_phi_to_egraph_node.clear();
-    m_grasp_phi_to_egraph_node.clear();
+    m_egraph_node_validity.clear();
     m_egraph_phi_coords.clear();
     m_egraph_pre_phi_coords.clear();
+    m_demo_z_values.clear();
     m_egraph_node_pregrasps.clear();
     m_egraph_node_grasps.clear();
-    m_egraph_node_validity.clear();
+
+    m_phi_to_egraph_nodes.clear();
+    m_pregrasp_phi_to_egraph_node.clear();
+
     m_egraph_edge_validity.clear();
+
     WorkspaceLatticeEGraph::clearExperienceGraph();
 }
 
@@ -1299,20 +1358,27 @@ int RomanObjectManipLattice::getSnapMotion(
     auto dx = dst_state->state[WORLD_JOINT_X] - src_state->state[WORLD_JOINT_X];
     auto dy = dst_state->state[WORLD_JOINT_Y] - src_state->state[WORLD_JOINT_Y];
     auto thresh = 1e-4;
+
+#if !ENABLE_BASE_IN_SNAP_MOTIONS
     if (std::fabs(dx) > thresh | std::fabs(dy) > thresh) {
+        SMPL_DEBUG_NAMED(G_SNAP_LOG, "  Skip! (requires base translation)");
+        return -1;
+    } else {
+        // no x,y motion, let's check theta motio
         auto heading = atan2(dy, dx);
         auto alt_heading = heading + M_PI;
         auto thresh = smpl::to_radians(10.0);
         if (smpl::shortest_angle_dist(heading, src_state->state[WORLD_JOINT_THETA]) > thresh &&
             smpl::shortest_angle_dist(alt_heading, src_state->state[WORLD_JOINT_THETA]) > thresh)
         {
-            SMPL_DEBUG_NAMED(G_SNAP_LOG, "  Skip! (requires base motion)");
-            return -1; //false;
+            SMPL_DEBUG_NAMED(G_SNAP_LOG, "  Skip! (requires base rotation)");
+            return -1;
         }
     }
+#endif
 
-    smpl::WorkspaceState start_state;
-    smpl::WorkspaceState finish_state;
+    auto start_state = smpl::WorkspaceState();
+    auto finish_state = smpl::WorkspaceState();
     stateCoordToWorkspace(src_state->coord, start_state);
     stateCoordToWorkspace(dst_state->coord, finish_state);
 
@@ -1665,8 +1731,8 @@ bool RomanObjectManipLattice::extractPath(
         }
 
         auto type = !motion.empty() ? (TransitionType::Type)(motion.back().back()) : TransitionType::Unknown;
-        ROS_INFO("Found transition %d -> %d of type %s with %zu points", prev_id, curr_id, to_cstring(type), motion.size());
-        ROS_INFO_STREAM("  motion: " << motion);
+        ROS_DEBUG_NAMED(G_LOG, "Found transition %d -> %d of type %s with %zu points", prev_id, curr_id, to_cstring(type), motion.size());
+        ROS_DEBUG_STREAM_NAMED(G_LOG, "  motion: " << motion);
 
         for (auto& point : motion) {
             opath.push_back(std::move(point));

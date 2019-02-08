@@ -217,14 +217,24 @@ public:
         std::vector<int>* costs) override;
     ///@}
 
+    template <class T>
+    using AlignedVector = std::vector<T, Eigen::aligned_allocator<T>>;
+
     // map: [x, y, z, yaw] -> [n1, ..., nn]
     using PhiCoordToEGraphNodesMap = smpl::hash_map<
             PhiCoord,
             std::vector<smpl::ExperienceGraph::node_id>,
             smpl::VectorHash<int>>;
 
-    std::vector<bool> m_egraph_node_validity;
-    std::vector<bool> m_egraph_edge_validity;
+    double pregrasp_offset_x = -0.10;
+
+    // Additional properties of demonstration nodes
+    std::vector<bool>               m_egraph_node_validity;
+    std::vector<PhiCoord>           m_egraph_phi_coords;
+    std::vector<PhiCoord>           m_egraph_pre_phi_coords;
+    std::vector<double>             m_demo_z_values;
+    AlignedVector<Eigen::Affine3d>  m_egraph_node_pregrasps;
+    AlignedVector<Eigen::Affine3d>  m_egraph_node_grasps;
 
     // map discrete (x, y, z, yaw) poses to e-graph states whose discrete state
     // is within some tolerance. The tolerance is defined as lying within the
@@ -232,18 +242,10 @@ public:
     // queried to determine the set of edges E_z during planning.
     PhiCoordToEGraphNodesMap m_phi_to_egraph_nodes;
 
-    double pregrasp_offset_x = -0.10;
     PhiCoordToEGraphNodesMap m_pregrasp_phi_to_egraph_node;
-    PhiCoordToEGraphNodesMap m_grasp_phi_to_egraph_node;
 
-    std::vector<PhiCoord> m_egraph_phi_coords;
-    std::vector<PhiCoord> m_egraph_pre_phi_coords;
-
-    template <class T>
-    using AlignedVector = std::vector<T, Eigen::aligned_allocator<T>>;
-
-    AlignedVector<Eigen::Affine3d> m_egraph_node_pregrasps;
-    AlignedVector<Eigen::Affine3d> m_egraph_node_grasps;
+    // Additional properties of demonstration edges
+    std::vector<bool> m_egraph_edge_validity;
 
     // these tables store the previously generated actions of different types.
     // This is especially useful for actions which have some probability of

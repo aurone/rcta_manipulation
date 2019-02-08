@@ -162,9 +162,8 @@ void UpdateUserGoal(
             heur->planningSpace());
 
     auto goal_z = goal.angles[0];
-    auto goal_thresh = goal.angle_tolerances[0];
 
-    SMPL_INFO_NAMED(H_LOG, "Goal Z: %f @ %f", goal_z, goal_thresh);
+    SMPL_INFO_NAMED(H_LOG, "Goal Z: %f", goal_z);
 
     auto* egraph = heur->eg->getExperienceGraph();
 
@@ -233,9 +232,7 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(node);
         auto* state = graph->getState(state_id);
 
-        // TODO: maybe make the goal threshold be the resolution of the z
-        // variable?
-        if (std::fabs(egraph_state[HINGE] - goal_z) <= goal_thresh) {
+        if (egraph_state[HINGE] == goal_z) {
             search_nodes[node].g = 0;
             open.push(&search_nodes[node]);
 
@@ -673,7 +670,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
     }
 
     if (h_min == std::numeric_limits<int>::max()) {
-        SMPL_WARN_ONCE_NAMED(H_LOG, "no e-graph state with z = %0.12f", state->state[HINGE]);
+        SMPL_WARN_ONCE_NAMED(H_LOG, "no e-graph state with z = %f", state->state[HINGE]);
     }
 
     if (is_egraph) {

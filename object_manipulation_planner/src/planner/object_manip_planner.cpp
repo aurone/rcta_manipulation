@@ -38,8 +38,9 @@ bool Init(
         smpl::to_radians(22.5),     // base theta
         0.05,                       // base x
         0.05,                       // base y
-        0.00001                     // object z
+        1.0                         // object z
     };
+
     p.res_x = 0.025;
     p.res_y = 0.025;
     p.res_z = 0.025;
@@ -141,12 +142,23 @@ void UpdateRobotState(
     }
 }
 
+struct PlannerAndGoal
+{
+    RomanObjectManipLattice* graph;
+    smpl::GoalConstraint* goal;
+};
+
 bool IsGoal(void* user, const smpl::RobotState& state)
 {
-    auto* goal = static_cast<smpl::GoalConstraint*>(user);
-    auto diff = state.back() - goal->angles.back();
-    if (std::fabs(diff) < goal->angle_tolerances.back()) {
-        ROS_INFO("Found a goal state (%f vs %f)", state.back(), goal->angles.back());
+    auto* data = static_cast<PlannerAndGoal*>(user);
+    auto* graph = data->graph;
+    auto* goal = data->goal;
+
+    auto z_index = (int)state[HINGE];
+    auto goal_z_index = (int)goal->angles.back();
+
+    if (z_index == goal_z_index) {
+        ROS_INFO("Found a goal state (%d vs %d)", z_index, goal_z_index);
         return true;
     }
 
@@ -165,6 +177,31 @@ bool PlanPath(
     // the demonstration (the pose of the robot) is stored in the frame of the
     // object -> transform the demonstration into the global frame
     planner->graph.clearExperienceGraph();
+    planner->graph.m_goal_entry = NULL;
+    planner->graph.m_goal_state_id = -1;
+    planner->graph.m_start_entry = NULL;
+    planner->graph.m_start_state_id = -1;
+    for (auto* state : planner->graph.m_states) {
+        delete state;
+    }
+    planner->graph.m_states.clear();
+    planner->graph.m_state_to_id.clear();
+
+    smpl::WorkspaceCoord fake_coord;
+    planner->graph.m_goal_state_id = planner->graph.createState(fake_coord);
+    planner->graph.m_goal_entry = planner->graph.getState(planner->graph.m_goal_state_id);
+
+    // TODO: assuming here that we have a single demonstration, this is going to
+    // get hairy...Also, changing the RobotModel is considered very bad by smpl
+    // conventions. In this case we get lucky. The maximum object index, which
+    // changes per demonstration, is used for two things:
+    // (1) adjusting the discretization so that maximum and minimum bounds are
+    // reachable for bounded state variables. Our discretization of 1 should
+    // never need to change here
+    // (2) Checking joint limits. This would invalidate/validate some states,
+    // but we're clearing the state of the search between each call.
+    planner->model->min_object_pos = (double)0;
+    planner->model->max_object_pos = (double)planner->demos.front().size() - 1;
 
     for (auto& demo : planner->demos) {
         auto transformed_demo = demo;
@@ -196,7 +233,26 @@ bool PlanPath(
     }
 
     auto start = MakeGraphStatePrefix(start_state, planner->model);
-    start.push_back(object_start_state);
+
+    // TODO: maybe find the closest z-value?
+    auto closest_z_index = [&](double z)
+    {
+        auto closest_z_index = -1;
+        auto closest_z_dist = std::numeric_limits<double>::infinity();
+        for (auto i = 0; i < planner->graph.m_demo_z_values.size(); ++i) {
+            auto z_value = planner->graph.m_demo_z_values[i];
+            auto dist = std::fabs(z - z_value);
+            if (dist < closest_z_dist) {
+                closest_z_dist = dist;
+                closest_z_index = i;
+            }
+        }
+        return closest_z_index;
+    };
+
+    auto start_z_index = closest_z_index(object_start_state);
+
+    start.push_back((double)start_z_index);
     if (!planner->graph.setStart(start)) {
         ROS_ERROR("Failed to set start");
         return false;
@@ -211,16 +267,21 @@ bool PlanPath(
 
     // Hijacking the goal state/tolerance vectors to store the goal position
     // of the object
-    goal.angles.push_back(object_goal_state);
+    goal.angles.push_back(closest_z_index(object_goal_state));
     goal.angle_tolerances.push_back(0.05);
     goal.check_goal = IsGoal;
-    goal.check_goal_user = &goal;
+
+    PlannerAndGoal goal_data;
+    goal_data.goal = &goal;
+    goal_data.graph = &planner->graph;
+    goal.check_goal_user = &goal_data;
+
     planner->graph.setGoal(goal);
 
     planner->heuristic.updateGoal(goal);
 
     ClearActionCache(&planner->graph);
-    planner->search.force_planning_from_scratch();
+    planner->search.force_planning_from_scratch_and_free_memory();
 
     auto start_id = planner->graph.getStartStateID();
     auto goal_id = planner->graph.getGoalStateID();
@@ -230,8 +291,8 @@ bool PlanPath(
     ROS_INFO("start state id = %d", start_id);
     ROS_INFO("goal state id = %d", goal_id);
 
-    std::vector<int> solution;
-    int solution_cost;
+    auto solution = std::vector<int>();
+    auto solution_cost = 0;
 
 #if 1
     smpl::ARAStar::TimeParameters timing;
@@ -249,11 +310,11 @@ bool PlanPath(
 #endif
 
     if (!res) {
-        ROS_ERROR("Failed to plan path");
+        ROS_ERROR("Failed to plan path after %d expansions (%f seconds)", planner->search.get_n_expands(), planner->search.get_final_eps_planning_time());
         return false;
     }
 
-    ROS_INFO("Found path through %zu states with cost %d in %d expansions", solution.size(), solution_cost, planner->search.get_n_expands());
+    ROS_INFO("Found path through %zu states with cost %d in %d expansions (%f seconds)", solution.size(), solution_cost, planner->search.get_n_expands(), planner->search.get_final_eps_planning_time());
 
     using RobotPath = std::vector<smpl::RobotState>;
     RobotPath path;
@@ -306,12 +367,15 @@ bool PlanPath(
 
     for (auto i = 0; i < segments.size(); ++i) {
         auto& segment = segments[i];
+        auto type = segment_types[i];
+
+        ROS_INFO("Smooth path of type %s", to_cstring(type));
+
         if (!smpl::InterpolatePath(*planner->checker, segment)) {
             ROS_ERROR("Failed to interpolate path");
             return false;
         }
 
-        auto type = segment_types[i];
         switch (type) {
         case TransitionType::OrigStateOrigSucc:     // yes
         case TransitionType::OrigStateBridgeSucc:   // yes
@@ -319,7 +383,8 @@ bool PlanPath(
         case TransitionType::PreGraspAmpSucc:       // yes
         case TransitionType::SnapSucc:              // yes
         {
-            std::vector<smpl::RobotState> shortcut;
+            ROS_INFO("Shortcut path with %zu waypoints", segment.size());
+            auto shortcut = std::vector<smpl::RobotState>();
             auto type = smpl::ShortcutType::JOINT_POSITION_VELOCITY_SPACE;
             smpl::ShortcutPath(planner->model, planner->checker, segment, shortcut, type);
             (void)smpl::InterpolatePath(*planner->checker, shortcut);
@@ -410,8 +475,8 @@ bool PlanPath(
 }
 
 void MakeRobotTrajectory(
-        const std::vector<std::unique_ptr<Command>>* commands,
-        robot_trajectory::RobotTrajectory* traj)
+    const std::vector<std::unique_ptr<Command>>* commands,
+    robot_trajectory::RobotTrajectory* traj)
 {
     // remove all gripper commands and squash all trajectories
     for (auto& command : (*commands)) {
