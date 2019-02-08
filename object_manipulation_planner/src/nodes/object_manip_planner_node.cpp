@@ -407,16 +407,15 @@ bool ManipulateObject(
     }
     ProfilerStop();
 
-    auto trajectory = robot_trajectory::RobotTrajectory(robot_model, group_name);
-    MakeRobotTrajectory(&commands, &trajectory);
-
     //////////////////////////////
     // display the planned path //
     //////////////////////////////
 
-    ROS_INFO("Display trajectory");
+    if (false) {
+        auto trajectory = robot_trajectory::RobotTrajectory(robot_model, group_name);
+        MakeRobotTrajectory(&commands, &trajectory);
 
-    {
+        ROS_INFO("Display trajectory");
         moveit_msgs::DisplayTrajectory display;
 
         display.model_id = robot_model->getName();
