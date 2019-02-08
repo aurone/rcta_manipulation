@@ -48,6 +48,10 @@ target_link_libraries(
     ${orocos_kdl_LIBRARIES})
 
 install(
+    FILES kdl_kinematics_plugin_description.xml
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
+install(
     TARGETS kdl_kinematics_plugin
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
