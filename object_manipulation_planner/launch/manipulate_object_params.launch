@@ -1,9 +1,14 @@
+<!-- We have a separate launch file that loads parameters for the manipulate_object
+test executable so that we can script running the executable outside of roslaunch
+but with a similar setup as if we had
+-->
 <launch>
     <arg name="execute" default="false"/>
     <arg name="scenario" default="$(find object_manipulation_planner)/tests/test-1.yaml"/>
+    <arg name="allowed_planning_time" default="15.0"/>
     <group ns="manipulate_object">
         <param name="execute" value="$(arg execute)"/>
         <rosparam command="load" file="$(arg scenario)"/>
-        <param name="allowed_planning_time" value="15.0"/>
+        <param name="allowed_planning_time" value="$(arg allowed_planning_time)"/>
     </group>
 </launch>

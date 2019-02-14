@@ -62,7 +62,15 @@ int main(int argc, char* argv[])
         std::stringstream ss;
         auto cmd = std::string();
 
-        ss << "roslaunch --disable-title object_manipulation_planner manipulate_object_params.launch scenario:=" << p << " > /dev/null";
+        auto allowed_time = 60.0;
+
+        ss << "roslaunch";
+        ss << " --disable-title";
+        ss << " object_manipulation_planner";
+        ss << " manipulate_object_params.launch";
+        ss << " allowed_planning_time:=" << allowed_time;
+        ss << " scenario:=" << p;
+        ss << " > /dev/null";
         cmd = ss.str();
         printf("%sexecute '%s'%s\n", smpl::console::codes::cyan, cmd.c_str(), smpl::console::codes::reset);
         err = system(cmd.c_str());
