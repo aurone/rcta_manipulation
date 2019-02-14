@@ -102,15 +102,16 @@ bool LoadDemonstrations(ObjectManipPlanner* planner, const std::string& path)
         // TODO: maybe this function should rearrange the variables in the
         // waypoint if they are not identical...oh well...we'll modify
         // the data for now
-        if (!smpl::ParseExperienceGraphFile(filepath, planner->model, demo_path)) {
-            continue;
-        }
 
         // TODO: We may want to parse the demonstration file ourselves here, so
         // the header information is available to match up the joint variables
         // with their order in the planning model. We get lucky in most cases
         // because the order of the variables recorded in the demonstration
         // happens to match the order in the planning model.
+        ROS_INFO("Load demonstration from '%s'", filepath.c_str());
+        if (!smpl::ParseExperienceGraphFile(filepath, planner->model, demo_path)) {
+            continue;
+        }
 
         planner->demos.push_back(std::move(demo_path));
     }
@@ -174,8 +175,8 @@ bool PlanPath(
     double allowed_time,
     std::vector<std::unique_ptr<Command>>* commands)
 {
-    // the demonstration (the pose of the robot) is stored in the frame of the
-    // object -> transform the demonstration into the global frame
+    // Clear the graph structure. We shouldn't need to do this but it's
+    // preventing a problem somewhere.
     planner->graph.clearExperienceGraph();
     planner->graph.m_goal_entry = NULL;
     planner->graph.m_goal_state_id = -1;

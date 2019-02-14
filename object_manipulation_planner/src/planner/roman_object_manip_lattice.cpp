@@ -1095,14 +1095,12 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
 
     auto modpath = path;
 
-#if 0
-    for (auto i = 0; i < modpath.size() / 2; ++i) {
-        modpath[i] = modpath[2 * i];
-    }
-    modpath.resize(modpath.size() / 2);
-    modpath.push_back(path.back());
-#else
 #if 1
+    // Filter trajectory to remove consecutive waypoints where the object
+    // dimension doesn't change. This means we're going to miss intermediate
+    // waypoints along the demonstration which might be important, but
+    // apparently we were doing this all the time and it improves planning
+    // efficiency.
     auto mod_to_orig_indices = std::vector<int>();
     mod_to_orig_indices.push_back(0);
     {
@@ -1126,7 +1124,6 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     ROS_INFO("Modified Path Size: %zu", modpath.size());
     ROS_INFO("Modified Path to Original Path Indices: %zu", mod_to_orig_indices.size());
 #endif
-#endif
 
     m_demo_z_values.resize(modpath.size(), -1.0);
     for (auto i = 0; i < modpath.size(); ++i) {
@@ -1144,9 +1141,6 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     m_egraph_node_grasps.clear();
     m_phi_to_egraph_nodes.clear();
     m_pregrasp_phi_to_egraph_node.clear();
-#if 0
-    m_demo_z_values.clear();
-#endif
 
     // discrete 3d positions of the end effector throughout the demonstration
     auto phi_points = std::vector<Eigen::Vector3i>();
@@ -1162,13 +1156,11 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     m_egraph_node_validity.resize(m_egraph.num_nodes(), true);
     m_egraph_edge_validity.resize(m_egraph.num_edges(), true);
 
-#if 0
-    m_demo_z_values.resize(m_egraph.num_nodes(), -1.0);
-#endif
-
     auto nodes = m_egraph.nodes();
 
-    // validity check experience graph nodes and edges
+    /////////////////////////////////////////////////////
+    // validity check experience graph nodes and edges //
+    /////////////////////////////////////////////////////
 
     auto num_invalid_nodes = 0;
     auto num_invalid_edges = 0;
