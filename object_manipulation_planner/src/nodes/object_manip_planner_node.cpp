@@ -2,6 +2,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <mutex>
 #include <vector>
 
 // system includes
@@ -32,6 +33,7 @@
 #include <smpl_urdf_robot_model/robot_model.h>
 #include <smpl_urdf_robot_model/robot_state.h>
 #include <smpl_urdf_robot_model/robot_state_visualization.h>
+#include <tf_conversions/tf_eigen.h>
 #include <tf/transform_listener.h>
 #include <urdf_parser/urdf_parser.h>
 
@@ -41,6 +43,28 @@
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
 //#include "roman_robot_model.h"
+
+struct CurrentStateMonitor
+{
+    std::mutex m;
+    std::shared_ptr<tf::TransformListener> listener;
+    moveit::core::RobotState curr_state;
+
+    CurrentStateMonitor(const moveit::core::RobotModelConstPtr& robot_model)
+        : curr_state(robot_model)
+    { }
+};
+
+void Init(CurrentStateMonitor* monitor)
+{
+    monitor->curr_state.setToDefaultValues();
+}
+
+void UpdateCurrentState(
+    CurrentStateMonitor* monitor,
+    const sensor_msgs::JointState& joint_state);
+
+auto GetCurrentState(CurrentStateMonitor* monitor) -> moveit::core::RobotState;
 
 // A necessary evil
 namespace std {
@@ -446,13 +470,50 @@ bool ManipulateObject(
     return true;
 }
 
+void UpdateCurrentState(
+    CurrentStateMonitor* monitor,
+    const sensor_msgs::JointState& joint_state)
+{
+    std::unique_lock<std::mutex> lock(monitor->m);
+    for (auto i = 0; i < joint_state.name.size(); ++i) {
+        // skip unknown variable name
+        auto& name = joint_state.name[i];
+        auto it = std::find(
+                begin(monitor->curr_state.getVariableNames()),
+                end(monitor->curr_state.getVariableNames()),
+                name);
+        if (it == end(monitor->curr_state.getVariableNames())) continue;
+
+        auto index = std::distance(begin(monitor->curr_state.getVariableNames()), it);
+        auto position = joint_state.position[i];
+        monitor->curr_state.setVariablePosition(index, position);
+    }
+}
+
+auto GetCurrentState(CurrentStateMonitor* monitor) -> moveit::core::RobotState
+{
+    auto& root_link_name = monitor->curr_state.getRobotModel()->getRootLink()->getName();
+    auto T_world_robot = Eigen::Affine3d(Eigen::Affine3d::Identity());
+    auto world_frame = "map";
+    try {
+        auto tf = tf::StampedTransform();
+        monitor->listener->lookupTransform(world_frame, root_link_name, ros::Time(0), tf);
+        tf::transformTFToEigen(tf, T_world_robot);
+    } catch (const tf::TransformException& ex) {
+        ROS_ERROR("Failed to lookup transform from '%s' to '%s'", world_frame, root_link_name.c_str());
+    }
+    auto lock = std::unique_lock<std::mutex>(monitor->m);
+    auto state = monitor->curr_state;
+    state.setJointPositions(state.getRobotModel()->getRootJoint()->getName(), T_world_robot);
+    return state;
+}
+
 // 1. Generate a trajectory using the model of the object
 // 2. Save the example trajectory as a demonstration
 // 3. Construct state space: (base/x, base/y, base/theta, torso, ee/x, ee/y,
 //    ee/z, ee/yaw, arm/free_angle)
 // 4. Construct a Workspace Lattice with a special action set.
 //  * The original action space, replicated for all values of z
-//  *
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "object_manip_planner");
@@ -763,18 +824,25 @@ int main(int argc, char* argv[])
     // Fire up planning/execution service //
     ////////////////////////////////////////
 
-    auto listener = boost::make_shared<tf::TransformListener>();
-    auto state_monitor =
-            smpl::make_unique<planning_scene_monitor::CurrentStateMonitor>(
-                    robot_model, listener);
-    state_monitor->startStateMonitor();
+    CurrentStateMonitor state_monitor(robot_model);
+    Init(&state_monitor);
+    state_monitor.listener = std::make_shared<tf::TransformListener>();
+
+    using JointStateCallback = boost::function<void(const sensor_msgs::JointState::ConstPtr&)>;
+    JointStateCallback jsfun =
+    [&](const sensor_msgs::JointState::ConstPtr& msg)
+    {
+        UpdateCurrentState(&state_monitor, *msg);
+    };
+
+    auto sub = nh.subscribe("joint_states", 10, jsfun);
 
     auto autostart = false;
     ManipulateObjectActionServer server(
             "manipulate_object",
             [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
             {
-                auto curr_state = state_monitor->getCurrentState();
+                auto curr_state = GetCurrentState(&state_monitor);
                 if (ManipulateObject(
                         robot_model,
                         group_name,
@@ -782,7 +850,7 @@ int main(int argc, char* argv[])
                         &cspace,
                         &planning_model,
                         &planner,
-                        curr_state.get(),
+                        &curr_state,
                         display_publisher,
                         ph,
                         msg))

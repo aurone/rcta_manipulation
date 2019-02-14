@@ -28,7 +28,8 @@ find_package(
         sbpl_collision_checking
         smpl_urdf_robot_model
         smpl_ros
-        tf)
+        tf
+        tf_conversions)
 
 find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
@@ -78,7 +79,8 @@ target_include_directories(
         ${eigen_conversions_INCLUDE_DIRS}
         ${tf_INCLUDE_DIRS}
         ${smpl_urdf_robot_model_INCLUDE_DIRS}
-        ${urdfdom_INCLUDE_DIRS})
+        ${urdfdom_INCLUDE_DIRS}
+        ${tf_conversions_INCLUDE_DIRS})
 target_link_libraries(
     object_manip_planner_node
     PRIVATE
@@ -90,6 +92,7 @@ target_link_libraries(
         ${tf_LIBRARIES}
         ${smpl_urdf_robot_model_LIBRARIES}
         ${urdfdom_LIBRARIES}
+        ${tf_conversions_LIBRARIES}
         profiler)
 install(TARGETS object_manip_planner_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
