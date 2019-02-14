@@ -500,7 +500,13 @@ auto GetCurrentState(CurrentStateMonitor* monitor) -> moveit::core::RobotState
         monitor->listener->lookupTransform(world_frame, root_link_name, ros::Time(0), tf);
         tf::transformTFToEigen(tf, T_world_robot);
     } catch (const tf::TransformException& ex) {
-        ROS_ERROR("Failed to lookup transform from '%s' to '%s'", world_frame, root_link_name.c_str());
+        // TODO:: This isn't exactly what we need here, since there is no state
+        // information for from the world frame to the root link of our robot,
+        // which for the current URDF is the fake "z" link, and not the actual
+        // root link of the robot. Luckily, all of our examples right now
+        // don't move the robot and we have no collision information registered
+        // in the global frame
+        ROS_WARN("Failed to lookup transform from '%s' to '%s'. Defaulting to identity", world_frame, root_link_name.c_str());
     }
     auto lock = std::unique_lock<std::mutex>(monitor->m);
     auto state = monitor->curr_state;
