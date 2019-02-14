@@ -16,6 +16,8 @@
 #include "object_manip_heuristic.h"
 #include "variables.h"
 
+#define USE_UNIQUE_GOAL 0
+
 ObjectManipPlanner::ObjectManipPlanner() : search(&graph, &heuristic) { }
 
 bool Init(
@@ -156,12 +158,21 @@ bool IsGoal(void* user, const smpl::RobotState& state)
     auto* goal = data->goal;
 
     auto z_index = (int)state[HINGE];
-    auto goal_z_index = (int)goal->angles.back();
 
+#if USE_UNIQUE_GOAL
+    auto goal_z_index = (int)goal->angles.back();
     if (z_index == goal_z_index) {
         ROS_INFO("Found a goal state (%d vs %d)", z_index, goal_z_index);
         return true;
     }
+#else
+    auto z_val = graph->m_demo_z_values[z_index];
+    auto z_goal = goal->angles[0];
+    auto goal_thresh = goal->angle_tolerances[0];
+    if (fabs(z_goal - z_val) <= goal_thresh) {
+        return true;
+    }
+#endif
 
     return false;
 }
@@ -192,17 +203,8 @@ bool PlanPath(
     planner->graph.m_goal_state_id = planner->graph.createState(fake_coord);
     planner->graph.m_goal_entry = planner->graph.getState(planner->graph.m_goal_state_id);
 
-    // TODO: assuming here that we have a single demonstration, this is going to
-    // get hairy...Also, changing the RobotModel is considered very bad by smpl
-    // conventions. In this case we get lucky. The maximum object index, which
-    // changes per demonstration, is used for two things:
-    // (1) adjusting the discretization so that maximum and minimum bounds are
-    // reachable for bounded state variables. Our discretization of 1 should
-    // never need to change here
-    // (2) Checking joint limits. This would invalidate/validate some states,
-    // but we're clearing the state of the search between each call.
-    planner->model->min_object_pos = (double)0;
-    planner->model->max_object_pos = (double)planner->demos.front().size() - 1;
+    // the demonstration (the pose of the robot) is stored in the frame of the
+    // object -> transform the demonstration into the global frame
 
     for (auto& demo : planner->demos) {
         auto transformed_demo = demo;
@@ -232,6 +234,20 @@ bool PlanPath(
 
         planner->graph.insertExperienceGraphPath(transformed_demo);
     }
+
+    // Update the bounds of the object dimension, which is the number of
+    // discrete values it can take on. Changing the RobotModel is considered
+    // very bad by smpl conventions, but we get lucky in this case. The maximum
+    // object index, which changes per demonstration, is used for two things:
+    //
+    // (1) adjusting the discretization so that maximum and minimum bounds are
+    // reachable for bounded state variables. Our discretization of 1 should
+    // never need to change here
+    //
+    // (2) Checking joint limits. This would invalidate/validate some states,
+    // but we're clearing the state of the search between each call.
+    planner->model->min_object_pos = (double)0;
+    planner->model->max_object_pos = (double)(planner->graph.m_demo_z_values.size() - 1);
 
     auto start = MakeGraphStatePrefix(start_state, planner->model);
 
@@ -266,9 +282,16 @@ bool PlanPath(
     smpl::GoalConstraint goal;
     goal.type = smpl::GoalType::USER_GOAL_CONSTRAINT_FN;
 
-    // Hijacking the goal state/tolerance vectors to store the goal position
-    // of the object
+    // Hijacking the goal state/tolerance vectors to store the goal position of
+    // the object. Since we may have multiple demonstrations that modify the
+    // object to some degree, and those demonstrations may not hit the exact
+    // same z-value, but be close enough, we want to accept more than one
+    // unique z value
+#if USE_UNIQUE_GOAL
     goal.angles.push_back(closest_z_index(object_goal_state));
+#else
+    goal.angles.push_back(object_goal_state);
+#endif
     goal.angle_tolerances.push_back(0.05);
     goal.check_goal = IsGoal;
 

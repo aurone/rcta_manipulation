@@ -18,7 +18,8 @@ static const double FixedPointRatio = 500.0;
 
 #define HV_LOG H_LOG ".verbose"
 
-#define ENABLE_PREPHI 1
+// TODO: duplicate in object_manip_planner.cpp
+#define USE_UNIQUE_GOAL 0
 
 auto operator<<(std::ostream& o, const HeuristicCoord& coord) -> std::ostream&
 {
@@ -201,7 +202,12 @@ void UpdateUserGoal(
     auto* graph = static_cast<const RomanObjectManipLattice*>(
             heur->planningSpace());
 
+#if USE_UNIQUE_GOAL
     auto goal_z = (int)goal.angles[0];
+#else
+    auto goal_z = goal.angles[0];
+#endif
+    auto goal_thresh = goal.angle_tolerances[0];
 
     SMPL_INFO_NAMED(H_LOG, "Goal Z: %f", goal_z);
 
@@ -273,7 +279,12 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(node);
         auto* state = graph->getState(state_id);
 
+#if USE_UNIQUE_GOAL
         if (GetZIndex(state) == goal_z) {
+#else
+        auto z_node = graph->m_demo_z_values[GetZIndex(state)];
+        if (fabs(z_node - goal_z) < goal_thresh) {
+#endif
             search_nodes[node].g = 0;
             open.push(&search_nodes[node]);
 

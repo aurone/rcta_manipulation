@@ -245,7 +245,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
 
             auto adj_id = *ait;
 
-#if PHI_INCLUDE_RP
+#if !PHI_INCLUDE_RP
             // Create a target pose from the position of the adjacent state
             // and the orientation of the current state
             auto& grasp_pose = m_egraph_node_grasps[adj_id];
@@ -1125,12 +1125,34 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
     ROS_INFO("Modified Path to Original Path Indices: %zu", mod_to_orig_indices.size());
 #endif
 
-    m_demo_z_values.resize(modpath.size(), -1.0);
+    // Overwrite object state variables to be indices into the table of
+    // real-valued object states.
+    auto new_demo_z_values = std::vector<double>(modpath.size(), -1.0);
     for (auto i = 0; i < modpath.size(); ++i) {
-        m_demo_z_values[i] = path[mod_to_orig_indices[i]][HINGE];
-        modpath[i][HINGE] = (double)i;
+        new_demo_z_values[i] = path[mod_to_orig_indices[i]][HINGE];
+        modpath[i][HINGE] = (double)(m_demo_z_values.size() + i);
     }
     WorkspaceLatticeEGraph::insertExperienceGraphPath(modpath);
+
+    // Add the real-valued object states to the table.
+    m_demo_z_values.insert(
+            end(m_demo_z_values),
+            begin(new_demo_z_values),
+            end(new_demo_z_values));
+
+    // Create edges between nodes with similar z values.
+    for (auto i = 0; i < m_egraph.m_nodes.size(); ++i) {
+        for (auto j = i + 1; j < m_egraph.m_nodes.size(); ++j) {
+            auto z_i = m_demo_z_values[i];
+            auto z_j = m_demo_z_values[j];
+            auto thresh = 0.02;
+            if ((z_i - z_j) * (z_i - z_j) < thresh * thresh) {
+                if (!m_egraph.edge(i, j)) {
+                    m_egraph.insert_edge(i, j, { });
+                }
+            }
+        }
+    }
 
     // we're only adding one path...but going to clear and recompute all
     // auxiliary data for the entire e-graph :/
