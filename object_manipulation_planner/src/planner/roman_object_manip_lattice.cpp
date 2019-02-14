@@ -20,8 +20,9 @@
 
 #define ENABLE_BASE_IN_SNAP_MOTIONS 0
 #define ENABLE_EGRAPH_EDGES 1
-//    auto enable_egraph_edges = false;
 
+#define PHI_INCLUDE_RP 1
+#define RESTRICTIVE_Z_EDGES 1
 
 namespace TransitionType {
 auto to_cstring(Type t) -> const char*
@@ -46,14 +47,25 @@ auto to_cstring(Type t) -> const char*
 // Color a set of markers.
 static
 auto color(
-    std::vector<smpl::visual::Marker>&& markers,
+    std::vector<smpl::visual::Marker> markers,
     smpl::visual::Color color)
-    -> std::vector<smpl::visual::Marker>&&
+    -> std::vector<smpl::visual::Marker>
 {
-    for (auto& m : markers) {
-        m.color = color;
+    for (auto& marker : markers) {
+        marker.color = color;
     }
-    return std::move(markers);
+    return markers;
+}
+
+// Label a sequence of markers with increasing ids starting at $id.
+static
+auto label(std::vector<smpl::visual::Marker> markers, int& id)
+    -> std::vector<smpl::visual::Marker>
+{
+    for (auto& marker : markers) {
+        marker.id = id++;
+    }
+    return markers;
 }
 
 // Get successors of actions from E_z where u is an E-Graph state.
@@ -72,6 +84,7 @@ void RomanObjectManipLattice::getEGraphStateZSuccs(
 // successors are determined by applying the original action space and checking
 // whether the endpoints of the action align with any edge in the
 // demonstration.
+#if 0
 void RomanObjectManipLattice::getOrigStateZSuccs(
     smpl::WorkspaceLatticeState* state,
     std::vector<int>* succs,
@@ -171,27 +184,14 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
 
         ++disconnected_count;
 
-        auto color = [](std::vector<smpl::visual::Marker> markers) {
-            for (auto& marker : markers) {
-                marker.color = smpl::visual::Color{ 1.0f, 0.0f, 0.5f, 0.9f };
-            }
-            return markers;
-        };
-
-        auto label = [&](std::vector<smpl::visual::Marker> markers) {
-            for (auto& marker : markers) {
-                marker.id = marker_id++;
-            }
-            return markers;
-        };
-
         auto vis_name = "candidate_z_successor";
-        SV_SHOW_DEBUG_NAMED(vis_name, label(color(getStateVisualization(final_robot_state, vis_name))));
+        SV_SHOW_DEBUG_NAMED(vis_name, label(color(getStateVisualization(final_robot_state, vis_name)), marker_id));
     }
 
     auto succ_count = succs->size();
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Found %zu/%zu z successors (%d invalid, %d off demo, %d disconnected)", succ_count - orig_succ_count, actions.size(), invalid_count, off_demo_count, disconnected_count);
 }
+#endif
 
 // Get successors of actions from E_z where u is not an E-Graph state. The
 // successors are determined by attempting an adaptive IK motion to the
@@ -204,17 +204,17 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "Apply Z actions");
 
     // s_demo states where phi(s) ~ phi(s_demo) and z(s) = z(s_demo)
-    auto parent_nearby_nodes = std::vector<smpl::ExperienceGraph::node_id>();
+    auto nearby_egraph_states = std::vector<smpl::ExperienceGraph::node_id>();
     {
-        auto pose_coord = getPhiCoord(state->coord);
-        SMPL_DEBUG_STREAM("  parent pose coord = " << pose_coord);
-        auto it = m_phi_to_egraph_nodes.find(pose_coord);
+        auto phi_coord = getPhiCoord(state->coord);
+        SMPL_DEBUG_STREAM("  parent phi coord = " << phi_coord);
+        auto it = m_phi_to_egraph_nodes.find(phi_coord);
         if (it != end(m_phi_to_egraph_nodes)) {
-            SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  check z-values of " << it->second.size() << " e-graph states at " << pose_coord);
+            SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "  check z-values of " << it->second.size() << " e-graph states at " << phi_coord);
             for (auto node : it->second) {
                 if ((int)m_egraph.state(node)[HINGE] == (int)state->state[HINGE]) {
                     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    matching z == %f!", m_egraph.state(node)[HINGE]);
-                    parent_nearby_nodes.push_back(node);
+                    nearby_egraph_states.push_back(node);
                 } else {
                     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "    %f != %f", m_egraph.state(node)[HINGE], state->state[HINGE]);
                 }
@@ -222,7 +222,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
         }
     }
 
-    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  %zu equivalent e-graph states", parent_nearby_nodes.size());
+    SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  %zu equivalent e-graph states", nearby_egraph_states.size());
 
     auto old_size = succs->size();
 
@@ -235,7 +235,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
     auto collision_count = 0;
 
     // for all adjacent nodes in the experience graph
-    for (auto neighbor_id : parent_nearby_nodes) {
+    for (auto neighbor_id : nearby_egraph_states) {
         auto adj_nodes = m_egraph.adjacent_nodes(neighbor_id);
         for (auto ait = adj_nodes.first; ait != adj_nodes.second; ++ait) {
             ++candidate_succ_count;
@@ -245,12 +245,29 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
 
             auto adj_id = *ait;
 
+#if PHI_INCLUDE_RP
+            // Create a target pose from the position of the adjacent state
+            // and the orientation of the current state
+            auto& grasp_pose = m_egraph_node_grasps[adj_id];
+
+            auto workspace_state = smpl::WorkspaceState();
+            stateCoordToWorkspace(state->coord, workspace_state);
+
+            auto pose = Eigen::Affine3d(
+                    Eigen::Translation3d(
+                            grasp_pose.translation().x(),
+                            grasp_pose.translation().y(),
+                            grasp_pose.translation().z()) *
+                    Eigen::AngleAxisd(workspace_state[EE_QZ], Eigen::Vector3d::UnitZ()) *
+                    Eigen::AngleAxisd(workspace_state[EE_QY], Eigen::Vector3d::UnitY()) *
+                    Eigen::AngleAxisd(workspace_state[EE_QX], Eigen::Vector3d::UnitX()));
+#else
             auto& pose = m_egraph_node_grasps[adj_id];
+#endif
 
             // TODO: permissive or restrictive ik?
             // probably want restrictive but with a mini-search over free angles
             // for the arm/torso
-#define RESTRICTIVE_Z_EDGES 0
 #if RESTRICTIVE_Z_EDGES
             auto solution = smpl::RobotState();
             if (!m_rm_iface->computeFastIK(pose, state->state, solution)) {
@@ -273,6 +290,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
                 continue;
             }
 
+            // Use the z value at the adjacent state
             solution[HINGE] = m_egraph.state(adj_id)[HINGE];
 
             // 1. add this to our state table?
@@ -291,22 +309,12 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
             auto edge_cost = computeCost(*state, *succ_state);
             costs->push_back(edge_cost);
 
-            auto color = [](std::vector<smpl::visual::Marker> markers) {
-                for (auto& marker : markers) {
-                    marker.color = smpl::visual::Color{ 1.0f, 0.0f, 0.5f, 0.9f };
-                }
-                return markers;
-            };
-
-            auto label = [&](std::vector<smpl::visual::Marker> markers) {
-                for (auto& marker : markers) {
-                    marker.id = marker_id++;
-                }
-                return markers;
-            };
-
             auto vis_name = "candidate_z_successor";
-            SV_SHOW_DEBUG_NAMED(vis_name, label(color(getStateVisualization(solution, vis_name))));
+            SV_SHOW_DEBUG_NAMED(vis_name, label(color(getStateVisualization(
+                    solution,
+                    vis_name),
+                    smpl::visual::Color{ 1.0f, 0.0f, 0.5f, 0.9f }),
+                    marker_id));
         }
     }
 
@@ -861,10 +869,12 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ(
     int& best_cost,
     std::vector<smpl::RobotState>& best_path)
 {
+#if 0
     std::vector<int> succs, costs;
     getOrigStateZSuccs(state, &succs, &costs);
     updateBestTransitionSimple(
             succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
+#endif
 }
 
 void RomanObjectManipLattice::updateBestTransitionOrigZ2(
@@ -1433,10 +1443,10 @@ int RomanObjectManipLattice::getSnapMotion(
             }
 
             Eigen::Affine3d pose =
-                    Eigen::Translation3d(state[0], state[1], state[2]) *
-                    Eigen::AngleAxisd(state[5], Eigen::Vector3d::UnitZ()) *
-                    Eigen::AngleAxisd(state[4], Eigen::Vector3d::UnitY()) *
-                    Eigen::AngleAxisd(state[3], Eigen::Vector3d::UnitX());
+                    Eigen::Translation3d(state[EE_PX], state[EE_PY], state[EE_PZ]) *
+                    Eigen::AngleAxisd(state[EE_QZ], Eigen::Vector3d::UnitZ()) *
+                    Eigen::AngleAxisd(state[EE_QY], Eigen::Vector3d::UnitY()) *
+                    Eigen::AngleAxisd(state[EE_QX], Eigen::Vector3d::UnitX());
 
             return m_ik_iface->computeIK(pose, seed, ostate);
         };
@@ -1479,31 +1489,27 @@ bool RomanObjectManipLattice::trySnap(int src_id, int dst_id, int& cost)
     return false;
 }
 
-#define PHI_INCLUDE_RP 1
-
 auto RomanObjectManipLattice::getPhiCoord(const Eigen::Affine3d& pose) const
     -> PhiCoord
 {
 #if PHI_INCLUDE_RP
     PhiCoord coord(6);
 #else
-    PhiCoord coord(4);
+    PhiCoord coord(3);
 #endif
 
     posWorkspaceToCoord(pose.translation().data(), coord.data());
 
+#if PHI_INCLUDE_RP
     double ea[3];
     smpl::get_euler_zyx(Eigen::Matrix3d(pose.rotation()), ea[2], ea[1], ea[0]);
 
     int ea_disc[3];
     rotWorkspaceToCoord(ea, ea_disc);
 
-#if PHI_INCLUDE_RP
     coord[3] = ea_disc[0];
     coord[4] = ea_disc[1];
     coord[5] = ea_disc[2];
-#else
-    coord[3] = ea_disc[2];
 #endif
 
     return coord;
@@ -1514,23 +1520,18 @@ auto RomanObjectManipLattice::getPhiState(const Eigen::Affine3d& pose) const
 {
 #if PHI_INCLUDE_RP
     PhiState state(6);
-#else
-    PhiState state(4);
-#endif
-
-    state[0] = pose.translation().x();
-    state[1] = pose.translation().y();
-    state[2] = pose.translation().z();
 
     double y, p, r;
     smpl::get_euler_zyx(Eigen::Matrix3d(pose.rotation()), y, p, r);
 
-#if PHI_INCLUDE_RP
     state[3] = r;
     state[4] = p;
     state[5] = y;
 #else
-    state[3] = y;
+    PhiState state(3);
+    state[0] = pose.translation().x();
+    state[1] = pose.translation().y();
+    state[2] = pose.translation().z();
 #endif
 
     return state;
@@ -1542,7 +1543,7 @@ auto RomanObjectManipLattice::getPhiCoord(const smpl::WorkspaceCoord& coord) con
 #if PHI_INCLUDE_RP
     return PhiCoord{ coord[0], coord[1], coord[2], coord[3], coord[4], coord[5] };
 #else
-    return PhiCoord{ coord[0], coord[1], coord[2], coord[5] };
+    return PhiCoord{ coord[0], coord[1], coord[2] };
 #endif
 }
 
@@ -1554,7 +1555,7 @@ auto GetPhiState(
 #if PHI_INCLUDE_RP
     return PhiState{ state[0], state[1], state[2], state[3], state[4], state[5] };
 #else
-    return PhiState{ state[0], state[1], state[2], state[5] };
+    return PhiState{ state[0], state[1], state[2] };
 #endif
 };
 

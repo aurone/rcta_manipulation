@@ -59,10 +59,12 @@ public:
         std::vector<int>* succs,
         std::vector<int>* costs);
 
+#if 0
     void getOrigStateZSuccs(
         smpl::WorkspaceLatticeState* state,
         std::vector<int>* succs,
         std::vector<int>* costs);
+#endif
 
     void getOrigStateZSuccs2(
         smpl::WorkspaceLatticeState* state,
