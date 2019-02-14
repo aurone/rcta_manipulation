@@ -9,6 +9,9 @@ find_package(Boost REQUIRED COMPONENTS filesystem)
 
 find_package(Eigen3 REQUIRED)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(fcl REQUIRED fcl)
+
 find_package(
     catkin
     REQUIRED
@@ -89,6 +92,25 @@ target_link_libraries(
         ${urdfdom_LIBRARIES}
         profiler)
 install(TARGETS object_manip_planner_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+add_executable(call_planner_fcl src/call_planner_fcl.cpp)
+target_compile_options(call_planner_fcl PRIVATE -std=c++11)
+target_include_directories(
+    call_planner_fcl
+    SYSTEM PRIVATE
+    ${smpl_urdf_robot_model_INCLUDE_DIRS}
+    ${fcl_INCLUDE_DIRS}
+    ${smpl_ros_INCLUDE_DIRS}
+    ${roscpp_INCLUDE_DIRS}
+    ${geometric_shapes_INCLUDE_DIRS})
+target_link_libraries(
+    call_planner_fcl
+    PRIVATE
+    ${smpl_urdf_robot_model_LIBRARIES}
+    ${fcl_LIBRARIES}
+    ${smpl_ros_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${geometric_shapes_LIBRARIES})
 
 # test_object_manip_planner
 add_executable(test_object_manip_planner src/test/test_object_manip_planner.cpp)
