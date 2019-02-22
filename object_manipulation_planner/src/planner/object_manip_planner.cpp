@@ -206,6 +206,8 @@ bool PlanPath(
     // the demonstration (the pose of the robot) is stored in the frame of the
     // object -> transform the demonstration into the global frame
 
+    planner->graph.clearExperienceGraph();  
+
     for (auto& demo : planner->demos) {
         auto transformed_demo = demo;
         for (auto& point : transformed_demo) {
@@ -228,7 +230,8 @@ bool PlanPath(
             auto T_world_robot = Eigen::Affine3d(object_pose * T_obj_robot);
             point[WORLD_JOINT_X] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
             point[WORLD_JOINT_Y] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
-            point[WORLD_JOINT_THETA] = round(1000.0 * smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
+            point[WORLD_JOINT_THETA] = round(1000.0 * smpl::get_nearest_planar_rotation
+                (Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
             point[WORLD_JOINT_Z] = round(1000.0 * T_world_robot.translation().z()) / 1000.0;
         }
 
@@ -325,6 +328,8 @@ bool PlanPath(
     timing.type = smpl::ARAStar::TimeParameters::TIME;
     timing.max_allowed_time_init = smpl::to_duration(allowed_time);
     timing.max_allowed_time = smpl::to_duration(allowed_time);
+    
+    //this finds the path from the set start to the goal state
     bool res = planner->search.replan(timing, &solution, &solution_cost);
 #else
     auto plan_start = std::chrono::high_resolution_clock::now();

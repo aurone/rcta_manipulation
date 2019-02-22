@@ -5,9 +5,6 @@ source screenrc.common
 screen -t core
 stuff "roscore"
 
-screen -t rviz
-stuff "rosrun rviz rviz -d $HOME/.rviz/rcta.rviz"
-
 screen -t sim
 stuff "roslaunch roman_simulation robot_simulator.launch --screen"
 
@@ -21,5 +18,10 @@ screen -t repo
 stuff "roslaunch roman_manipulation reposition_base_executor.launch --screen"
 
 screen -t obm
-stuff "roslaunch object_manipulation_planner object_manip_planner_node.launch --screen"
+stuff "roslaunch object_manipulation_planner simple_crate_planner.launch --screen"
 
+screen -t manip
+stuff "roslaunch ../../object_manipulation_planner/launch/manipulate_object.launch"
+
+screen -t rviz
+stuff "rosrun rviz rviz -d $HOME/.rviz/rcta.rviz"
