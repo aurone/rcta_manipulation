@@ -782,7 +782,9 @@ int main(int argc, char* argv[])
     SV_SHOW_INFO(cspace.getCollisionWorldVisualization());
 
     ObjectManipChecker ochecker;
-    ochecker.parent = &cspace;
+    if (!Init(&ochecker, &cspace)) {
+        return false;
+    }
 
     ////////////////////////////
     // Initialize the Planner //

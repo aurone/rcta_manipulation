@@ -52,17 +52,24 @@ add_library(
     src/planner/roman_workspace_lattice_action_space.cpp
     src/planner/roman_object_manip_lattice.cpp)
 target_include_directories(object_manip_planner PUBLIC src/planner)
-target_include_directories(object_manip_planner SYSTEM PUBLIC ${Boost_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
+target_include_directories(
+    object_manip_planner
+    SYSTEM
+    PUBLIC ${Boost_INCLUDE_DIRS}
+    PUBLIC ${catkin_INCLUDE_DIRS}
+    PUBLIC ${EIGEN3_INCLUDE_DIR}
+    PUBLIC ${fcl_INCLUDE_DIRS})
 target_link_libraries(
     object_manip_planner
     PUBLIC
-    ${smpl_moveit_interface_LIBRARIES}
+    ${fcl_LIBRARIES}
     ${moveit_core_LIBRARIES}
     ${moveit_ros_planning_LIBRARIES}
     ${roscpp_LIBRARIES}
     ${sbpl_collision_checking_LIBRARIES}
-    smpl::smpl
-    ${smpl_ros_LIBRARIES})
+    ${smpl_moveit_interface_LIBRARIES}
+    ${smpl_ros_LIBRARIES}
+    smpl::smpl)
 install(
     TARGETS object_manip_planner
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

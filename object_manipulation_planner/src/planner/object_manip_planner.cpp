@@ -14,6 +14,7 @@
 // project includes
 #include "object_manip_model.h"
 #include "object_manip_heuristic.h"
+#include "object_manip_checker.h"
 #include "variables.h"
 
 #define USE_UNIQUE_GOAL 0
@@ -23,7 +24,7 @@ ObjectManipPlanner::ObjectManipPlanner() : search(&graph, &heuristic) { }
 bool Init(
     ObjectManipPlanner* planner,
     ObjectManipModel* model,
-    smpl::CollisionChecker* checker,
+    ObjectManipChecker* checker,
     smpl::OccupancyGrid* grid,
     const ObjectManipPlannerParams* params)
 {
@@ -186,6 +187,8 @@ bool PlanPath(
     double allowed_time,
     std::vector<std::unique_ptr<Command>>* commands)
 {
+    SetObjectPose(planner->checker, object_pose);
+
     // Clear the graph structure. We shouldn't need to do this but it's
     // preventing a problem somewhere.
     planner->graph.clearExperienceGraph();

@@ -2,12 +2,26 @@
 #define OBJECT_MANIPULATION_PLANNER_OBJECT_MANIP_CHECKER_H
 
 #include <smpl/collision_checker.h>
+#include <smpl/spatial.h>
+
+namespace smpl {
+namespace collision {
+class CollisionSpace;
+}
+}
+
+struct ObjectManipCheckerImpl;
 
 class ObjectManipChecker : public smpl::CollisionChecker
 {
 public:
 
-    smpl::CollisionChecker* parent = NULL;
+    ObjectManipCheckerImpl* impl = NULL;
+
+//    smpl::CollisionChecker* parent = NULL;
+    smpl::collision::CollisionSpace* parent = NULL;
+
+    smpl::Affine3 object_pose;
 
     bool isStateValid(
         const smpl::RobotState& state,
@@ -28,5 +42,8 @@ public:
 
     auto getExtension(size_t class_code) -> smpl::Extension* override;
 };
+
+bool Init(ObjectManipChecker* checker, smpl::collision::CollisionSpace* parent);
+void SetObjectPose(ObjectManipChecker* checker, const smpl::Affine3& pose);
 
 #endif
