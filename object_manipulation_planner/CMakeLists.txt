@@ -29,7 +29,8 @@ find_package(
         smpl_urdf_robot_model
         smpl_ros
         tf
-        tf_conversions)
+        tf_conversions
+        urdf)
 
 find_package(smpl REQUIRED)
 find_package(urdfdom REQUIRED)
@@ -96,6 +97,34 @@ target_link_libraries(
         profiler)
 install(TARGETS object_manip_planner_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
+# urdf_to_robot
+add_executable(urdf_to_robot src/tools/urdf_to_robot.cpp)
+target_compile_options(urdf_to_robot PRIVATE -std=c++11)
+target_include_directories(urdf_to_robot SYSTEM PRIVATE ${urdf_INCLUDE_DIRS})
+target_link_libraries(urdf_to_robot PRIVATE ${urdf_LIBRARIES})
+
+# draw_kinematics
+add_executable(draw_kinematics src/tools/draw_kinematics.cpp)
+target_include_directories(
+    draw_kinematics
+    SYSTEM
+    PRIVATE
+    ${smpl_urdf_robot_model_INCLUDE_DIRS}
+    ${moveit_msgs_INCLUDE_DIRS}
+    ${urdfdom_INCLUDE_DIRS}
+    ${smpl_ros_INCLUDE_DIRS}
+    ${urdf_INCLUDE_DIRS})
+target_link_libraries(
+    draw_kinematics
+    PRIVATE
+    ${smpl_urdf_robot_model_LIBRARIES}
+    ${moveit_msgs_LIBRARIES}
+    ${urdfdom_LIBRARIES}
+    ${smpl_ros_LIBRARIES}
+    ${urdf_LIBRARIES}
+    smpl::smpl)
+
+# call_planner_fcl
 add_executable(call_planner_fcl src/call_planner_fcl.cpp)
 target_compile_options(call_planner_fcl PRIVATE -std=c++11)
 target_include_directories(
