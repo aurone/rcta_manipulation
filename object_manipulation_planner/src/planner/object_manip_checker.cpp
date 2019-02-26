@@ -122,9 +122,7 @@ void UpdateTransform(fcl::CollisionObject* obj, const smpl::Affine3& pose)
     auto rot = fcl::Quaternion3f(q.w(), q.x(), q.y(), q.z());
     auto pos = fcl::Vec3f(pose.translation().x(), pose.translation().y(), pose.translation().z());
     obj->setTransform(rot, pos);
-#if BROADPHASE_PESSIMISTIC
     obj->computeAABB();
-#endif
 }
 
 struct BroadphaseResult
