@@ -1392,8 +1392,8 @@ int RomanObjectManipLattice::getSnapMotion(
         auto heading = atan2(dy, dx);
         auto alt_heading = heading + M_PI;
         auto thresh = smpl::to_radians(10.0);
-        if (smpl::shortest_angle_dist(heading, src_state->state[WORLD_JOINT_THETA]) > thresh &&
-            smpl::shortest_angle_dist(alt_heading, src_state->state[WORLD_JOINT_THETA]) > thresh)
+        if (smpl::shortest_angle_dist(heading, src_state->state[WORLD_JOINT_YAW]) > thresh &&
+            smpl::shortest_angle_dist(alt_heading, src_state->state[WORLD_JOINT_YAW]) > thresh)
         {
             SMPL_DEBUG_NAMED(G_SNAP_LOG, "  Skip! (requires base rotation)");
             return -1;
@@ -1439,7 +1439,7 @@ int RomanObjectManipLattice::getSnapMotion(
         // interpolate torso, theta, x, y
         interm_workspace_state[TR_JP] = interp(start_state[TR_JP], finish_state[TR_JP], t);
         interm_workspace_state[BD_PZ] = interp(start_state[BD_PZ], finish_state[BD_PZ], t);
-        interm_workspace_state[BD_TH] = interp(start_state[BD_TH], finish_state[BD_TH], t);
+        interm_workspace_state[BD_QZ] = interp(start_state[BD_QZ], finish_state[BD_QZ], t);
         interm_workspace_state[BD_PX] = interp(start_state[BD_PX], finish_state[BD_PX], t);
         interm_workspace_state[BD_PY] = interp(start_state[BD_PY], finish_state[BD_PY], t);
 

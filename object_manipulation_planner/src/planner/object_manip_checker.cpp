@@ -10,6 +10,7 @@
 #include <smpl/stl/memory.h>
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/marker_utils.h>
+#include <smpl/console/console.h>
 
 #include "variables.h"
 
@@ -51,11 +52,28 @@ auto MakeBoxMarker(
     return box_marker;
 }
 
+// TODO: copypasta with object_manip_checker
 static
-auto ExtractState(const smpl::RobotState& state) -> smpl::RobotState
+auto ExtractParentState(const smpl::RobotState& state)
+    -> smpl::RobotState
 {
-    auto s = state;
-    s.pop_back();
+    auto small_state = smpl::RobotState(PMV_COUNT);
+    for (auto& p : RobotToParentVariablePairs) {
+        small_state[p.second] = state[p.first];
+    }
+    return small_state;
+}
+
+static
+auto FuseWithParent(
+    const smpl::RobotState& full_state,
+    const smpl::RobotState& parent_state)
+    -> smpl::RobotState
+{
+    auto s = full_state;
+    for (auto& p : RobotToParentVariablePairs) {
+        s[p.first] = parent_state[p.second];
+    }
     return s;
 }
 
@@ -220,7 +238,7 @@ bool ObjectManipChecker::isStateValid(
     if (state[WORLD_JOINT_Z] * state[WORLD_JOINT_Z] > z_thresh * z_thresh) {
         return false;
     }
-    if (!parent->isStateValid(ExtractState(state), verbose)) {
+    if (!parent->isStateValid(ExtractParentState(state), verbose)) {
         return false;
     }
 
@@ -240,7 +258,7 @@ bool ObjectManipChecker::isStateToStateValid(
     }
 
 #if 0
-    if (!parent->isStateToStateValid(ExtractState(start), ExtractState(finish), verbose)) {
+    if (!parent->isStateToStateValid(ExtractParentState(start), ExtractParentState(finish), verbose)) {
         return false;
     }
 #endif
@@ -249,7 +267,7 @@ bool ObjectManipChecker::isStateToStateValid(
     interp_path.reserve(4);
     interpolatePath(start, finish, interp_path);
     for (auto& point : interp_path) {
-        auto s = ExtractState(point);
+        auto s = ExtractParentState(point);
         if (!parent->isStateValid(s, false)) return false;
 
         if (!CheckObjectGripperCollisions(this)) return false;
@@ -270,13 +288,14 @@ bool ObjectManipChecker::interpolatePath(
     }
 
     auto old_size = path.size();
-    if (!parent->interpolatePath(ExtractState(start), ExtractState(finish), path)) {
+    if (!parent->interpolatePath(ExtractParentState(start), ExtractParentState(finish), path)) {
         return false;
     }
     auto new_size = path.size();
 
     for (auto i = old_size; i != new_size; ++i) {
-        path[i].push_back(start.back());
+        path[i] = FuseWithParent(start, path[i]);
+        // path[i].push_back(start.back());
     }
 
     return true;
@@ -285,7 +304,7 @@ bool ObjectManipChecker::interpolatePath(
 auto ObjectManipChecker::getCollisionModelVisualization(const smpl::RobotState& state)
     -> std::vector<smpl::visual::Marker>
 {
-    return parent->getCollisionModelVisualization(ExtractState(state));
+    return parent->getCollisionModelVisualization(ExtractParentState(state));
 }
 
 auto ObjectManipChecker::getExtension(size_t class_code) -> smpl::Extension*

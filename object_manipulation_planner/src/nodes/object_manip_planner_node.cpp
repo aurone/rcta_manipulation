@@ -558,48 +558,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-#if 0
-    auto urdf_copy = boost::make_shared<urdf::ModelInterface>(*orig_robot_model->getURDF());
-    {
-        auto z_link = boost::make_shared<::urdf::Link>();
-        auto z_joint = boost::make_shared<::urdf::Joint>();
-
-        z_link->name = "world_link";
-        z_link->parent_joint;
-        z_link->child_joints = { z_joint };
-        z_link->child_links = std::vector<boost::shared_ptr<::urdf::Link>>{
-            urdf_copy->links_[urdf_copy->getRoot()->name]
-        };
-        // TODO: no way to remap urdf.getRoot()'s weak_ptr, do we need that?
-
-        z_joint->name = "world_z";
-        z_joint->type = ::urdf::Joint::PRISMATIC;
-        z_joint->axis = ::urdf::Vector3(0, 0, 1);
-        z_joint->child_link_name = urdf_copy->getRoot()->name;
-        z_joint->parent_link_name = z_link->name;
-        z_joint->parent_to_joint_origin_transform.clear();
-
-        urdf_copy->root_link_->parent_joint = z_joint;
-
-        urdf_copy->links_[z_link->name] = z_link;
-        urdf_copy->joints_[z_joint->name] = z_joint;
-        urdf_copy->root_link_ = z_link;
-    }
-
-    for (auto& e : urdf_copy->joints_) {
-        ROS_INFO("joint: %s", e.first.c_str());
-    }
-    for (auto& e : urdf_copy->links_) {
-        ROS_INFO("link: %s", e.first.c_str());
-    }
-
-    auto srdf_copy = orig_robot_model->getSRDF();
-    srdf_copy->virtual_joints_[0].child_link_ = "world_link";
-    auto robot_model = std::make_shared<moveit::core::RobotModel>(
-            urdf_copy,
-            orig_robot_model->getSRDF());
-#endif
-
     auto redundant_joints = std::vector<std::string>();
     if (ik_group_name == "right_arm") {
         redundant_joints = { "limb_right_joint3" };
@@ -663,6 +621,11 @@ int main(int argc, char* argv[])
     if (!planning_model.init(robot_model, group_name, ik_group_name)) {
         ROS_ERROR("Failed to initialize robot model");
         return 1;
+    }
+
+    ROS_INFO("Parent planning joints:");
+    for (auto i = 0; i < planning_model.jointVariableCount(); ++i) {
+        ROS_INFO("  %s", planning_model.getPlanningJoints()[i].c_str());
     }
 
     if (!planning_model.setPlanningLink(tip_link)) {

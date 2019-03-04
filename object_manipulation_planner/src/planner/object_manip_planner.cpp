@@ -10,6 +10,8 @@
 #include <smpl/post_processing.h>
 #include <smpl/planning_params.h>
 #include <smpl/stl/memory.h>
+#include <smpl/spatial.h>
+#include <smpl/angles.h>
 
 // project includes
 #include "object_manip_model.h"
@@ -17,6 +19,7 @@
 #include "object_manip_checker.h"
 #include "variables.h"
 
+// TODO: if you change me, change me in object_manip_heuristic
 #define USE_UNIQUE_GOAL 0
 
 ObjectManipPlanner::ObjectManipPlanner() : search(&graph, &heuristic) { }
@@ -31,27 +34,30 @@ bool Init(
     planner->model = model;
     planner->checker = checker;
 
-    smpl::WorkspaceLattice::Params p;
-    // TODO: configurate these
-    p.free_angle_res =
+    // TODO: configurate all of this
+    auto wsp = smpl::WorkspaceLattice::Params{ };
+
+    wsp.res_x = 0.025;
+    wsp.res_y = 0.025;
+    wsp.res_z = 0.025;
+    wsp.Y_count = 36; // resolution = 10 degrees
+    wsp.P_count = 19; // resolution = 10 degrees
+    wsp.R_count = 36; // resolution = 10 degrees
+
+    wsp.free_angle_res =
     {
-        smpl::to_radians(5),        // arm free angle
-        0.05,                       // base z
-        smpl::to_radians(5),        // torso joint
-        smpl::to_radians(22.5),     // base theta
         0.05,                       // base x
         0.05,                       // base y
+        0.05,                       // base z
+        smpl::to_radians(22.5),     // base yaw
+        smpl::to_radians(22.5),     // base pitch
+        smpl::to_radians(22.5),     // base roll
+        smpl::to_radians(5),        // torso joint
+        smpl::to_radians(5),        // arm free angle
         1.0                         // object z
     };
 
-    p.res_x = 0.025;
-    p.res_y = 0.025;
-    p.res_z = 0.025;
-    p.Y_count = 36; // resolution = 10 degrees
-    p.P_count = 19; // resolution = 10 degrees
-    p.R_count = 36; // resolution = 10 degrees
-
-    if (!planner->graph.init(model, checker, p, &planner->actions)) {
+    if (!planner->graph.init(model, checker, wsp, &planner->actions)) {
         ROS_ERROR("Failed to initialize Workspace Lattice E-Graph");
         return false;
     }
@@ -135,15 +141,58 @@ auto MakeGraphStatePrefix(
     return s;
 }
 
+auto MakePlannerState(
+    const moveit::core::RobotState& state,
+    ObjectManipModel* model,
+    double z_index)
+    -> smpl::RobotState
+{
+    auto s = smpl::RobotState(VARIABLE_COUNT);
+    s[WORLD_JOINT_X] = state.getVariablePosition("world_joint/x");
+    s[WORLD_JOINT_Y] = state.getVariablePosition("world_joint/y");
+    s[WORLD_JOINT_Z] = 0.0;
+    s[WORLD_JOINT_YAW] = state.getVariablePosition("world_joint/theta");
+    s[WORLD_JOINT_PITCH] = 0.0;
+    s[WORLD_JOINT_ROLL] = 0.0;
+    s[TORSO_JOINT1] = state.getVariablePosition("torso_joint1");
+    s[LIMB_JOINT1] = state.getVariablePosition("limb_right_joint1");
+    s[LIMB_JOINT2] = state.getVariablePosition("limb_right_joint2");
+    s[LIMB_JOINT3] = state.getVariablePosition("limb_right_joint3");
+    s[LIMB_JOINT4] = state.getVariablePosition("limb_right_joint4");
+    s[LIMB_JOINT5] = state.getVariablePosition("limb_right_joint5");
+    s[LIMB_JOINT6] = state.getVariablePosition("limb_right_joint6");
+    s[LIMB_JOINT7] = state.getVariablePosition("limb_right_joint7");
+    s[HINGE] = z_index;
+    return s;
+}
+
 void UpdateRobotState(
     moveit::core::RobotState& robot_state,
     const smpl::RobotState& graph_state,
     ObjectManipModel* model)
 {
+#if 1
+    robot_state.setVariablePosition("world_joint/x", graph_state[WORLD_JOINT_X]);
+    robot_state.setVariablePosition("world_joint/y", graph_state[WORLD_JOINT_Y]);
+    // robot_state.setVariablePosition("", graph_state[WORLD_JOINT_Z]);
+    robot_state.setVariablePosition("world_joint/theta", graph_state[WORLD_JOINT_YAW]);
+    // robot_state.setVariablePosition("", graph_state[WORLD_JOINT_PITCH]);
+    // robot_state.setVariablePosition("", graph_state[WORLD_JOINT_ROLL]);
+    robot_state.setVariablePosition("torso_joint1", graph_state[TORSO_JOINT1]);
+    robot_state.setVariablePosition("limb_right_joint1", graph_state[LIMB_JOINT1]);
+    robot_state.setVariablePosition("limb_right_joint2", graph_state[LIMB_JOINT2]);
+    robot_state.setVariablePosition("limb_right_joint3", graph_state[LIMB_JOINT3]);
+    robot_state.setVariablePosition("limb_right_joint4", graph_state[LIMB_JOINT4]);
+    robot_state.setVariablePosition("limb_right_joint5", graph_state[LIMB_JOINT5]);
+    robot_state.setVariablePosition("limb_right_joint6", graph_state[LIMB_JOINT6]);
+    robot_state.setVariablePosition("limb_right_joint7", graph_state[LIMB_JOINT7]);
+    // robot_state.setVariablePosition("", graph_state[HINGE]);
+#else
     for (size_t i = 0; i < model->parent_model->getPlanningJoints().size(); ++i) {
         auto varname = model->parent_model->getPlanningJoints()[i];
         robot_state.setVariablePosition(varname, graph_state[i]);
     }
+#endif
 }
 
 struct PlannerAndGoal
@@ -178,6 +227,23 @@ bool IsGoal(void* user, const smpl::RobotState& state)
     return false;
 }
 
+// Return the index of the waypoint on the demonstration whose z value is
+// closest to the given z.
+int GetClosestZIndex(RomanObjectManipLattice* graph, double z)
+{
+    auto closest_z_index = -1;
+    auto closest_z_dist = std::numeric_limits<double>::infinity();
+    for (auto i = 0; i < graph->m_demo_z_values.size(); ++i) {
+        auto z_value = graph->m_demo_z_values[i];
+        auto dist = std::fabs(z - z_value);
+        if (dist < closest_z_dist) {
+            closest_z_dist = dist;
+            closest_z_index = i;
+        }
+    }
+    return closest_z_index;
+}
+
 bool PlanPath(
     ObjectManipPlanner* planner,
     const moveit::core::RobotState& start_state,
@@ -189,8 +255,11 @@ bool PlanPath(
 {
     SetObjectPose(planner->checker, object_pose);
 
-    // Clear the graph structure. We shouldn't need to do this but it's
-    // preventing a problem somewhere.
+    //////////////////////////////////////////////////////////////////////
+    // Clear the graph structure. We shouldn't need to do this but it's //
+    // preventing a problem somewhere.                                  //
+    //////////////////////////////////////////////////////////////////////
+
     planner->graph.clearExperienceGraph();
     planner->graph.m_goal_entry = NULL;
     planner->graph.m_goal_state_id = -1;
@@ -202,42 +271,11 @@ bool PlanPath(
     planner->graph.m_states.clear();
     planner->graph.m_state_to_id.clear();
 
-    smpl::WorkspaceCoord fake_coord;
+    auto fake_coord = smpl::WorkspaceCoord{ };
     planner->graph.m_goal_state_id = planner->graph.createState(fake_coord);
     planner->graph.m_goal_entry = planner->graph.getState(planner->graph.m_goal_state_id);
 
-    // the demonstration (the pose of the robot) is stored in the frame of the
-    // object -> transform the demonstration into the global frame
-
-    for (auto& demo : planner->demos) {
-        auto transformed_demo = demo;
-        for (auto& point : transformed_demo) {
-            auto T_obj_robot = Eigen::Affine3d(
-                    Eigen::Translation3d(
-                            point[WORLD_JOINT_X],
-                            point[WORLD_JOINT_Y],
-                            point[WORLD_JOINT_Z]) *
-                    Eigen::AngleAxisd(
-                            point[WORLD_JOINT_THETA],
-                            Eigen::Vector3d::UnitZ()));
-
-            // TODO: this is obnoxiously sensitive. Transforming the
-            // demonstration to object frame during recording and back to world
-            // frame, even if the relative pose is about the same, causes the
-            // pose of the robot to be slightly off due to precision. This is
-            // causing some of the nominal examples to not work anymore. The
-            // rounding here is a hack to avoid that for now, but the planner
-            // should be made robust to these situations.
-            auto T_world_robot = Eigen::Affine3d(object_pose * T_obj_robot);
-            point[WORLD_JOINT_X] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
-            point[WORLD_JOINT_Y] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
-            point[WORLD_JOINT_THETA] = round(1000.0 * smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
-            point[WORLD_JOINT_Z] = round(1000.0 * T_world_robot.translation().z()) / 1000.0;
-        }
-
-        planner->graph.insertExperienceGraphPath(transformed_demo);
-    }
-
+    ////////////////////////////////////////////////////////////////////////////
     // Update the bounds of the object dimension, which is the number of
     // discrete values it can take on. Changing the RobotModel is considered
     // very bad by smpl conventions, but we get lucky in this case. The maximum
@@ -249,30 +287,64 @@ bool PlanPath(
     //
     // (2) Checking joint limits. This would invalidate/validate some states,
     // but we're clearing the state of the search between each call.
-    planner->model->min_object_pos = (double)0;
-    planner->model->max_object_pos = (double)(planner->graph.m_demo_z_values.size() - 1);
+    ////////////////////////////////////////////////////////////////////////////
 
-    auto start = MakeGraphStatePrefix(start_state, planner->model);
+    planner->model->min_positions[HINGE] = (double)0;
+    planner->model->max_positions[HINGE] = (double)(planner->graph.m_demo_z_values.size() - 1);
 
-    // TODO: maybe find the closest z-value?
-    auto closest_z_index = [&](double z)
-    {
-        auto closest_z_index = -1;
-        auto closest_z_dist = std::numeric_limits<double>::infinity();
-        for (auto i = 0; i < planner->graph.m_demo_z_values.size(); ++i) {
-            auto z_value = planner->graph.m_demo_z_values[i];
-            auto dist = std::fabs(z - z_value);
-            if (dist < closest_z_dist) {
-                closest_z_dist = dist;
-                closest_z_index = i;
-            }
+    //////////////////////////////////////////////////////////////////////////
+    // Transform the object-relative demonstration to the world frame using //
+    // the object's pose                                                    //
+    //////////////////////////////////////////////////////////////////////////
+
+    for (auto& demo : planner->demos) {
+        auto transformed_demo = demo;
+        for (auto& point : transformed_demo) {
+            auto T_obj_robot = smpl::MakeAffine(
+                    point[WORLD_JOINT_X],
+                    point[WORLD_JOINT_Y],
+                    point[WORLD_JOINT_Z],
+                    point[WORLD_JOINT_YAW],
+                    point[WORLD_JOINT_PITCH],
+                    point[WORLD_JOINT_ROLL]);
+
+            // TODO: this is obnoxiously sensitive. Transforming the
+            // demonstration to object frame during recording and back to world
+            // frame, even if the relative pose is about the same, causes the
+            // pose of the robot to be slightly off due to precision. This is
+            // causing some of the nominal examples to not work anymore. The
+            // rounding here is a hack to avoid that for now, but the planner
+            // should be made robust to these situations.
+            auto T_world_robot = smpl::Affine3(object_pose * T_obj_robot);
+#if 1
+            point[WORLD_JOINT_X] = T_world_robot.translation().x();
+            point[WORLD_JOINT_Y] = T_world_robot.translation().y();
+            point[WORLD_JOINT_Z] = T_world_robot.translation().z();
+            smpl::get_euler_zyx(
+                T_world_robot.rotation(),
+                point[WORLD_JOINT_YAW],
+                point[WORLD_JOINT_PITCH],
+                point[WORLD_JOINT_ROLL]);
+#else
+            point[WORLD_JOINT_X] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
+            point[WORLD_JOINT_Y] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
+            point[WORLD_JOINT_THETA] = round(1000.0 * smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_world_robot.rotation()))) / 1000.0;
+            point[WORLD_JOINT_Z] = round(1000.0 * T_world_robot.translation().z()) / 1000.0;
+#endif
         }
-        return closest_z_index;
-    };
 
-    auto start_z_index = closest_z_index(object_start_state);
+        planner->graph.insertExperienceGraphPath(transformed_demo);
+    }
 
-    start.push_back((double)start_z_index);
+    ////////////////////////////
+    // Update the start state //
+    ////////////////////////////
+
+    auto start_z_index = GetClosestZIndex(&planner->graph, object_start_state);
+
+    auto start = MakePlannerState(
+            start_state, planner->model, (double)start_z_index);
+
     if (!planner->graph.setStart(start)) {
         ROS_ERROR("Failed to set start");
         return false;
@@ -282,7 +354,11 @@ bool PlanPath(
 
     ROS_INFO_STREAM("Start state = " << start);
 
-    smpl::GoalConstraint goal;
+    /////////////////////
+    // Update the goal //
+    /////////////////////
+
+    auto goal = smpl::GoalConstraint{ };
     goal.type = smpl::GoalType::USER_GOAL_CONSTRAINT_FN;
 
     // Hijacking the goal state/tolerance vectors to store the goal position of
@@ -291,7 +367,7 @@ bool PlanPath(
     // same z-value, but be close enough, we want to accept more than one
     // unique z value
 #if USE_UNIQUE_GOAL
-    goal.angles.push_back(closest_z_index(object_goal_state));
+    goal.angles.push_back(GetClosestZIndex(&planner->graph, object_goal_state));
 #else
     goal.angles.push_back(object_goal_state);
 #endif
@@ -306,6 +382,10 @@ bool PlanPath(
     planner->graph.setGoal(goal);
 
     planner->heuristic.updateGoal(goal);
+
+    //////////////////////////////////////////////////////
+    // Find a path from the start state to a goal state //
+    //////////////////////////////////////////////////////
 
     ClearActionCache(&planner->graph);
     planner->search.force_planning_from_scratch_and_free_memory();
@@ -341,10 +421,14 @@ bool PlanPath(
         return false;
     }
 
+    /////////////////////////
+    // Prepare return path //
+    /////////////////////////
+
     ROS_INFO("Found path through %zu states with cost %d in %d expansions (%f seconds)", solution.size(), solution_cost, planner->search.get_n_expands(), planner->search.get_final_eps_planning_time());
 
     using RobotPath = std::vector<smpl::RobotState>;
-    RobotPath path;
+    auto path = RobotPath{ };
     if (!planner->graph.extractPath(solution, path)) {
         ROS_ERROR("Failed to extract path");
         return false;
