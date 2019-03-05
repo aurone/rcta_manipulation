@@ -1180,7 +1180,8 @@ int main(int argc, char* argv[])
         "manipulate_object",
         [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
         {
-            auto curr_state = state_monitor->getCurrentState();
+            //auto curr_state = state_monitor.getCurrentState();
+            auto curr_state = GetCurrentState(&state_monitor);
             if (ManipulateObject(
                 robot_model,
                 group_name,
@@ -1188,14 +1189,14 @@ int main(int argc, char* argv[])
                 &cspace,
                 &planning_model,
                 &planner,
-                curr_state.get(),
+                &curr_state,
                 display_publisher,
                 ph,
                 msg))
             {
 
                 //if (!msg->plan_only) {
-                    auto fresh_state = state_monitor->getCurrentState();
+                    // auto fresh_state = state_monitor.getCurrentState();
                     // TODO: current state might not be exactly what we want here, since the planning
                     // request can take start state overrides
                     // the useful part is the for loop below 

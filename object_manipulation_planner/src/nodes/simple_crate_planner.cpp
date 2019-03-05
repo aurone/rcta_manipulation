@@ -493,13 +493,17 @@ bool ManipulateObject(
     const ros::NodeHandle& nh,
     double release_offset)
 {
+    // goal->object_pose.position.x = 0.85,
+    // goal->object_pose.position.y = 0.05,
+    // goal->object_pose.position.z = 0.0, 
+    
     ROS_INFO("Received manipulate object request");
     ROS_INFO("  start_state");
     ROS_INFO("  object_id: %s", goal->object_id.c_str());
     ROS_INFO("  object_pose: (%f, %f, %f, %f, %f, %f, %f)",
             goal->object_pose.position.x,
             goal->object_pose.position.y,
-            goal->object_pose.position.z,
+            goal->object_pose.position.z + 0.015,
             goal->object_pose.orientation.w,
             goal->object_pose.orientation.x,
             goal->object_pose.orientation.y,
@@ -538,8 +542,8 @@ bool ManipulateObject(
     auto object_pose =
             smpl::Affine3(smpl::Translation3(
                     goal->object_pose.position.x,
-                    goal->object_pose.position.y,
-                    goal->object_pose.position.z) *
+                    goal->object_pose.position.y + 0.1,
+                    goal->object_pose.position.z+ 0.015) *
             smpl::Quaternion(
                     goal->object_pose.orientation.w,
                     goal->object_pose.orientation.x,
@@ -731,7 +735,7 @@ bool ManipulateObject(
             return false;
         }
 
-        auto write_manip_trajectory = false; // TODO: configurate this
+        auto write_manip_trajectory = true; // TODO: configurate this
         if (write_manip_trajectory) {
 
             auto traj = robot_trajectory::RobotTrajectory(
@@ -883,7 +887,7 @@ bool ManipulateObject(
 
             auto s = interp(
                     0.0,
-                    -0.2*M_PI,
+                    -0.3*M_PI,
                     alpha);
 
             Eigen::Vector3d rot2(0,0,1); 
