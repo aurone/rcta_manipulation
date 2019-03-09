@@ -66,7 +66,7 @@ bool InitRomanWorkspaceLatticeActions(
     // create 2-connected motions for rotation and free angle motions
     for (int a = 3; a < space->dofCount(); ++a) {
         // skip roll and pitch primitives
-//        if (a == EE_QX || a == EE_QY) continue;
+        // if (a == EE_QX || a == EE_QY) continue;
 
         // handle translational base motions later
         if (a == BD_PX || a == BD_PY) continue;

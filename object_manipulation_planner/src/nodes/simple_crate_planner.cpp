@@ -111,6 +111,7 @@ bool OpenGripper(GripperCommandActionClient* gripper_client)
     ROS_INFO("Open gripper");
     control_msgs::GripperCommandGoal gripper_goal;
     gripper_goal.command.position = 0.0841;
+    //gripper_goal.command.position = 0.0666;
     auto res = gripper_client->sendGoalAndWait(gripper_goal);
     return res.state_ == res.SUCCEEDED;
 }
@@ -416,8 +417,14 @@ bool WritePlan(
     double object_goal)
 {
     // TODO: configurate filename
-    auto* f = fopen("manipulation.csv", "w");
-    if (f == NULL) return false;
+
+    FILE* f = fopen("manipulation_right.csv", "w");
+    if (f == NULL){
+        ROS_INFO("could not open the file ");
+        return false;
+    }
+
+    fputs("\n", f);
 
     // TODO: configurate...grabbed from door_demonstrator.launch
     auto variables = std::vector<const char*>{
@@ -440,7 +447,7 @@ bool WritePlan(
         if (i != 0) fputs(",", f);
         fputs(variables[i], f);
     }
-    fputs("\n", f);
+    fputs("writing in this is taking so long", f);
 
     auto object_transform = Eigen::Affine3d();
     tf::poseMsgToEigen(object_pose, object_transform);
@@ -542,7 +549,7 @@ bool ManipulateObject(
     auto object_pose =
             smpl::Affine3(smpl::Translation3(
                     goal->object_pose.position.x,
-                    goal->object_pose.position.y + 0.1,
+                    goal->object_pose.position.y - 0.1,
                     goal->object_pose.position.z+ 0.015) *
             smpl::Quaternion(
                     goal->object_pose.orientation.w,

@@ -770,6 +770,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
 
 bool Init(ObjectManipHeuristic* heur, smpl::RobotPlanningSpace* space)
 {
+
     heur->eg = space->getExtension<smpl::ExperienceGraphExtension>();
     if (heur->eg == NULL) {
         SMPL_WARN_NAMED(H_LOG, "ObjectManipHeuristic requires Experience Graph Extension");

@@ -12,6 +12,8 @@ void Execute(
     const control_msgs::GripperCommandGoal::ConstPtr& goal)
 {
     ROS_DEBUG("Execute gripper command { position = %f, max_effort = %f }", goal->command.position, goal->command.max_effort);
+    ROS_INFO("Execute gripper command { position = %f, max_effort = %f }", goal->command.position, goal->command.max_effort);
+
 
     std_msgs::Float64MultiArray command;
 
@@ -22,8 +24,17 @@ void Execute(
 
     // hardcoded maximum width for the robotiq c-model gripper
     if (goal->command.position == 0.0841) {
+        ROS_INFO("in the 0.0841 function");
         command.data = { 0.0495, 0.0495, 0.0495 };
-    } else {
+    } 
+
+    else if (goal->command.position == 0.0666) {
+        ROS_INFO("in the 0.0666 function");
+        command.data = { 0.5861, 0.5861, 0.5861 };
+    }
+
+    else {
+        ROS_INFO("in the else function");
         command.data = { 1.2218, 1.2218, 1.2218 };
     }
 

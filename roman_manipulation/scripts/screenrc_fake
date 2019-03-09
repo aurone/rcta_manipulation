@@ -24,4 +24,4 @@ screen -t manip
 stuff "roslaunch ../../object_manipulation_planner/launch/manipulate_object.launch"
 
 screen -t rviz
-stuff "rosrun rviz rviz -d $HOME/.rviz/rcta.rviz"
+stuff "LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:$LD_LIBRARY_PATH;rosrun rviz rviz -d $HOME/.rviz/rcta.rviz"
