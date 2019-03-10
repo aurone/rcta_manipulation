@@ -359,7 +359,6 @@ bool ManipulateObject(
     ///////////////////////////////
 
     {
-        ros::Duration(1.0).sleep();
         auto ma = visualization_msgs::MarkerArray();
         auto color = std_msgs::ColorRGBA();
         color.r = 0.8f;
@@ -374,7 +373,6 @@ bool ManipulateObject(
                 ros::Duration(0.0));
         ROS_INFO("Visualize %zu markers", ma.markers.size());
         SV_SHOW_INFO(ma);
-        ros::Duration(1.0).sleep();
     }
 
     ///////////////////////////////
