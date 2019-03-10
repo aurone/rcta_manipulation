@@ -2,7 +2,7 @@
 joint_state_controller:
   type: joint_state_controller/JointStateController
   publish_rate: 50
-# TORSO + RIGHT ARM TRAJECTORY CONTROLLER
+# TORSO + RIGHT ARM TRAJECTORY CONTROLLER + LEFT ARM TRAJECTORY CONTROLLER
 rcta_joint_trajectory_controller:
   type: position_controllers/JointTrajectoryController
   joints:
@@ -14,16 +14,16 @@ rcta_joint_trajectory_controller:
     - limb_right_joint5
     - limb_right_joint6
     - limb_right_joint7
-#    - limb_left_joint1
-#    - limb_left_joint2
-#    - limb_left_joint3
-#    - limb_left_joint4
-#    - limb_left_joint5
-#    - limb_left_joint6
-#    - limb_left_joint7
-  constraints:
-    goal_time: 0.5
-    stopped_velocity_tolerance: 0.02
+    - limb_left_joint1
+    - limb_left_joint2
+    - limb_left_joint3
+    - limb_left_joint4
+    - limb_left_joint5
+    - limb_left_joint6
+    - limb_left_joint7
+constraints:
+  goal_time: 0.5
+  stopped_velocity_tolerance: 0.02
   #allow_partial_joints_goal: True
 rcta_right_robotiq_controller:
   type: position_controllers/JointGroupPositionController
@@ -31,12 +31,12 @@ rcta_right_robotiq_controller:
     - limb_right_finger_1_joint_1
     - limb_right_finger_2_joint_1
     - limb_right_finger_middle_joint_1
-#rcta_left_robotiq_controller:
-#  type: position_controllers/JointGroupPositionController
-#  joints:
-#    - limb_left_finger_1_joint_1
-#    - limb_left_finger_2_joint_1
-#    - limb_left_finger_middle_joint_1
+rcta_left_robotiq_controller:
+  type: position_controllers/JointGroupPositionController
+  joints:
+    - limb_left_finger_1_joint_1
+    - limb_left_finger_2_joint_1
+    - limb_left_finger_middle_joint_1
 rcta_velocity_controller:
   type: "diff_drive_controller/DiffDriveController"
   left_wheel: ['front_left_wheel', 'rear_left_wheel']

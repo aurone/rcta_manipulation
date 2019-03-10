@@ -1,0 +1,11 @@
+clients:
+  - name: rcta_joint_trajectory_controller/follow_joint_trajectory
+    joints:
+      - torso_joint1
+      - limb_right_joint1
+      - limb_right_joint2
+      - limb_right_joint3
+      - limb_right_joint4
+      - limb_right_joint5
+      - limb_right_joint6
+      - limb_right_joint7

@@ -1,0 +1,12 @@
+<launch>
+    <rosparam command="load" file="$(find roman_simulation)/config/controllers_roman1.yaml"/>
+
+    <!-- This node is the culprit that won't die on C-c (at least in indigo)
+    since it attempts to unload the controllers after the controller manager
+    has already died. The shutdown-timeout argument makes this less terrible,
+    but it is deprecated in xenial/kinetic.
+    -->
+    <node name="controller_spawner" pkg="controller_manager" type="spawner"
+            args="joint_state_controller rcta_joint_trajectory_controller
+                  rcta_right_robotiq_controller rcta_velocity_controller"/>
+</launch>
