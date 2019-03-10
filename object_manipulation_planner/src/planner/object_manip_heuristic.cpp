@@ -13,8 +13,11 @@
 #include "smpl_assert.h"
 #include "variables.h"
 
-//static const double FixedPointRatio = 1000.0;
+#if 1
+static const double FixedPointRatio = 1000.0;
+#else
 static const double FixedPointRatio = 500.0;
+#endif
 
 #define HV_LOG H_LOG ".verbose"
 
