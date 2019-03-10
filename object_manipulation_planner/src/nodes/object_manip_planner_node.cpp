@@ -281,6 +281,68 @@ bool AnimateTrajectory(
 using ManipulateObjectActionServer =
         actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 
+// because fuck you moveit, plz stahp throwing exceptions...unreferenced
+// but keeping this around in case we explode
+//
+// We exploded. Someone please explain to me why we have a return code
+// on robotStateMsgToRobotState if we're just going to throw an exception.
+// - Andrew on 3/10/2019
+bool RobotHasVariable(
+    const moveit::core::RobotModel& model,
+    const std::string& name)
+{
+    auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
+    return it != end(model.getVariableNames());
+};
+
+int GetVariableIndex(moveit::core::RobotState* state, const std::string& name)
+{
+    auto it = std::find(
+            begin(state->getVariableNames()),
+            end(state->getVariableNames()),
+            name);
+
+    if (it == end(state->getVariableNames())) return -1;
+
+    return std::distance(begin(state->getVariableNames()), it);
+}
+
+// A less pissy version of robotStateMsgToRobotState that doesn't complain when
+// extra joints show up in the state message. We want this for convenience so
+// test scenarios can specify configurations for the entire RoMan when specific
+// RoMans lack different components.
+void RobotStateMsgToRobotState(
+    const moveit_msgs::RobotState* msg,
+    moveit::core::RobotState* state)
+{
+    for (auto i = 0; i < msg->joint_state.name.size(); ++i) {
+        auto& joint_name = msg->joint_state.name[i];
+
+        auto index = GetVariableIndex(state, joint_name);
+        if (index < 0) continue;
+
+        auto position = msg->joint_state.position[i];
+        state->setVariablePosition(index, position);
+    }
+
+    for (auto i = 0; i < msg->multi_dof_joint_state.joint_names.size(); ++i) {
+        auto& joint_name = msg->multi_dof_joint_state.joint_names[i];
+
+        // explicit check here to avoid stupid error spam
+        if (!state->getRobotModel()->hasJointModel(joint_name)) continue;
+
+        auto* joint = state->getRobotModel()->getJointModel(joint_name);
+        assert(joint != NULL);
+
+        auto& transform = msg->multi_dof_joint_state.transforms[i];
+
+        auto T_eigen = Eigen::Affine3d{ };
+        tf::transformMsgToEigen(transform, T_eigen);
+
+        state->setJointPositions(joint, T_eigen);
+    }
+}
+
 // Plan and execute (or animate) a sequence of trajectory/gripper commands to
 // manipulate the state of an object.
 // \param robot_model
@@ -335,24 +397,7 @@ bool ManipulateObject(
 
     auto start_state = moveit::core::RobotState(*real_start_state);
 
-    // TODO: initialize to current state values
-//    start_state.setToDefaultValues();
-
-    // because fuck you moveit, plz stahp throwing exceptions...unreferenced
-    // but keeping this around in case we explode
-    auto robot_has_variable = [&](
-        const moveit::core::RobotModel& model,
-        const std::string& name)
-    {
-        auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
-        return it != end(model.getVariableNames());
-    };
-
-    // hmmm...is this going to barf when there are superflous joints?
-    if (!moveit::core::robotStateMsgToRobotState(msg->start_state, start_state)) {
-        ROS_ERROR("Failed to update start state");
-        return false;
-    }
+    RobotStateMsgToRobotState(&msg->start_state, &start_state);
 
     ///////////////////////////////
     // Visualize the start state //
