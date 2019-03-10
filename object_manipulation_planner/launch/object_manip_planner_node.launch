@@ -10,6 +10,7 @@
     -->
     <arg name="load_robot_description" default="true"/>
 
+    <!-- Choose output topic names based on live or simulation mode -->
     <arg if="$(arg live)" name="follow_joint_trajectory_action_name" default="trajectory_dispatcher/follow_joint_trajectory"/>
     <arg if="$(arg live)" name="gripper_command_action_name" default="rcta_right_robotiq_controller/gripper_action"/>
     <arg unless="$(arg live)" name="follow_joint_trajectory_action_name" default="follow_joint_trajectory"/>
@@ -18,9 +19,11 @@
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
     <arg unless="$(arg debug)" name="launch_prefix" value=""/>
 
+    <!--
     <include ns="object_manip_planner" file="$(find object_manipulation_planner)/launch/planning_context.launch.xml">
         <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     </include>
+    -->
 
     <!-- Same deal as above...using a custom collision model configuration
     solely for the purposes of modeling the root joint as a floating joint.

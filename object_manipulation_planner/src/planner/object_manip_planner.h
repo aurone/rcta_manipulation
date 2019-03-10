@@ -31,6 +31,7 @@ class RobotTrajectory;
 } // namespace robot_trajectory
 
 class ObjectManipModel;
+class ObjectManipChecker;
 
 struct ObjectManipPlannerParams
 {
@@ -70,7 +71,7 @@ struct ObjectManipPlannerParams
 
 struct ObjectManipPlanner
 {
-    smpl::CollisionChecker*                 checker;
+    ObjectManipChecker*                     checker;
     ObjectManipModel*                       model;
     RomanObjectManipLattice                 graph;
     RomanWorkspaceLatticeActionSpace        actions;
@@ -85,7 +86,7 @@ struct ObjectManipPlanner
 bool Init(
     ObjectManipPlanner* planner,
     ObjectManipModel* model,
-    smpl::CollisionChecker* checker,
+    ObjectManipChecker* checker,
     smpl::OccupancyGrid* grid,
     const ObjectManipPlannerParams* params);
 
