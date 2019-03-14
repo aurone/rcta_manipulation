@@ -290,6 +290,7 @@ actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 // manipulate the state of an object.
 // \param robot_model
 // \param group_name needed to create final trajectory
+
 bool ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
     const std::string& group_name,
@@ -464,7 +465,11 @@ bool ManipulateObject(
     // Execute (or animate) the resulting plan //
     /////////////////////////////////////////////
 
-    auto execute = !msg->plan_only;
+    // auto execute = !msg->plan_only;
+    auto execute = msg->plan_only;
+
+    ROS_INFO("execute is %d", execute);
+    ROS_INFO("msg->plan_only is %d", msg->plan_only);
 
     if (execute) {
         ExecuteTrajectory(ph, commands);
@@ -521,326 +526,296 @@ auto GetCurrentState(CurrentStateMonitor* monitor) -> moveit::core::RobotState
     return state;
 }
 
+template <class T>
+auto interp(const T& src, const T& dst, double t) -> T
+{
+    // ROS_INFO(":::::::::::::value of alpha is = %f", t);
+    return (1.0 - t) * src + t * dst;
+}
+
+template <class Sampler>
+bool PlanManipulationTrajectory(
+    moveit::planning_interface::MoveGroupInterface* move_group,
+    const std::string& group_name,
+    const std::string& tool_link_name,
+    int samples,
+    Sampler sampler,
+    moveit::planning_interface::MoveGroupInterface::Plan* oplan)
+{
+    auto nh = ros::NodeHandle();
+    auto check_state_validity = nh.serviceClient<moveit_msgs::GetStateValidity>(
+            "check_state_validity");
+
+    auto interm_state = *move_group->getCurrentState();
+    auto manip_traj = robot_trajectory::RobotTrajectory(
+            interm_state.getRobotModel(), group_name);
+    manip_traj.addSuffixWayPoint(interm_state, 0.0);
+    auto ids = (int32_t)0; //if we want it of that particular type, why not declare it right here 
+
+    ROS_INFO("samples  = %d", samples);
+    for (auto i = 1; i < samples; ++i) { // skip the first waypoint, assume we have at least two samples
+        auto alpha = (double)i / (double)(samples - 1);
+        
+        // ROS_INFO("calling sample manifold fn now with alpa  = %f", alpha);
+        auto contact_pose = sampler(alpha);
+
+        std::cout << "contact pose is " << contact_pose.matrix();
+
+        auto robot_model = interm_state.getRobotModel();
+        auto* group = robot_model->getJointModelGroup(group_name);
+
+        auto consistency_limits = std::vector<double>(group->getVariableCount(), smpl::to_radians(10));
+
+        // TODO: Why don't we require a feasible ik solution at all intermediate
+        // waypoints? This could be worse, if we weren't using consistency
+        // limits, but it's still pretty bad.
+
+        if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
+            ROS_INFO(":::::::::: calling ik now ");
+            visualization_msgs::MarkerArray ma;
+            std_msgs::ColorRGBA color;
+            color.r = 1.0f;
+            color.g = 0.5f;
+            color.b = 0.0f;
+            color.a = 0.8f;
+            interm_state.getRobotMarkers(ma, robot_model->getLinkModelNames(), color, "constrained", ros::Duration(0));
+            for (auto& m : ma.markers) {
+                m.id = ids++;
+            }
+            SV_SHOW_INFO(ma);
+            manip_traj.addSuffixWayPoint(interm_state, 1.0);
+
+            // TODO: interpolate path since for lack of an interface for CCD.
+
+            moveit_msgs::GetStateValidity::Request req;
+            moveit_msgs::GetStateValidity::Response res;
+            robotStateToRobotStateMsg(interm_state, req.robot_state);
+            req.group_name = "right_arm_and_torso";
+            if (!check_state_validity.call(req, res)) {
+                ROS_WARN("Failed to call check_state_validity service for waypoint %d", i);
+                return false;
+            }
+
+            if (!res.valid) {
+                ROS_WARN("Waypoint %d on manipulation trajectory is invalid", i);
+                return false;
+            }
+        }
+        else 
+            ROS_INFO("calling ik now ");
+
+    }
+
+    // timestamp waypoint
+    auto itp = trajectory_processing::IterativeParabolicTimeParameterization();
+    if (!itp.computeTimeStamps(manip_traj)) {
+        ROS_ERROR("Failed to compute timestamps");
+        return false;
+    }
+
+    auto plan = moveit::planning_interface::MoveGroupInterface::Plan();
+    robotStateToRobotStateMsg(*move_group->getCurrentState(), plan.start_state_);
+    manip_traj.getRobotTrajectoryMsg(plan.trajectory_);
+
+    *oplan = std::move(plan);
+    return true;
+}
+
 bool ReleaseCrate(
     const moveit::core::RobotState* curr_state,
-    const std::string& group_name,
     const smpl::urdf::RobotModel* object_model,
-    const ros::NodeHandle& ph,
-    const moveit::core::RobotState* initial_state)
+    const ros::NodeHandle& ph)
 {
+
+    /////////////////////////////////////
+    // Initialize Move Group Interface //
+    /////////////////////////////////////
+
+    auto group_name = std::string("right_arm_and_torso");
+    auto move_group =
+            moveit::planning_interface::MoveGroupInterface(group_name);
+
+    move_group.setPlanningTime(10.0);
+
+    // TODO: ugh of course this is only settable in the planning frame
+    move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
+
+    auto gripper_client_name = std::string("rcta_right_robotiq_controller/gripper_action");
+
+    auto tool_link_name = "limb_right_tool0";
+
+    using GripperCommandActionClient =
+        actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
+
+
+    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
+    GripperCommandActionClient gripper_client(gripper_client_name);
+    if (!gripper_client.waitForServer()) {
+        ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
+        return 1;
+    }
+
+    ROS_INFO("finished watiting for the GripperCommand action server. out now ");
+
+    //////////////////////
+    // Release Manifold //
+    //////////////////////
+
+    {
+        auto release_manifold = [&](double alpha) -> Eigen::Affine3d
+        {
+
+            // ROS_INFO("value of alpha is = %f", alpha);
+            auto s = interp(
+                    0.0,
+                    -0.3*M_PI,
+                    alpha);
+            // ROS_INFO("value of s is = %f", s);
+
+            Eigen::Vector3d rot2(0,0,1); 
+            double mag = rot2.norm();
+            Eigen::AngleAxisd rot(s , rot2/mag);
+            // Eigen::AngleAxisd rot(- 0.5 * M_PI, Eigen::Vector3d::UnitZ());
+            auto curr_state = *move_group.getCurrentState();
+            auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+            auto rotate_gripper_pose =
+                    tool_transform*rot;
+
+            std::cout << "tool transform is - " << tool_transform.matrix() << std::endl;
+
+            return rotate_gripper_pose;
+        };
+
+        auto samples = 20; //std::max(2, (int)std::round(arc / res));
+        
+        auto plan = moveit::planning_interface::MoveGroupInterface::Plan();
+        if (!PlanManipulationTrajectory(
+                &move_group,
+                group_name, tool_link_name,
+                samples, release_manifold,
+                &plan))
+        {
+            return false;
+        }
+
+        std::cout << plan.trajectory_ << std::endl;
+
+
+        ROS_INFO("finished PlanManipulation Trajectory, now going to execute");
+
+        auto err = move_group.execute(plan);
+        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+            ROS_ERROR("Failed to execute manip trajectory");
+            return false;
+        }
+    
+    }
+
+
+#if 0
+
+        auto write_manip_trajectory = false; // TODO: configurate this
+        if (write_manip_trajectory) {
+
+            auto traj = robot_trajectory::RobotTrajectory(
+                    move_group->getRobotModel(), *group_name);
+            traj.setRobotTrajectoryMsg(
+                    *move_group->getCurrentState(),
+                    plan.start_state_,
+                    plan.trajectory_);
+            if (!WritePlan(&traj, goal->object_pose, goal->object_start, goal->object_goal)) {
+                ROS_ERROR("Failed to write manipulation trajectory");
+            }
+        }
+
+        auto err = move_group->execute(plan);
+        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+            ROS_ERROR("Failed to execute manip trajectory");
+            return false;
+        }
+    }
+
+#endif
+
+#if 0
+    
+    auto start_state = *curr_state;
+
+
     ROS_INFO("done with manipulate object");
 
-    // auto group_name = std::string("right_arm_and_torso");
-    // auto move_group = moveit::planning_interface::MoveGroupInterface(group_name);
-    
-    // method
-    // where do i need to call ik, and where do i need to pass the command ?
-    // i think what i need to do is this - compute target pose, compute IK, compute trajectory, 
-    // and then pass it to the executor  
+    auto init_state = curr_state;    
 
     // Broad methodology 
     // 1. Rotate the gripper in place
     // 2. Open the gripper
     // 3. While maintaining the same current orientation, move the gripper back by a certain distance 
     // 4. Move gripper back to the starting position
+    
+    /////////////////////////////////////
+    // Initialize Move Group Interface //
+    /////////////////////////////////////
 
-    //adding this part from the simple crate planner 
+    // auto group_name = std::string("right_arm_and_torso");
+    auto move_group =
+            moveit::planning_interface::MoveGroupInterface(group_name);
 
-
-    auto move_group = moveit::planning_interface::MoveGroupInterface(group_name);
     move_group.setPlanningTime(10.0);
+
+    // TODO: ugh of course this is only settable in the planning frame
     move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
 
+    auto gripper_client_name = std::string("rcta_right_robotiq_controller/gripper_action");
+
     auto tool_link_name = "limb_right_tool0";
-    
-    auto start_state = *curr_state;
 
-    // init robot pose 
-    auto object_state = smpl::urdf::RobotState();
-    
-    InitRobotState(&object_state, object_model, false, false);
+    using GripperCommandActionClient =
+        actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
 
-    // capturing the crate pose here - from goal 
-
-    auto* lid_var = GetVariable(object_model, "lid_joint");
-    auto* handle_var = GetVariable(object_model, "handle_joint");
-    auto* root_joint = GetRootJoint(object_model);
-
-    // robot visualization 
-    UpdateVisualBodyTransforms(&object_state);
-    SV_SHOW_INFO_NAMED("object_state", 
-        MakeRobotVisualization(&object_state, smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f }, "map", "object_state"));
-
-    auto& tool_transform = start_state.getGlobalLinkTransform(tool_link_name);    
-
-    auto prerelease_pose = tool_transform*smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
-
-
-#if 0
-
-    using GripperCommandActionClient = 
-    actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
-    auto gripper_client_name = std::string();
-    GetParam(ph, "gripper_command_action_name", &gripper_client_name);
 
     ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
-
     GripperCommandActionClient gripper_client(gripper_client_name);
-
     if (!gripper_client.waitForServer()) {
         ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
         return 1;
     }
 
-    control_msgs::GripperCommandGoal gripper_goal;
-    gripper_goal.command.position = 0.0841;
-    auto res = gripper_client.sendGoalAndWait(gripper_goal);
-
-#endif
-
-
-
-    {        
-        Eigen::Vector3d axis_rot(0,0,1); 
-        double magnitude_unit_vector = axis_rot.norm();
-        Eigen::AngleAxisd rot(- 0.2 * M_PI, axis_rot/magnitude_unit_vector);
-        
-        auto curr_state = *move_group.getCurrentState();
-        auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
-        auto rotate_gripper_pose =
-                tool_transform*rot;
-        ROS_INFO("calculated the pose, now going to move there");
-        //MoveToPose(move_group, rotate_gripper_pose, tool_link_name);
-        ROS_INFO("finished calling the MoveToPose function");
-    }
+    ROS_INFO("finished watiting for the GripperCommand action server. out now ");
 
     ///////////////////////////
     // move the gripper back //
     ///////////////////////////
 
+    move_group.setEndEffectorLink(tool_link_name);
+
+
+    ROS_INFO("trial - going to move the gripper back now");
+
     {
-        auto curr_state = *move_group.getCurrentState();
-        auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+        // auto curr_state = *move_group->getCurrentState();
+        auto& tool_transform = curr_state->getGlobalLinkTransform(tool_link_name);
+
+        ROS_INFO("done with getGlobalLinkTransform");
+
         auto withdraw_pose =
                 tool_transform *
                 Eigen::Translation3d(-0.1, 0.0, 0.0);
-        //MoveToPose(move_group, withdraw_pose, tool_link_name);
+        // MoveToPose(move_group, withdraw_pose, tool_link_name);
 
-        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]");
-        move_group.setGoalJointTolerance(smpl::to_radians(1.0));
-        move_group.setJointValueTarget(withdraw_pose);
-        auto err = move_group.move();
-        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
-            return false;
-        }
+        ROS_INFO("done with setting poses, now moving ");
 
-    }
-
-    ////////////////////////////
-    // open the gripper again //
-    ////////////////////////////
-
-    // if (!OpenGripper(gripper_client)) {
-    //     ROS_ERROR("Failed to open gripper");
-    //     return false;
-    // }
-
-    //////////////////////////////////
-    // move back to the start state //
-    //////////////////////////////////
-
-    {
-        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]");
-        move_group.setGoalJointTolerance(smpl::to_radians(1.0));
-        move_group.setJointValueTarget(start_state);
-        auto err = move_group.move();
-        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
-            return false;
-        }
-    }   
-
-#if 0 
-
-    auto move_group = moveit::planning_interface::MoveGroupInterface(group_name);
-    move_group.setPlanningTime(10.0);
-    move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
-
-    auto tool_link_name = "limb_right_tool0";
-    
-    // 1. Rotate the gripper in place
-
-    auto start_state = *curr_state;
-
-    // init robot pose 
-    auto object_state = smpl::urdf::RobotState();
-    //const smpl::urdf::RobotModel* object_model2;
-
-    InitRobotState(&object_state, object_model, false, false);
-
-
-#if 0
-
-    // capturing the crate pose here - from goal 
-    auto object_pose = 
-    smpl::Affine3(smpl::Translation3(
-        goal->object_pose.position.x,
-        goal->object_pose.position.y,
-        goal->object_pose.position.z) *
-    smpl::Quaternion(
-        goal->object_pose.orientation.w,
-        goal->object_pose.orientation.x,
-        goal->object_pose.orientation.y,
-        goal->object_pose.orientation.z));
-
-    auto* lid_var = GetVariable(object_model, "lid_joint");
-    auto* handle_var = GetVariable(object_model, "handle_joint");
-    auto* root_joint = GetRootJoint(object_model);
-
-    SetVariablePosition(&object_state, lid_var, get_lid_pos_from_pct(goal->object_start));
-    SetVariablePosition(&object_state, handle_var, 0.0);
-    SetJointPositions(&object_state, root_joint, &object_pose);
-
-#endif
-
-#if 0
-
-    // robot visualization 
-    UpdateVisualBodyTransforms(&object_state);
-    SV_SHOW_INFO_NAMED("object_state", 
-        MakeRobotVisualization(&object_state, smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f }, "map", "object_state"));
-
-    // getting the contact link for the crate 
-    // auto* contact_link = GetLink(object_model, "tool");
-    
-
-    auto& tool_transform = start_state.getGlobalLinkTransform(tool_link_name);
-
-    // getting the contact pose for the crate - *IMPORTANT*
-    //auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link); // function pointer?
-
-    // rotate so that the end effector is correct
-    //contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
-    // auto target_state = curr_state*smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
-
-    // cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr msg;
-    // const cmu_manipulation_msgs::ManipulateObjectGoal* goal = 0;
-
-    // moveit::core::robotStateMsgToRobotState(goal->start_state, start_state);
-
-    // move the robot from curr_state to target_state
-
-    // auto prerelease_pose =
-    //             tool_transform *
-    //             Eigen::Translation3d(release_offset, 0.0, 0.0);      
-
-    auto prerelease_pose = tool_transform*smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
-
-#endif 
-
-#if 0
-
-    {
         move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
         move_group.setGoalPositionTolerance(0.02);
-
-        move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
-
-        move_group.setPoseTarget(prerelease_pose, tool_link_name);
-        auto err = move_group.move();
-    }
-
-#endif
-
-    // 2. Open the gripper
-#if 0
-
-    using GripperCommandActionClient = 
-    actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
-    auto gripper_client_name = std::string();
-    GetParam(ph, "gripper_command_action_name", &gripper_client_name);
-
-    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
-
-    GripperCommandActionClient gripper_client(gripper_client_name);
-
-    if (!gripper_client.waitForServer()) {
-        ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
-        return 1;
-    }
-
-    control_msgs::GripperCommandGoal gripper_goal;
-    gripper_goal.command.position = 0.0841;
-    auto res = gripper_client.sendGoalAndWait(gripper_goal);
-
-#endif
-
-
-    // 3. While maintaining the same current orientation, move the gripper back by a certain distance 
-
-    // move up in the world frame a little bit to avoid jamming the fingers
-    // on the lid
-#if 0
-
-    auto pregrasp_offset = -0.1;
-    auto withdraw_pose = smpl::Affine3(
-        prerelease_pose *
-        smpl::Translation3(pregrasp_offset, 0.0, 0.0));
-
-#endif 
-
-
-#if 0
-    // contact_pose = Eigen::Translation3d(0.0, 0.0, 0.02) * contact_pose;
-
-    {
-        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
-        move_group.setGoalPositionTolerance(0.02);
-
         move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
 
         move_group.setPoseTarget(withdraw_pose, tool_link_name);
         auto err = move_group.move();
+    
     }
+
+    ROS_INFO("done with trial now");
 
 #endif
-
-    // 4. Move gripper back to the starting position
-
-#if 0
-    {
-
-        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
-        move_group.setGoalPositionTolerance(0.02);
-
-        move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
-
-        move_group.setPoseTarget(contact_pose, tool_link_name);
-        auto err = move_group.move();
-
-    }
-#endif 
-
-#if 0
-
-    {
-
-        auto start_state = *initial_state;
-
-        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]");
-        move_group.setGoalJointTolerance(smpl::to_radians(1.0));
-        move_group.setJointValueTarget(start_state);
-        
-        auto err = move_group.move();
-
-    }
-
-    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
-
-#endif    
-
-#endif
-
-
 
     return true;
 }
@@ -1176,12 +1151,14 @@ int main(int argc, char* argv[])
     auto sub = nh.subscribe("joint_states", 10, jsfun);
 
     auto autostart = false;
+
     ManipulateObjectActionServer server(
         "manipulate_object",
         [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
         {
             //auto curr_state = state_monitor.getCurrentState();
             auto curr_state = GetCurrentState(&state_monitor);
+            
             if (ManipulateObject(
                 robot_model,
                 group_name,
@@ -1196,16 +1173,18 @@ int main(int argc, char* argv[])
             {
 
                 //if (!msg->plan_only) {
-                    // auto fresh_state = state_monitor.getCurrentState();
+                if (true) {
+                    //auto fresh_state = state_monitor.getCurrentState();
+                    auto fresh_state = GetCurrentState(&state_monitor);
                     // TODO: current state might not be exactly what we want here, since the planning
                     // request can take start state overrides
                     // the useful part is the for loop below 
-                    // if (!ReleaseCrate(fresh_state.get(), group_name, &object_model, ph, curr_state.get())) {
-                    //     ROS_ERROR("Failed to release crate");
-                    //     server.setAborted();
-                    //     return;
-                    // }
-                //}
+                    if (!ReleaseCrate(&fresh_state, &object_model, ph)) {
+                        ROS_ERROR("Failed to release crate");
+                        server.setAborted();
+                        return;
+                    }
+                }
 
                 server.setSucceeded();
 

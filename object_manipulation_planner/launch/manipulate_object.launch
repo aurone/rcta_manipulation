@@ -1,5 +1,6 @@
 <launch>
-    <arg name="scenario"/>
+    <!-- <arg name="scenario"/> -->
+    <arg name="scenario" default="$(find object_manipulation_planner)/tests/test-1.yaml"/>
     <arg name="execute" default="false"/>
     <arg name="allowed_planning_time" default="15.0"/>
     <include file="$(find object_manipulation_planner)/launch/manipulate_object_params.launch">

@@ -352,6 +352,8 @@ bool PlanManipulationTrajectory(
         //ROS_INFO("calling sample manifold fn now ");
         auto contact_pose = sampler(alpha);
 
+        std::cout << "contact pose is " << contact_pose.matrix();
+
         // std::cout << "contact pose is " << contact_pose.matrix();
 
         auto robot_model = interm_state.getRobotModel();
@@ -905,9 +907,8 @@ bool ManipulateObject(
             auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
             auto rotate_gripper_pose =
                     tool_transform*rot;
-            ROS_INFO("calculated the pose, now going to move there");
-            // MoveToPoseConstraints(move_group, rotate_gripper_pose, tool_link_name);
-            ROS_INFO("finished calling the MoveToPose function");
+            
+            std::cout << "tool transform is - " << tool_transform.matrix() << std::endl;
             
             return rotate_gripper_pose;
         };
@@ -923,6 +924,8 @@ bool ManipulateObject(
         {
             return false;
         }
+
+        std::cout << plan.trajectory_ << std::endl;
 
         auto write_manip_trajectory = false; // TODO: configurate this
         if (write_manip_trajectory) {

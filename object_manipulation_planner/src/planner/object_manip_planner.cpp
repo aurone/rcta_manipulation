@@ -460,6 +460,8 @@ bool PlanPath(
     auto& first_segment = segments.front();
     commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));
 
+    // ROS_INFO("printing the cmds fyi");
+
     for (auto i = 1; i < segments.size(); ++i) {
         if (segment_types[i] == TransitionType::GraspSucc) {
             commands->push_back(smpl::make_unique<GripperCommand>(true));
@@ -468,6 +470,10 @@ bool PlanPath(
         auto cmd = smpl::make_unique<TrajectoryCommand>(
                 MakeRobotTrajectory(segments[i]));
         commands->push_back(std::move(cmd));
+
+        // ROS_INFO("--------------------");
+
+        // std::cout << segments[i] << std::endl;
 
         if (segment_types[i] == TransitionType::GraspSucc) {
             commands->push_back(smpl::make_unique<GripperCommand>(false));
