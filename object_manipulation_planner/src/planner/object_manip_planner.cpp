@@ -360,6 +360,7 @@ bool PlanPath(
     auto segment = RobotPath();
     for (auto i = 0; i < path.size(); ++i) {
         auto& point = path[i];
+        std::cout << "point is " << point << std::endl;
         auto type = TransitionType::Type(point.back());
         if (type != segment_type) {
             // record this segment

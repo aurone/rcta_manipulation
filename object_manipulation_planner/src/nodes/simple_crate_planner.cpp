@@ -1,4 +1,4 @@
-f#include <actionlib/server/simple_action_server.h>
+#include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <cmu_manipulation_msgs/ManipulateObjectAction.h>
 #include <control_msgs/GripperCommandAction.h>
@@ -543,12 +543,13 @@ bool ManipulateObject(
         return false;
     }
 
-    // capturing the crate pose here - from goal 
+    // capturing the crate pose here - from goal
+    // goal->object_pose.position.z + 0.015 had to be used for the robot to catch the crate properly
     auto object_pose =
             smpl::Affine3(smpl::Translation3(
                     goal->object_pose.position.x,
-                    goal->object_pose.position.y - 0.1,
-                    goal->object_pose.position.z+ 0.015) *
+                    goal->object_pose.position.y,
+                    goal->object_pose.position.z) *
             smpl::Quaternion(
                     goal->object_pose.orientation.w,
                     goal->object_pose.orientation.x,
