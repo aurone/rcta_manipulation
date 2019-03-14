@@ -1158,7 +1158,7 @@ int main(int argc, char* argv[])
         {
             //auto curr_state = state_monitor.getCurrentState();
             auto curr_state = GetCurrentState(&state_monitor);
-            
+            //auto curr_state = state_monitor->getCurrentState();
             if (ManipulateObject(
                 robot_model,
                 group_name,
@@ -1166,7 +1166,7 @@ int main(int argc, char* argv[])
                 &cspace,
                 &planning_model,
                 &planner,
-                &curr_state,
+                curr_state.get(),
                 display_publisher,
                 ph,
                 msg))
@@ -1176,6 +1176,8 @@ int main(int argc, char* argv[])
                 if (true) {
                     //auto fresh_state = state_monitor.getCurrentState();
                     auto fresh_state = GetCurrentState(&state_monitor);
+
+                    //auto fresh_state = state_monitor->getCurrentState();
                     // TODO: current state might not be exactly what we want here, since the planning
                     // request can take start state overrides
                     // the useful part is the for loop below 
