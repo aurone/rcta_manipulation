@@ -198,6 +198,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs(
 // states adjacent to any demonstration states that are near this state.
 void RomanObjectManipLattice::getOrigStateZSuccs2(
     smpl::WorkspaceLatticeState* state,
+    const PhiCoord& phi_coord,
     std::vector<int>* succs,
     std::vector<int>* costs)
 {
@@ -206,7 +207,6 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
     // s_demo states where phi(s) ~ phi(s_demo) and z(s) = z(s_demo)
     auto nearby_egraph_states = std::vector<smpl::ExperienceGraph::node_id>();
     {
-        auto phi_coord = getPhiCoord(state->coord);
         SMPL_DEBUG_STREAM("  parent phi coord = " << phi_coord);
         auto it = m_phi_to_egraph_nodes.find(phi_coord);
         if (it != end(m_phi_to_egraph_nodes)) {
@@ -682,6 +682,8 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
     SMPL_DEBUG_NAMED(G_EXPANSIONS_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
+    auto phi_coord = getPhiCoord(state);
+
     if (is_egraph_node) { // expanding an egraph node
         GetEGraphStateAdjacentSuccs(this, state, egraph_node, succs, costs);
 
@@ -703,11 +705,10 @@ void RomanObjectManipLattice::getUniqueSuccs(
 
 #if ENABLE_Z_EDGES
         // getOrigStateZSuccs(state, succs, costs);
-        getOrigStateZSuccs2(state, succs, costs);
+        getOrigStateZSuccs2(state, phi_coord, succs, costs);
 #endif
     }
 
-    auto phi_coord = getPhiCoord(state->coord);
     SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "phi(s) = " << phi_coord);
     getGraspSuccs(state_id, state, phi_coord, succs, costs);
 #if ENABLE_PREGRASP_EDGES
@@ -762,6 +763,8 @@ bool RomanObjectManipLattice::extractTransition(
     auto best_cost = std::numeric_limits<int>::max();
     auto best_path = std::vector<smpl::RobotState>();
 
+    auto phi_coord = getPhiCoord(state);
+
     if (is_egraph_node) { // expanding an egraph node
         updateBestTransitionEGraphAdjacent(state, egraph_node, dst_id, best_cost, best_path);
         updateBestTransitionEGraphBridge(state, egraph_node, dst_id, best_cost, best_path);
@@ -772,11 +775,10 @@ bool RomanObjectManipLattice::extractTransition(
         updateBestTransitionOrig(state, dst_id, best_cost, best_path);
         updateBestTransitionOrigBridge(state, dst_id, best_cost, best_path);
 #if ENABLE_Z_EDGES
-        updateBestTransitionOrigZ2(state, dst_id, best_cost, best_path);
+        updateBestTransitionOrigZ2(state, phi_coord, dst_id, best_cost, best_path);
 #endif
     }
 
-    auto phi_coord = getPhiCoord(state->coord);
     SMPL_DEBUG_STREAM_NAMED(G_EXPANSIONS_LOG, "phi(s) = " << phi_coord);
     updateBestTransitionGrasp(src_id, state, phi_coord, dst_id, best_cost, best_path);
 #if ENABLE_PREGRASP_EDGES
@@ -879,12 +881,13 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ(
 
 void RomanObjectManipLattice::updateBestTransitionOrigZ2(
     smpl::WorkspaceLatticeState* state,
+    const PhiCoord& phi_coord,
     int dst_id,
     int& best_cost,
     std::vector<smpl::RobotState>& best_path)
 {
     std::vector<int> succs, costs;
-    getOrigStateZSuccs2(state, &succs, &costs);
+    getOrigStateZSuccs2(state, phi_coord, &succs, &costs);
     updateBestTransitionSimple(
             succs, costs, dst_id, best_cost, best_path, TransitionType::OrigStateZSucc);
 }
@@ -1235,30 +1238,35 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         auto node = *nit;
         auto& egraph_robot_state = m_egraph.state(node);
 
+        // Get the real workspace coordinates of the e-graph state to determine
+        // the grasp and pre-grasp pose.
         auto tmp = smpl::WorkspaceState();
         stateRobotToWorkspace(egraph_robot_state, tmp);
 
         auto pregrasp_offset = smpl::MakeAffine(this->pregrasp_offset_x, 0.0, 0.0);
-
         auto grasp_pose = smpl::MakeAffine(tmp[0], tmp[1], tmp[2], tmp[5], tmp[4], tmp[3]);
-
         auto pregrasp_pose = smpl::Affine3(grasp_pose * pregrasp_offset);
 
-        // TODO: these are stored in the state now, get them from there
-        auto disc_egraph_state = smpl::WorkspaceCoord(dofCount());
-        stateWorkspaceToCoord(tmp, disc_egraph_state);
+        // Get the state corresponding to this e-graph node to use its discrete
+        // coordinates.
+        auto state_id = this->m_egraph_node_to_state[node];
+        auto* egraph_state = this->m_states[state_id];
 
+        // TODO: This was an attempt to remove pre-grasp and grasp coordinates
+        // for states that are not actually manipulating the object, since we
+        // don't want to perform grasp/pre-grasp motions to arbitrary states
+        // that are not grasping the object.
+#if 0
         auto adj = m_egraph.adjacent_nodes(node);
         for (auto ait = adj.first; ait != adj.second; ++ait) {
             auto anode = *ait;
             auto& adj_state = m_egraph.state(anode);
-#if 0
             if (m_demo_z_values[egraph_robot_state[HINGE]] !=
                 m_demo_z_values[adj_state[HINGE]])
 #endif
             {
                 // map phi(discrete egraph state) -> egraph node
-                auto phi_coord = getPhiCoord(disc_egraph_state);
+                auto phi_coord = getPhiCoord(egraph_state);
                 m_phi_to_egraph_nodes[phi_coord].push_back(node);
                 phi_points.emplace_back(phi_coord[0], phi_coord[1], phi_coord[2]);
 
@@ -1268,7 +1276,9 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
                 pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
                 break;
             }
+#if 0
         }
+#endif
 
         m_egraph_node_grasps[node] = grasp_pose;
         m_egraph_node_pregrasps[node] = pregrasp_pose;
@@ -1529,50 +1539,23 @@ auto RomanObjectManipLattice::getPhiCoord(const Eigen::Affine3d& pose) const
     return coord;
 }
 
-auto RomanObjectManipLattice::getPhiState(const Eigen::Affine3d& pose) const
-    -> PhiState
+void RomanObjectManipLattice::setObjectPose(const smpl::Affine3& pose)
 {
-#if PHI_INCLUDE_RP
-    PhiState state(6);
-
-    double y, p, r;
-    smpl::get_euler_zyx(Eigen::Matrix3d(pose.rotation()), y, p, r);
-
-    state[3] = r;
-    state[4] = p;
-    state[5] = y;
-#else
-    PhiState state(3);
-    state[0] = pose.translation().x();
-    state[1] = pose.translation().y();
-    state[2] = pose.translation().z();
-#endif
-
-    return state;
+    m_object_pose = pose;
 }
 
-auto RomanObjectManipLattice::getPhiCoord(const smpl::WorkspaceCoord& coord) const
+auto RomanObjectManipLattice::getPhiCoord(const smpl::WorkspaceLatticeState* state) const
     -> PhiCoord
 {
+    auto& coord = state->coord;
 #if PHI_INCLUDE_RP
+    assert(state->coord.size() >= 6);
     return PhiCoord{ coord[0], coord[1], coord[2], coord[3], coord[4], coord[5] };
 #else
+    assert(state->coord.size() >= 3);
     return PhiCoord{ coord[0], coord[1], coord[2] };
 #endif
 }
-
-auto GetPhiState(
-    const RomanObjectManipLattice* graph,
-    const smpl::WorkspaceState& state)
-    -> PhiState
-{
-#if PHI_INCLUDE_RP
-    return PhiState{ state[0], state[1], state[2], state[3], state[4], state[5] };
-#else
-    return PhiState{ state[0], state[1], state[2] };
-#endif
-};
-
 
 bool RomanObjectManipLattice::snap(int src_id, int dst_id, int& cost)
 {
@@ -1603,27 +1586,28 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
 
         auto tmp = smpl::WorkspaceState();
         stateRobotToWorkspace(egraph_robot_state, tmp);
-
-        auto pregrasp_offset = smpl::MakeAffine(this->pregrasp_offset_x, 0.0, 0.0);
-
+        auto pregrasp_offset = smpl::MakeAffine(
+                this->pregrasp_offset_x, 0.0, 0.0);
         auto grasp_pose = smpl::MakeAffine(
                 tmp[0], tmp[1], tmp[2], tmp[5], tmp[4], tmp[3]);
-
         auto pregrasp_pose = smpl::Affine3(grasp_pose * pregrasp_offset);
 
         // TODO: these are stored in the state now, get them from there
-        auto disc_egraph_state = smpl::WorkspaceCoord(dofCount());
-        stateWorkspaceToCoord(tmp, disc_egraph_state);
+        auto state_id = this->m_egraph_node_to_state[node];
+        auto* egraph_state = this->m_states[state_id];
 
+        // see note in insertExperienceGraph
+#if 0
         auto adj = m_egraph.adjacent_nodes(node);
         for (auto ait = adj.first; ait != adj.second; ++ait) {
             auto anode = *ait;
             auto& adj_state = m_egraph.state(anode);
             if (egraph_robot_state[RobotVariableIndex::HINGE] !=
                 adj_state[RobotVariableIndex::HINGE])
+#endif
             {
                 // map phi(discrete egraph state) -> egraph node
-                auto phi_coord = getPhiCoord(disc_egraph_state);
+                auto phi_coord = getPhiCoord(egraph_state);
                 m_phi_to_egraph_nodes[phi_coord].push_back(node);
                 phi_points.emplace_back(phi_coord[0], phi_coord[1], phi_coord[2]);
 
@@ -1633,7 +1617,9 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
                 pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
                 break;
             }
+#if 0
         }
+#endif
 
         m_egraph_node_grasps[node] = grasp_pose;
         m_egraph_node_pregrasps[node] = pregrasp_pose;

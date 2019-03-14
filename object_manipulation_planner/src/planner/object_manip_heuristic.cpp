@@ -59,7 +59,7 @@ auto GetHeuristicCoord(
     const smpl::WorkspaceLatticeState* state)
     -> HeuristicCoord
 {
-    auto phi = graph->getPhiCoord(state->coord);
+    auto phi = graph->getPhiCoord(state);
     auto z = GetZIndex(state);
     return HeuristicCoord{ std::move(phi), z };
 }
@@ -78,7 +78,7 @@ void GetEquivalentStates(
     SMPL_ASSERT(state->state.size() == VARIABLE_COUNT);
     SMPL_ASSERT(state->coord.size() == VARIABLE_COUNT);
 
-    auto phi = graph->getPhiCoord(state->coord);
+    auto phi = graph->getPhiCoord(state);
 
     // TODO: connectable might be different than the snap condition
 
@@ -97,7 +97,7 @@ void GetEquivalentStates(
         if (GetZIndex(state) != GetZIndex(egraph_state)) continue;
 
 //        auto egraph_phi = graph->egraph_pre_phi_coords[node];
-        auto egraph_phi = graph->getPhiCoord(egraph_state->coord);
+        auto egraph_phi = graph->getPhiCoord(egraph_state);
 
         if (egraph_phi[0] == phi[0] &
             egraph_phi[1] == phi[1] &
@@ -254,7 +254,7 @@ void UpdateUserGoal(
         auto state_id = heur->eg->getStateID(node);
         auto* state = graph->getState(state_id);
 
-        auto phi = graph->getPhiCoord(state->coord);
+        auto phi = graph->getPhiCoord(state);
         heur->z_to_phi[GetZIndex(state)].push_back(phi);
 
         auto pre_phi = graph->m_egraph_pre_phi_coords[node];
@@ -294,7 +294,7 @@ void UpdateUserGoal(
             search_nodes[node].g = 0;
             open.push(&search_nodes[node]);
 
-            auto phi = graph->getPhiCoord(state->coord);
+            auto phi = graph->getPhiCoord(state);
 
             auto h_coord = HeuristicCoord{ phi, GetZIndex(state) };
             heur->phi_heuristic[h_coord] = 0;
@@ -350,7 +350,7 @@ void UpdateUserGoal(
             auto succ_state_id = heur->eg->getStateID(succ_egraph_id);
             auto* succ_state = graph->getState(succ_state_id);
 
-            auto succ_phi = graph->getPhiCoord(succ_state->coord);
+            auto succ_phi = graph->getPhiCoord(succ_state);
 
             auto dx = graph->resolution()[0] * double(succ_phi[0] - phi[0]);
             auto dy = graph->resolution()[1] * double(succ_phi[1] - phi[1]);
@@ -577,7 +577,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
 
 //    SMPL_DEBUG_STREAM_NAMED(H_LOG, "  coord(state) = " << state->state);
 
-    auto phi = graph->getPhiCoord(state->coord);
+    auto phi = graph->getPhiCoord(state);
 
     // Test whether the task-space projection of this state is coincident with
     // any state on the demonstration

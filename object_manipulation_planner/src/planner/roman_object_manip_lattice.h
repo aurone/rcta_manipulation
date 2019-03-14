@@ -6,7 +6,6 @@
 #include <Eigen/StdVector>
 #include <smpl/graph/workspace_lattice_egraph.h>
 
-using PhiState = std::vector<double>;
 using PhiCoord = std::vector<int>;
 
 class ObjectManipHeuristic;
@@ -49,10 +48,10 @@ public:
 
     using WorkspaceLattice::isGoal;
 
-    auto getPhiState(const smpl::WorkspaceState& state) const -> PhiState;
-    auto getPhiCoord(const smpl::WorkspaceCoord& coord) const -> PhiCoord;
+    void setObjectPose(const smpl::Affine3& pose);
+
+    auto getPhiCoord(const smpl::WorkspaceLatticeState* coord) const -> PhiCoord;
     auto getPhiCoord(const Eigen::Affine3d& pose) const -> PhiCoord;
-    auto getPhiState(const Eigen::Affine3d& pose) const -> PhiState;
 
     void getUniqueSuccs(
         int state_id,
@@ -68,6 +67,7 @@ public:
 
     void getOrigStateZSuccs2(
         smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
         std::vector<int>* succs,
         std::vector<int>* costs);
 
@@ -134,6 +134,7 @@ public:
 
     void updateBestTransitionOrigZ2(
         smpl::WorkspaceLatticeState* state,
+        const PhiCoord& phi_coord,
         int dst_id,
         int& best_cost,
         std::vector<smpl::RobotState>& best_path);
@@ -229,6 +230,8 @@ public:
             smpl::VectorHash<int>>;
 
     double pregrasp_offset_x = -0.10;
+
+    smpl::Affine3 m_object_pose;
 
     // Additional properties of demonstration nodes
     std::vector<bool>               m_egraph_node_validity;
