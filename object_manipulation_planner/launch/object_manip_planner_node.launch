@@ -8,6 +8,8 @@
     <arg name="follow_joint_trajectory_action_name" default="trajectory_dispatcher/follow_joint_trajectory"/>
     <arg name="gripper_command_action_name" default="rcta_right_robotiq_controller/gripper_action"/>
 
+    <arg name="demonstrations" default="$(find object_manipulation_planner)/data/roman0"/>
+
     <!-- End actual arguments -->
 
     <arg if="$(arg debug)" name="launch_prefix" value="gdb ex --args"/>
@@ -33,7 +35,7 @@
         <param name="gripper_command_action_name" value="$(arg gripper_command_action_name)"/>
 
         <param name="planning_frame" value="map"/>
-        <param name="demonstrations_path" value="$(find object_manipulation_planner)/data"/>
+        <param name="demonstrations_path" value="$(arg demonstrations)"/>
 
         <param name="grid/size_x"       value="6.0"/>
         <param name="grid/size_y"       value="6.0"/>
