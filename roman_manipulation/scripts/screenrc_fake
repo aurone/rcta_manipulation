@@ -6,7 +6,7 @@ screen -t core
 stuff "roscore"
 
 screen -t sim
-stuff "roslaunch roman_simulation robot_simulator.launch --screen"
+stuff "roslaunch roman_simulation robot_simulator.launch robot:=roman1 --screen"
 
 screen -t move
 stuff "roslaunch roman_moveit_config move_group.launch --screen"

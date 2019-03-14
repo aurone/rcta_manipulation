@@ -65,9 +65,9 @@ bool InitControlledRobot(
     auto internal_variable_count =
             GetVariableCount(model) - GetVariableCount(GetRootJoint(model));
 
-    ROS_INFO("Root joint has %zu variables", GetVariableCount(GetRootJoint(model)));
-    ROS_INFO("Robot Model contains %zu variables", GetVariableCount(model));
-    ROS_INFO("Robot Model contains %zu internal variables", internal_variable_count);
+    ROS_DEBUG("Root joint has %zu variables", GetVariableCount(GetRootJoint(model)));
+    ROS_DEBUG("Robot Model contains %zu variables", GetVariableCount(model));
+    ROS_DEBUG("Robot Model contains %zu internal variables", internal_variable_count);
 
     // TODO: non-mimic joints?
     robot->variable_count = internal_variable_count;
@@ -99,7 +99,7 @@ bool InitControlledRobot(
         // skip root joint variables
         if (var->joint == GetRootJoint(model)) continue;
 
-        ROS_INFO("Make joint state interface for joint variable '%s'", var->name.c_str());
+        ROS_DEBUG("Make joint state interface for joint variable '%s'", var->name.c_str());
 
         hardware_interface::JointStateHandle h_joint_state(
                 var->name,
@@ -108,7 +108,7 @@ bool InitControlledRobot(
                 &robot->joint_efforts[ii]);
         robot->i_joint_state.registerHandle(h_joint_state);
 
-        ROS_INFO("Make joint command interface for joint variable '%s'", var->name.c_str());
+        ROS_DEBUG("Make joint command interface for joint variable '%s'", var->name.c_str());
 
         hardware_interface::JointHandle h_joint_pos(robot->i_joint_state.getHandle(var->name), &robot->position_commands[ii]);
         hardware_interface::JointHandle h_joint_vel(robot->i_joint_state.getHandle(var->name), &robot->velocity_commands[ii]);
@@ -317,7 +317,7 @@ int main(int argc, char* argv[])
     // after controllers are unloaded.
     signal(SIGINT, HandleInterrupt);
 
-    ROS_INFO("ready");
+    ROS_DEBUG("ready");
 
     ros::AsyncSpinner spinner(1);
     spinner.start();

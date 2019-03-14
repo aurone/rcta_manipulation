@@ -43,493 +43,41 @@
 
 namespace rcta {
 
+static const char* LOG = "grasping_command_panel";
+
 GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     rviz::Panel(parent),
-    server_("grasping_commands")
+    m_server("grasping_commands")
 {
-    setupGUI();
-    robot_markers_pub_ = nh_.advertise<visualization_msgs::MarkerArray>(
-            "visualization_markers", 1);
-    occupancy_grid_sub_ = nh_.subscribe(
-            "map", 1, &GraspingCommandPanel::occupancyGridCallback, this);
-}
+    ///////////////////
+    // Construct GUI //
+    ///////////////////
 
-GraspingCommandPanel::~GraspingCommandPanel()
-{
-}
-
-void GraspingCommandPanel::load(const rviz::Config& config)
-{
-    rviz::Panel::load(config);
-
-    ROS_INFO("Loading config for '%s'", this->getName().toStdString().c_str());
-
-    auto robot_description = QString();
-    auto global_frame = QString();
-    auto obj_mesh_resource = QString();
-    auto obj_scale_x = 0.0f;
-    auto obj_scale_y = 0.0f;
-    auto obj_scale_z = 0.0f;
-    auto base_x = 0.0f;
-    auto base_y = 0.0f;
-    auto base_yaw = 0.0f;
-    auto object_x = 0.0f;
-    auto object_y = 0.0f;
-    auto object_z = 0.0f;
-    auto object_yaw = 0.0f;
-    auto object_start = 0.0f;
-    auto object_goal = 1.0f;
-    config.mapGetString("robot_description", &robot_description);
-    config.mapGetString("global_frame", &global_frame);
-    config.mapGetString("object_mesh_resource", &obj_mesh_resource);
-    config.mapGetFloat("object_scale_x", &obj_scale_x);
-    config.mapGetFloat("object_scale_y", &obj_scale_y);
-    config.mapGetFloat("object_scale_z", &obj_scale_z);
-    config.mapGetFloat("base_x", &base_x);
-    config.mapGetFloat("base_y", &base_y);
-    config.mapGetFloat("base_yaw", &base_yaw);
-    config.mapGetFloat("object_x", &object_x);
-    config.mapGetFloat("object_y", &object_y);
-    config.mapGetFloat("object_z", &object_z);
-    config.mapGetFloat("object_yaw", &object_yaw);
-    config.mapGetFloat("object_start", &object_start);
-    config.mapGetFloat("object_goal", &object_goal);
-
-    ROS_INFO("Robot Description: %s", robot_description.toStdString().c_str());
-    ROS_INFO("Global Frame: %s", global_frame.toStdString().c_str());
-    ROS_INFO("Object Mesh Resource: %s", obj_mesh_resource.toStdString().c_str());
-
-    m_obj_mesh_resource = obj_mesh_resource.toStdString();
-    m_obj_scale_x = obj_scale_x;
-    m_obj_scale_y = obj_scale_y;
-    m_obj_scale_z = obj_scale_z;
-
-    m_obj_start = object_start;
-    m_obj_goal = object_goal;
-
-    // note: set the robot description before the global frame so we don't flag
-    // virtual joint parent frames as unacceptable
-    if (!robot_description.isEmpty()) {
-        // attempt to initalize the robot using this robot description
-        std::string why;
-        if (!setRobotDescription(robot_description.toStdString(), why)) {
-            QMessageBox::warning(
-                    this,
-                    tr("Config Failure"),
-                    tr("Failed to load 'robot_description' from panel config (%1)").arg(QString::fromStdString(why)));
-        }
-    }
-
-    if (!global_frame.isEmpty()) {
-        // attempt to set the global frame
-        std::string why;
-        if (!setGlobalFrame(global_frame.toStdString(), why)) {
-            QMessageBox::warning(
-                    this,
-                    tr("Config Failure"),
-                    tr("Failed to load 'global_frame' from panel config (%1)").arg(QString::fromStdString(why)));
-        }
-    }
-
-    T_world_robot_ =
-            Eigen::Translation3d(base_x, base_y, 0.0) *
-            Eigen::AngleAxisd(base_yaw, Eigen::Vector3d::UnitZ());
-
-    T_world_object_ =
-            Eigen::Translation3d(object_x, object_y, object_z) *
-            Eigen::AngleAxisd(object_yaw, Eigen::Vector3d::UnitZ());
-
-    updateObjectMarkerPose();
-    updateBasePoseSpinBoxes();
-
-    updateGUI();
-}
-
-void GraspingCommandPanel::save(rviz::Config config) const
-{
-    rviz::Panel::save(config);
-
-    ROS_INFO("Saving config for '%s'", this->getName().toStdString().c_str());
-
-    config.mapSetValue("robot_description", QString::fromStdString(robot_description_));
-    config.mapSetValue("global_frame", QString::fromStdString(global_frame_));
-    config.mapSetValue("object_mesh_resource", QString::fromStdString(m_obj_mesh_resource));
-
-    config.mapSetValue("object_scale_x", m_obj_scale_x);
-    config.mapSetValue("object_scale_y", m_obj_scale_y);
-    config.mapSetValue("object_scale_z", m_obj_scale_z);
-
-    config.mapSetValue("base_x", T_world_robot_.translation()(0, 0));
-    config.mapSetValue("base_y", T_world_robot_.translation()(1, 0));
-    double yaw, pitch, roll;
-    msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
-    config.mapSetValue("base_yaw", yaw);
-
-    config.mapSetValue("object_x", T_world_object_.translation()(0, 0));
-    config.mapSetValue("object_y", T_world_object_.translation()(1, 0));
-    config.mapSetValue("object_z", T_world_object_.translation()(2, 0));
-    msg_utils::get_euler_ypr(T_world_object_, yaw, pitch, roll);
-    config.mapSetValue("object_yaw", yaw);
-
-    config.mapSetValue("object_start", m_obj_start);
-    config.mapSetValue("object_goal", m_obj_goal);
-}
-
-void GraspingCommandPanel::refreshRobotDescription()
-{
-    auto user_robot_description = robot_description_line_edit_->text().toStdString();
-    if (user_robot_description.empty()) {
-        QMessageBox::information(this, tr("Robot Description"), tr("Please enter a valid ROS parameter for the URDF"));
-        return;
-    }
-
-    std::string why;
-    if (!setRobotDescription(user_robot_description, why)) {
-        QMessageBox::warning(
-                this,
-                tr("Robot Description"),
-                tr("Failed to set the robot description to '%1' (%2)")
-                    .arg(QString::fromStdString(user_robot_description), QString::fromStdString(why)));
-    }
-
-    updateGUI();
-}
-
-void GraspingCommandPanel::refreshGlobalFrame()
-{
-    auto user_global_frame = global_frame_line_edit_->text().toStdString();
-
-    std::string why;
-    if (!setGlobalFrame(user_global_frame, why)) {
-        QMessageBox::warning(
-                this,
-                tr("Global Frame"),
-                tr("Failed to set the global frame to  '%1' (%2)")
-                    .arg(QString::fromStdString(user_global_frame), QString::fromStdString(why)));
-    }
-
-    updateGUI();
-}
-
-void GraspingCommandPanel::refreshObjectMeshResource()
-{
-    QMessageBox::warning(this, tr("Object Mesh Resource"), tr("You set the object mesh resource"));
-    m_obj_mesh_resource = m_obj_mesh_resource_line_edit->text().toStdString();
-    reinitObjectInteractiveMarker();
-}
-
-void GraspingCommandPanel::copyCurrentBasePose()
-{
-    try {
-        tf::StampedTransform world_to_robot;
-        listener_.lookupTransform(global_frame_, robot_model_->getModelFrame(), ros::Time(0), world_to_robot);
-        tf::transformTFToEigen(world_to_robot, T_world_robot_);
-
-        teleport_base_command_x_box_->setValue(T_world_robot_.translation()[0]);
-        teleport_base_command_y_box_->setValue(T_world_robot_.translation()[1]);
-        teleport_base_command_z_box_->setValue(T_world_robot_.translation()[2]);
-
-        double roll, pitch, yaw;
-        msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
-        teleport_base_command_yaw_box_->setValue(smpl::angles::to_degrees(yaw));
-
-        publishPhantomRobotVisualization();
-    } catch (const tf::TransformException& ex) {
-        QMessageBox::critical(this, tr("Transform Exception"), tr("%1").arg(QString(ex.what())));
-    }
-}
-
-void GraspingCommandPanel::updateBasePoseX(double x)
-{
-    T_world_robot_.translation()(0, 0) = x;
-    publishPhantomRobotVisualization();
-}
-
-void GraspingCommandPanel::updateBasePoseY(double y)
-{
-    T_world_robot_.translation()(1, 0) = y;
-    publishPhantomRobotVisualization();
-}
-
-void GraspingCommandPanel::updateBasePoseZ(double z)
-{
-    T_world_robot_.translation()(2, 0) = z;
-    publishPhantomRobotVisualization();
-}
-
-void GraspingCommandPanel::updateBasePoseYaw(double yaw_deg)
-{
-    double yaw_rad = smpl::angles::to_radians(yaw_deg);
-    T_world_robot_ =
-            Eigen::Translation3d(T_world_robot_.translation()) *
-            Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d(0.0, 0.0, 1.0));
-    publishPhantomRobotVisualization();
-}
-
-void GraspingCommandPanel::updateBasePoseCandidate(int index)
-{
-    if (index > 0) {
-        base_candidate_idx_ = index - 1;
-        assert(base_candidate_idx_ >= 0 && base_candidate_idx_ < candidate_base_poses_.size());
-        publishBasePoseCandidateVisualization(candidate_base_poses_[base_candidate_idx_]);
-    }
-}
-
-void GraspingCommandPanel::updateMeshScaleX()
-{
-    auto ok = false;
-    auto scale = m_obj_mesh_scale_x_line_edit->text().toDouble(&ok);
-    if (ok) {
-        m_obj_scale_x = scale;
-        reinitObjectInteractiveMarker();
-    }
-}
-
-void GraspingCommandPanel::updateMeshScaleY()
-{
-    auto ok = false;
-    auto scale = m_obj_mesh_scale_y_line_edit->text().toDouble(&ok);
-    if (ok) {
-        m_obj_scale_y = scale;
-        reinitObjectInteractiveMarker();
-    }
-}
-
-void GraspingCommandPanel::updateMeshScaleZ()
-{
-    auto ok = false;
-    auto scale = m_obj_mesh_scale_z_line_edit->text().toDouble(&ok);
-    if (ok) {
-        m_obj_scale_z = scale;
-        reinitObjectInteractiveMarker();
-    }
-}
-
-void GraspingCommandPanel::updateObjectPoseX(double val)
-{
-    T_world_object_.translation().x() = val;
-    updateObjectMarkerPose();
-}
-
-void GraspingCommandPanel::updateObjectPoseY(double val)
-{
-    T_world_object_.translation().y() = val;
-    updateObjectMarkerPose();
-}
-
-void GraspingCommandPanel::updateObjectPoseZ(double val)
-{
-    T_world_object_.translation().z() = val;
-    updateObjectMarkerPose();
-}
-
-void GraspingCommandPanel::updateObjectPoseYaw(double val)
-{
-    double yaw, pitch, roll;
-    smpl::get_euler_zyx(T_world_object_.rotation(), yaw, pitch, roll);
-    yaw = smpl::to_radians(val);
-    Eigen::Matrix3d new_rot;
-    smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
-    T_world_object_ = Eigen::Translation3d(T_world_object_.translation()) * Eigen::Quaterniond(new_rot);
-    updateObjectMarkerPose();
-}
-
-void GraspingCommandPanel::updateObjectPosePitch(double val)
-{
-    double yaw, pitch, roll;
-    smpl::get_euler_zyx(T_world_object_.rotation(), yaw, pitch, roll);
-    pitch = smpl::to_radians(val);
-    Eigen::Matrix3d new_rot;
-    smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
-    T_world_object_ = Eigen::Translation3d(T_world_object_.translation()) * Eigen::Quaterniond(new_rot);
-    updateObjectMarkerPose();
-}
-
-void GraspingCommandPanel::updateObjectPoseRoll(double val)
-{
-    double yaw, pitch, roll;
-    smpl::get_euler_zyx(T_world_object_.rotation(), yaw, pitch, roll);
-    roll = smpl::to_radians(val);
-    Eigen::Matrix3d new_rot;
-    smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
-    T_world_object_ = Eigen::Translation3d(T_world_object_.translation()) * Eigen::Quaterniond(new_rot);
-    updateObjectMarkerPose();
-}
-
-void GraspingCommandPanel::updateObjectStart()
-{
-    auto ok = false;
-    auto start = m_object_start_line_edit->text().toDouble(&ok);
-    if (ok) {
-        m_obj_start = start;
-    }
-}
-
-void GraspingCommandPanel::updateObjectGoal()
-{
-    auto ok = false;
-    auto goal = m_object_goal_line_edit->text().toDouble(&ok);
-    if (ok) {
-        m_obj_goal = goal;
-    }
-}
-
-void GraspingCommandPanel::sendGraspObjectCommand()
-{
-    visualization_msgs::InteractiveMarker gas_can_interactive_marker;
-    if (!server_.get(m_gascan_interactive_marker_name, gas_can_interactive_marker)) {
-        QMessageBox::warning(
-                this,
-                tr("Command Failure"),
-                tr("Unable to send Grasp Object Command (no interactive marker named '%1'")
-                    .arg(QString::fromStdString(m_gascan_interactive_marker_name)));
-        return;
-    }
-
-    // robot -> object = robot -> world * world -> object
-    Eigen::Affine3d robot_to_object = T_world_robot_.inverse() * T_world_object_;
-
-    ROS_INFO("Robot -> Marker: %s", to_string(T_world_robot_.inverse()).c_str());
-    ROS_INFO("Marker -> Object: %s", to_string(T_world_object_).c_str());
-    ROS_INFO("Robot -> Object: %s", to_string(robot_to_object).c_str());
-
-#if USE_MANIPULATE_ACTION
-    if(!ReconnectActionClient(manipulate_client_, "manipulate")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate (server is not available)"));
-        return;
-    }
-
-    cmu_manipulation_msgs::ManipulateGoal grasp_object_goal;
-    grasp_object_goal.task = "pickup";
-    grasp_object_goal.selected_arms |= cmu_manipulation_msgs::ManipulateGoal::RIGHT;
-
-    grasp_object_goal.goal_poses.resize(1);
-    grasp_object_goal.goal_poses[0].header.frame_id = robot_model_->getModelFrame();
-    tf::poseEigenToMsg(T_world_object_, grasp_object_goal.goal_poses[0].pose);
-
-    auto result_callback = boost::bind(&GraspingCommandPanel::manipulate_result_cb, this, _1, _2);
-    manipulate_client_->sendGoal(grasp_object_goal, result_callback);
-
-    pending_manipulate_command_ = true;
-#else
-    if (!ReconnectActionClient(grasp_object_command_client_, "grasp_object_command")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not available)"));
-        return;
-    }
-
-    cmu_manipulation_msgs::GraspObjectCommandGoal grasp_object_goal;
-    grasp_object_goal.gas_can_in_base_link.header.frame_id = robot_model_->getModelFrame();
-    tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
-
-    static int grasp_object_goal_id = 0;
-    grasp_object_goal.id = grasp_object_goal_id++;
-    grasp_object_goal.retry_count = 0;
-
-    grasp_object_goal.gas_can_in_map.header.frame_id = global_frame_;
-    tf::poseEigenToMsg(T_world_object_, grasp_object_goal.gas_can_in_map.pose);
-
-    auto result_callback = boost::bind(&GraspingCommandPanel::grasp_object_command_result_cb, this, _1, _2);
-    grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
-
-    pending_grasp_object_command_ = true;
-#endif
-
-    updateGUI();
-}
-
-void GraspingCommandPanel::sendRepositionBaseCommand()
-{
-    if (!ReconnectActionClient(
-            reposition_base_command_client_, "reposition_base_command"))
-    {
-        QMessageBox::warning(
-                this,
-                tr("Command Failure"),
-                tr("Unable to send Reposition Base Command (server is not available)"));
-        return;
-    }
-
-    if (!occupancy_grid_) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("No map data received"));
-        return;
-    }
-
-    cmu_manipulation_msgs::RepositionBaseCommandGoal reposition_base_goal;
-
-    static int reposition_base_goal_id = 0;
-    reposition_base_goal.id = reposition_base_goal_id++;
-    reposition_base_goal.retry_count = 0;
-
-    tf::poseEigenToMsg(T_world_object_, reposition_base_goal.gas_can_in_map.pose);
-    reposition_base_goal.gas_can_in_map.header.frame_id = global_frame_;
-
-    tf::poseEigenToMsg(T_world_robot_, reposition_base_goal.base_link_in_map.pose);
-    reposition_base_goal.base_link_in_map.header.frame_id = global_frame_;
-
-    reposition_base_goal.map = *occupancy_grid_;
-
-    auto result_callback = boost::bind(&GraspingCommandPanel::reposition_base_command_result_cb, this, _1, _2);
-    reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
-
-    pending_reposition_base_command_ = true;
-    updateGUI();
-}
-
-void GraspingCommandPanel::sendManipulateObjectCommand()
-{
-    if (!ReconnectActionClient(manipulate_object_client_, "manipulate_object")) {
-        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate Object command (server is not available)"));
-        return;
-    }
-
-    cmu_manipulation_msgs::ManipulateObjectGoal goal;
-
-    static auto goal_id = 0;
-    goal.object_id = "crate";
-    tf::poseEigenToMsg(T_world_object_, goal.object_pose);
-    goal.object_start = m_obj_start;
-    goal.object_goal = m_obj_goal;
-    goal.plan_only = false;
-    goal.allowed_planning_time = 15.0;
-    goal.start_state.is_diff = true;
-
-    auto result_callback = boost::bind(&GraspingCommandPanel::manipulateObjectResultCallback, this, _1, _2);
-    manipulate_object_client_->sendGoal(goal, result_callback);
-
-    pending_manipulate_command_ = true;
-    updateGUI();
-}
-
-void GraspingCommandPanel::setupGUI()
-{
     auto* parent_layout = new QVBoxLayout;
     auto* scroll_area = new QScrollArea;
     auto* scroll_area_widget = new QWidget;
     auto* main_layout = new QVBoxLayout;
 
-    //////////////////////
-    // general settings //
-    //////////////////////
-
+    // general settings
     auto* general_settings_group = new QGroupBox(tr("General Settings"));
     auto* general_settings_layout = new QVBoxLayout;
 
     auto* robot_description_layout = new QHBoxLayout;
     auto* robot_description_label = new QLabel(tr("Robot Description:"));
-    robot_description_line_edit_ = new QLineEdit;
-    refresh_robot_desc_button_ = new QPushButton(tr("Refresh"));
+    m_robot_description_line_edit = new QLineEdit;
+    m_refresh_robot_desc_button = new QPushButton(tr("Refresh"));
     robot_description_layout->addWidget(robot_description_label);
-    robot_description_layout->addWidget(robot_description_line_edit_);
-    robot_description_layout->addWidget(refresh_robot_desc_button_);
+    robot_description_layout->addWidget(m_robot_description_line_edit);
+    robot_description_layout->addWidget(m_refresh_robot_desc_button);
 
     auto* global_frame_layout = new QHBoxLayout;
     auto* global_frame_label = new QLabel(tr("Global Frame:"));
-    global_frame_line_edit_ = new QLineEdit;
-    global_frame_line_edit_->setEnabled(false);
-    refresh_global_frame_button_ = new QPushButton(tr("Refresh"));
+    m_global_frame_line_edit = new QLineEdit;
+    m_global_frame_line_edit->setEnabled(false);
+    m_refresh_global_frame_button = new QPushButton(tr("Refresh"));
     global_frame_layout->addWidget(global_frame_label);
-    global_frame_layout->addWidget(global_frame_line_edit_);
-    global_frame_layout->addWidget(refresh_global_frame_button_);
+    global_frame_layout->addWidget(m_global_frame_line_edit);
+    global_frame_layout->addWidget(m_refresh_global_frame_button);
 
     auto* obj_mesh_resource_layout = new QHBoxLayout;
     auto* obj_mesh_resource_label = new QLabel(tr("Object Mesh Resource:"));
@@ -582,41 +130,39 @@ void GraspingCommandPanel::setupGUI()
     general_settings_layout->addLayout(obj_pose_layout);
     general_settings_group->setLayout(general_settings_layout);
 
-    ////////////////////////////////
-    // reposition planner command //
-    ////////////////////////////////
+    // reposition planner command
 
     auto* reposition_planner_group = new QGroupBox(tr("Reposition Base"));
 
     auto* reposition_planner_group_layout = new QVBoxLayout;
 
-    copy_current_base_pose_button_ = new QPushButton(tr("Copy Current Base Pose"));
+    m_copy_current_base_pose_button = new QPushButton(tr("Copy Current Base Pose"));
 
     auto* base_pose_spinbox_layout = new QHBoxLayout;
     auto* x_label = new QLabel(tr("X:"));
-    teleport_base_command_x_box_ = new QDoubleSpinBox;
-    teleport_base_command_x_box_->setMinimum(-100.0);
-    teleport_base_command_x_box_->setMaximum(100.0);
-    teleport_base_command_x_box_->setSingleStep(0.05);
+    m_teleport_base_command_x_box = new QDoubleSpinBox;
+    m_teleport_base_command_x_box->setMinimum(-100.0);
+    m_teleport_base_command_x_box->setMaximum(100.0);
+    m_teleport_base_command_x_box->setSingleStep(0.05);
     auto* y_label = new QLabel(tr("Y:"));
-    teleport_base_command_y_box_ = new QDoubleSpinBox;
-    teleport_base_command_y_box_->setMinimum(-100.0);
-    teleport_base_command_y_box_->setMaximum(100.0);
-    teleport_base_command_y_box_->setSingleStep(0.05);
+    m_teleport_base_command_y_box = new QDoubleSpinBox;
+    m_teleport_base_command_y_box->setMinimum(-100.0);
+    m_teleport_base_command_y_box->setMaximum(100.0);
+    m_teleport_base_command_y_box->setSingleStep(0.05);
     auto* z_label = new QLabel(tr("Z:"));
-    teleport_base_command_z_box_ = new QDoubleSpinBox;
+    m_teleport_base_command_z_box = new QDoubleSpinBox;
     auto* yaw_label = new QLabel(tr("Yaw:"));
-    teleport_base_command_yaw_box_ = new QDoubleSpinBox;
-    teleport_base_command_yaw_box_->setMinimum(0.0);
-    teleport_base_command_yaw_box_->setMaximum(359.0);
-    teleport_base_command_yaw_box_->setSingleStep(1.0);
-    teleport_base_command_yaw_box_->setWrapping(true);
+    m_teleport_base_command_yaw_box = new QDoubleSpinBox;
+    m_teleport_base_command_yaw_box->setMinimum(0.0);
+    m_teleport_base_command_yaw_box->setMaximum(359.0);
+    m_teleport_base_command_yaw_box->setSingleStep(1.0);
+    m_teleport_base_command_yaw_box->setWrapping(true);
     base_pose_spinbox_layout->addWidget(x_label);
-    base_pose_spinbox_layout->addWidget(teleport_base_command_x_box_);
+    base_pose_spinbox_layout->addWidget(m_teleport_base_command_x_box);
     base_pose_spinbox_layout->addWidget(y_label);
-    base_pose_spinbox_layout->addWidget(teleport_base_command_y_box_);
+    base_pose_spinbox_layout->addWidget(m_teleport_base_command_y_box);
     base_pose_spinbox_layout->addWidget(yaw_label);
-    base_pose_spinbox_layout->addWidget(teleport_base_command_yaw_box_);
+    base_pose_spinbox_layout->addWidget(m_teleport_base_command_yaw_box);
 
     send_reposition_base_command_button_ = new QPushButton(tr("Reposition Base"));
 
@@ -627,22 +173,27 @@ void GraspingCommandPanel::setupGUI()
     candidates_layout->addWidget(update_candidate_spinbox_);
     candidates_layout->addWidget(num_candidates_label_);
 
-    reposition_planner_group_layout->addWidget(copy_current_base_pose_button_);
+    reposition_planner_group_layout->addWidget(m_copy_current_base_pose_button);
     reposition_planner_group_layout->addLayout(base_pose_spinbox_layout);
     reposition_planner_group_layout->addWidget(send_reposition_base_command_button_);
     reposition_planner_group_layout->addLayout(candidates_layout);
 
     reposition_planner_group->setLayout(reposition_planner_group_layout);
 
-    ///////////////////////////////////////
-    // manipulate object planner command //
-    ///////////////////////////////////////
+    // manipulate object planner command
 
     auto* manip_object_command_group = new QGroupBox(tr("Manipulate Object"));
 
     auto* manip_object_command_layout = new QVBoxLayout;
 
     send_manipulate_object_command_button_ = new QPushButton(tr("Manipulate Object"));
+
+    m_allowed_planning_time_spinbox = new QDoubleSpinBox;
+    m_allowed_planning_time_spinbox->setMinimum(0.0);
+
+    auto* allowed_planning_time_layout = new QHBoxLayout;
+    allowed_planning_time_layout->addWidget(new QLabel(tr("Allowed Planning Time:")));
+    allowed_planning_time_layout->addWidget(m_allowed_planning_time_spinbox);
 
     auto* manip_object_settings_layout = new QHBoxLayout;
     m_object_start_line_edit = new QLineEdit;
@@ -653,12 +204,11 @@ void GraspingCommandPanel::setupGUI()
     manip_object_settings_layout->addWidget(m_object_goal_line_edit);
     manip_object_command_layout->addWidget(send_manipulate_object_command_button_);
     manip_object_command_layout->addLayout(manip_object_settings_layout);
+    manip_object_command_layout->addLayout(allowed_planning_time_layout);
 
     manip_object_command_group->setLayout(manip_object_command_layout);
 
-    //////////////////////////////
-    // grasping object executor //
-    //////////////////////////////
+    // grasping object executor
 
     auto* grasp_object_command_group = new QGroupBox(tr("Grasp Object"));
 
@@ -670,9 +220,7 @@ void GraspingCommandPanel::setupGUI()
 
     grasp_object_command_group->setLayout(grasp_object_command_layout);
 
-    ///////////////////////////
-    // Build the main layout //
-    ///////////////////////////
+    // Build the main layout
 
     main_layout->addWidget(general_settings_group);
     main_layout->addWidget(reposition_planner_group);
@@ -686,17 +234,23 @@ void GraspingCommandPanel::setupGUI()
     parent_layout->addWidget(scroll_area);
     setLayout(parent_layout);
 
+    //////////////////////////
+    // Connect GUI to Model //
+    //////////////////////////
+
     // note: do not connect any outgoing signals from general settings line edits; force users to use refresh button
-    connect(refresh_robot_desc_button_, SIGNAL(clicked()), this, SLOT(refreshRobotDescription()));
-    connect(refresh_global_frame_button_, SIGNAL(clicked()), this, SLOT(refreshGlobalFrame()));
+    connect(m_refresh_robot_desc_button, SIGNAL(clicked()), this, SLOT(refreshRobotDescription()));
+    connect(m_refresh_global_frame_button, SIGNAL(clicked()), this, SLOT(refreshGlobalFrame()));
     connect(m_refresh_obj_mesh_resource_button, SIGNAL(clicked()), this, SLOT(refreshObjectMeshResource()));
 
     // base commands
-    connect(copy_current_base_pose_button_, SIGNAL(clicked()), this, SLOT(copyCurrentBasePose()));
-    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
-    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
-    connect(teleport_base_command_z_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseZ(double)));
-    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
+    connect(m_copy_current_base_pose_button, SIGNAL(clicked()), this, SLOT(copyCurrentBasePose()));
+    connect(m_teleport_base_command_x_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
+    connect(m_teleport_base_command_y_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
+    connect(m_teleport_base_command_z_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseZ(double)));
+    connect(m_teleport_base_command_yaw_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
+
+    connect(m_allowed_planning_time_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateAllowedPlanningTime(double)));
 
     // object interaction commands
     connect(send_grasp_object_command_button_, SIGNAL(clicked()), this, SLOT(sendGraspObjectCommand()));
@@ -715,10 +269,523 @@ void GraspingCommandPanel::setupGUI()
     connect(m_obj_pose_Y_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseYaw(double)));
     connect(m_obj_pose_P_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPosePitch(double)));
     connect(m_obj_pose_R_spinbox, SIGNAL(valueChanged(double)), this, SLOT(updateObjectPoseRoll(double)));
+
+    connect(this, SIGNAL(objectPoseXUpdated(double)),       m_obj_pose_x_spinbox, SLOT(setValue(double)));
+    connect(this, SIGNAL(objectPoseYUpdated(double)),       m_obj_pose_y_spinbox, SLOT(setValue(double)));
+    connect(this, SIGNAL(objectPoseZUpdated(double)),       m_obj_pose_z_spinbox, SLOT(setValue(double)));
+    connect(this, SIGNAL(objectPoseYawUpdated(double)),     m_obj_pose_Y_spinbox, SLOT(setValue(double)));
+    connect(this, SIGNAL(objectPosePitchUpdated(double)),   m_obj_pose_P_spinbox, SLOT(setValue(double)));
+    connect(this, SIGNAL(objectPoseRollUpdated(double)),    m_obj_pose_R_spinbox, SLOT(setValue(double)));
 #endif
 
     connect(m_object_start_line_edit, SIGNAL(editingFinished()), this, SLOT(updateObjectStart()));
     connect(m_object_goal_line_edit, SIGNAL(editingFinished()), this, SLOT(updateObjectGoal()));
+
+    //////////////////////////
+    // Initialize the Model //
+    //////////////////////////
+
+    m_marker_pub = m_nh.advertise<visualization_msgs::MarkerArray>(
+            "visualization_markers", 1);
+    m_occupancy_grid_sub = m_nh.subscribe(
+            "map", 1, &GraspingCommandPanel::occupancyGridCallback, this);
+}
+
+GraspingCommandPanel::~GraspingCommandPanel()
+{
+}
+
+void GraspingCommandPanel::load(const rviz::Config& config)
+{
+    rviz::Panel::load(config);
+
+    ROS_DEBUG_NAMED(LOG, "Loading config for '%s'", this->getName().toStdString().c_str());
+
+    auto robot_description = QString();
+    auto global_frame = QString();
+    auto obj_mesh_resource = QString();
+    auto obj_scale_x = 0.0f;
+    auto obj_scale_y = 0.0f;
+    auto obj_scale_z = 0.0f;
+    auto base_x = 0.0f;
+    auto base_y = 0.0f;
+    auto base_yaw = 0.0f;
+    auto object_x = 0.0f;
+    auto object_y = 0.0f;
+    auto object_z = 0.0f;
+    auto object_yaw = 0.0f;
+    auto object_pitch = 0.0f;
+    auto object_roll = 0.0f;
+    auto object_start = 0.0f;
+    auto object_goal = 1.0f;
+    config.mapGetString("robot_description", &robot_description);
+    config.mapGetString("global_frame", &global_frame);
+    config.mapGetString("object_mesh_resource", &obj_mesh_resource);
+    config.mapGetFloat("object_scale_x", &obj_scale_x);
+    config.mapGetFloat("object_scale_y", &obj_scale_y);
+    config.mapGetFloat("object_scale_z", &obj_scale_z);
+    config.mapGetFloat("base_x", &base_x);
+    config.mapGetFloat("base_y", &base_y);
+    config.mapGetFloat("base_yaw", &base_yaw);
+    config.mapGetFloat("object_x", &object_x);
+    config.mapGetFloat("object_y", &object_y);
+    config.mapGetFloat("object_z", &object_z);
+    config.mapGetFloat("object_yaw", &object_yaw);
+    config.mapGetFloat("object_pitch", &object_pitch);
+    config.mapGetFloat("object_roll", &object_roll);
+    config.mapGetFloat("object_start", &object_start);
+    config.mapGetFloat("object_goal", &object_goal);
+
+    ROS_DEBUG_NAMED(LOG, "Robot Description: %s", robot_description.toStdString().c_str());
+    ROS_DEBUG_NAMED(LOG, "Global Frame: %s", global_frame.toStdString().c_str());
+    ROS_DEBUG_NAMED(LOG, "Object Mesh Resource: %s", obj_mesh_resource.toStdString().c_str());
+
+    m_obj_mesh_resource = obj_mesh_resource.toStdString();
+    updateMeshScaleX(obj_scale_x);
+    updateMeshScaleY(obj_scale_y);
+    updateMeshScaleZ(obj_scale_z);
+
+    m_obj_start = object_start;
+    m_obj_goal = object_goal;
+
+    // note: set the robot description before the global frame so we don't flag
+    // virtual joint parent frames as unacceptable
+    if (!robot_description.isEmpty()) {
+        // attempt to initalize the robot using this robot description
+        std::string why;
+        if (!setRobotDescription(robot_description.toStdString(), why)) {
+            QMessageBox::warning(
+                    this,
+                    tr("Config Failure"),
+                    tr("Failed to load 'robot_description' from panel config (%1)").arg(QString::fromStdString(why)));
+        }
+    }
+
+    if (!global_frame.isEmpty()) {
+        // attempt to set the global frame
+        std::string why;
+        if (!setGlobalFrame(global_frame.toStdString(), why)) {
+            QMessageBox::warning(
+                    this,
+                    tr("Config Failure"),
+                    tr("Failed to load 'global_frame' from panel config (%1)").arg(QString::fromStdString(why)));
+        }
+    }
+
+    m_T_world_robot =
+            Eigen::Translation3d(base_x, base_y, 0.0) *
+            Eigen::AngleAxisd(base_yaw, Eigen::Vector3d::UnitZ());
+
+    updateBasePoseSpinBoxes();
+
+    updateObjectPoseX(object_x);
+    updateObjectPoseY(object_y);
+    updateObjectPoseZ(object_z);
+    updateObjectPoseYaw(object_yaw);
+    updateObjectPosePitch(object_pitch);
+    updateObjectPoseRoll(object_roll);
+
+    updateGUI();
+}
+
+void GraspingCommandPanel::save(rviz::Config config) const
+{
+    rviz::Panel::save(config);
+
+    ROS_DEBUG_NAMED(LOG, "Saving config for '%s'", this->getName().toStdString().c_str());
+
+    config.mapSetValue("robot_description", QString::fromStdString(robot_description_));
+    config.mapSetValue("global_frame", QString::fromStdString(global_frame_));
+    config.mapSetValue("object_mesh_resource", QString::fromStdString(m_obj_mesh_resource));
+
+    config.mapSetValue("object_scale_x", m_obj_scale_x);
+    config.mapSetValue("object_scale_y", m_obj_scale_y);
+    config.mapSetValue("object_scale_z", m_obj_scale_z);
+
+    config.mapSetValue("base_x", m_T_world_robot.translation()(0, 0));
+    config.mapSetValue("base_y", m_T_world_robot.translation()(1, 0));
+    double yaw, pitch, roll;
+    msg_utils::get_euler_ypr(m_T_world_robot, yaw, pitch, roll);
+    config.mapSetValue("base_yaw", yaw);
+
+    config.mapSetValue("object_x", m_T_world_object.translation()(0, 0));
+    config.mapSetValue("object_y", m_T_world_object.translation()(1, 0));
+    config.mapSetValue("object_z", m_T_world_object.translation()(2, 0));
+    msg_utils::get_euler_ypr(m_T_world_object, yaw, pitch, roll);
+    config.mapSetValue("object_yaw", yaw);
+    config.mapSetValue("object_pitch", pitch);
+    config.mapSetValue("object_roll", roll);
+
+    config.mapSetValue("object_start", m_obj_start);
+    config.mapSetValue("object_goal", m_obj_goal);
+}
+
+void GraspingCommandPanel::refreshRobotDescription()
+{
+    auto user_robot_description = m_robot_description_line_edit->text().toStdString();
+    if (user_robot_description.empty()) {
+        QMessageBox::information(this, tr("Robot Description"), tr("Please enter a valid ROS parameter for the URDF"));
+        return;
+    }
+
+    std::string why;
+    if (!setRobotDescription(user_robot_description, why)) {
+        QMessageBox::warning(
+                this,
+                tr("Robot Description"),
+                tr("Failed to set the robot description to '%1' (%2)")
+                    .arg(QString::fromStdString(user_robot_description), QString::fromStdString(why)));
+    }
+
+    updateGUI();
+}
+
+void GraspingCommandPanel::refreshGlobalFrame()
+{
+    auto user_global_frame = m_global_frame_line_edit->text().toStdString();
+
+    std::string why;
+    if (!setGlobalFrame(user_global_frame, why)) {
+        QMessageBox::warning(
+                this,
+                tr("Global Frame"),
+                tr("Failed to set the global frame to  '%1' (%2)")
+                    .arg(QString::fromStdString(user_global_frame), QString::fromStdString(why)));
+    }
+
+    updateGUI();
+}
+
+void GraspingCommandPanel::refreshObjectMeshResource()
+{
+    QMessageBox::warning(this, tr("Object Mesh Resource"), tr("You set the object mesh resource"));
+    m_obj_mesh_resource = m_obj_mesh_resource_line_edit->text().toStdString();
+    reinitObjectInteractiveMarker();
+}
+
+void GraspingCommandPanel::copyCurrentBasePose()
+{
+    try {
+        tf::StampedTransform world_to_robot;
+        m_listener.lookupTransform(global_frame_, robot_model_->getModelFrame(), ros::Time(0), world_to_robot);
+        tf::transformTFToEigen(world_to_robot, m_T_world_robot);
+
+        m_teleport_base_command_x_box->setValue(m_T_world_robot.translation()[0]);
+        m_teleport_base_command_y_box->setValue(m_T_world_robot.translation()[1]);
+        m_teleport_base_command_z_box->setValue(m_T_world_robot.translation()[2]);
+
+        double roll, pitch, yaw;
+        msg_utils::get_euler_ypr(m_T_world_robot, yaw, pitch, roll);
+        m_teleport_base_command_yaw_box->setValue(smpl::angles::to_degrees(yaw));
+
+        publishPhantomRobotVisualization();
+    } catch (const tf::TransformException& ex) {
+        QMessageBox::critical(this, tr("Transform Exception"), tr("%1").arg(QString(ex.what())));
+    }
+}
+
+void GraspingCommandPanel::updateBasePoseX(double x)
+{
+    m_T_world_robot.translation()(0, 0) = x;
+    publishPhantomRobotVisualization();
+}
+
+void GraspingCommandPanel::updateBasePoseY(double y)
+{
+    m_T_world_robot.translation()(1, 0) = y;
+    publishPhantomRobotVisualization();
+}
+
+void GraspingCommandPanel::updateBasePoseZ(double z)
+{
+    m_T_world_robot.translation()(2, 0) = z;
+    publishPhantomRobotVisualization();
+}
+
+void GraspingCommandPanel::updateBasePoseYaw(double yaw_deg)
+{
+    double yaw_rad = smpl::angles::to_radians(yaw_deg);
+    m_T_world_robot =
+            Eigen::Translation3d(m_T_world_robot.translation()) *
+            Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d(0.0, 0.0, 1.0));
+    publishPhantomRobotVisualization();
+}
+
+void GraspingCommandPanel::updateBasePoseCandidate(int index)
+{
+    if (index > 0) {
+        base_candidate_idx_ = index - 1;
+        assert(base_candidate_idx_ >= 0 && base_candidate_idx_ < candidate_base_poses_.size());
+        publishBasePoseCandidateVisualization(candidate_base_poses_[base_candidate_idx_]);
+    }
+}
+
+void GraspingCommandPanel::updateAllowedPlanningTime(double val)
+{
+    if (m_allowed_planning_time != val) {
+        m_allowed_planning_time = val;
+    }
+}
+
+void GraspingCommandPanel::updateMeshScaleX()
+{
+    auto ok = false;
+    auto scale = m_obj_mesh_scale_x_line_edit->text().toDouble(&ok);
+    if (ok) {
+        updateMeshScaleX(scale);
+    }
+}
+
+void GraspingCommandPanel::updateMeshScaleY()
+{
+    auto ok = false;
+    auto scale = m_obj_mesh_scale_y_line_edit->text().toDouble(&ok);
+    if (ok) {
+        updateMeshScaleY(scale);
+    }
+}
+
+void GraspingCommandPanel::updateMeshScaleZ()
+{
+    auto ok = false;
+    auto scale = m_obj_mesh_scale_z_line_edit->text().toDouble(&ok);
+    if (ok) {
+        updateMeshScaleZ(scale);
+    }
+}
+
+void GraspingCommandPanel::updateObjectPoseX(double val)
+{
+    if (m_T_world_object.translation().x() != val) {
+        m_T_world_object.translation().x() = val;
+        updateObjectMarkerPose();
+        Q_EMIT objectPoseXUpdated(val);
+    }
+}
+
+void GraspingCommandPanel::updateObjectPoseY(double val)
+{
+    if (m_T_world_object.translation().y() != val) {
+        m_T_world_object.translation().y() = val;
+        updateObjectMarkerPose();
+        Q_EMIT objectPoseYUpdated(val);
+    }
+}
+
+void GraspingCommandPanel::updateObjectPoseZ(double val)
+{
+    if (m_T_world_object.translation().z() != val) {
+        m_T_world_object.translation().z() = val;
+        updateObjectMarkerPose();
+        Q_EMIT objectPoseZUpdated(val);
+    }
+}
+
+void GraspingCommandPanel::updateObjectPoseYaw(double val)
+{
+    double yaw, pitch, roll;
+    smpl::get_euler_zyx(m_T_world_object.rotation(), yaw, pitch, roll);
+    auto new_yaw = smpl::to_radians(val);
+    if (new_yaw != yaw) {
+        yaw = new_yaw;
+        Eigen::Matrix3d new_rot;
+        smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
+        m_T_world_object = Eigen::Translation3d(m_T_world_object.translation()) * Eigen::Quaterniond(new_rot);
+        updateObjectMarkerPose();
+        Q_EMIT objectPoseYawUpdated(val);
+    }
+}
+
+void GraspingCommandPanel::updateObjectPosePitch(double val)
+{
+    double yaw, pitch, roll;
+    smpl::get_euler_zyx(m_T_world_object.rotation(), yaw, pitch, roll);
+    auto new_pitch = smpl::to_radians(val);
+    if (new_pitch != pitch) {
+        pitch = new_pitch;
+        Eigen::Matrix3d new_rot;
+        smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
+        m_T_world_object = Eigen::Translation3d(m_T_world_object.translation()) * Eigen::Quaterniond(new_rot);
+        updateObjectMarkerPose();
+        Q_EMIT objectPosePitchUpdated(val);
+    }
+}
+
+void GraspingCommandPanel::updateObjectPoseRoll(double val)
+{
+    double yaw, pitch, roll;
+    smpl::get_euler_zyx(m_T_world_object.rotation(), yaw, pitch, roll);
+    auto new_roll = smpl::to_radians(val);
+    if (new_roll != roll) {
+        roll = new_roll;
+        Eigen::Matrix3d new_rot;
+        smpl::from_euler_zyx(yaw, pitch, roll, new_rot);
+        m_T_world_object = Eigen::Translation3d(m_T_world_object.translation()) * Eigen::Quaterniond(new_rot);
+        updateObjectMarkerPose();
+        Q_EMIT objectPoseRollUpdated(val);
+    }
+}
+
+void GraspingCommandPanel::updateMeshScaleX(double scale)
+{
+    m_obj_scale_x = scale;
+    reinitObjectInteractiveMarker();
+}
+
+void GraspingCommandPanel::updateMeshScaleY(double scale)
+{
+    m_obj_scale_y = scale;
+    reinitObjectInteractiveMarker();
+}
+
+void GraspingCommandPanel::updateMeshScaleZ(double scale)
+{
+    m_obj_scale_z = scale;
+    reinitObjectInteractiveMarker();
+}
+
+void GraspingCommandPanel::updateObjectStart()
+{
+    auto ok = false;
+    auto start = m_object_start_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_start = start;
+    }
+}
+
+void GraspingCommandPanel::updateObjectGoal()
+{
+    auto ok = false;
+    auto goal = m_object_goal_line_edit->text().toDouble(&ok);
+    if (ok) {
+        m_obj_goal = goal;
+    }
+}
+
+void GraspingCommandPanel::sendGraspObjectCommand()
+{
+    visualization_msgs::InteractiveMarker gas_can_interactive_marker;
+    if (!m_server.get(m_gascan_interactive_marker_name, gas_can_interactive_marker)) {
+        QMessageBox::warning(
+                this,
+                tr("Command Failure"),
+                tr("Unable to send Grasp Object Command (no interactive marker named '%1'")
+                    .arg(QString::fromStdString(m_gascan_interactive_marker_name)));
+        return;
+    }
+
+    // robot -> object = robot -> world * world -> object
+    Eigen::Affine3d robot_to_object = m_T_world_robot.inverse() * m_T_world_object;
+
+    ROS_DEBUG_NAMED(LOG, "Robot -> Marker: %s", to_string(m_T_world_robot.inverse()).c_str());
+    ROS_DEBUG_NAMED(LOG, "Marker -> Object: %s", to_string(m_T_world_object).c_str());
+    ROS_DEBUG_NAMED(LOG, "Robot -> Object: %s", to_string(robot_to_object).c_str());
+
+#if USE_MANIPULATE_ACTION
+    if(!ReconnectActionClient(manipulate_client_, "manipulate")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate (server is not available)"));
+        return;
+    }
+
+    cmu_manipulation_msgs::ManipulateGoal grasp_object_goal;
+    grasp_object_goal.task = "pickup";
+    grasp_object_goal.selected_arms |= cmu_manipulation_msgs::ManipulateGoal::RIGHT;
+
+    grasp_object_goal.goal_poses.resize(1);
+    grasp_object_goal.goal_poses[0].header.frame_id = robot_model_->getModelFrame();
+    tf::poseEigenToMsg(m_T_world_object, grasp_object_goal.goal_poses[0].pose);
+
+    auto result_callback = boost::bind(&GraspingCommandPanel::manipulate_result_cb, this, _1, _2);
+    manipulate_client_->sendGoal(grasp_object_goal, result_callback);
+
+    pending_manipulate_command_ = true;
+#else
+    if (!ReconnectActionClient(grasp_object_command_client_, "grasp_object_command")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Grasp Object Command (server is not available)"));
+        return;
+    }
+
+    cmu_manipulation_msgs::GraspObjectCommandGoal grasp_object_goal;
+    grasp_object_goal.gas_can_in_base_link.header.frame_id = robot_model_->getModelFrame();
+    tf::poseEigenToMsg(robot_to_object, grasp_object_goal.gas_can_in_base_link.pose);
+
+    static int grasp_object_goal_id = 0;
+    grasp_object_goal.id = grasp_object_goal_id++;
+    grasp_object_goal.retry_count = 0;
+
+    grasp_object_goal.gas_can_in_map.header.frame_id = global_frame_;
+    tf::poseEigenToMsg(m_T_world_object, grasp_object_goal.gas_can_in_map.pose);
+
+    auto result_callback = boost::bind(&GraspingCommandPanel::grasp_object_command_result_cb, this, _1, _2);
+    grasp_object_command_client_->sendGoal(grasp_object_goal, result_callback);
+
+    pending_grasp_object_command_ = true;
+#endif
+
+    updateGUI();
+}
+
+void GraspingCommandPanel::sendRepositionBaseCommand()
+{
+    if (!ReconnectActionClient(
+            reposition_base_command_client_, "reposition_base_command"))
+    {
+        QMessageBox::warning(
+                this,
+                tr("Command Failure"),
+                tr("Unable to send Reposition Base Command (server is not available)"));
+        return;
+    }
+
+    if (!occupancy_grid_) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("No map data received"));
+        return;
+    }
+
+    cmu_manipulation_msgs::RepositionBaseCommandGoal reposition_base_goal;
+
+    static int reposition_base_goal_id = 0;
+    reposition_base_goal.id = reposition_base_goal_id++;
+    reposition_base_goal.retry_count = 0;
+
+    tf::poseEigenToMsg(m_T_world_object, reposition_base_goal.gas_can_in_map.pose);
+    reposition_base_goal.gas_can_in_map.header.frame_id = global_frame_;
+
+    tf::poseEigenToMsg(m_T_world_robot, reposition_base_goal.base_link_in_map.pose);
+    reposition_base_goal.base_link_in_map.header.frame_id = global_frame_;
+
+    reposition_base_goal.map = *occupancy_grid_;
+
+    auto result_callback = boost::bind(&GraspingCommandPanel::reposition_base_command_result_cb, this, _1, _2);
+    reposition_base_command_client_->sendGoal(reposition_base_goal, result_callback);
+
+    pending_reposition_base_command_ = true;
+    updateGUI();
+}
+
+void GraspingCommandPanel::sendManipulateObjectCommand()
+{
+    if (!ReconnectActionClient(manipulate_object_client_, "manipulate_object")) {
+        QMessageBox::warning(this, tr("Command Failure"), tr("Unable to send Manipulate Object command (server is not available)"));
+        return;
+    }
+
+    cmu_manipulation_msgs::ManipulateObjectGoal goal;
+
+    static auto goal_id = 0;
+    goal.object_id = "crate";
+    tf::poseEigenToMsg(m_T_world_object, goal.object_pose);
+    goal.object_start = m_obj_start;
+    goal.object_goal = m_obj_goal;
+    goal.plan_only = false;
+    goal.allowed_planning_time = m_allowed_planning_time;
+    goal.start_state.is_diff = true;
+
+    auto result_callback = boost::bind(&GraspingCommandPanel::manipulateObjectResultCallback, this, _1, _2);
+    manipulate_object_client_->sendGoal(goal, result_callback);
+
+    pending_manipulate_command_ = true;
+    updateGUI();
 }
 
 bool GraspingCommandPanel::setRobotDescription(
@@ -727,7 +794,7 @@ bool GraspingCommandPanel::setRobotDescription(
 {
     // attempt to reinitialize the robot from this robot description
     if (reinit(robot_description, why)) {
-        ROS_INFO("Successfully reinitialized robot from '%s'", robot_description.c_str());
+        ROS_DEBUG_NAMED(LOG, "Successfully reinitialized robot from '%s'", robot_description.c_str());
 
         if (robot_description_ != robot_description) {
             // robot description changed to something different, not just
@@ -742,9 +809,9 @@ bool GraspingCommandPanel::setRobotDescription(
         // disabling signals since setRobotDescription is invoked via refresh
         // button callback
         QString q_robot_desc = QString::fromStdString(robot_description_);
-        robot_description_line_edit_->setText(q_robot_desc);
+        m_robot_description_line_edit->setText(q_robot_desc);
 
-        ROS_INFO("Robot Description set to '%s'", robot_description.c_str());
+        ROS_DEBUG_NAMED(LOG, "Robot Description set to '%s'", robot_description.c_str());
         return true;
     } else {
         QMessageBox::warning(
@@ -754,7 +821,7 @@ bool GraspingCommandPanel::setRobotDescription(
 
         // revert to previous robot_description
         auto q_robot_desc = QString::fromStdString(robot_description_);
-        robot_description_line_edit_->setText(q_robot_desc);
+        m_robot_description_line_edit->setText(q_robot_desc);
         return false;
     }
 }
@@ -765,7 +832,7 @@ bool GraspingCommandPanel::setGlobalFrame(
 {
     if (!isValidGlobalFrame(global_frame)) {
         why = global_frame + " is not a valid frame";
-        global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
+        m_global_frame_line_edit->setText(QString::fromStdString(global_frame_));
         return false;
     }
 
@@ -777,11 +844,11 @@ bool GraspingCommandPanel::setGlobalFrame(
     }
 
     global_frame_ = global_frame;
-    global_frame_line_edit_->setText(QString::fromStdString(global_frame_));
+    m_global_frame_line_edit->setText(QString::fromStdString(global_frame_));
 
     updateObjectMarkerPose();
 
-    ROS_INFO("Global Frame set to %s", global_frame.c_str());
+    ROS_DEBUG_NAMED(LOG, "Global Frame set to %s", global_frame.c_str());
     return true;
 }
 
@@ -789,7 +856,7 @@ bool GraspingCommandPanel::isValidGlobalFrame(const std::string& frame) const
 {
     // TODO: remove these...check for existing tf frames that are not part of
     // the robot and refresh periodically?...use a dropdown for this
-    std::vector<std::string> valid_global_frames = {
+    auto valid_global_frames = std::vector<std::string>{
         "abs_nwu",
         "abs_ned",
         "/abs_nwu",
@@ -809,9 +876,9 @@ bool GraspingCommandPanel::isValidGlobalFrame(const std::string& frame) const
 
     auto fit = std::find(valid_global_frames.begin(), valid_global_frames.end(), frame);
     if (fit == valid_global_frames.end()) {
-        ROS_INFO("'%s' is not a valid frame. Available candidates are:", frame.c_str());
+        ROS_DEBUG_NAMED(LOG, "'%s' is not a valid frame. Available candidates are:", frame.c_str());
         for (const auto& f : valid_global_frames) {
-            ROS_INFO("  %s", f.c_str());
+            ROS_DEBUG_NAMED(LOG, "  %s", f.c_str());
         }
     }
 
@@ -823,11 +890,19 @@ bool GraspingCommandPanel::robotModelLoaded() const
     return (bool)(robot_model_);
 }
 
-void GraspingCommandPanel::processGascanMarkerFeedback(
+void GraspingCommandPanel::processObjectMarkerFeedback(
     const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback)
 {
     if (feedback->event_type == visualization_msgs::InteractiveMarkerFeedback::POSE_UPDATE) {
-        tf::poseMsgToEigen(feedback->pose, T_world_object_);
+        tf::poseMsgToEigen(feedback->pose, m_T_world_object);
+        double yaw, pitch, roll;
+        msg_utils::get_euler_ypr(m_T_world_object, yaw, pitch, roll);
+        Q_EMIT objectPoseXUpdated(m_T_world_object.translation().x());
+        Q_EMIT objectPoseYUpdated(m_T_world_object.translation().y());
+        Q_EMIT objectPoseZUpdated(m_T_world_object.translation().z());
+        Q_EMIT objectPoseYawUpdated(yaw);
+        Q_EMIT objectPosePitchUpdated(pitch);
+        Q_EMIT objectPoseRollUpdated(roll);
     }
 }
 
@@ -839,8 +914,8 @@ void GraspingCommandPanel::publishPhantomRobotVisualization()
 
     robot_state_->update();
 
-    const std::vector<std::string>& link_names = robot_model_->getLinkModelNames();
-    std_msgs::ColorRGBA color = std_msgs::CreateColorRGBA(0.94, 0.44, 0.44, 1.0);
+    auto& link_names = robot_model_->getLinkModelNames();
+    auto color = std_msgs::CreateColorRGBA(0.94, 0.44, 0.44, 1.0);
     std::string ns = "phantom_robot_link";
     ros::Duration d(0);
 
@@ -848,17 +923,17 @@ void GraspingCommandPanel::publishPhantomRobotVisualization()
     robot_state_->getRobotMarkers(marker_array, link_names, color, ns, d);
 
     // transform all markers from the robot frame into the global frame
-    for (visualization_msgs::Marker& marker : marker_array.markers) {
+    for (auto& marker : marker_array.markers) {
         Eigen::Affine3d root_to_marker;
         tf::poseMsgToEigen(marker.pose, root_to_marker);
         // world -> marker = world -> robot * robot -> marker
-        Eigen::Affine3d world_to_marker = T_world_robot_ * root_to_marker;
+        Eigen::Affine3d world_to_marker = m_T_world_robot * root_to_marker;
         tf::poseEigenToMsg(world_to_marker, marker.pose);
         marker.header.frame_id = global_frame_;
         marker.header.stamp = ros::Time(0);
     }
 
-    robot_markers_pub_.publish(marker_array);
+    m_marker_pub.publish(marker_array);
 }
 
 void GraspingCommandPanel::publishBasePoseCandidateVisualization(
@@ -870,8 +945,8 @@ void GraspingCommandPanel::publishBasePoseCandidateVisualization(
 
     robot_state_->update();
 
-    const std::vector<std::string>& link_names = robot_model_->getLinkModelNames();
-    std_msgs::ColorRGBA color = std_msgs::CreateColorRGBA(0.44, 0.94, 0.44, 1.0);
+    auto& link_names = robot_model_->getLinkModelNames();
+    auto color = std_msgs::CreateColorRGBA(0.44, 0.94, 0.44, 1.0);
     std::string ns = "base_pose_candidate";
     ros::Duration d(0);
 
@@ -882,7 +957,7 @@ void GraspingCommandPanel::publishBasePoseCandidateVisualization(
     tf::poseMsgToEigen(candidate_pose.pose, T_world_candidate);
 
     // transform all markers from the robot frame into the global frame
-    for (visualization_msgs::Marker& marker : marker_array.markers) {
+    for (auto& marker : marker_array.markers) {
         Eigen::Affine3d root_to_marker;
         tf::poseMsgToEigen(marker.pose, root_to_marker);
         // world -> marker = world -> robot * robot -> marker
@@ -892,13 +967,13 @@ void GraspingCommandPanel::publishBasePoseCandidateVisualization(
         marker.header.stamp = ros::Time(0);
     }
 
-    robot_markers_pub_.publish(marker_array);
+    m_marker_pub.publish(marker_array);
 }
 
 auto GraspingCommandPanel::createSixDOFControls() const
     -> std::vector<visualization_msgs::InteractiveMarkerControl>
 {
-    std::vector<visualization_msgs::InteractiveMarkerControl> controls(6);
+    auto controls = std::vector<visualization_msgs::InteractiveMarkerControl>(6);
 
     visualization_msgs::InteractiveMarkerControl control;
 
@@ -978,8 +1053,8 @@ bool GraspingCommandPanel::reinitRobotModels(
     const std::string& robot_description,
     std::string& why)
 {
-    if (!nh_.hasParam(robot_description) ||
-        !nh_.hasParam(robot_description + "_semantic"))
+    if (!m_nh.hasParam(robot_description) ||
+        !m_nh.hasParam(robot_description + "_semantic"))
     {
         std::stringstream ss;
         ss << "Failed to retrieve '" << robot_description << "' and '" <<
@@ -989,7 +1064,7 @@ bool GraspingCommandPanel::reinitRobotModels(
     }
 
     std::string urdf_string;
-    if (!nh_.getParam(robot_description, urdf_string)) {
+    if (!m_nh.getParam(robot_description, urdf_string)) {
         std::stringstream ss;
         ss << "Failed to retrieve '" << robot_description <<
                 "' from the param server";
@@ -1015,12 +1090,12 @@ bool GraspingCommandPanel::reinitRobotModels(
     robot_model_ = robot_model;
     robot_state_ =  robot_state;
 
-    ROS_INFO("MoveIt model is consistent with HDT Robot Model");
+    ROS_DEBUG_NAMED(LOG, "MoveIt model is consistent with HDT Robot Model");
 
-    ROS_INFO("Root link name: %s", robot_model_->getRootLinkName().c_str());
-    ROS_INFO("Robot Joints:");
+    ROS_DEBUG_NAMED(LOG, "Root link name: %s", robot_model_->getRootLinkName().c_str());
+    ROS_DEBUG_NAMED(LOG, "Robot Joints:");
     for (const std::string& joint_name : robot_model_->getJointModelNames()) {
-        ROS_INFO("    %s", joint_name.c_str());
+        ROS_DEBUG_NAMED(LOG, "    %s", joint_name.c_str());
     }
 
     robot_state_->setToDefaultValues();
@@ -1030,7 +1105,7 @@ bool GraspingCommandPanel::reinitRobotModels(
 
 bool GraspingCommandPanel::reinitObjectInteractiveMarker()
 {
-    ROS_INFO("Inserting marker '%s'", m_gascan_interactive_marker_name.c_str());
+    ROS_DEBUG_NAMED(LOG, "Inserting marker '%s'", m_gascan_interactive_marker_name.c_str());
 
     // TODO: grab the gas canister mesh and scale from the parameter server
     // (does this mean those parameters have to be global?)
@@ -1038,7 +1113,7 @@ bool GraspingCommandPanel::reinitObjectInteractiveMarker()
     // initializer an interactive marker for the gas canister object
     visualization_msgs::InteractiveMarker gascan_imarker;
     gascan_imarker.header.frame_id = global_frame_;
-    tf::poseEigenToMsg(T_world_object_, gascan_imarker.pose);
+    tf::poseEigenToMsg(m_T_world_object, gascan_imarker.pose);
 //    gascan_imarker.pose = geometry_msgs::IdentityPose();     // TODO: object pose?
     gascan_imarker.name = m_gascan_interactive_marker_name;
     gascan_imarker.description = "Gas Canister Positioning";
@@ -1080,12 +1155,12 @@ bool GraspingCommandPanel::reinitObjectInteractiveMarker()
 
     gascan_imarker.controls.push_back(gas_can_mesh_control);
 
-    server_.insert(gascan_imarker);
-    auto gascan_feedback_cb = boost::bind(&GraspingCommandPanel::processGascanMarkerFeedback, this, _1);
-    server_.setCallback(gascan_imarker.name, gascan_feedback_cb);
-    ROS_INFO("Inserted marker '%s'", m_gascan_interactive_marker_name.c_str());
+    m_server.insert(gascan_imarker);
+    auto gascan_feedback_cb = boost::bind(&GraspingCommandPanel::processObjectMarkerFeedback, this, _1);
+    m_server.setCallback(gascan_imarker.name, gascan_feedback_cb);
+    ROS_DEBUG_NAMED(LOG, "Inserted marker '%s'", m_gascan_interactive_marker_name.c_str());
 
-    server_.applyChanges();
+    m_server.applyChanges();
     return true;
 }
 
@@ -1102,7 +1177,7 @@ void GraspingCommandPanel::manipulate_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const cmu_manipulation_msgs::ManipulateResult::ConstPtr& result)
 {
-    ROS_INFO("Received Result from Grasp Object Command Action");
+    ROS_DEBUG_NAMED(LOG, "Received Result from Grasp Object Command Action");
     pending_manipulate_command_ = false;
     updateGUI();
 }
@@ -1121,7 +1196,7 @@ void GraspingCommandPanel::grasp_object_command_result_cb(
     const actionlib::SimpleClientGoalState& state,
     const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result)
 {
-    ROS_INFO("Received Result from Grasp Object Command Action");
+    ROS_DEBUG_NAMED(LOG, "Received Result from Grasp Object Command Action");
     pending_grasp_object_command_ = false;
     updateGUI();
 }
@@ -1141,12 +1216,12 @@ void GraspingCommandPanel::reposition_base_command_result_cb(
     const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result)
 {
 
-    ROS_INFO("Received Result from Reposition Base Command Action");
+    ROS_DEBUG_NAMED(LOG, "Received Result from Reposition Base Command Action");
     pending_reposition_base_command_ = false;
 
     if (result && result->result == cmu_manipulation_msgs::RepositionBaseCommandResult::SUCCESS) {
         candidate_base_poses_ = result->candidate_base_poses;
-        ROS_INFO("Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
+        ROS_DEBUG_NAMED(LOG, "Reposition Base Command returned %zd candidate poses", candidate_base_poses_.size());
     }
 
     updateGUI();
@@ -1156,22 +1231,22 @@ void GraspingCommandPanel::manipulateObjectResultCallback(
     const actionlib::SimpleClientGoalState& state,
     const cmu_manipulation_msgs::ManipulateObjectResult::ConstPtr& result)
 {
-    ROS_INFO("Received result from Manipulate Object action");
+    ROS_DEBUG_NAMED(LOG, "Received result from Manipulate Object action");
 }
 
 void GraspingCommandPanel::updateBasePoseSpinBoxes()
 {
-    disconnect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
-    disconnect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
-    disconnect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
-    teleport_base_command_x_box_->setValue(T_world_robot_.translation()(0, 0));
-    teleport_base_command_y_box_->setValue(T_world_robot_.translation()(1, 0));
+    disconnect(m_teleport_base_command_x_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
+    disconnect(m_teleport_base_command_y_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
+    disconnect(m_teleport_base_command_yaw_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
+    m_teleport_base_command_x_box->setValue(m_T_world_robot.translation()(0, 0));
+    m_teleport_base_command_y_box->setValue(m_T_world_robot.translation()(1, 0));
     double yaw, pitch, roll;
-    msg_utils::get_euler_ypr(T_world_robot_, yaw, pitch, roll);
-    teleport_base_command_yaw_box_->setValue(smpl::angles::to_degrees(yaw));
-    connect(teleport_base_command_x_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
-    connect(teleport_base_command_y_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
-    connect(teleport_base_command_yaw_box_, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
+    msg_utils::get_euler_ypr(m_T_world_robot, yaw, pitch, roll);
+    m_teleport_base_command_yaw_box->setValue(smpl::angles::to_degrees(yaw));
+    connect(m_teleport_base_command_x_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseX(double)));
+    connect(m_teleport_base_command_y_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseY(double)));
+    connect(m_teleport_base_command_yaw_box, SIGNAL(valueChanged(double)), this, SLOT(updateBasePoseYaw(double)));
 }
 
 // Update GUI elements to reflect the current model:
@@ -1180,9 +1255,9 @@ void GraspingCommandPanel::updateBasePoseSpinBoxes()
 //  2. Result of most recent reposition base command.
 void GraspingCommandPanel::updateGUI()
 {
-    ROS_INFO("    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
-    ROS_INFO("    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
-    ROS_INFO("    Pending Manipulate: %s", pending_manipulate_command_ ? "TRUE" : "FALSE");
+    ROS_DEBUG_NAMED(LOG, "    Pending Grasp Object Command: %s", pending_grasp_object_command_ ? "TRUE" : "FALSE");
+    ROS_DEBUG_NAMED(LOG, "    Pending Reposition Base Command: %s", pending_reposition_base_command_ ? "TRUE" : "FALSE");
+    ROS_DEBUG_NAMED(LOG, "    Pending Manipulate: %s", pending_manipulate_command_ ? "TRUE" : "FALSE");
 
     auto pending_motion_command =
             pending_grasp_object_command_       ||
@@ -1201,13 +1276,15 @@ void GraspingCommandPanel::updateGUI()
     m_object_start_line_edit->setText(tr("%1").arg(m_obj_start));
     m_object_goal_line_edit->setText(tr("%1").arg(m_obj_goal));
 
-    global_frame_line_edit_->setEnabled(true);
+    m_allowed_planning_time_spinbox->setValue(m_allowed_planning_time);
 
-    copy_current_base_pose_button_->setEnabled(robotModelLoaded());
-    teleport_base_command_x_box_->setEnabled(robotModelLoaded());
-    teleport_base_command_y_box_->setEnabled(robotModelLoaded());
-    teleport_base_command_z_box_->setEnabled(robotModelLoaded());
-    teleport_base_command_yaw_box_->setEnabled(robotModelLoaded());
+    m_global_frame_line_edit->setEnabled(true);
+
+    m_copy_current_base_pose_button->setEnabled(robotModelLoaded());
+    m_teleport_base_command_x_box->setEnabled(robotModelLoaded());
+    m_teleport_base_command_y_box->setEnabled(robotModelLoaded());
+    m_teleport_base_command_z_box->setEnabled(robotModelLoaded());
+    m_teleport_base_command_yaw_box->setEnabled(robotModelLoaded());
 
     send_grasp_object_command_button_->setEnabled(robotModelLoaded() && !pending_motion_command);
     send_reposition_base_command_button_->setEnabled(robotModelLoaded() && !pending_motion_command);
@@ -1230,20 +1307,22 @@ void GraspingCommandPanel::updateGUI()
     num_candidates_label_->setText(QString::fromStdString(num_candidates_label_text));
 }
 
-// Update the pose of the interactive marker to reflect T_world_object_;
+// Update the pose of the interactive marker to reflect m_T_world_object;
 void GraspingCommandPanel::updateObjectMarkerPose()
 {
     visualization_msgs::InteractiveMarker object_marker;
-    if (server_.get(m_gascan_interactive_marker_name, object_marker)) {
-        std_msgs::Header header;
-        header.seq = 0;
-        header.stamp = ros::Time(0);
-        header.frame_id = global_frame_;
-        geometry_msgs::Pose new_pose;
-        tf::poseEigenToMsg(T_world_object_, new_pose);
-        server_.setPose(m_gascan_interactive_marker_name, new_pose, header);
-        server_.applyChanges();
+    if (!m_server.get(m_gascan_interactive_marker_name, object_marker)) {
+        return;
     }
+
+    std_msgs::Header header;
+    header.seq = 0;
+    header.stamp = ros::Time(0);
+    header.frame_id = global_frame_;
+    geometry_msgs::Pose new_pose;
+    tf::poseEigenToMsg(m_T_world_object, new_pose);
+    m_server.setPose(m_gascan_interactive_marker_name, new_pose, header);
+    m_server.applyChanges();
 }
 
 } // namespace rcta

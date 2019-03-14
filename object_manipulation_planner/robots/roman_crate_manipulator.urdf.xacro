@@ -1,6 +1,95 @@
 <?xml version="1.0"?>
 <robot name="roman_object_manipulator" xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:include filename="$(find roman_model)/robots/rcta_roman.urdf.xacro"/>
+    <xacro:include filename="$(find rslimb_description)/urdf/rslimb.urdf.xacro"/>
+    <xacro:include filename="$(find roman_description)/urdf/robotiq_hand.urdf.xacro"/>
+    <xacro:include filename="$(find roman_description)/urdf/robotiq.transmission.xacro"/>
+    <xacro:include filename="$(find camhand_description)/urdf/camhand.urdf.xacro"/>
+
+    <xacro:arg name="namespace"     default="false"/>
+
+    <xacro:arg name="right_limb"         default="$(optenv ROBOT_HAS_RIGHT_RSLIMB 0)"/>
+    <xacro:arg name="left_limb"          default="$(optenv ROBOT_HAS_LEFT_RSLIMB 0)"/>
+    <xacro:arg name="right_wrist_angle"  default="0.0"/>
+    <xacro:arg name="left_wrist_angle"   default="0.0"/>
+
+    <xacro:property name="name" value="$(optenv ROS_PLATFORM_NAME robot)"/>
+    <xacro:property name="M_PI" value="3.14159"/>
+    <xacro:property name="robot"    value="$(optenv ROBOT robot)"/>
+    <xacro:property name="params_filename"    value="$(find rcta_sensors_data)/calibration/${name}.yaml"/>
+
+    <xacro:property name="robot_params" value="${load_yaml(params_filename)}"/>
+
+    <xacro:property name="chest_rev" value="$(optenv ROBOT_HAS_CHEST_REV 1)" />
+    <xacro:property name="right_gripper_type" value="$(optenv ROBOT_RIGHT_GRIPPER_TYPE 0)"/>
+    <xacro:property name="left_gripper_type"  value="$(optenv ROBOT_LEFT_GRIPPER_TYPE 0)"/>
+
+    <xacro:include filename="$(find ${robot}_description)/urdf/body.urdf.xacro"/>
+    <xacro:body name="base" parent="base_link" namespace="$(arg namespace)">
+        <origin xyz="0.353 0.000000 -0.085" rpy="-1.5708 -1.5708 0.0"/>
+    </xacro:body>
+
+
+    <!-- ptu -->
+    <xacro:if value="$(optenv ROBOT_HAS_FLIR_PTU 0)">
+        <xacro:include filename="$(find flir_ptu_description)/urdf/rcta_ptu.urdf.xacro"/>
+        <ptu_d47 name="ptu" parent="${robot_params['ptu_link']['parent']}"
+                 ptu_xyz="${robot_params['ptu_link']['xyz']}" ptu_rpy="${robot_params['ptu_link']['rpy']}"
+        />
+    </xacro:if>
+
+    <!-- sensor head -->
+    <xacro:if value="$(optenv ROBOT_HAS_SENSOR_HEAD 0)">
+        <xacro:include filename="$(find hardware_launch)/urdf/accessories/sensor_head.urdf.xacro"/>
+        <sensor_head name="head" parent="${robot_params['head_link']['parent']}"
+                     camera="head_realsense" lidar="head_velodyne"
+                     head_xyz="${robot_params['head_link']['xyz']}" head_rpy="${robot_params['head_link']['rpy']}"
+                     camera_xyz="${robot_params['head_realsense_link']['xyz']}" camera_rpy="${robot_params['head_realsense_link']['rpy']}"
+                     lidar_xyz="${robot_params['head_velodyne_link']['xyz']}" lidar_rpy="${robot_params['head_velodyne_link']['rpy']}"
+        />
+    </xacro:if>
+
+    <!-- rgbd_tilt -->
+    <xacro:if value="$(optenv ROBOT_HAS_RGBD_TILT 0)">
+        <xacro:include filename="$(find hardware_launch)/urdf/accessories/rcta_tilt_rgbd.urdf.xacro"/>
+        <rcta_tilt_rgbd parent="chest" />
+    </xacro:if>
+
+    <!-- rs limb -->
+    <xacro:if value="$(arg right_limb)">
+        <rslimb prefix="limb_right_" parent="chest" namespace="$(arg namespace)">
+            <xacro:if value="${chest_rev == 1}">
+                <origin xyz="0.0705 0.0 0.1" rpy="0.0 -1.5708 -1.5708"/>
+            </xacro:if>
+            <xacro:if value="${chest_rev == 2}">
+                <origin xyz="0.1211 0.027577 0.1248" rpy="0.0 -0.7854 -1.5708"/>
+            </xacro:if>
+        </rslimb>
+        <!-- grippers (0 = no gripper, 1 = robotiq, 2 = camhand)-->
+        <xacro:if value="${right_gripper_type == 1}">
+            <xacro:robotiq_hand prefix="limb_right_" wrist_angle="$(arg right_wrist_angle)"/>
+        </xacro:if>
+        <xacro:if value="${right_gripper_type == 2}">
+            <xacro:camhand      prefix="limb_right_" wrist_angle="$(arg right_wrist_angle)"/>
+        </xacro:if>
+    </xacro:if>
+
+    <xacro:if value="$(arg left_limb)">
+        <rslimb prefix="limb_left_" parent="chest" namespace="$(arg namespace)">
+            <xacro:if value="${chest_rev == 1}">
+                <origin xyz="0.0705 0.0 -0.1" rpy="0.0 1.5708 -1.5708"/>
+            </xacro:if>
+            <xacro:if value="${chest_rev == 2}">
+                <origin xyz="0.1211 0.027577 -0.1248" rpy="0.0 0.7854 -1.5708"/>
+            </xacro:if>
+        </rslimb>
+        <!-- grippers (0 = no gripper, 1 = robotiq, 2 = camhand) -->
+        <xacro:if value="${left_gripper_type == 1}">
+            <xacro:robotiq_hand prefix="limb_left_" wrist_angle="$(arg left_wrist_angle)"/>
+        </xacro:if>
+        <xacro:if value="${left_gripper_type == 2}">
+            <xacro:camhand      prefix="limb_left_" wrist_angle="$(arg left_wrist_angle)"/>
+        </xacro:if>
+    </xacro:if>
 
     <link name="z_link"/>
     <joint name="base_link_z_joint" type="prismatic">

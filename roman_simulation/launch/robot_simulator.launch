@@ -1,43 +1,30 @@
 <launch>
-    <include file="$(find roman_model)/robots/upload_rcta_roman.launch"/>
+    <!-- Whether to load the URDF -->
+    <arg name="load_robot_description" default="false"/>
+
+    <!-- Which robot the simulation is for -->
+    <arg name="robot" default="roman"/>
+
+    <!-- Optionally, load the URDF for the default RoMan (roman1) -->
+    <include if="$(arg load_robot_description)" file="$(find roman_model)/robots/upload_roman1.launch"/>
+
+    <!-- Spawn the main simulation node that provides a surrogate, kinematic simulation of the robot -->
     <node name="robot_simulator" pkg="roman_simulation" type="robot_simulator"/>
-    <rosparam command="load" file="$(find roman_simulation)/config/roman_control_sim.yaml"/>
 
-    <!-- This node is the culprit that won't die on C-c (at least in indigo)
-    since it attempts to unload the controllers after the controller manager
-    has already died. The shutdown-timeout argument makes this less terrible,
-    but it is deprecated in xenial/kinetic.
-    -->
-    <node name="controller_spawner" pkg="controller_manager" type="spawner"
-            args="--shutdown-timeout 0.5 joint_state_controller rcta_joint_trajectory_controller
-                  rcta_left_robotiq_controller rcta_right_robotiq_controller rcta_velocity_controller"/>
+    <!-- Spawn controllers for the specific robot -->
+    <include file="$(find roman_simulation)/launch/robot_simulator_$(arg robot).launch"/>
 
+    <!-- Publish /tf for internal joint transforms -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 
-    <node name="fake_localization" pkg="tf" type="static_transform_publisher"
-            args="0 0 0 0 0 0 map odom 16"/>
+    <!-- Publish a static transform for localization (odometry provided by controllers) -->
+    <node name="fake_localization" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map odom 16"/>
 
+    <!-- Spawn trajectory controller wrapper node that accepts under-specified trajectories -->
     <node name="trajectory_dispatcher" pkg="roman_simulation" type="trajectory_dispatcher">
-        <rosparam param="clients">
-            - name: rcta_joint_trajectory_controller/follow_joint_trajectory
-              joints:
-                - torso_joint1
-                - limb_right_joint1
-                - limb_right_joint2
-                - limb_right_joint3
-                - limb_right_joint4
-                - limb_right_joint5
-                - limb_right_joint6
-                - limb_right_joint7
-                - limb_left_joint1
-                - limb_left_joint2
-                - limb_left_joint3
-                - limb_left_joint4
-                - limb_left_joint5
-                - limb_left_joint6
-                - limb_left_joint7
-        </rosparam>
+        <rosparam command="load" file="$(find roman_simulation)/config/trajectory_dispatcher_$(arg robot).yaml"/>
     </node>
 
+    <!-- Spawn an action server for simple gripper commands -->
     <node name="gripper_command_action_server" pkg="roman_simulation" type="gripper_command_action_server"/>
 </launch>

@@ -34,33 +34,6 @@ find_package(urdfdom REQUIRED)
 
 catkin_package()
 
-add_executable(
-    depth_sensor_simulator
-    src/depth_sensor_simulator/depth_sensor_simulator.cpp)
-target_compile_options(depth_sensor_simulator PRIVATE -std=c++11)
-target_include_directories(
-    depth_sensor_simulator
-    SYSTEM
-    PRIVATE
-    ${sdl2_INCLUDE_DIRS}
-    ${roscpp_INCLUDE_DIRS}
-    ${moveit_msgs_INCLUDE_DIRS}
-    ${EIGEN3_INCLUDE_DIR}
-    ${sdl2_INCLUDE_DIRS}
-    ${GLEW_INCLUDE_DIR}
-    ${rospack_INCLUDE_DIRS}
-    ${smpl_INCLUDE_DIRS}
-    ${spellbook_INCLUDE_DIRS})
-target_link_libraries(
-    depth_sensor_simulator
-    PRIVATE
-    ${rospack_LIBRARIES}
-    ${smpl_LIBRARIES}
-    ${roscpp_LIBRARIES}
-    ${sdl2_LIBRARIES}
-    ${OPENGL_LIBRARIES}
-    ${GLEW_LIBRARIES})
-
 # A gazebo_ros_control::RobotHWSim plugin for kinematic control of a robot
 # within Gazebo
 add_library(
@@ -87,6 +60,11 @@ target_link_libraries(
     ${smpl_urdf_robot_model_LIBRARIES}
     ${hardware_interface_LIBRARIES})
 target_compile_options(kinematic_robot_hw_sim PRIVATE ${GAZEBO_CXX_FLAGS})
+install(
+    TARGETS kinematic_robot_hw_sim
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
 
 add_executable(
     ground_truth_publisher
@@ -110,36 +88,9 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${tf_LIBRARIES}
     ${tf_conversions_LIBRARIES})
-
-add_executable(
-    kinect_simulator
-    src/kinect_simulator/kinect_simulator.cpp)
-target_compile_options(kinect_simulator PRIVATE -std=c++11)
-target_include_directories(
-    kinect_simulator
-    SYSTEM
-    PRIVATE
-    ${roscpp_INCLUDE_DIRS}
-    ${sensor_msgs_INCLUDE_DIRS})
-target_link_libraries(
-    kinect_simulator
-    PRIVATE
-    ${roscpp_LIBRARIES})
-
-add_executable(
-    tilt_mount_simulator
-    src/tilt_mount_simulator/tilt_mount_simulator.cpp)
-target_compile_options(tilt_mount_simulator PRIVATE -std=c++11)
-target_include_directories(
-    tilt_mount_simulator
-    SYSTEM
-    PRIVATE
-    ${roscpp_INCLUDE_DIRS}
-    ${sensor_msgs_INCLUDE_DIRS})
-target_link_libraries(
-    tilt_mount_simulator
-    PRIVATE
-    ${roscpp_LIBRARIES})
+install(
+    TARGETS ground_truth_publisher
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 add_executable(robot_simulator src/robot_simulator/robot_simulator.cpp)
 target_compile_options(robot_simulator PRIVATE -std=c++11)
@@ -160,6 +111,9 @@ target_link_libraries(
     ${roscpp_LIBRARIES}
     ${smpl_urdf_robot_model_LIBRARIES}
     ${urdfdom_LIBRARIES})
+install(
+    TARGETS robot_simulator
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 add_executable(
     trajectory_dispatcher
@@ -177,6 +131,9 @@ target_link_libraries(
     PRIVATE
     ${actionlib_LIBRARIES}
     ${roscpp_LIBRARIES})
+install(
+    TARGETS trajectory_dispatcher
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 add_executable(
     gripper_command_action_server
@@ -195,17 +152,12 @@ target_link_libraries(
     PRIVATE
     ${actionlib_LIBRARIES}
     ${roscpp_LIBRARIES})
-
 install(
-    TARGETS
-        depth_sensor_simulator
-        ground_truth_publisher
-        kinect_simulator
-        robot_simulator
-        tilt_mount_simulator
+    TARGETS gripper_command_action_server
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY models DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY plugins DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY worlds DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

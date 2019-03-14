@@ -290,6 +290,68 @@ bool AnimateTrajectory(
 using ManipulateObjectActionServer =
 actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 
+// because fuck you moveit, plz stahp throwing exceptions...unreferenced
+// but keeping this around in case we explode
+//
+// We exploded. Someone please explain to me why we have a return code
+// on robotStateMsgToRobotState if we're just going to throw an exception.
+// - Andrew on 3/10/2019
+bool RobotHasVariable(
+    const moveit::core::RobotModel& model,
+    const std::string& name)
+{
+    auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
+    return it != end(model.getVariableNames());
+};
+
+int GetVariableIndex(moveit::core::RobotState* state, const std::string& name)
+{
+    auto it = std::find(
+            begin(state->getVariableNames()),
+            end(state->getVariableNames()),
+            name);
+
+    if (it == end(state->getVariableNames())) return -1;
+
+    return std::distance(begin(state->getVariableNames()), it);
+}
+
+// A less pissy version of robotStateMsgToRobotState that doesn't complain when
+// extra joints show up in the state message. We want this for convenience so
+// test scenarios can specify configurations for the entire RoMan when specific
+// RoMans lack different components.
+void RobotStateMsgToRobotState(
+    const moveit_msgs::RobotState* msg,
+    moveit::core::RobotState* state)
+{
+    for (auto i = 0; i < msg->joint_state.name.size(); ++i) {
+        auto& joint_name = msg->joint_state.name[i];
+
+        auto index = GetVariableIndex(state, joint_name);
+        if (index < 0) continue;
+
+        auto position = msg->joint_state.position[i];
+        state->setVariablePosition(index, position);
+    }
+
+    for (auto i = 0; i < msg->multi_dof_joint_state.joint_names.size(); ++i) {
+        auto& joint_name = msg->multi_dof_joint_state.joint_names[i];
+
+        // explicit check here to avoid stupid error spam
+        if (!state->getRobotModel()->hasJointModel(joint_name)) continue;
+
+        auto* joint = state->getRobotModel()->getJointModel(joint_name);
+        assert(joint != NULL);
+
+        auto& transform = msg->multi_dof_joint_state.transforms[i];
+
+        auto T_eigen = Eigen::Affine3d{ };
+        tf::transformMsgToEigen(transform, T_eigen);
+
+        state->setJointPositions(joint, T_eigen);
+    }
+}
+
 // Plan and execute (or animate) a sequence of trajectory/gripper commands to
 // manipulate the state of an object.
 // \param robot_model
@@ -345,6 +407,7 @@ bool ManipulateObject(
 
     auto start_state = moveit::core::RobotState(*real_start_state);
 
+    /*
     // TODO: initialize to current state values
     // start_state.setToDefaultValues();
 
@@ -364,12 +427,15 @@ bool ManipulateObject(
         return false;
     }
 
+    */
+
+    RobotStateMsgToRobotState(&msg->start_state, &start_state);
+
     ///////////////////////////////
     // Visualize the start state //
     ///////////////////////////////
 
     {
-        ros::Duration(1.0).sleep();
         auto ma = visualization_msgs::MarkerArray();
         auto color = std_msgs::ColorRGBA();
         color.r = 0.8f;
@@ -384,7 +450,6 @@ bool ManipulateObject(
             ros::Duration(0.0));
         ROS_INFO("Visualize %zu markers", ma.markers.size());
         SV_SHOW_INFO(ma);
-        ros::Duration(1.0).sleep();
     }
 
     ///////////////////////////////
@@ -873,48 +938,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-#if 0
-    auto urdf_copy = boost::make_shared<urdf::ModelInterface>(*orig_robot_model->getURDF());
-    {
-        auto z_link = boost::make_shared<::urdf::Link>();
-        auto z_joint = boost::make_shared<::urdf::Joint>();
-
-        z_link->name = "world_link";
-        z_link->parent_joint;
-        z_link->child_joints = { z_joint };
-        z_link->child_links = std::vector<boost::shared_ptr<::urdf::Link>>{
-            urdf_copy->links_[urdf_copy->getRoot()->name]
-        };
-        // TODO: no way to remap urdf.getRoot()'s weak_ptr, do we need that?
-
-        z_joint->name = "world_z";
-        z_joint->type = ::urdf::Joint::PRISMATIC;
-        z_joint->axis = ::urdf::Vector3(0, 0, 1);
-        z_joint->child_link_name = urdf_copy->getRoot()->name;
-        z_joint->parent_link_name = z_link->name;
-        z_joint->parent_to_joint_origin_transform.clear();
-
-        urdf_copy->root_link_->parent_joint = z_joint;
-
-        urdf_copy->links_[z_link->name] = z_link;
-        urdf_copy->joints_[z_joint->name] = z_joint;
-        urdf_copy->root_link_ = z_link;
-    }
-
-    for (auto& e : urdf_copy->joints_) {
-        ROS_INFO("joint: %s", e.first.c_str());
-    }
-    for (auto& e : urdf_copy->links_) {
-        ROS_INFO("link: %s", e.first.c_str());
-    }
-
-    auto srdf_copy = orig_robot_model->getSRDF();
-    srdf_copy->virtual_joints_[0].child_link_ = "world_link";
-    auto robot_model = std::make_shared<moveit::core::RobotModel>(
-            urdf_copy,
-            orig_robot_model->getSRDF());
-#endif
-
     auto redundant_joints = std::vector<std::string>();
     if (ik_group_name == "right_arm") {
         redundant_joints = { "limb_right_joint3" };
@@ -978,6 +1001,11 @@ int main(int argc, char* argv[])
     if (!planning_model.init(robot_model, group_name, ik_group_name)) {
         ROS_ERROR("Failed to initialize robot model");
         return 1;
+    }
+
+    ROS_INFO("Parent planning joints:");
+    for (auto i = 0; i < planning_model.jointVariableCount(); ++i) {
+        ROS_INFO("  %s", planning_model.getPlanningJoints()[i].c_str());
     }
 
     if (!planning_model.setPlanningLink(tip_link)) {
@@ -1097,7 +1125,9 @@ int main(int argc, char* argv[])
     SV_SHOW_INFO(cspace.getCollisionWorldVisualization());
 
     ObjectManipChecker ochecker;
-    ochecker.parent = &cspace;
+    if (!Init(&ochecker, &cspace)) {
+        return false;
+    }
 
     ////////////////////////////
     // Initialize the Planner //

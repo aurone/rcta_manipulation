@@ -4,13 +4,9 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Global Options1
-        - /TF1/Frames1
-        - /InteractiveMarkers1
-        - /MarkerArray1
-        - /InteractiveMarkers2
-      Splitter Ratio: 0.504828
-    Tree Height: 680
+        - /Status1
+      Splitter Ratio: 0.5
+    Tree Height: 910
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -19,7 +15,7 @@ Panels:
       - /2D Nav Goal1
       - /Publish Point1
     Name: Tool Properties
-    Splitter Ratio: 0.588679
+    Splitter Ratio: 0.588679016
   - Class: rviz/Views
     Expanded:
       - /Current View1
@@ -29,60 +25,90 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: LaserScan
+    SyncSource: ""
   - Class: move_group_interface/Move Group Command Panel
     Name: Move Group Command Panel
     active_joint_group: right_arm
     allowed_planning_time: 10
-    current_planner_id_index: 0
+    current_planner_id_index: 4
     current_planner_index: 0
-    joint_tolerance: 0.0872664600610733
+    joint_tolerance: 0.0015707963267948967
     num_planning_attempts: 1
-    orientation_tolerance: 0.174532920122147
+    orientation_tolerance: 0.0029670597283903608
     phantom_state:
-      limb_left_joint1: 0
-      limb_left_joint2: 0
+      front_left_wheel: 0
+      front_right_wheel: 0
+      limb_left_finger_1_joint_1: 0.63565000000000005
+      limb_left_finger_1_joint_2: 0
+      limb_left_finger_1_joint_3: -0.63700000000000001
+      limb_left_finger_2_joint_1: 0.63565000000000005
+      limb_left_finger_2_joint_2: 0
+      limb_left_finger_2_joint_3: -0.63700000000000001
+      limb_left_finger_middle_joint_1: 0.63565000000000005
+      limb_left_finger_middle_joint_2: 0
+      limb_left_finger_middle_joint_3: -0.63700000000000001
+      limb_left_joint1: 1.5707899999999999
+      limb_left_joint2: -1.5707899999999999
       limb_left_joint3: 0
-      limb_left_joint4: 0
+      limb_left_joint4: 3.1415899999999999
       limb_left_joint5: 0
       limb_left_joint6: 0
-      limb_left_joint7: 0
-      limb_right_joint1: 0
-      limb_right_joint2: 1.5707963267949
+      limb_left_joint7: 1.5707899999999999
+      limb_left_palm_finger_1_joint: 0
+      limb_left_palm_finger_2_joint: 0
+      limb_right_finger_1_joint_1: 0.63565000000000005
+      limb_right_finger_1_joint_2: 0
+      limb_right_finger_1_joint_3: -0.63700000000000001
+      limb_right_finger_2_joint_1: 0.63565000000000005
+      limb_right_finger_2_joint_2: 0
+      limb_right_finger_2_joint_3: -0.63700000000000001
+      limb_right_finger_middle_joint_1: 0.63565000000000005
+      limb_right_finger_middle_joint_2: 0
+      limb_right_finger_middle_joint_3: -0.63700000000000001
+      limb_right_joint1: -1.5707899999999999
+      limb_right_joint2: 1.5707899999999999
       limb_right_joint3: 0
-      limb_right_joint4: 0
+      limb_right_joint4: -3.1415899999999999
       limb_right_joint5: 0
       limb_right_joint6: 0
-      limb_right_joint7: 0
+      limb_right_joint7: 1.5707899999999999
+      limb_right_palm_finger_1_joint: 0
+      limb_right_palm_finger_2_joint: 0
+      rear_left_wheel: 0
+      rear_right_wheel: 0
       torso_joint1: 0
-      track_left_joint: 0
-      track_right_joint: 0
-      world_joint/theta: 0.012915436464758
-      world_joint/x: -0.021
-      world_joint/y: -0.0528392791748047
-    position_tolerance: 0.0500000007450581
-    robot_description: /robot_description
-    workspace_frame: base_footprint
+      world_joint/theta: 0
+      world_joint/x: 0
+      world_joint/y: 0
+    position_tolerance: 0.050000000000000003
+    robot_description: robot_description
+    workspace_frame: base_link
     workspace_max_x: 1.5
-    workspace_max_y: 0.5
-    workspace_max_z: 2
+    workspace_max_y: 1.5
+    workspace_max_z: 1.3
     workspace_min_x: -0.5
     workspace_min_y: -1.5
-    workspace_min_z: 0
-  - Class: rcta_plugins/ViservoCommandPanel
-    Name: ViservoCommandPanel
-  - Class: rcta_plugins/GripperCommandPanel
-    Name: GripperCommandPanel
+    workspace_min_z: -0.19999999999999998
   - Class: rcta_plugins/GraspingCommandPanel
     Name: GraspingCommandPanel
     base_x: 0
     base_y: 0
     base_yaw: 0
     global_frame: map
-    object_x: 1.20966219902039
+    object_goal: 0
+    object_mesh_resource: package://gascan_description/meshes/rcta_gastank.ply
+    object_scale_x: 1
+    object_scale_y: 1
+    object_scale_z: 1
+    object_start: 0
+    object_x: 0
     object_y: 0
     object_yaw: 0
+    object_z: 0
     robot_description: robot_description
+  - Class: rcta_plugins/GripperCommandPanel
+    Name: GripperCommandPanel
+    action_name: rcta_right_robotiq_controller/gripper_action
 Visualization Manager:
   Class: ""
   Displays:
@@ -92,7 +118,7 @@ Visualization Manager:
       Color: 160; 160; 164
       Enabled: true
       Line Style:
-        Line Width: 0.03
+        Line Width: 0.0299999993
         Value: Lines
       Name: Grid
       Normal Cell Count: 0
@@ -101,16 +127,16 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 100
+      Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz/Axes
-      Enabled: true
+      Enabled: false
       Length: 1
       Name: Axes
-      Radius: 0.01
+      Radius: 0.100000001
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -121,6 +147,27 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        asus_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        asus_rgb_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_rgb_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         base_footprint:
           Alpha: 1
           Show Axes: false
@@ -134,28 +181,78 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_link:
+          Value: true
+        chest:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_rgb_frame:
+        front_left_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_rgb_optical_frame:
+          Value: true
+        front_right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        chest:
+          Value: true
+        limb_left_finger_1_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -200,6 +297,75 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        limb_left_palm:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        limb_right_finger_1_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         limb_right_link0:
           Alpha: 1
           Show Axes: false
@@ -240,7 +406,21 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        talon:
+        limb_right_palm:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rear_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -250,14 +430,6 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        track_left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        track_right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -268,235 +440,47 @@ Visualization Manager:
       Enabled: false
       Frame Timeout: 15
       Frames:
-        All Enabled: false
+        All Enabled: true
       Marker Scale: 1
       Name: TF
-      Show Arrows: false
+      Show Arrows: true
       Show Axes: true
-      Show Names: false
+      Show Names: true
       Tree:
         {}
       Update Interval: 0
       Value: false
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/LaserScan
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 0
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: LaserScan
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.01
-      Style: Flat Squares
-      Topic: /base_scan
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Alpha: 0.7
-      Class: rviz/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: true
-      Name: Map
-      Topic: /map
-      Unreliable: false
-      Value: true
-    - Class: moveit_rviz_plugin/PlanningScene
-      Enabled: true
-      Move Group Namespace: ""
-      Name: PlanningScene
-      Planning Scene Topic: /move_group/monitored_planning_scene
-      Robot Description: robot_description
-      Scene Geometry:
-        Scene Alpha: 0.9
-        Scene Color: 50; 230; 50
-        Scene Display Time: 0.2
-        Show Scene Geometry: true
-        Voxel Coloring: Z-Axis
-        Voxel Rendering: Occupied Voxels
-      Scene Robot:
-        Attached Body Color: 150; 50; 150
-        Links:
-          All Links Enabled: true
-          Expand Joint Details: false
-          Expand Link Details: false
-          Expand Tree: false
-          Link Tree Style: Links in Alphabetic Order
-          base_footprint:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          base_laser_frame:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          base_link:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          camera_depth_frame:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          camera_depth_optical_frame:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          camera_link:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          camera_rgb_frame:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          camera_rgb_optical_frame:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          chest:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link0:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link1:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link2:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link3:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link4:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link5:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link6:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_left_link7:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link0:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link1:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link2:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link3:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link4:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link5:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link6:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          limb_right_link7:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          talon:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          torso_link0:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-            Value: true
-          track_left:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-          track_right:
-            Alpha: 1
-            Show Axes: false
-            Show Trail: false
-        Robot Alpha: 1
-        Show Robot Collision: false
-        Show Robot Visual: false
-      Value: true
-    - Class: rviz/InteractiveMarkers
-      Enable Transparency: true
-      Enabled: true
-      Name: InteractiveMarkers
-      Show Axes: false
-      Show Descriptions: false
-      Show Visual Aids: false
-      Update Topic: /phantom_controls/update
-      Value: true
     - Class: moveit_rviz_plugin/Trajectory
+      Color Enabled: false
       Enabled: true
-      Interrupt Display: true
+      Interrupt Display: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        asus_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        asus_rgb_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_rgb_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         base_footprint:
           Alpha: 1
           Show Axes: false
@@ -510,28 +494,78 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_link:
+          Value: true
+        chest:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_rgb_frame:
+        front_left_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_rgb_optical_frame:
+          Value: true
+        front_right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        chest:
+          Value: true
+        limb_left_finger_1_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -576,6 +610,75 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        limb_left_palm:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        limb_right_finger_1_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         limb_right_link0:
           Alpha: 1
           Show Axes: false
@@ -616,7 +719,21 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        talon:
+        limb_right_palm:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rear_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -626,54 +743,354 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        track_left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        track_right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-      Loop Animation: true
+      Loop Animation: false
       Name: Trajectory
-      Robot Alpha: 1
+      Robot Alpha: 0.5
+      Robot Color: 150; 50; 150
       Robot Description: robot_description
       Show Robot Collision: false
       Show Robot Visual: true
       Show Trail: false
       State Display Time: 0.05 s
+      Trail Step Size: 1
       Trajectory Topic: /move_group/display_planned_path
+      Value: true
+    - Class: moveit_rviz_plugin/Trajectory
+      Color Enabled: false
+      Enabled: true
+      Interrupt Display: false
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        asus_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        asus_rgb_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        asus_rgb_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_footprint:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_laser_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        chest:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_1_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_2_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_finger_middle_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_palm:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_left_tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        limb_right_finger_1_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_1_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_2_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_finger_middle_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_palm:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        limb_right_tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rear_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        torso_link0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Loop Animation: false
+      Name: Trajectory
+      Robot Alpha: 0.5
+      Robot Color: 150; 50; 150
+      Robot Description: robot_description
+      Show Robot Collision: false
+      Show Robot Visual: true
+      Show Trail: false
+      State Display Time: 0.05 s
+      Trail Step Size: 1
+      Trajectory Topic: /object_manip_planner/planned_path
+      Value: true
+    - Class: rviz/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Name: InteractiveMarkers
+      Show Axes: false
+      Show Descriptions: false
+      Show Visual Aids: false
+      Update Topic: /phantom_controls/update
+      Value: true
+    - Class: rviz/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Name: InteractiveMarkers
+      Show Axes: false
+      Show Descriptions: false
+      Show Visual Aids: false
+      Update Topic: /grasping_commands/update
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /visualization_markers
       Name: MarkerArray
       Namespaces:
-        collision_space_bounds: true
         rcta_roman_command: true
         workspace: true
       Queue Size: 100
       Value: true
-    - Class: rviz/MarkerArray
-      Enabled: false
-      Marker Topic: /visualization_marker_array
-      Name: MarkerArray
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Class: rviz/InteractiveMarkers
-      Enable Transparency: true
-      Enabled: true
-      Name: InteractiveMarkers
-      Show Axes: false
-      Show Descriptions: true
-      Show Visual Aids: false
-      Update Topic: /grasping_commands/update
-      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
+    Default Light: true
     Fixed Frame: map
     Frame Rate: 30
   Name: root
@@ -695,22 +1112,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 6.16577
+      Distance: 10
       Enable Stereo Rendering:
-        Stereo Eye Separation: 0.06
+        Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.831966
-        Y: -0.236316
-        Z: 0.182125
+        X: 0
+        Y: 0
+        Z: 0
+      Focal Shape Fixed Size: false
+      Focal Shape Size: 0.0500000007
+      Invert Z Axis: false
       Name: Current View
-      Near Clip Distance: 0.01
-      Pitch: 0.485399
+      Near Clip Distance: 0.00999999978
+      Pitch: 0.785398185
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.97541
+      Yaw: 0.785398185
     Saved: ~
 Window Geometry:
   Displays:
@@ -724,17 +1144,17 @@ Window Geometry:
   Hide Right Dock: false
   Move Group Command Panel:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000016a00000452fc020000000cfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000002e9000000dd00fffffffb0000000a005600690065007700730100000317000000b0000000b000fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000002e004d0061006e006900700075006c00610074006f00720043006f006d006d0061006e006400500061006e0065006c0000000131000003490000000000000000fb00000026005600690073006500720076006f0043006f006d006d0061006e006400500061006e0065006c01000003cd000000430000004300fffffffb0000002600470072006900700070006500720043006f006d006d0061006e006400500061006e0065006c0100000416000000640000006400ffffff000000010000022200000452fc0200000004fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb00000030004d006f00760065002000470072006f0075007000200043006f006d006d0061006e0064002000500061006e0065006c0100000028000002b60000007600fffffffb00000028004700720061007300700069006e00670043006f006d006d0061006e006400500061006e0065006c01000002e4000001960000019600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f0000003efc0100000002fb0000000800540069006d006500000000000000073f000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000003a70000045200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000015600000444fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003a000003c8000000c600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000003e00fffffffb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000003e00fffffffb0000002600470072006900700070006500720043006f006d006d0061006e006400500061006e0065006c0100000408000000760000007600ffffff000000010000020800000444fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fc0000003a00000444000000b801000019fa000000010100000003fb00000028004700720061007300700069006e00670043006f006d006d0061006e006400500061006e0065006c0100000000ffffffff000000c900fffffffb00000030004d006f00760065002000470072006f0075007000200043006f006d006d0061006e0064002000500061006e0065006c0100000000ffffffff000000e300fffffffb0000000a0056006900650077007301000006300000010f0000010000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f0000003efc0100000002fb0000000800540069006d006500000000000000073f0000024400fffffffb0000000800540069006d00650100000000000004500000000000000000000003d50000044400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
     collapsed: false
   Tool Properties:
     collapsed: false
+  Trajectory - Slider:
+    collapsed: false
   Views:
     collapsed: false
-  ViservoCommandPanel:
-    collapsed: false
   Width: 1855
-  X: 55
-  Y: -14
+  X: 65
+  Y: 24

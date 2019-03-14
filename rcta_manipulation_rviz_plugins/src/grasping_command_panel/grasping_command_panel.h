@@ -67,12 +67,18 @@ public Q_SLOTS:
     void updateMeshScaleY();
     void updateMeshScaleZ();
 
+    void updateAllowedPlanningTime(double val);
+
     void updateObjectPoseX(double val);
     void updateObjectPoseY(double val);
     void updateObjectPoseZ(double val);
     void updateObjectPoseYaw(double val);
     void updateObjectPosePitch(double val);
     void updateObjectPoseRoll(double val);
+
+    void updateMeshScaleX(double scale);
+    void updateMeshScaleY(double scale);
+    void updateMeshScaleZ(double scale);
 
     void updateObjectStart();
     void updateObjectGoal();
@@ -81,17 +87,71 @@ public Q_SLOTS:
     void sendRepositionBaseCommand();
     void sendManipulateObjectCommand();
 
+Q_SIGNALS:
+
+    void robotDescriptionUpdated(const QString& name);
+    void globalFrameUpdated(const QString& frame);
+    void objectMeshResourceUpdated(const QString& uri);
+    void objectPoseXUpdated(double val);
+    void objectPoseYUpdated(double val);
+    void objectPoseZUpdated(double val);
+    void objectPoseYawUpdated(double val);
+    void objectPosePitchUpdated(double val);
+    void objectPoseRollUpdated(double val);
+
 private:
 
-    /// @{ ROS Comms
+    ros::NodeHandle m_nh;
 
-    ros::NodeHandle nh_;
+    /// \name Interface
+    ///@{
 
-    ros::Publisher robot_markers_pub_;
+    // Global Settings Widgets
+    QLineEdit*      m_robot_description_line_edit = NULL;
+    QPushButton*    m_refresh_robot_desc_button = NULL;
+    QLineEdit*      m_global_frame_line_edit = NULL;
+    QPushButton*    m_refresh_global_frame_button = NULL;
+    QLineEdit*      m_obj_mesh_resource_line_edit = NULL;
+    QPushButton*    m_refresh_obj_mesh_resource_button = NULL;
+    QLineEdit*      m_obj_mesh_scale_x_line_edit = NULL;
+    QLineEdit*      m_obj_mesh_scale_y_line_edit = NULL;
+    QLineEdit*      m_obj_mesh_scale_z_line_edit = NULL;
 
-    ros::Subscriber occupancy_grid_sub_;
+    // Base Command Widgets
+    QPushButton*    m_copy_current_base_pose_button = NULL;
+    QDoubleSpinBox* m_teleport_base_command_x_box = NULL;
+    QDoubleSpinBox* m_teleport_base_command_y_box = NULL;
+    QDoubleSpinBox* m_teleport_base_command_z_box = NULL;
+    QDoubleSpinBox* m_teleport_base_command_yaw_box = NULL;
 
-    tf::TransformListener listener_;
+    // Object Interaction Command Widgets
+    QPushButton*    send_grasp_object_command_button_ = NULL;
+    QPushButton*    send_reposition_base_command_button_ = NULL;
+    QPushButton*    send_manipulate_object_command_button_ = NULL;
+    QLineEdit*      m_object_start_line_edit = NULL;
+    QLineEdit*      m_object_goal_line_edit = NULL;
+    QDoubleSpinBox* m_allowed_planning_time_spinbox = NULL;
+    QSpinBox*       update_candidate_spinbox_ = NULL;
+    QLabel*         num_candidates_label_ = NULL;
+
+    QDoubleSpinBox* m_obj_pose_x_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_y_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_z_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_Y_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_P_spinbox = NULL;
+    QDoubleSpinBox* m_obj_pose_R_spinbox = NULL;
+
+    ros::Publisher m_marker_pub;
+
+    interactive_markers::InteractiveMarkerServer m_server;
+
+    ///@}
+
+    /// \name Model
+    ///@{
+    ros::Subscriber m_occupancy_grid_sub;
+
+    tf::TransformListener m_listener;
 
     using ManipulateActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateAction>;
     std::unique_ptr<ManipulateActionClient> manipulate_client_;
@@ -109,52 +169,10 @@ private:
     std::unique_ptr<ManipulateObjectActionClient> manipulate_object_client_;
     bool pending_manipulate_object_command_ = false;
 
-    interactive_markers::InteractiveMarkerServer server_;
-
-    /// @}
-
-    ///@{ GUI Interface
-
-    // Global Settings Widgets
-    QLineEdit* robot_description_line_edit_ = NULL;
-    QPushButton* refresh_robot_desc_button_ = NULL;
-    QLineEdit* global_frame_line_edit_ = NULL;
-    QPushButton* refresh_global_frame_button_ = NULL;
-    QLineEdit* m_obj_mesh_resource_line_edit = NULL;
-    QPushButton* m_refresh_obj_mesh_resource_button = NULL;
-    QLineEdit* m_obj_mesh_scale_x_line_edit = NULL;
-    QLineEdit* m_obj_mesh_scale_y_line_edit = NULL;
-    QLineEdit* m_obj_mesh_scale_z_line_edit = NULL;
-
-    // Base Command Widgets
-    QPushButton* copy_current_base_pose_button_ = NULL;
-    QDoubleSpinBox* teleport_base_command_x_box_ = NULL;
-    QDoubleSpinBox* teleport_base_command_y_box_ = NULL;
-    QDoubleSpinBox* teleport_base_command_z_box_ = NULL;
-    QDoubleSpinBox* teleport_base_command_yaw_box_ = NULL;
-
-    // Object Interaction Command Widgets
-    QPushButton* send_grasp_object_command_button_ = NULL;
-    QPushButton* send_reposition_base_command_button_ = NULL;
-    QPushButton* send_manipulate_object_command_button_ = NULL;
-    QLineEdit* m_object_start_line_edit = NULL;
-    QLineEdit* m_object_goal_line_edit = NULL;
-    QSpinBox* update_candidate_spinbox_ = NULL;
-    QLabel* num_candidates_label_ = NULL;
-
-    QDoubleSpinBox* m_obj_pose_x_spinbox = NULL;
-    QDoubleSpinBox* m_obj_pose_y_spinbox = NULL;
-    QDoubleSpinBox* m_obj_pose_z_spinbox = NULL;
-    QDoubleSpinBox* m_obj_pose_Y_spinbox = NULL;
-    QDoubleSpinBox* m_obj_pose_P_spinbox = NULL;
-    QDoubleSpinBox* m_obj_pose_R_spinbox = NULL;
-
-    /// @}
-
     // TODO: can this be maintained via the transform of the root joint or is
     // there a reason this is being maintained externally?
-    Eigen::Affine3d T_world_robot_ = Eigen::Affine3d::Identity();
-    Eigen::Affine3d T_world_object_ = Eigen::Affine3d::Identity();
+    Eigen::Affine3d m_T_world_robot = Eigen::Affine3d::Identity();
+    Eigen::Affine3d m_T_world_object = Eigen::Affine3d::Identity();
 
     robot_model_loader::RobotModelLoaderPtr rml_;
     robot_model::RobotModelPtr robot_model_;
@@ -171,14 +189,15 @@ private:
     std::string m_gascan_interactive_marker_name = "gas_canister_fixture";
     std::string m_obj_mesh_resource = "package://gascan_description/meshes/rcta_gastank.ply";
 
+    double m_allowed_planning_time = 10.0;
+
     double m_obj_scale_x = 1.0;
     double m_obj_scale_y = 1.0;
     double m_obj_scale_z = 1.0;
 
     double m_obj_start = 0.0;
     double m_obj_goal = 0.0;
-
-    void setupGUI();
+    ///@}
 
     // The set utilities have the effect of changing the text in the line edit
     // box as well as applying the same action as the corresponding refresh
@@ -194,7 +213,7 @@ private:
 
     bool robotModelLoaded() const;
 
-    void processGascanMarkerFeedback(
+    void processObjectMarkerFeedback(
         const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback);
 
     void publishPhantomRobotVisualization();

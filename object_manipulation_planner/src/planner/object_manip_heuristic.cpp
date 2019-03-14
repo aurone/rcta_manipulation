@@ -13,12 +13,15 @@
 #include "smpl_assert.h"
 #include "variables.h"
 
-//static const double FixedPointRatio = 1000.0;
+#if 1
+static const double FixedPointRatio = 1000.0;
+#else
 static const double FixedPointRatio = 500.0;
+#endif
 
 #define HV_LOG H_LOG ".verbose"
 
-// TODO: duplicate in object_manip_planner.cpp
+// TODO: duplicate in object_manip_planner.cpp, change me there too
 #define USE_UNIQUE_GOAL 0
 
 auto operator<<(std::ostream& o, const HeuristicCoord& coord) -> std::ostream&
@@ -210,6 +213,9 @@ void UpdateUserGoal(
     auto goal_thresh = goal.angle_tolerances[0];
 
     SMPL_INFO_NAMED(H_LOG, "Goal Z: %f", goal_z);
+#if USE_UNIQUE_GOAL == 0
+    SMPL_INFO_NAMED(H_LOG, "Goal Threshold: %f", goal_thresh);
+#endif
 
     auto* egraph = heur->eg->getExperienceGraph();
 
@@ -302,7 +308,7 @@ void UpdateUserGoal(
             auto node = *nit;
             auto& egraph_state = egraph->state(node);
             auto egraph_state_z = GetZIndex(egraph_state);
-            SMPL_WARN_NAMED(H_LOG, "  z(%zu) = %d", node, egraph_state_z);
+            SMPL_WARN_NAMED(H_LOG, "  z(%zu) = %f @ %d", node, graph->m_demo_z_values[egraph_state_z], egraph_state_z);
         }
     }
 
@@ -565,7 +571,7 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
             MakePoseTransform(
                     state->state[WORLD_JOINT_X],
                     state->state[WORLD_JOINT_Y],
-                    state->state[WORLD_JOINT_THETA]),
+                    state->state[WORLD_JOINT_YAW]),
             "map",
             "state_base"));
 
@@ -667,14 +673,14 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
                 MakePoseTransform(
                         egraph_state[WORLD_JOINT_X],
                         egraph_state[WORLD_JOINT_Y],
-                        egraph_state[WORLD_JOINT_THETA]),
+                        egraph_state[WORLD_JOINT_YAW]),
                 "map",
                 "egraph_base"));
 
         // pose delta in discrete space
         auto disc_dx = graph_state->coord[BD_PX] - egraph_graph_state->coord[BD_PX];
         auto disc_dy = graph_state->coord[BD_PY] - egraph_graph_state->coord[BD_PY];
-        auto disc_dtheta = shortest_angle_dist(graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH], graph->m_val_count[BD_TH]);
+        auto disc_dtheta = shortest_angle_dist(graph_state->coord[BD_QZ], egraph_graph_state->coord[BD_QZ], graph->m_val_count[BD_QZ]);
 
         SMPL_DEBUG_NAMED(HV_LOG, "    disc delta base = (%d, %d, %d)", disc_dx, disc_dy, disc_dtheta);
 
@@ -682,19 +688,19 @@ int GetGoalHeuristic(ObjectManipHeuristic* heur, int state_id)
         auto dx = egraph_state[WORLD_JOINT_X] - state->state[WORLD_JOINT_X];
         auto dy = egraph_state[WORLD_JOINT_Y] - state->state[WORLD_JOINT_Y];
         auto dtheta = smpl::shortest_angle_dist(
-                egraph_state[WORLD_JOINT_THETA], state->state[WORLD_JOINT_THETA]);
+                egraph_state[WORLD_JOINT_YAW], state->state[WORLD_JOINT_YAW]);
 
         auto rot_dist = 0.0;
         if (heur->use_rotation) {
             rot_dist = ComputeRotationHeuristic(
-                    graph_state->coord[BD_TH], egraph_graph_state->coord[BD_TH],
-                    graph_state->state[BD_TH], egraph_graph_state->coord[BD_TH],
+                    graph_state->coord[BD_QZ], egraph_graph_state->coord[BD_QZ],
+                    graph_state->state[BD_QZ], egraph_graph_state->coord[BD_QZ],
                     dx, dy, dtheta,
                     disc_dx, disc_dy, disc_dtheta,
                     heur->heading_condition,
                     heur->heading_thresh,
-                    graph->m_val_count[BD_TH],
-                    graph->resolution()[BD_TH],
+                    graph->m_val_count[BD_QZ],
+                    graph->resolution()[BD_QZ],
                     heur->disc_rotation_heuristic);
             if (!heur->disc_rotation_heuristic) {
                 rot_dist = deadband(rot_dist, heur->theta_db);

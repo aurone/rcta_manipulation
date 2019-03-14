@@ -2,6 +2,7 @@
 #define OBJECT_MANIPULATION_PLANNER_OBJECT_MANIPULATION_MODEL_H
 
 #include <smpl/robot_model.h>
+#include "variables.h"
 
 // A RobotModel that references an existing RobotModel and extends it by
 // adding a single degree-of-freedom to represent an articulated object.
@@ -20,8 +21,12 @@ public:
     smpl::InverseKinematicsInterface* ik_iface = NULL;
     smpl::RedundantManipulatorInterface* rm_iface = NULL;
 
-    double min_object_pos = 0.0;
-    double max_object_pos = 0.0;
+    double min_positions[VARIABLE_COUNT] = { };
+    double max_positions[VARIABLE_COUNT] = { };
+    bool   pos_limited[VARIABLE_COUNT] = { };
+    bool   continuous[VARIABLE_COUNT] = { };
+    double vel_limits[VARIABLE_COUNT] = { };
+    double acc_limits[VARIABLE_COUNT] = { };
 
     auto objectJointName() const -> const std::string&;
 
