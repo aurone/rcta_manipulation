@@ -9,3 +9,5 @@ install/*
 !.gitignore
 .catkin_workspace
 .catkin_tools/*
+manipulation1.csv
+manipulate_object_combined.launch
