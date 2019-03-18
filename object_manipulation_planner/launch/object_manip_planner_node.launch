@@ -20,6 +20,7 @@
         <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     </include>
 
+
     <!-- Load the crate URDF -->
     <include file="$(find object_manipulation_planner)/launch/upload_crate.launch"/>
 
@@ -27,6 +28,7 @@
     <env name="SMPL_VISUALIZE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/smpl_visual.ini"/>
     <env name="ROSCONSOLE_CONFIG_FILE" value="$(find object_manipulation_planner)/config/rosconsole.properties"/>
     <node name="object_manip_planner" pkg="object_manipulation_planner" type="object_manip_planner_node" launch-prefix="$(arg launch_prefix)">
+        <rosparam command="load" file="$(find roman_moveit_config)/config/collision_model.yaml"/>
         <param name="group_name" value="right_arm_torso_base"/>
         <param name="tip_link" value="limb_right_tool0"/>
         <param name="ik_group_name" value="right_arm"/>

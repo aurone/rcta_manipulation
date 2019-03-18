@@ -363,7 +363,8 @@ bool PlanManipulationTrajectory(
 
         // TODO: Why don't we require a feasible ik solution at all intermediate
         // waypoints? This could be worse, if we weren't using consistency
-        // limits, but it's still pretty bad.
+        // limits, but it's still pretty bad...we should definitely bail and report what
+        // percentage of the motion we accomplished
 
         if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
             visualization_msgs::MarkerArray ma;
@@ -420,7 +421,7 @@ bool WritePlan(
 {
     // TODO: configurate filename
 
-    FILE* f = fopen("manipulation_right.csv", "w");
+    FILE* f = fopen("manipulation_angle2.csv", "w");
     if (f == NULL){
         ROS_INFO("could not open the file ");
         return false;
@@ -449,7 +450,6 @@ bool WritePlan(
         if (i != 0) fputs(",", f);
         fputs(variables[i], f);
     }
-    fputs("writing in this is taking so long", f);
 
     auto object_transform = Eigen::Affine3d();
     tf::poseMsgToEigen(object_pose, object_transform);
@@ -615,8 +615,13 @@ bool ManipulateObject(
 
     print_pose("contact link pose", contact_pose);
 
+    // transform to get the desired pose of the gripper with respect to the contact link on the object
+    auto contact_pose_offset = smpl::Affine3(
+            smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX()) *
+            smpl::AngleAxis(-0.15 * M_PI, smpl::Vector3::UnitZ()));
+
     // rotate so that the end effector is correct
-    contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
+    contact_pose = contact_pose * contact_pose_offset;
 
     print_pose("grasp pose", contact_pose);
 
@@ -703,6 +708,7 @@ bool ManipulateObject(
               
             // ROS_INFO("lid_limits max_position is %f", lid_limits->max_position);
             
+            // starting pose of the contact link on the object
             auto default_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
 
             auto s = interp(
@@ -717,7 +723,7 @@ bool ManipulateObject(
             auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
             contact_pose = smpl::Translation3(contact_pose.translation()) *
                     smpl::Quaternion(default_pose.rotation());
-            contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX()); //frame matching
+            contact_pose = contact_pose * contact_pose_offset; //frame matching
             return contact_pose;
         };
 
@@ -741,7 +747,7 @@ bool ManipulateObject(
             return false;
         }
 
-        auto write_manip_trajectory = false; // TODO: configurate this
+        auto write_manip_trajectory = true; // TODO: configurate this
         if (write_manip_trajectory) {
 
             auto traj = robot_trajectory::RobotTrajectory(
@@ -893,7 +899,7 @@ bool ManipulateObject(
 
             auto s = interp(
                     0.0,
-                    -0.2*M_PI,
+                    -0.15*M_PI,
                     alpha);
 
             Eigen::Vector3d rot2(0,0,1); 
@@ -924,7 +930,7 @@ bool ManipulateObject(
 
         std::cout << plan.trajectory_ << std::endl;
 
-        auto write_manip_trajectory = false; // TODO: configurate this
+        auto write_manip_trajectory = true; // TODO: configurate this
         if (write_manip_trajectory) {
 
             auto traj = robot_trajectory::RobotTrajectory(
@@ -1114,6 +1120,7 @@ int main(int argc, char* argv[])
             "manipulate_object",
             [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
             {
+                ROS_INFO("started action server, going to manipulate object now");
                 if (!ManipulateObject(
                         msg.get(),
                         &move_group,

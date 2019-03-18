@@ -1,12 +1,12 @@
 <launch>
     <!-- Whether to load the URDF -->
-    <arg name="load_robot_description" default="false"/>
+    <arg name="load_robot_description" default="true"/>
 
     <!-- Which robot the simulation is for -->
     <arg name="robot" default="roman"/>
 
     <!-- Optionally, load the URDF for the default RoMan (roman1) -->
-    <include if="$(arg load_robot_description)" file="$(find roman_model)/robots/upload_roman1.launch"/>
+    <include if="$(arg load_robot_description)" file="$(find roman_model)/robots/upload_rcta_roman.launch"/>
 
     <!-- Spawn the main simulation node that provides a surrogate, kinematic simulation of the robot -->
     <node name="robot_simulator" pkg="roman_simulation" type="robot_simulator"/>

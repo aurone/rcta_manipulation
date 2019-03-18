@@ -534,8 +534,7 @@ bool ManipulateObject(
     // Execute (or animate) the resulting plan //
     /////////////////////////////////////////////
 
-    // auto execute = !msg->plan_only;
-    auto execute = msg->plan_only;
+    auto execute = !msg->plan_only;
 
     ROS_INFO("execute is %d", execute);
     ROS_INFO("msg->plan_only is %d", msg->plan_only);
@@ -732,6 +731,11 @@ bool ReleaseCrate(
 
     move_group.setPlanningTime(10.0);
 
+    move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+    move_group.setGoalPositionTolerance(0.02);
+    move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
+
+
     // TODO: ugh of course this is only settable in the planning frame
     move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
 
@@ -756,7 +760,7 @@ bool ReleaseCrate(
     // const moveit::core::RobotState* curr_start_state;
 
 
-#if 0
+#if 1
     //////////////////////
     // Release Manifold //
     //////////////////////
@@ -771,7 +775,7 @@ bool ReleaseCrate(
             // ROS_INFO("value of alpha is = %f", alpha);
             auto s = interp(
                     0.0,
-                    -0.3*M_PI,
+                    -0.15*M_PI,
                     alpha);
             // ROS_INFO("value of s is = %f", s);
 
@@ -814,15 +818,53 @@ bool ReleaseCrate(
     
     }
 
+    if (!OpenGripper(&gripper_client)) {
+        ROS_ERROR("Failed to open gripper");
+        return false;
+    }
+
+    ///////////////////////////
+    // move the gripper back //
+    ///////////////////////////
+
+    {
+        auto curr_state = *move_group.getCurrentState();
+        auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+        auto withdraw_pose =
+                tool_transform *
+                Eigen::Translation3d(-0.1, 0.0, 0.0);
+
+        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+        move_group.setGoalPositionTolerance(0.02);
+        move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));        
+        move_group.setPoseTarget(withdraw_pose, tool_link_name);
+        auto err = move_group.move();
+    }
+
+    //////////////////////////////////
+    // move back to the start state //
+    //////////////////////////////////
+    //try to get the ARA* planner working instead of doing this 
+
+    {
+        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]");
+        move_group.setGoalJointTolerance(smpl::to_radians(1.0));
+        move_group.setJointValueTarget(*curr_start_state);
+
+        auto err = move_group.move();
+        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+            return false;
+        }
+    }    
+
 #endif
 
-#if 1
+#if 0
     
     move_group.setEndEffectorLink(tool_link_name);
 
     ROS_INFO("trial - going to move the gripper back now");
 
-    
     {
 
         for (int rot_iter = 0; rot_iter <= 5; rot_iter++){
@@ -1184,6 +1226,7 @@ int main(int argc, char* argv[])
     [&](const sensor_msgs::JointState::ConstPtr& msg)
     {
         UpdateCurrentState(&state_monitor, *msg);
+        // ROS_INFO("just saw a msg on joint states. msg->plan_only is %d", msg->plan_only);
     };
 
     auto sub = nh.subscribe("joint_states", 10, jsfun);
@@ -1194,6 +1237,7 @@ int main(int argc, char* argv[])
         "manipulate_object",
         [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
         {
+            ROS_INFO("started action server, going to manipulate object now");
             //auto curr_state = state_monitor.getCurrentState();
             auto curr_state = GetCurrentState(&state_monitor);
             if (ManipulateObject(
@@ -1209,8 +1253,8 @@ int main(int argc, char* argv[])
                 msg))
             {
 
-                //if (!msg->plan_only) {
-                if (true) {
+                if (!msg->plan_only) {
+                // if (true) {
                     //auto fresh_state = state_monitor.getCurrentState();
                     auto fresh_state = GetCurrentState(&state_monitor);
 
