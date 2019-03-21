@@ -430,11 +430,29 @@ bool WritePlan(
     fputs("\n", f);
 
     // TODO: configurate...grabbed from door_demonstrator.launch
+    // auto variables = std::vector<const char*>{
+    //     "world_joint/x",
+    //     "world_joint/y",
+    //     "world_joint/theta",
+    //     "base_link_z_joint",
+    //     "torso_joint1",
+    //     "limb_right_joint1",
+    //     "limb_right_joint2",
+    //     "limb_right_joint3",
+    //     "limb_right_joint4",
+    //     "limb_right_joint5",
+    //     "limb_right_joint6",
+    //     "limb_right_joint7",
+    //     "hinge",                // TODO: where does this name come from?
+    // };
+
     auto variables = std::vector<const char*>{
         "world_joint/x",
         "world_joint/y",
-        "world_joint/theta",
-        "base_link_z_joint",
+        "world_joint/z",
+        "world_joint/yaw",
+        "world_joint/pitch",
+        "world_joint/roll",
         "torso_joint1",
         "limb_right_joint1",
         "limb_right_joint2",
@@ -474,11 +492,20 @@ bool WritePlan(
                 fprintf(f, "%f", T_object_robot.translation().x());
             } else if (var == "world_joint/y") {
                 fprintf(f, "%f", T_object_robot.translation().y());
-            } else if (var == "world_joint/theta") {
-                auto theta = smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_object_robot.rotation()));
-                fprintf(f, "%f", theta);
-            } else if (var == "base_link_z_joint") {
-                fprintf(f, "%f", -object_pose.position.z);
+            } else if (var == "world_joint/z") {
+                fprintf(f, "%f", T_object_robot.translation().z());
+            } else if (var == "world_joint/yaw") {
+                double yaw, pitch, roll;
+                smpl::get_euler_zyx(T_object_robot.rotation(), yaw, pitch, roll);
+                fprintf(f, "%f", yaw);
+            } else if (var == "world_joint/pitch") {
+                double yaw, pitch, roll;
+                smpl::get_euler_zyx(T_object_robot.rotation(), yaw, pitch, roll);
+                fprintf(f, "%f", pitch);
+            } else if (var == "world_joint/roll") {
+                double yaw, pitch, roll;
+                smpl::get_euler_zyx(T_object_robot.rotation(), yaw, pitch, roll);
+                fprintf(f, "%f", roll);
             } else if (var == "hinge") { // TODO: where does this variable name come from?
                 fprintf(f, "%f", object_pos);
             } else {
@@ -662,10 +689,12 @@ bool ManipulateObject(
     // open the gripper //
     //////////////////////
 
+#if 0 // TODO: REPLACE ME WITH PARTIAL OPEN STATE
     if (!OpenGripper(gripper_client)) {
         ROS_ERROR("Failed to open gripper");
         return false;
     }
+#endif
 
     ///////////////////
     // move to grasp //
@@ -930,7 +959,7 @@ bool ManipulateObject(
 
         std::cout << plan.trajectory_ << std::endl;
 
-        auto write_manip_trajectory = true; // TODO: configurate this
+        auto write_manip_trajectory = false; // TODO: configurate this
         if (write_manip_trajectory) {
 
             auto traj = robot_trajectory::RobotTrajectory(

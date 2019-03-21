@@ -153,7 +153,9 @@ bool ExecuteTrajectory(
             auto* c = static_cast<GripperCommand*>(command.get());
             control_msgs::GripperCommandGoal goal;
             if (c->open) {
-                goal.command.position = 0.0841; //1.0;
+                // TODO: herp derp, replace me with partial open state
+                // goal.command.position = 0.0841; //1.0;
+                continue;
             } else {
                 goal.command.position = 0.0;
             }
@@ -1026,6 +1028,7 @@ int main(int argc, char* argv[])
     j_object_world.axis = smpl::Vector3::Zero();
     j_object_world.name = "world_joint";
     j_object_world.type = smpl::urdf::JointType::Floating;
+    ROS_INFO("goint to call InitRobotModel");
     if (!InitRobotModel(&object_model, object_urdf.get())) {
         ROS_ERROR("Failed to initialize object model");
         return 1;
