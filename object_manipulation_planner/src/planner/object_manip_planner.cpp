@@ -227,8 +227,6 @@ bool IsGoal(void* user, const smpl::RobotState& state)
     return false;
 }
 
-// Return the index of the waypoint on the demonstration whose z value is
-// closest to the given z.
 int GetClosestZIndex(RomanObjectManipLattice* graph, double z)
 {
     auto closest_z_index = -1;
@@ -447,7 +445,6 @@ bool PlanPath(
     auto segment = RobotPath();
     for (auto i = 0; i < path.size(); ++i) {
         auto& point = path[i];
-        // std::cout << "point is " << point << std::endl;
         auto type = TransitionType::Type(point.back());
         if (type != segment_type) {
             // record this segment
@@ -546,11 +543,7 @@ bool PlanPath(
 
     // create robot trajectory for the first segment
     auto& first_segment = segments.front();
-    commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));
-
-    // ROS_INFO("printing the cmds fyi");
-    // this will baiscally fill up the commands vector.
-    // whenever it sees a graspsucc, it will add the true and false graspsucc.  
+    commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));  
 
     for (auto i = 1; i < segments.size(); ++i) {
         if (segment_types[i] == TransitionType::GraspSucc) {
@@ -560,10 +553,6 @@ bool PlanPath(
         auto cmd = smpl::make_unique<TrajectoryCommand>(
                 MakeRobotTrajectory(segments[i]));
         commands->push_back(std::move(cmd));
-
-        // ROS_INFO("--------------------");
-
-        // std::cout << segments[i] << std::endl;
 
         if (segment_types[i] == TransitionType::GraspSucc) {
             commands->push_back(smpl::make_unique<GripperCommand>(false));
