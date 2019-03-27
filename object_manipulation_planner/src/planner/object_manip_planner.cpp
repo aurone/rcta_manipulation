@@ -447,7 +447,7 @@ bool PlanPath(
     auto segment = RobotPath();
     for (auto i = 0; i < path.size(); ++i) {
         auto& point = path[i];
-        std::cout << "point is " << point << std::endl;
+        // std::cout << "point is " << point << std::endl;
         auto type = TransitionType::Type(point.back());
         if (type != segment_type) {
             // record this segment
@@ -549,6 +549,8 @@ bool PlanPath(
     commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));
 
     // ROS_INFO("printing the cmds fyi");
+    // this will baiscally fill up the commands vector.
+    // whenever it sees a graspsucc, it will add the true and false graspsucc.  
 
     for (auto i = 1; i < segments.size(); ++i) {
         if (segment_types[i] == TransitionType::GraspSucc) {

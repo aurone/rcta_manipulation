@@ -24,6 +24,7 @@
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <moveit_msgs/GetStateValidity.h>
 #include <ros/ros.h>
+#include "std_msgs/Float64MultiArray.h"
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
 #include <smpl/console/nonstd.h>
@@ -47,6 +48,10 @@
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
 //#include "roman_robot_model.h"
+
+//for sleeping
+#include <chrono>
+#include <thread>
 
 using GripperCommandActionClient =
         actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
@@ -107,7 +112,151 @@ bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
     return true;
 }
 
+bool AdjustGripper()
+{
+
+    // init move_group
+    // adjust the gripper position if necessary
+    // check again maybe ?
+    // return true
+
+    auto group_name = std::string("right_arm_and_torso");
+    auto move_group =
+            moveit::planning_interface::MoveGroupInterface(group_name);
+
+    move_group.setPlanningTime(10.0);
+
+    move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+    move_group.setGoalPositionTolerance(0.02);
+    move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
+
+    move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
+
+    auto gripper_client_name = std::string("rcta_right_robotiq_controller/gripper_action");
+
+    auto tool_link_name = "limb_right_tool0";
+
+    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
+    GripperCommandActionClient gripper_client(gripper_client_name);
+    if (!gripper_client.waitForServer()) {
+        ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
+        return 1;
+    }
+
+    ROS_INFO("finished watiting for the GripperCommand action server. out now ");
+
+    move_group.setEndEffectorLink(tool_link_name);
+
+    {
+        auto curr_state = *move_group.getCurrentState();
+        auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+        // TODO - change this value 
+        auto move_pose =
+                tool_transform *
+                Eigen::Translation3d(0.0, -0.1, 0.0);
+
+        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+        move_group.setGoalPositionTolerance(0.02);
+        move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));        
+        move_group.setPoseTarget(move_pose, tool_link_name);
+        auto err = move_group.move();
+        std::cout << "moved in adjust gripper " << std::endl;
+    }
+
+    return true;
+}
+
+
+// void GripperCallback(const sensor_msgs::JointState::ConstPtr& msg)
+// {
+//     std::cout << "position of finger is "<< msg->position[0]  << std::endl;
+
+//     if(1){
+//         AdjustGripper();
+//     }
+
+// }
+
+// bool CheckGripperGrip()
+// {
+
+//     // // subscribe to the /roman1/joint_space topic 
+//     // // read the gripper's current position
+//     // // return feedback
+
+//     // // AdjustGripper();
+
+//     auto nh = ros::NodeHandle(); // Worked 
+//     // auto nh = ros::NodeHandle();
+//     // ros::Rate loop_rate(10);
+
+//     // // ros::Subscriber sub = n.subscribe("chatter", 1000, chatterCallback);
+//     // ros::Subscriber sub = nh.subscribe("joint_states", 1000, GripperCallback);
+//     // // ros::Subscriber sub = nh.subscribe("roman1/joint_states", 10, GripperCallback);
+
+//     // for (int cc = 0; cc < 5; cc++){
+//     //     loop_rate.sleep();
+//     //     ros::spinOnce();
+//     // }
+
+//     // for(int i = 0; i < 100; i++){
+//     //     ROS_INFO("inside the CheckGripperGrip fn, printing %i", i );
+//     // }
+
+//     // boost::shared_ptr<sensor_msgs::JointState const> msg;
+//     // sensor_msgs::JointState data;
+//     // msg = ros::topic::waitForMessage<sensor_msgs::JointState>("/joint_states", nh, ros::Duration(10.0));
+
+//     auto msg = ros::topic::waitForMessage<sensor_msgs::JointState>("/joint_states", nh, ros::Duration(10.0));
+//     // if(msg != NULL)
+//     // {
+//     //     data = *msg;
+//     // }
+
+//     if (!msg)
+//     {
+//         ROS_ERROR("No message received in CheckGripperGrip!");
+//     }
+//     else
+//     {
+//         ROS_INFO("Got some message in CheckGripperGrip.");
+//     }
+    
+
+//     return 0;
+// }
+
+bool CheckGripperGrip()
+{
+
+    // subscribe to the /roman1/joint_space topic 
+    // read the gripper's current position
+    // return feedback
+
+    auto nh = ros::NodeHandle();
+
+    auto msg = ros::topic::waitForMessage<sensor_msgs::JointState>("/roman1/joint_states", nh, ros::Duration(10.0));
+
+    int size_msg = msg->position.size();
+
+    if (msg)
+    {
+        std::cout << "name of finger (1 th) is %d" << msg->name[size_msg - 6] << std::endl;
+        std::cout << "name of finger (2 th) is %d" << msg->name[size_msg - 5] << std::endl;
+        std::cout << "name of finger (3 th) is %d" << msg->name[size_msg - 4] << std::endl;
+        
+        
+        ROS_INFO("position of finger (%d th) is %d", 1, msg->position[size_msg - 6]);
+        ROS_INFO("position of finger (%d th) is %d", 2, msg->position[size_msg - 5]);
+        ROS_INFO("position of finger (%d th) is %d", 3, msg->position[size_msg - 4]);
+        
+    }
+    
+    return 0;
+}
+
 // Execute a sequence of trajectory/gripper commands.
+// Looking for command type "smpl::make_unique<GripperCommand>(false)"
 bool ExecuteTrajectory(
     const ros::NodeHandle& nh,
     const std::vector<std::unique_ptr<Command>>& commands)
@@ -148,6 +297,10 @@ bool ExecuteTrajectory(
     // open the gripper
     // move the arm to the post-grasp configuration
 
+    ROS_INFO("going to partially open the gripper nw ");
+    auto nh1 = ros::NodeHandle();
+    ros::Publisher gripper_command_pub = nh1.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1000);
+                
     for (auto& command : commands) {
         if (command->type == Command::Type::Gripper) {
             auto* c = static_cast<GripperCommand*>(command.get());
@@ -155,18 +308,49 @@ bool ExecuteTrajectory(
             if (c->open) {
                 // TODO: herp derp, replace me with partial open state
                 // goal.command.position = 0.0841; //1.0;
+#if 1
+                // auto nh1 = ros::NodeHandle();
+                // ROS_INFO("going to partially open the gripper nw ");
+                // ros::Publisher gripper_command_pub = nh1.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1000);
+                
+                std::cout << "fully opening now " << std::endl;
+
+                std_msgs::Float64MultiArray msg;
+                msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                msg.layout.dim[0].label = "joint";
+                msg.layout.dim[0].size = 4;
+                msg.layout.dim[0].stride = 1;
+                msg.layout.data_offset = 0; 
+                msg.data = {60.0, 60.0, 240.0, 137.0};
+                gripper_command_pub.publish(msg);
+#else                
                 continue;
+#endif
             } else {
-                goal.command.position = 0.0;
+                // goal.command.position = 0.0;
+
+                std::cout << "fully closing now " << std::endl;
+
+                std_msgs::Float64MultiArray msg;
+                msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                msg.layout.dim[0].label = "joint";
+                msg.layout.dim[0].size = 4;
+                msg.layout.dim[0].stride = 1;
+                msg.layout.data_offset = 0; 
+                msg.data = {200.0, 200.0, 200.0, 137.0};
+                gripper_command_pub.publish(msg);
+
             }
 
             ROS_INFO("%s gripper", c->open ? "Open" : "Close");
-            auto res = gripper_client.sendGoalAndWait(goal);
-            if (res.state_ == res.SUCCEEDED) {
-                ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
-            } else {
-                ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
-            }
+            // auto res = gripper_client.sendGoalAndWait(goal);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+            CheckGripperGrip();
+            // if (res.state_ == res.SUCCEEDED) {
+            //     ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
+            // } else {
+            //     ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            // }
         } else if (command->type == Command::Type::Trajectory) {
             auto* c = static_cast<TrajectoryCommand*>(command.get());
 
@@ -641,7 +825,7 @@ bool PlanManipulationTrajectory(
         // limits, but it's still pretty bad.
 
         if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
-            ROS_INFO(":::::::::: calling ik now ");
+            // ROS_INFO(":::::::::: calling ik now ");
             visualization_msgs::MarkerArray ma;
             std_msgs::ColorRGBA color;
             color.r = 1.0f;
@@ -693,12 +877,36 @@ bool PlanManipulationTrajectory(
 
 bool OpenGripper(GripperCommandActionClient* gripper_client)
 {
-    ROS_INFO("Open gripper");
+    ROS_INFO("Open gripper full function");
     control_msgs::GripperCommandGoal gripper_goal;
     gripper_goal.command.position = 0.0841;
     //gripper_goal.command.position = 0.0666;
     auto res = gripper_client->sendGoalAndWait(gripper_goal);
     return res.state_ == res.SUCCEEDED;
+
+}
+
+bool OpenGripperPartial()
+{
+    auto nh2 = ros::NodeHandle();
+    ROS_INFO("going to partially open the gripper nw ");
+    ros::Publisher gripper_command_pub = nh2.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1);
+    ros::Duration(0.5).sleep();
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    // getchar();
+    std_msgs::Float64MultiArray msg;
+    msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+    msg.layout.dim[0].label = "joint";
+    msg.layout.dim[0].size = 4;
+    msg.layout.dim[0].stride = 1;
+    msg.layout.data_offset = 0; 
+    msg.data = {60.0, 60.0, 240.0, 137.0};
+    gripper_command_pub.publish(msg);
+    // gripper_command_pub.publish(msg);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+ 
+    return true;
 }
 
 bool CloseGripper(GripperCommandActionClient* gripper_client)
@@ -790,7 +998,7 @@ bool ReleaseCrate(
             auto rotate_gripper_pose =
                     tool_transform*rot;
 
-            std::cout << "tool transform is - " << tool_transform.matrix() << std::endl;
+            // std::cout << "tool transform is - " << tool_transform.matrix() << std::endl;
 
             return rotate_gripper_pose;
         };
@@ -807,7 +1015,7 @@ bool ReleaseCrate(
             return false;
         }
 
-        std::cout << plan.trajectory_ << std::endl;
+        // std::cout << plan.trajectory_ << std::endl;
 
 
         ROS_INFO("finished PlanManipulation Trajectory, now going to execute");
@@ -820,10 +1028,12 @@ bool ReleaseCrate(
     
     }
 
-    if (!OpenGripper(&gripper_client)) {
-        ROS_ERROR("Failed to open gripper");
-        return false;
-    }
+    // if (!OpenGripper(&gripper_client)) {
+    //     ROS_ERROR("Failed to open gripper");
+    //     return false;
+    // }
+
+    OpenGripperPartial();
 
     ///////////////////////////
     // move the gripper back //
@@ -1229,7 +1439,6 @@ int main(int argc, char* argv[])
     [&](const sensor_msgs::JointState::ConstPtr& msg)
     {
         UpdateCurrentState(&state_monitor, *msg);
-        // ROS_INFO("just saw a msg on joint states. msg->plan_only is %d", msg->plan_only);
     };
 
     auto sub = nh.subscribe("joint_states", 10, jsfun);
