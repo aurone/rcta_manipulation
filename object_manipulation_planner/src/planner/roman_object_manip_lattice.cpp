@@ -21,7 +21,12 @@
 #define ENABLE_BASE_IN_SNAP_MOTIONS 0
 #define ENABLE_EGRAPH_EDGES 1
 
-#define PHI_INCLUDE_RP 1
+#define PHI_FUNCTION_3D 0
+#define PHI_FUNCTION_6D 1
+#define PHI_FUNCTION_5D 2
+#define PHI_FUNCTION_5D_BIG_YAW 3
+#define PHI_FUNCTION PHI_FUNCTION_5D_BIG_YAW
+
 #define RESTRICTIVE_Z_EDGES 1
 
 namespace TransitionType {
@@ -245,7 +250,7 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
 
             auto adj_id = *ait;
 
-#if !PHI_INCLUDE_RP
+#if PHI_FUNCTION != PHI_FUNCTION_6D
             // Create a target pose from the position of the adjacent state
             // and the orientation of the current state
             auto& grasp_pose = m_egraph_node_grasps[adj_id];
@@ -1263,8 +1268,8 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
             auto& adj_state = m_egraph.state(anode);
             if (m_demo_z_values[egraph_robot_state[HINGE]] !=
                 m_demo_z_values[adj_state[HINGE]])
-#endif
             {
+#endif
                 // map phi(discrete egraph state) -> egraph node
                 auto phi_coord = getPhiCoord(egraph_state);
                 m_phi_to_egraph_nodes[phi_coord].push_back(node);
@@ -1274,9 +1279,9 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
                 auto pre_phi_coord = getPhiCoord(pregrasp_pose);
                 m_pregrasp_phi_to_egraph_node[pre_phi_coord].push_back(node);
                 pg_phi_points.emplace_back(pre_phi_coord[0], pre_phi_coord[1], pre_phi_coord[2]);
+#if 0
                 break;
             }
-#if 0
         }
 #endif
 
@@ -1284,6 +1289,9 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         m_egraph_node_pregrasps[node] = pregrasp_pose;
         m_egraph_phi_coords[node] = getPhiCoord(grasp_pose);
         m_egraph_pre_phi_coords[node] = getPhiCoord(pregrasp_pose);
+
+        ROS_INFO_STREAM("phi(" << node << ") = " << m_egraph_phi_coords[node]);
+        // ROS_INFO_STREAM("phi'(" << node << ") = " << m_egraph_pre_phi_coords[node]);
     }
 
     // create visualizations of the down-projected demonstration
@@ -1513,47 +1521,105 @@ bool RomanObjectManipLattice::trySnap(int src_id, int dst_id, int& cost)
     return false;
 }
 
-auto RomanObjectManipLattice::getPhiCoord(const Eigen::Affine3d& pose) const
-    -> PhiCoord
-{
-#if PHI_INCLUDE_RP
-    PhiCoord coord(6);
-#else
-    PhiCoord coord(3);
-#endif
-
-    posWorkspaceToCoord(pose.translation().data(), coord.data());
-
-#if PHI_INCLUDE_RP
-    double ea[3];
-    smpl::get_euler_zyx(Eigen::Matrix3d(pose.rotation()), ea[2], ea[1], ea[0]);
-
-    int ea_disc[3];
-    rotWorkspaceToCoord(ea, ea_disc);
-
-    coord[3] = ea_disc[0];
-    coord[4] = ea_disc[1];
-    coord[5] = ea_disc[2];
-#endif
-
-    return coord;
-}
-
 void RomanObjectManipLattice::setObjectPose(const smpl::Affine3& pose)
 {
     m_object_pose = pose;
+    m_object_pose_inv = pose.inverse();
 }
 
 auto RomanObjectManipLattice::getPhiCoord(const smpl::WorkspaceLatticeState* state) const
     -> PhiCoord
 {
+#if PHI_FUNCTION == PHI_FUNCTION_3D
     auto& coord = state->coord;
-#if PHI_INCLUDE_RP
-    assert(state->coord.size() >= 6);
-    return PhiCoord{ coord[0], coord[1], coord[2], coord[3], coord[4], coord[5] };
-#else
     assert(state->coord.size() >= 3);
     return PhiCoord{ coord[0], coord[1], coord[2] };
+#elif PHI_FUNCTION == PHI_FUNCTION_6D
+    auto& coord = state->coord;
+    assert(state->coord.size() >= 6);
+    return PhiCoord{ coord[0], coord[1], coord[2], coord[3], coord[4], coord[5] };
+#elif PHI_FUNCTION == PHI_FUNCTION_5D || PHI_FUNCTION == PHI_FUNCTION_5D_BIG_YAW
+    auto workspace_coords = smpl::WorkspaceState();
+    stateRobotToWorkspace(state->state, workspace_coords);
+    auto tool_pose = smpl::MakeAffine(
+            workspace_coords[0], workspace_coords[1], workspace_coords[2],
+            workspace_coords[5], workspace_coords[4], workspace_coords[3]);
+    return getPhiCoord(tool_pose);
+#else
+#error "Unknown phi function"
+#endif
+}
+
+auto RomanObjectManipLattice::getPhiCoord(const Eigen::Affine3d& T_map_tool) const
+    -> PhiCoord
+{
+#if PHI_FUNCTION == PHI_FUNCTION_3D
+
+    // phi(s) == phi(s') => poses have the same discrete 3D task-space
+    // coordinates
+
+    auto coord = PhiCoord(3);
+    posWorkspaceToCoord(T_map_tool.translation().data(), coord.data());
+    return coord;
+
+#elif PHI_FUNCTION == PHI_FUNCTION_6D
+
+    // phi(s) == phi(s') => poses have the same discrete 6D task-space
+    // coordinates
+    auto coord = PhiCoord(6);
+    posWorkspaceToCoord(T_map_tool.translation().data(), coord.data());
+    double ea[3]; // r, p, y
+    smpl::get_euler_zyx(Eigen::Matrix3d(T_map_tool.rotation()), ea[2], ea[1], ea[0]);
+    int ea_disc[3];
+    rotWorkspaceToCoord(ea, ea_disc);
+    coord[3] = ea_disc[0];
+    coord[4] = ea_disc[1];
+    coord[5] = ea_disc[2];
+    return coord;
+
+#elif PHI_FUNCTION == PHI_FUNCTION_5D
+
+    // (map -> object)^1 * (map -> tool) = object -> map * map -> tool = object -> tool
+    auto T_obj_tool = smpl::Affine3(m_object_pose_inv * T_map_tool);
+    auto coord = PhiCoord(5);
+    posWorkspaceToCoord(T_map_tool.translation().data(), coord.data());
+    double ea[3]; // r, p, y
+    smpl::get_euler_zyx(Eigen::Matrix3d(T_obj_tool.rotation()), ea[2], ea[1], ea[0]);
+    int ea_disc[3];
+    coord[3] = ea_disc[0]; // roll
+    coord[4] = ea_disc[2]; // yaw
+    return coord;
+
+#elif PHI_FUNCTION == PHI_FUNCTION_5D_BIG_YAW
+
+    // (map -> object)^1 * (map -> tool) = object -> map * map -> tool = object -> tool
+    auto T_obj_tool = smpl::Affine3(m_object_pose_inv * T_map_tool);
+    auto coord = PhiCoord(5);
+    posWorkspaceToCoord(T_map_tool.translation().data(), coord.data());
+    double ea[3]; // r, p, y
+    smpl::get_euler_zyx(Eigen::Matrix3d(T_obj_tool.rotation()), ea[2], ea[1], ea[0]);
+
+    int ea_disc[3];
+
+    // assuming current values of 36/19/36 for nominal discretization
+    int val_count[3] = { 36, 19, 18 };
+
+    double res[3] = {
+        2.0 * M_PI / (double)val_count[0],
+        M_PI / (double)(val_count[1] - 1),
+        2.0 * M_PI / (double)val_count[2]
+    };
+
+    ea_disc[0] = (int)((smpl::normalize_angle_positive(ea[0]) + res[0] * 0.5) / res[0]) % val_count[0];
+    ea_disc[1] = (int)((smpl::normalize_angle(ea[1]) + (0.5 * M_PI) + res[1] * 0.5) / res[1]) % val_count[1];
+    ea_disc[2] = (int)((smpl::normalize_angle_positive(ea[2]) + res[2] * 0.5) / res[2]) % val_count[2];
+
+    coord[3] = ea_disc[0]; // roll
+    coord[4] = ea_disc[2]; // yaw
+    return coord;
+
+#else
+#error "Unknown phi function"
 #endif
 }
 

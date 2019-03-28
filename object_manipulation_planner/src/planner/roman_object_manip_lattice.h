@@ -232,6 +232,7 @@ public:
     double pregrasp_offset_x = -0.10;
 
     smpl::Affine3 m_object_pose;
+    smpl::Affine3 m_object_pose_inv;
 
     // Additional properties of demonstration nodes
     std::vector<bool>               m_egraph_node_validity;

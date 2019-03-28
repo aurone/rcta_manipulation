@@ -254,6 +254,7 @@ bool PlanPath(
     std::vector<std::unique_ptr<Command>>* commands)
 {
     SetObjectPose(planner->checker, object_pose);
+    planner->graph.setObjectPose(object_pose);
 
     //////////////////////////////////////////////////////////////////////
     // Clear the graph structure. We shouldn't need to do this but it's //
