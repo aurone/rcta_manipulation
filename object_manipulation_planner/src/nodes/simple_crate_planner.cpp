@@ -340,8 +340,10 @@ bool WritePlan(
     auto variables = std::vector<const char*>{
         "world_joint/x",
         "world_joint/y",
-        "world_joint/theta",
-        "base_link_z_joint",
+        "world_joint/z",
+        "world_joint/yaw",
+        "world_joint/pitch",
+        "world_joint/roll",
         "torso_joint1",
         "limb_right_joint1",
         "limb_right_joint2",
@@ -372,6 +374,9 @@ bool WritePlan(
 
         auto T_object_robot = object_transform.inverse() * j_root_transform;
 
+        double yaw, pitch, roll;
+        smpl::get_euler_zyx(T_object_robot.rotation(), yaw, pitch, roll);
+
         for (auto j = 0; j < variables.size(); ++j) {
             if (j != 0) fputs(",", f);
 
@@ -382,12 +387,16 @@ bool WritePlan(
                 fprintf(f, "%f", T_object_robot.translation().x());
             } else if (var == "world_joint/y") {
                 fprintf(f, "%f", T_object_robot.translation().y());
-            } else if (var == "world_joint/theta") {
-                auto theta = smpl::get_nearest_planar_rotation(Eigen::Quaterniond(T_object_robot.rotation()));
-                fprintf(f, "%f", theta);
-            } else if (var == "base_link_z_joint") {
-                fprintf(f, "%f", -object_pose.position.z);
-            } else if (var == "hinge") { // TODO: where does this variable name come from?
+            } else if (var == "world_joint/z") {
+                fprintf(f, "%f", T_object_robot.translation().z());
+            } else if (var == "world_joint/yaw") {
+                fprintf(f, "%f", yaw);
+            } else if (var == "world_joint/pitch") {
+                fprintf(f, "%f", pitch);
+            } else if (var == "world_joint/roll") {
+                fprintf(f, "%f", roll);
+            } else if (var == "hinge") {
+                // TODO: where does this variable name come from?
                 fprintf(f, "%f", object_pos);
             } else {
                 fprintf(f, "%f", wp.getVariablePosition(variables[j]));
