@@ -522,6 +522,7 @@ bool ManipulateObject(
 
     // rotate so that the end effector is correct
     contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
+    contact_pose *= smpl::AngleAxis(-smpl::to_radians(10.0), smpl::Vector3::UnitZ());
 
     print_pose("grasp pose", contact_pose);
 
@@ -606,6 +607,7 @@ bool ManipulateObject(
             contact_pose = smpl::Translation3(contact_pose.translation()) *
                     smpl::Quaternion(default_pose.rotation());
             contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
+            contact_pose *= smpl::AngleAxis(-smpl::to_radians(10.0), smpl::Vector3::UnitZ());
             return contact_pose;
         };
 
