@@ -416,7 +416,8 @@ bool ManipulateObject(
     GripperCommandActionClient* gripper_client,
     const smpl::urdf::RobotModel* object_model,
     double pregrasp_offset,
-    double release_offset)
+    double release_offset,
+    bool write_manip_trajectory)
 {
     ROS_INFO("Received manipulate object request");
     ROS_INFO("  start_state");
@@ -631,9 +632,7 @@ bool ManipulateObject(
             return false;
         }
 
-        auto write_manip_trajectory = false; // TODO: configurate this
         if (write_manip_trajectory) {
-
             auto traj = robot_trajectory::RobotTrajectory(
                     move_group->getRobotModel(), *group_name);
             traj.setRobotTrajectoryMsg(
@@ -770,6 +769,8 @@ int main(int argc, char* argv[])
     if (!GetParam(ph, "pregrasp_offset", pregrasp_offset)) return 1;
     if (!GetParam(ph, "release_offset", pregrasp_offset)) return 1;
 
+    auto write_manip_trajectory = true;
+
     auto autostart = false;
     ManipulateObjectActionServer server(
             "manipulate_object",
@@ -782,7 +783,8 @@ int main(int argc, char* argv[])
                         &gripper_client,
                         &object_model,
                         pregrasp_offset,
-                        release_offset))
+                        release_offset,
+                        write_manip_trajectory))
                 {
                     ROS_ERROR("Action server aborted");
                     server.setAborted();
