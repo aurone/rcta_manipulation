@@ -269,11 +269,11 @@ bool ExecuteTrajectory(
             // auto res = gripper_client.sendGoalAndWait(goal);
             std::this_thread::sleep_for(std::chrono::milliseconds(10000));
             // CheckGripperGrip();
-            if (res.state_ == res.SUCCEEDED) {
-                ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
-            } else {
-                ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
-            }
+            // if (res.state_ == res.SUCCEEDED) {
+            //     ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
+            // } else {
+            //     ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            // }
         } else if (command->type == Command::Type::Trajectory) {
             auto* c = static_cast<TrajectoryCommand*>(command.get());
 
