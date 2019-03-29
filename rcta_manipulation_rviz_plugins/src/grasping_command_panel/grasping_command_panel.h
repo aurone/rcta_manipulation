@@ -1,31 +1,16 @@
-#ifndef rcta_grasping_command_panel_h
-#define rcta_grasping_command_panel_h
+#ifndef RCTA_MANIPULATION_RVIZ_PLUGINS_GRASPING_COMMAND_PANEL_H
+#define RCTA_MANIPULATION_RVIZ_PLUGINS_GRASPING_COMMAND_PANEL_H
 
 // standard includes
-#include <atomic>
-#include <array>
-#include <map>
 #include <memory>
-#include <mutex>
-#include <thread>
+#include <string>
 #include <vector>
 
 // system includes
-#ifndef Q_MOC_RUN
-#include <actionlib/client/simple_action_client.h>
-#include <control_msgs/GripperCommandAction.h>
-#include <interactive_markers/interactive_marker_server.h>
-#include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit/robot_model/robot_model.h>
-#include <moveit/robot_state/robot_state.h>
-#include <cmu_manipulation_msgs/RepositionBaseCommandAction.h>
-#include <cmu_manipulation_msgs/ManipulateAction.h>
-#include <cmu_manipulation_msgs/GraspObjectCommandAction.h>
-#include <cmu_manipulation_msgs/ManipulateObjectAction.h>
-#include <ros/ros.h>
 #include <rviz/panel.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
+#ifndef Q_MOC_RUN
+#include <interactive_markers/interactive_marker_server.h>
+#include <ros/ros.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #endif
@@ -37,6 +22,8 @@ class QPushButton;
 class QSpinBox;
 
 namespace rcta {
+
+class GraspingCommandModel;
 
 class GraspingCommandPanel : public rviz::Panel
 {
@@ -53,51 +40,44 @@ public:
 public Q_SLOTS:
 
     void refreshRobotDescription();
-    void refreshGlobalFrame();
     void refreshObjectMeshResource();
 
-    void copyCurrentBasePose();
-    void updateBasePoseX(double x);
-    void updateBasePoseY(double y);
-    void updateBasePoseZ(double z);
+    void notifyRobotLoaded(const QString&);
+    void updateRobotState();
+
     void updateBasePoseYaw(double yaw);
     void updateBasePoseCandidate(int index);
 
+    // interpret values in line edit and pass to model
     void updateMeshScaleX();
     void updateMeshScaleY();
     void updateMeshScaleZ();
 
-    void updateAllowedPlanningTime(double val);
+    void updateObjectPoseYawDegs(double val);
+    void updateObjectPosePitchDegs(double val);
+    void updateObjectPoseRollDegs(double val);
 
-    void updateObjectPoseX(double val);
-    void updateObjectPoseY(double val);
-    void updateObjectPoseZ(double val);
-    void updateObjectPoseYaw(double val);
-    void updateObjectPosePitch(double val);
-    void updateObjectPoseRoll(double val);
+    void setObjectPoseX(double val);
+    void setObjectPoseY(double val);
+    void setObjectPoseZ(double val);
+    void setObjectPoseYaw(double val);
+    void setObjectPosePitch(double val);
+    void setObjectPoseRoll(double val);
 
-    void updateMeshScaleX(double scale);
-    void updateMeshScaleY(double scale);
-    void updateMeshScaleZ(double scale);
+    // hooks to reinitialize interactive marker
+    void updateObjectMeshResourceChanged(const QString& path);
+    void updateMeshScale(double x, double y, double z);
 
+    // Signals to grab the current text and pass values to the model
     void updateObjectStart();
     void updateObjectGoal();
 
-    void sendGraspObjectCommand();
-    void sendRepositionBaseCommand();
-    void sendManipulateObjectCommand();
+    void updateObjectStart(double val);
+    void updateObjectGoal(double val);
+
+    void displayErrorMessageBox(const QString& s);
 
 Q_SIGNALS:
-
-    void robotDescriptionUpdated(const QString& name);
-    void globalFrameUpdated(const QString& frame);
-    void objectMeshResourceUpdated(const QString& uri);
-    void objectPoseXUpdated(double val);
-    void objectPoseYUpdated(double val);
-    void objectPoseZUpdated(double val);
-    void objectPoseYawUpdated(double val);
-    void objectPosePitchUpdated(double val);
-    void objectPoseRollUpdated(double val);
 
 private:
 
@@ -109,145 +89,63 @@ private:
     // Global Settings Widgets
     QLineEdit*      m_robot_description_line_edit = NULL;
     QPushButton*    m_refresh_robot_desc_button = NULL;
-    QLineEdit*      m_global_frame_line_edit = NULL;
-    QPushButton*    m_refresh_global_frame_button = NULL;
-    QLineEdit*      m_obj_mesh_resource_line_edit = NULL;
-    QPushButton*    m_refresh_obj_mesh_resource_button = NULL;
-    QLineEdit*      m_obj_mesh_scale_x_line_edit = NULL;
-    QLineEdit*      m_obj_mesh_scale_y_line_edit = NULL;
-    QLineEdit*      m_obj_mesh_scale_z_line_edit = NULL;
 
-    // Base Command Widgets
-    QPushButton*    m_copy_current_base_pose_button = NULL;
-    QDoubleSpinBox* m_teleport_base_command_x_box = NULL;
-    QDoubleSpinBox* m_teleport_base_command_y_box = NULL;
-    QDoubleSpinBox* m_teleport_base_command_z_box = NULL;
-    QDoubleSpinBox* m_teleport_base_command_yaw_box = NULL;
-
-    // Object Interaction Command Widgets
-    QPushButton*    send_grasp_object_command_button_ = NULL;
-    QPushButton*    send_reposition_base_command_button_ = NULL;
-    QPushButton*    send_manipulate_object_command_button_ = NULL;
-    QLineEdit*      m_object_start_line_edit = NULL;
-    QLineEdit*      m_object_goal_line_edit = NULL;
-    QDoubleSpinBox* m_allowed_planning_time_spinbox = NULL;
-    QSpinBox*       update_candidate_spinbox_ = NULL;
-    QLabel*         num_candidates_label_ = NULL;
-
+    // Object controls
     QDoubleSpinBox* m_obj_pose_x_spinbox = NULL;
     QDoubleSpinBox* m_obj_pose_y_spinbox = NULL;
     QDoubleSpinBox* m_obj_pose_z_spinbox = NULL;
     QDoubleSpinBox* m_obj_pose_Y_spinbox = NULL;
     QDoubleSpinBox* m_obj_pose_P_spinbox = NULL;
     QDoubleSpinBox* m_obj_pose_R_spinbox = NULL;
+    QLineEdit*      m_obj_mesh_resource_line_edit = NULL;
+
+    // Object view
+    QPushButton*    m_refresh_obj_mesh_resource_button = NULL;
+
+    QLineEdit*      m_obj_mesh_scale_x_line_edit = NULL;
+    QLineEdit*      m_obj_mesh_scale_y_line_edit = NULL;
+    QLineEdit*      m_obj_mesh_scale_z_line_edit = NULL;
+
+    // Reposition Base Command Widgets
+    QPushButton*    m_copy_current_base_pose_button = NULL;
+    QDoubleSpinBox* m_teleport_base_command_x_box = NULL;
+    QDoubleSpinBox* m_teleport_base_command_y_box = NULL;
+    QDoubleSpinBox* m_teleport_base_command_yaw_box = NULL;
+    QPushButton*    m_send_reposition_base_command_button = NULL;
+    QSpinBox*       m_update_candidate_spinbox = NULL;
+    QLabel*         m_num_candidates_label = NULL;
+
+    // Manipulate Object Command Widgets
+    QPushButton*    m_send_manipulate_object_button = NULL;
+    QLineEdit*      m_object_start_line_edit = NULL;
+    QLineEdit*      m_object_goal_line_edit = NULL;
+    QDoubleSpinBox* m_allowed_planning_time_spinbox = NULL;
+
+    // Grasp Object Command Widgets
+    QPushButton*    m_send_grasp_object_command_button = NULL;
 
     ros::Publisher m_marker_pub;
 
     interactive_markers::InteractiveMarkerServer m_server;
+    std::string m_gascan_interactive_marker_name = "gas_canister_fixture";
 
     ///@}
 
     /// \name Model
     ///@{
-    ros::Subscriber m_occupancy_grid_sub;
-
-    tf::TransformListener m_listener;
-
-    using ManipulateActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateAction>;
-    std::unique_ptr<ManipulateActionClient> manipulate_client_;
-    bool pending_manipulate_command_ = false;
-
-    using GraspObjectCommandActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::GraspObjectCommandAction>;
-    std::unique_ptr<GraspObjectCommandActionClient> grasp_object_command_client_;
-    bool pending_grasp_object_command_ = false;
-
-    using RepositionBaseCommandActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::RepositionBaseCommandAction>;
-    std::unique_ptr<RepositionBaseCommandActionClient> reposition_base_command_client_;
-    bool pending_reposition_base_command_ = false;
-
-    using ManipulateObjectActionClient = actionlib::SimpleActionClient<cmu_manipulation_msgs::ManipulateObjectAction>;
-    std::unique_ptr<ManipulateObjectActionClient> manipulate_object_client_;
-    bool pending_manipulate_object_command_ = false;
-
-    // TODO: can this be maintained via the transform of the root joint or is
-    // there a reason this is being maintained externally?
-    Eigen::Affine3d m_T_world_robot = Eigen::Affine3d::Identity();
-    Eigen::Affine3d m_T_world_object = Eigen::Affine3d::Identity();
-
-    robot_model_loader::RobotModelLoaderPtr rml_;
-    robot_model::RobotModelPtr robot_model_;
-    robot_state::RobotStatePtr robot_state_;
-
-    nav_msgs::OccupancyGrid::ConstPtr occupancy_grid_;
-
-    std::string robot_description_;
-    std::string global_frame_;
-
-    int base_candidate_idx_ = -1;
-    std::vector<geometry_msgs::PoseStamped> candidate_base_poses_;
-
-    std::string m_gascan_interactive_marker_name = "gas_canister_fixture";
-    std::string m_obj_mesh_resource = "package://gascan_description/meshes/rcta_gastank.ply";
-
-    double m_allowed_planning_time = 10.0;
-
-    double m_obj_scale_x = 1.0;
-    double m_obj_scale_y = 1.0;
-    double m_obj_scale_z = 1.0;
-
-    double m_obj_start = 0.0;
-    double m_obj_goal = 0.0;
+    std::unique_ptr<GraspingCommandModel> m_model;
     ///@}
 
     // The set utilities have the effect of changing the text in the line edit
     // box as well as applying the same action as the corresponding refresh
     // button; the get utilities retrieve the last 'refreshed' value
     bool setRobotDescription(const std::string& robot_description, std::string& why);
-    bool setGlobalFrame(const std::string& global_frame, std::string& why);
-
-    bool isValidGlobalFrame(const std::string& frame) const;
-
-    bool reinit(const std::string& robot_description, std::string& why);
-    bool reinitRobotModels(const std::string& robot_description, std::string& why);
-    bool reinitObjectInteractiveMarker();
-
-    bool robotModelLoaded() const;
 
     void processObjectMarkerFeedback(
         const visualization_msgs::InteractiveMarkerFeedback::ConstPtr& feedback);
 
-    void publishPhantomRobotVisualization();
-    void publishBasePoseCandidateVisualization(
-        const geometry_msgs::PoseStamped& candidate_pose);
-
-    auto createSixDOFControls() const -> std::vector<visualization_msgs::InteractiveMarkerControl>;
-
-    void occupancyGridCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
-
-    void manipulate_active_cb();
-    void manipulate_feedback_cb(const cmu_manipulation_msgs::ManipulateFeedback::ConstPtr& feedback);
-    void manipulate_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const cmu_manipulation_msgs::ManipulateResult::ConstPtr& result);
-
-    void grasp_object_command_active_cb();
-    void grasp_object_command_feeback_cb(const cmu_manipulation_msgs::GraspObjectCommandFeedback::ConstPtr& feedback);
-    void grasp_object_command_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const cmu_manipulation_msgs::GraspObjectCommandResult::ConstPtr& result);
-
-    void reposition_base_command_active_cb();
-    void reposition_base_command_feedback_cb(const cmu_manipulation_msgs::RepositionBaseCommandFeedback::ConstPtr& feedback);
-    void reposition_base_command_result_cb(
-        const actionlib::SimpleClientGoalState& state,
-        const cmu_manipulation_msgs::RepositionBaseCommandResult::ConstPtr& result);
-
-    void manipulateObjectResultCallback(
-            const actionlib::SimpleClientGoalState& state,
-            const cmu_manipulation_msgs::ManipulateObjectResult::ConstPtr& result);
-
+    bool updateObjectInteractiveMarker();
     void updateObjectMarkerPose();
-    void updateBasePoseSpinBoxes();
     void updateGUI();
 };
 

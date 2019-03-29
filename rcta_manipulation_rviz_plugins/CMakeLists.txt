@@ -55,16 +55,20 @@ endif()
 if(SMPL_MOVEIT_INTERFACE_QT5)
     qt5_wrap_cpp(
         GRASPING_COMMAND_PANEL_MOC_HEADER_SOURCES
-        src/grasping_command_panel/grasping_command_panel.h)
+        src/grasping_command_panel/grasping_command_panel.h
+        src/grasping_command_panel/grasping_command_model.h)
 else()
     qt4_wrap_cpp(
         GRASPING_COMMAND_PANEL_MOC_HEADER_SOURCES
-        src/grasping_command_panel/grasping_command_panel.h)
+        src/grasping_command_panel/grasping_command_panel.h
+        src/grasping_command_panel/grasping_command_model.h)
 endif()
 add_library(
     grasping_command_panel_plugin
     ${GRASPING_COMMAND_PANEL_MOC_HEADER_SOURCES}
-    src/grasping_command_panel/grasping_command_panel.cpp)
+    src/grasping_command_panel/grasping_command_panel.cpp
+    src/grasping_command_panel/grasping_command_model.cpp)
+target_compile_options(grasping_command_panel_plugin PRIVATE -Wfatal-errors)
 target_include_directories(
     grasping_command_panel_plugin
     SYSTEM PRIVATE
