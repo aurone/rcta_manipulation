@@ -190,7 +190,6 @@ bool CheckGripperGrip()
 }
 
 // Execute a sequence of trajectory/gripper commands.
-// Looking for command type "smpl::make_unique<GripperCommand>(false)"
 bool ExecuteTrajectory(
     const ros::NodeHandle& nh,
     const std::vector<std::unique_ptr<Command>>& commands)
@@ -231,7 +230,6 @@ bool ExecuteTrajectory(
     // open the gripper
     // move the arm to the post-grasp configuration
 
-    ROS_INFO("going to partially open the gripper nw ");
     auto nh1 = ros::NodeHandle();
     ros::Publisher gripper_command_pub = nh1.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1000);
                 
@@ -267,7 +265,7 @@ bool ExecuteTrajectory(
 
             ROS_INFO("%s gripper", c->open ? "Open" : "Close");
             // auto res = gripper_client.sendGoalAndWait(goal);
-            std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             // CheckGripperGrip();
             // if (res.state_ == res.SUCCEEDED) {
             //     ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
@@ -516,28 +514,6 @@ bool ManipulateObject(
 
     auto start_state = moveit::core::RobotState(*real_start_state);
 
-    /*
-    // TODO: initialize to current state values
-    // start_state.setToDefaultValues();
-
-    // because fuck you moveit, plz stahp throwing exceptions...unreferenced
-    // but keeping this around in case we explode
-    auto robot_has_variable = [&](
-        const moveit::core::RobotModel& model,
-        const std::string& name)
-    {
-        auto it = std::find(begin(model.getVariableNames()), end(model.getVariableNames()), name);
-        return it != end(model.getVariableNames());
-    };
-
-    // hmmm...is this going to barf when there are superflous joints?
-    if (!moveit::core::robotStateMsgToRobotState(msg->start_state, start_state)) {
-        ROS_ERROR("Failed to update start state");
-        return false;
-    }
-
-    */
-
     RobotStateMsgToRobotState(&msg->start_state, &start_state);
 
     ///////////////////////////////
@@ -644,9 +620,6 @@ bool ManipulateObject(
     /////////////////////////////////////////////
 
     auto execute = !msg->plan_only;
-
-    ROS_INFO("execute is %d", execute);
-    ROS_INFO("msg->plan_only is %d", msg->plan_only);
 
     if (execute) {
         ExecuteTrajectory(ph, commands);
@@ -809,7 +782,6 @@ bool OpenGripper(GripperCommandActionClient* gripper_client)
 bool OpenGripperPartial()
 {
     auto nh2 = ros::NodeHandle();
-    ROS_INFO("going to partially open the gripper nw ");
     ros::Publisher gripper_command_pub = nh2.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1);
     ros::Duration(0.5).sleep();
     // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -824,7 +796,7 @@ bool OpenGripperPartial()
     gripper_command_pub.publish(msg);
     // gripper_command_pub.publish(msg);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
  
     return true;
 }
@@ -1062,7 +1034,7 @@ int main(int argc, char* argv[])
     j_object_world.axis = smpl::Vector3::Zero();
     j_object_world.name = "world_joint";
     j_object_world.type = smpl::urdf::JointType::Floating;
-    ROS_INFO("goint to call InitRobotModel");
+    
     if (!InitRobotModel(&object_model, object_urdf.get())) {
         ROS_ERROR("Failed to initialize object model");
         return 1;

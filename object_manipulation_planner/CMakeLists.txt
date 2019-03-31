@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.12)
 project(object_manipulation_planner)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
 find_package(Boost REQUIRED COMPONENTS filesystem)
