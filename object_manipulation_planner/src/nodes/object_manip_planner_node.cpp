@@ -161,7 +161,11 @@ bool ExecuteTrajectory(
             auto* c = static_cast<TrajectoryCommand*>(command.get());
 
             control_msgs::FollowJointTrajectoryGoal traj;
-            traj.trajectory.header.stamp = ros::Time::now();
+#if 0
+            traj.trajectory.header.stamp = ros::Time(0);
+#else
+            traj.trajectory.header.stamp = ros::Time::now() + ros::Duration(0.2);
+#endif
             traj.trajectory.header.frame_id = "";
 
             traj.trajectory.joint_names = {
