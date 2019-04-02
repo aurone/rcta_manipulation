@@ -14,13 +14,17 @@
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <gperftools/profiler.h>
+#include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_monitor/current_state_monitor.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit_msgs/DisplayTrajectory.h>
+#include <moveit/trajectory_processing/iterative_time_parameterization.h>
+#include <moveit_msgs/GetStateValidity.h>
 #include <ros/ros.h>
+#include "std_msgs/Float64MultiArray.h"
 #include <sbpl_collision_checking/collision_model_config.h>
 #include <sbpl_collision_checking/collision_space.h>
 #include <smpl/console/nonstd.h>
@@ -36,6 +40,7 @@
 #include <tf_conversions/tf_eigen.h>
 #include <tf/transform_listener.h>
 #include <urdf_parser/urdf_parser.h>
+#include <smpl_urdf_robot_model/robot_model.h>
 
 // project includes
 #include "assert.h"
@@ -43,6 +48,14 @@
 #include "object_manip_model.h"
 #include "object_manip_checker.h"
 //#include "roman_robot_model.h"
+
+//for sleeping
+#include <chrono>
+#include <thread>
+
+using GripperCommandActionClient =
+        actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
+
 
 struct CurrentStateMonitor
 {
@@ -69,20 +82,20 @@ auto GetCurrentState(CurrentStateMonitor* monitor) -> moveit::core::RobotState;
 // A necessary evil
 namespace std {
 template <class Key, class Value>
-auto operator<<(std::ostream& o, const std::map<Key, Value>& m) -> std::ostream&
-{
-    o << '{';
-    auto i = 0;
-    for (auto& e : m) {
-        if (i++ != 0) {
-            o << ", ";
+    auto operator<<(std::ostream& o, const std::map<Key, Value>& m) -> std::ostream&
+    {
+        o << '{';
+        auto i = 0;
+        for (auto& e : m) {
+            if (i++ != 0) {
+                o << ", ";
+            }
+            o << '(' << e.first << ", " << e.second << ')';
         }
-        o << '(' << e.first << ", " << e.second << ')';
-    }
-    o << '}';
+        o << '}';
 
-    return o;
-}
+        return o;
+    }
 } // namespace
 
 // Downloads a parameter from the parameter server. If the downloaded succeeds,
@@ -99,16 +112,93 @@ bool GetParam(const ros::NodeHandle& nh, const std::string& name, T* value)
     return true;
 }
 
+bool AdjustGripper()
+{
+
+    // init move_group
+    // adjust the gripper position if necessary
+    // check again maybe ?
+    // return true
+
+    auto group_name = std::string("right_arm_and_torso");
+    auto move_group =
+            moveit::planning_interface::MoveGroupInterface(group_name);
+
+    move_group.setPlanningTime(10.0);
+
+    move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+    move_group.setGoalPositionTolerance(0.02);
+    move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
+
+    move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
+
+    auto gripper_client_name = std::string("rcta_right_robotiq_controller/gripper_action");
+
+    auto tool_link_name = "limb_right_tool0";
+
+    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
+    GripperCommandActionClient gripper_client(gripper_client_name);
+    if (!gripper_client.waitForServer()) {
+        ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
+        return 1;
+    }
+
+    ROS_INFO("finished watiting for the GripperCommand action server. out now ");
+
+    move_group.setEndEffectorLink(tool_link_name);
+
+    {
+        auto curr_state = *move_group.getCurrentState();
+        auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+        // TODO - change this value 
+        auto move_pose =
+                tool_transform *
+                Eigen::Translation3d(0.0, -0.1, 0.0);
+
+        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+        move_group.setGoalPositionTolerance(0.02);
+        move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));        
+        move_group.setPoseTarget(move_pose, tool_link_name);
+        auto err = move_group.move();
+        std::cout << "moved in adjust gripper " << std::endl;
+    }
+
+    return true;
+}
+
+bool CheckGripperGrip()
+{
+
+    // subscribe to the /roman1/joint_space topic 
+    // read the gripper's current position
+    // return feedback
+
+    auto nh = ros::NodeHandle();
+
+    auto msg = ros::topic::waitForMessage<sensor_msgs::JointState>("/roman1/joint_states", nh, ros::Duration(10.0));
+
+    int size_msg = msg->position.size();
+
+    if (msg)
+    {        
+        ROS_INFO("position of finger (%d th) is %d", 1, msg->position[size_msg - 6]);
+        ROS_INFO("position of finger (%d th) is %d", 2, msg->position[size_msg - 5]);
+        ROS_INFO("position of finger (%d th) is %d", 3, msg->position[size_msg - 4]);
+    }
+    
+    return 0;
+}
+
 // Execute a sequence of trajectory/gripper commands.
 bool ExecuteTrajectory(
     const ros::NodeHandle& nh,
     const std::vector<std::unique_ptr<Command>>& commands)
 {
     using GripperCommandActionClient =
-            actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
+    actionlib::SimpleActionClient<control_msgs::GripperCommandAction>;
 
     using FollowJointTrajectoryActionClient =
-            actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
+    actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
     auto traj_client_name = std::string();
     auto gripper_client_name = std::string();
@@ -140,23 +230,48 @@ bool ExecuteTrajectory(
     // open the gripper
     // move the arm to the post-grasp configuration
 
+    auto nh1 = ros::NodeHandle();
+    ros::Publisher gripper_command_pub = nh1.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1000);
+                
     for (auto& command : commands) {
         if (command->type == Command::Type::Gripper) {
             auto* c = static_cast<GripperCommand*>(command.get());
             control_msgs::GripperCommandGoal goal;
             if (c->open) {
-                goal.command.position = 0.0841; //1.0;
+#if 1
+                std_msgs::Float64MultiArray msg;
+                msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                msg.layout.dim[0].label = "joint";
+                msg.layout.dim[0].size = 4;
+                msg.layout.dim[0].stride = 1;
+                msg.layout.data_offset = 0; 
+                msg.data = {60.0, 60.0, 60.0, 137.0};
+                gripper_command_pub.publish(msg);
+#else                
+                continue;
+#endif
             } else {
-                goal.command.position = 0.0;
+                // goal.command.position = 0.0;
+
+                std_msgs::Float64MultiArray msg;
+                msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                msg.layout.dim[0].label = "joint";
+                msg.layout.dim[0].size = 4;
+                msg.layout.dim[0].stride = 1;
+                msg.layout.data_offset = 0; 
+                msg.data = {200.0, 200.0, 200.0, 137.0};
+                gripper_command_pub.publish(msg);
             }
 
             ROS_INFO("%s gripper", c->open ? "Open" : "Close");
-            auto res = gripper_client.sendGoalAndWait(goal);
-            if (res.state_ == res.SUCCEEDED) {
-                ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
-            } else {
-                ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
-            }
+            // auto res = gripper_client.sendGoalAndWait(goal);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            // CheckGripperGrip();
+            // if (res.state_ == res.SUCCEEDED) {
+            //     ROS_INFO("gripper client returned with state '%s'", res.toString().c_str());
+            // } else {
+            //     ROS_WARN("gripper client returned with state '%s' (%s)", res.toString().c_str(), res.getText().c_str());
+            // }
         } else if (command->type == Command::Type::Trajectory) {
             auto* c = static_cast<TrajectoryCommand*>(command.get());
 
@@ -190,9 +305,10 @@ bool ExecuteTrajectory(
                 traj.trajectory.points[i].positions = std::move(positions);
 
                 traj.trajectory.points[i].time_from_start =
-                        ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
+                ros::Duration(c->trajectory.getWayPointDurationFromStart(i));
 
-                ROS_DEBUG("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, traj.trajectory.points[i].time_from_start.toSec());
+                ROS_DEBUG("%zu positions, t(%d) = %f", traj.trajectory.points[i].positions.size(), i, 
+                    traj.trajectory.points[i].time_from_start.toSec());
             }
 
             ROS_INFO("Execute trajectory");
@@ -238,11 +354,11 @@ bool AnimateTrajectory(
 
             auto ma = visualization_msgs::MarkerArray();
             last_wp.getRobotMarkers(
-                    ma,
-                    last_wp.getRobotModel()->getLinkModelNames(),
-                    color,
-                    "trajectory",
-                    ros::Duration(0));
+                ma,
+                last_wp.getRobotModel()->getLinkModelNames(),
+                color,
+                "trajectory",
+                ros::Duration(0));
 
             SV_SHOW_INFO(ma);
 
@@ -262,11 +378,11 @@ bool AnimateTrajectory(
 
                 auto ma = visualization_msgs::MarkerArray();
                 wp.getRobotMarkers(
-                        ma,
-                        wp.getRobotModel()->getLinkModelNames(),
-                        color,
-                        "trajectory",
-                        ros::Duration(0));
+                    ma,
+                    wp.getRobotModel()->getLinkModelNames(),
+                    color,
+                    "trajectory",
+                    ros::Duration(0));
 
                 SV_SHOW_INFO(ma);
 
@@ -283,7 +399,7 @@ bool AnimateTrajectory(
 }
 
 using ManipulateObjectActionServer =
-        actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
+actionlib::SimpleActionServer<cmu_manipulation_msgs::ManipulateObjectAction>;
 
 // because fuck you moveit, plz stahp throwing exceptions...unreferenced
 // but keeping this around in case we explode
@@ -351,6 +467,7 @@ void RobotStateMsgToRobotState(
 // manipulate the state of an object.
 // \param robot_model
 // \param group_name needed to create final trajectory
+
 bool ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
     const std::string& group_name,
@@ -382,10 +499,10 @@ bool ManipulateObject(
             SetJointPositions(&obj_state, obj_root_joint, positions);
             UpdateVisualBodyTransforms(&obj_state);
             SV_SHOW_INFO_NAMED(
-                    "object_state",
-                    MakeRobotVisualization(
-                            &obj_state,
-                            smpl::visual::Color{ 1.0f, 0.5f, 0.0f, 1.0f },
+                "object_state",
+                MakeRobotVisualization(
+                    &obj_state,
+                    smpl::visual::Color{ 1.0f, 0.5f, 0.0f, 1.0f },
                             "map", // TODO: @planning frame
                             "object_state"));
         } else {
@@ -415,11 +532,11 @@ bool ManipulateObject(
         color.b = 1.0f;
         color.a = 0.9f;
         start_state.getRobotMarkers(
-                ma,
-                start_state.getRobotModel()->getLinkModelNames(),
-                color,
-                "start_state",
-                ros::Duration(0.0));
+            ma,
+            start_state.getRobotModel()->getLinkModelNames(),
+            color,
+            "start_state",
+            ros::Duration(0.0));
         ROS_INFO("Visualize %zu markers", ma.markers.size());
         SV_SHOW_INFO(ma);
     }
@@ -464,18 +581,19 @@ bool ManipulateObject(
 
     ProfilerStart("omp");
     if (!PlanPath(
-            planner,
-            start_state,
-            object_pose,
-            object_start_state,
-            object_goal_state,
-            allowed_time,
-            &commands))
+        planner,
+        start_state,
+        object_pose,
+        object_start_state,
+        object_goal_state,
+        allowed_time,
+        &commands))
     {
         ProfilerStop();
         ROS_ERROR("Failed to plan path");
         return false;
     }
+
     ProfilerStop();
 
     //////////////////////////////
@@ -495,8 +613,8 @@ bool ManipulateObject(
         trajectory.getRobotTrajectoryMsg(display.trajectory[0]);
 
         moveit::core::robotStateToRobotStateMsg(
-                trajectory.getFirstWayPoint(),
-                display.trajectory_start);
+            trajectory.getFirstWayPoint(),
+            display.trajectory_start);
 
         display_publisher.publish(display);
     }
@@ -516,6 +634,7 @@ bool ManipulateObject(
     ROS_INFO("Crate manipulation successful");
     return true;
 }
+
 
 void UpdateCurrentState(
     CurrentStateMonitor* monitor,
@@ -561,6 +680,274 @@ auto GetCurrentState(CurrentStateMonitor* monitor) -> moveit::core::RobotState
     return state;
 }
 
+template <class T>
+auto interp(const T& src, const T& dst, double t) -> T
+{
+    return (1.0 - t) * src + t * dst;
+}
+
+template <class Sampler>
+bool PlanManipulationTrajectory(
+    moveit::planning_interface::MoveGroupInterface* move_group,
+    const std::string& group_name,
+    const std::string& tool_link_name,
+    int samples,
+    Sampler sampler,
+    moveit::planning_interface::MoveGroupInterface::Plan* oplan)
+{
+    auto nh = ros::NodeHandle();
+    auto check_state_validity = nh.serviceClient<moveit_msgs::GetStateValidity>(
+            "check_state_validity");
+
+    auto interm_state = *move_group->getCurrentState();
+    auto manip_traj = robot_trajectory::RobotTrajectory(
+            interm_state.getRobotModel(), group_name);
+    manip_traj.addSuffixWayPoint(interm_state, 0.0);
+    auto ids = (int32_t)0; 
+
+    ROS_INFO("samples  = %d", samples);
+    for (auto i = 1; i < samples; ++i) { // skip the first waypoint, assume we have at least two samples
+        auto alpha = (double)i / (double)(samples - 1);
+        
+        // ROS_INFO("calling sample manifold fn now with alpa  = %f", alpha);
+        auto contact_pose = sampler(alpha);
+
+        std::cout << "contact pose is " << contact_pose.matrix();
+
+        auto robot_model = interm_state.getRobotModel();
+        auto* group = robot_model->getJointModelGroup(group_name);
+
+        auto consistency_limits = std::vector<double>(group->getVariableCount(), smpl::to_radians(10));
+
+        // TODO: Why don't we require a feasible ik solution at all intermediate
+        // waypoints? This could be worse, if we weren't using consistency
+        // limits, but it's still pretty bad.
+
+        if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
+            visualization_msgs::MarkerArray ma;
+            std_msgs::ColorRGBA color;
+            color.r = 1.0f;
+            color.g = 0.5f;
+            color.b = 0.0f;
+            color.a = 0.8f;
+            interm_state.getRobotMarkers(ma, robot_model->getLinkModelNames(), color, "constrained", ros::Duration(0));
+            for (auto& m : ma.markers) {
+                m.id = ids++;
+            }
+            SV_SHOW_INFO(ma);
+            manip_traj.addSuffixWayPoint(interm_state, 1.0);
+
+            // TODO: interpolate path since for lack of an interface for CCD.
+
+            moveit_msgs::GetStateValidity::Request req;
+            moveit_msgs::GetStateValidity::Response res;
+            robotStateToRobotStateMsg(interm_state, req.robot_state);
+            req.group_name = "right_arm_and_torso";
+            if (!check_state_validity.call(req, res)) {
+                ROS_WARN("Failed to call check_state_validity service for waypoint %d", i);
+                return false;
+            }
+
+            if (!res.valid) {
+                ROS_WARN("Waypoint %d on manipulation trajectory is invalid", i);
+                return false;
+            }
+        }
+        else 
+            ROS_INFO("unable to call ik ");
+
+    }
+
+    // timestamp waypoint
+    auto itp = trajectory_processing::IterativeParabolicTimeParameterization();
+    if (!itp.computeTimeStamps(manip_traj)) {
+        ROS_ERROR("Failed to compute timestamps");
+        return false;
+    }
+
+    auto plan = moveit::planning_interface::MoveGroupInterface::Plan();
+    robotStateToRobotStateMsg(*move_group->getCurrentState(), plan.start_state_);
+    manip_traj.getRobotTrajectoryMsg(plan.trajectory_);
+
+    *oplan = std::move(plan);
+    return true;
+}
+
+bool OpenGripper(GripperCommandActionClient* gripper_client)
+{
+    ROS_INFO("Open gripper full function");
+    control_msgs::GripperCommandGoal gripper_goal;
+    gripper_goal.command.position = 0.0841;
+    auto res = gripper_client->sendGoalAndWait(gripper_goal);
+    return res.state_ == res.SUCCEEDED;
+
+}
+
+bool OpenGripperPartial()
+{
+    auto nh2 = ros::NodeHandle();
+    ros::Publisher gripper_command_pub = nh2.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1);
+    ros::Duration(0.5).sleep();
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    // getchar();
+    std_msgs::Float64MultiArray msg;
+    msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+    msg.layout.dim[0].label = "joint";
+    msg.layout.dim[0].size = 4;
+    msg.layout.dim[0].stride = 1;
+    msg.layout.data_offset = 0; 
+    msg.data = {60.0, 60.0, 60.0, 137.0};
+    gripper_command_pub.publish(msg);
+    // gripper_command_pub.publish(msg);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+ 
+    return true;
+}
+
+bool CloseGripper(GripperCommandActionClient* gripper_client)
+{
+    ROS_INFO("Close gripper");
+    control_msgs::GripperCommandGoal gripper_goal;
+    gripper_goal.command.position = 0.0;
+    auto res = gripper_client->sendGoalAndWait(gripper_goal);
+    return res.state_ == res.SUCCEEDED;
+}
+
+
+bool ReleaseCrate(
+    const moveit::core::RobotState* curr_start_state,
+    const smpl::urdf::RobotModel* object_model,
+    const ros::NodeHandle& ph)
+{
+    
+    // Rotate the gripper in place
+    // Open the gripper
+    // While maintaining the same current orientation, move the gripper back by a certain distance 
+    // Move gripper back to the starting position
+    
+    /////////////////////////////////////
+    // Initialize Move Group Interface //
+    /////////////////////////////////////
+
+    auto group_name = std::string("right_arm_and_torso");
+    auto move_group =
+            moveit::planning_interface::MoveGroupInterface(group_name);
+
+    move_group.setPlanningTime(10.0);
+
+    move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+    move_group.setGoalPositionTolerance(0.02);
+    move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));
+
+    move_group.setWorkspace(-0.5, -1.5, -0.2, 1.5, 1.5, 1.8);
+
+    auto gripper_client_name = std::string("rcta_right_robotiq_controller/gripper_action");
+
+    auto tool_link_name = "limb_right_tool0";
+
+    ROS_INFO("Wait for GripperCommand action server '%s'", gripper_client_name.c_str());
+    GripperCommandActionClient gripper_client(gripper_client_name);
+    if (!gripper_client.waitForServer()) {
+        ROS_WARN("Failed to wait for action server '%s'", gripper_client_name.c_str());
+        return 1;
+    }
+
+    ROS_INFO("finished watiting for the GripperCommand action server. out now ");
+
+    auto start_state = *move_group.getCurrentState();
+
+    //////////////////////
+    // Release Manifold //
+    //////////////////////
+
+    move_group.setEndEffectorLink(tool_link_name);
+
+
+    {
+        auto release_manifold = [&](double alpha) -> Eigen::Affine3d
+        {
+
+            auto s = interp(
+                    0.0,
+                    -0.15*M_PI,
+                    alpha);
+
+            Eigen::Vector3d rot2(0,0,1); 
+            double mag = rot2.norm();
+            Eigen::AngleAxisd rot(s , rot2/mag);
+            auto curr_state = *move_group.getCurrentState();
+            auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+            auto rotate_gripper_pose =
+                    tool_transform*rot;
+
+            return rotate_gripper_pose;
+        };
+
+        auto samples = 20; //std::max(2, (int)std::round(arc / res));
+        
+        auto plan = moveit::planning_interface::MoveGroupInterface::Plan();
+        if (!PlanManipulationTrajectory(
+                &move_group,
+                group_name, tool_link_name,
+                samples, release_manifold,
+                &plan))
+        {
+            return false;
+        }
+
+        auto err = move_group.execute(plan);
+        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+            ROS_ERROR("Failed to execute manip trajectory");
+            return false;
+        }
+    
+    }
+
+    // if (!OpenGripper(&gripper_client)) {
+    //     ROS_ERROR("Failed to open gripper");
+    //     return false;
+    // }
+
+    OpenGripperPartial();
+
+    ///////////////////////////
+    // move the gripper back //
+    ///////////////////////////
+
+    {
+        auto curr_state = *move_group.getCurrentState();
+        auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+        auto withdraw_pose =
+                tool_transform *
+                Eigen::Translation3d(-0.1, 0.0, 0.0);
+
+        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+        move_group.setGoalPositionTolerance(0.02);
+        move_group.setGoalOrientationTolerance(smpl::to_radians(2.0));        
+        move_group.setPoseTarget(withdraw_pose, tool_link_name);
+        auto err = move_group.move();
+    }
+
+    //////////////////////////////////
+    // move back to the start state //
+    //////////////////////////////////
+
+    {
+        move_group.setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_JD_ML]");
+        move_group.setGoalJointTolerance(smpl::to_radians(1.0));
+        move_group.setJointValueTarget(*curr_start_state);
+
+        auto err = move_group.move();
+        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 // 1. Generate a trajectory using the model of the object
 // 2. Save the example trajectory as a demonstration
 // 3. Construct state space: (base/x, base/y, base/theta, torso, ee/x, ee/y,
@@ -574,7 +961,7 @@ int main(int argc, char* argv[])
     auto ph = ros::NodeHandle("~");
 
     auto display_publisher =
-            ph.advertise<moveit_msgs::DisplayTrajectory>("planned_path", 1);
+    ph.advertise<moveit_msgs::DisplayTrajectory>("planned_path", 1);
 
     auto visualizer = smpl::VisualizerROS();
     smpl::visual::set_visualizer(&visualizer);
@@ -651,6 +1038,7 @@ int main(int argc, char* argv[])
     j_object_world.axis = smpl::Vector3::Zero();
     j_object_world.name = "world_joint";
     j_object_world.type = smpl::urdf::JointType::Floating;
+    
     if (!InitRobotModel(&object_model, object_urdf.get())) {
         ROS_ERROR("Failed to initialize object model");
         return 1;
@@ -695,15 +1083,15 @@ int main(int argc, char* argv[])
     auto object_max_position = 1.0;
     auto object_variable_name = "hinge";
     if (!Init(
-            &omanip,
+        &omanip,
 #if 0
-            &roman_model,
+        &roman_model,
 #else
-            &planning_model,
+        &planning_model,
 #endif
-            object_variable_name,
-            object_min_position,
-            object_max_position))
+        object_variable_name,
+        object_min_position,
+        object_max_position))
     {
         ROS_ERROR("Failed to initialize Object Manipulation Model");
         return 1;
@@ -754,11 +1142,11 @@ int main(int argc, char* argv[])
     auto cspace = smpl::collision::CollisionSpace();
 #if 1
     if (!cspace.init(
-            &grid,
-            *robot_model->getURDF(),
-            config,
-            group_name,
-            omanip.parent_model->getPlanningJoints()))
+        &grid,
+        *robot_model->getURDF(),
+        config,
+        group_name,
+        omanip.parent_model->getPlanningJoints()))
     {
         ROS_ERROR("Failed to initialize Collision Space");
         return 1;
@@ -856,34 +1244,49 @@ int main(int argc, char* argv[])
     auto sub = nh.subscribe("joint_states", 10, jsfun);
 
     auto autostart = false;
+
     ManipulateObjectActionServer server(
-            "manipulate_object",
-            [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
+        "manipulate_object",
+        [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
+        {
+            auto curr_state = GetCurrentState(&state_monitor);
+            if (ManipulateObject(
+                robot_model,
+                group_name,
+                &object_model,
+                &cspace,
+                &planning_model,
+                &planner,
+                &curr_state,
+                display_publisher,
+                ph,
+                msg))
             {
-                auto curr_state = GetCurrentState(&state_monitor);
-                if (ManipulateObject(
-                        robot_model,
-                        group_name,
-                        &object_model,
-                        &cspace,
-                        &planning_model,
-                        &planner,
-                        &curr_state,
-                        display_publisher,
-                        ph,
-                        msg))
-                {
-                    server.setSucceeded();
-                } else {
-                    server.setAborted();
+
+                if (!msg->plan_only) {
+                    auto fresh_state = GetCurrentState(&state_monitor);
+
+                    if (!ReleaseCrate(&curr_state, &object_model, ph)) {
+                        ROS_ERROR("Failed to release crate");
+                        server.setAborted();
+                        return;
+                    }
                 }
-            },
-            autostart);
+
+                server.setSucceeded();
+
+            } else {
+                server.setAborted();
+            }
+        },
+        autostart);
 
     ROS_INFO("Start action server");
+
     server.start();
     ros::spin();
 
     return 0;
+
 }
 

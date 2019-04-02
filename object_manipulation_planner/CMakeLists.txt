@@ -85,6 +85,7 @@ target_include_directories(
         ${cmu_manipulation_msgs_INCLUDE_DIRS}
         ${control_msgs_INCLUDE_DIRS}
         ${eigen_conversions_INCLUDE_DIRS}
+        ${moveit_ros_planning_interface_INCLUDE_DIRS}
         ${tf_INCLUDE_DIRS}
         ${smpl_urdf_robot_model_INCLUDE_DIRS}
         ${urdfdom_INCLUDE_DIRS}
@@ -96,6 +97,7 @@ target_link_libraries(
         ${actionlib_LIBRARIES}
         ${cmu_manipulation_msgs_LIBRARIES}
         ${control_msgs_LIBRARIES}
+        ${moveit_ros_planning_interface_LIBRARIES}        
         ${eigen_conversions_LIBRARIES}
         ${tf_LIBRARIES}
         ${smpl_urdf_robot_model_LIBRARIES}

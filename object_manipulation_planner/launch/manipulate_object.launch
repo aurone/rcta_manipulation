@@ -1,11 +1,10 @@
 <launch>
-    <arg name="scenario"/>
-    <arg name="execute" default="false"/>
-    <arg name="allowed_planning_time" default="15.0"/>
-    <include file="$(find object_manipulation_planner)/launch/manipulate_object_params.launch">
-        <arg name="scenario" value="$(arg scenario)"/>
-        <arg name="execute" value="$(arg execute)"/>
-        <arg name="allowed_planning_time" value="$(arg allowed_planning_time)"/>
-    </include>
-    <node name="manipulate_object" pkg="object_manipulation_planner" type="manipulate_object" clear_params="true"/>
+    <!-- <arg name="scenario"/> -->
+    <arg name="scenario" default="$(find object_manipulation_planner)/tests/test-5.yaml"/>
+    <arg name="execute" default="true"/>
+    <node name="manipulate_object" pkg="object_manipulation_planner" type="manipulate_object" clear_params="true">
+        <param name="execute" value="$(arg execute)"/>
+        <rosparam command="load" file="$(arg scenario)"/>
+        <param name="allowed_planning_time" value="15.0"/>
+    </node>
 </launch>

@@ -3,6 +3,7 @@
     <node name="simple_crate_planner" pkg="object_manipulation_planner" type="simple_crate_planner">
         <param name="pregrasp_offset" value="-0.1"/>
         <param name="release_offset" value="-0.1"/>
+        <param name="tool_link_name" value="limb_right_tool0"/>
         <!-- TODO object_description -->
     </node>
 </launch>

@@ -68,6 +68,10 @@ bool InitRomanWorkspaceLatticeActions(
     // Create 2-connected motions for all other degrees of freedom //
     /////////////////////////////////////////////////////////////////
 
+    // create 2-connected motions for rotation and free angle motions
+    //for (int a = 3; a < space->dofCount(); ++a) {
+        // skip roll and pitch primitives
+        // if (a == EE_QX || a == EE_QY) continue;
     // note that for torso and base motions, we attempt to move the end
     // effector by the equivalent amount
 

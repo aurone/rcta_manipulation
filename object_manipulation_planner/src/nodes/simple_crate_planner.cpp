@@ -153,6 +153,21 @@ bool MoveToPose(
     return err == moveit::planning_interface::MoveItErrorCode::SUCCESS;
 }
 
+bool MoveToPoseConstraints(
+    moveit::planning_interface::MoveGroupInterface* move_group,
+    const Eigen::Affine3d& pose,
+    const std::string& tool_link_name)
+{
+
+    move_group->setPlannerId("right_arm_and_torso[right_arm_and_torso_ARA_BFS_ML]");
+    move_group->setGoalPositionTolerance(0.02);
+    move_group->setGoalOrientationTolerance(smpl::to_radians(2.0));
+    move_group->setPoseTarget(pose, tool_link_name);
+    auto err = move_group->move();
+    return err == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+
+}
+
 bool MoveCartesian(
     moveit::planning_interface::MoveGroupInterface* move_group,
     const Eigen::Affine3d& dst_pose,
@@ -268,6 +283,7 @@ bool PlanManipulationTrajectory(
 
     for (auto i = 1; i < samples; ++i) { // skip the first waypoint, assume we have at least two samples
         auto alpha = (double)i / (double)(samples - 1);
+        
         auto contact_pose = sampler(alpha);
 
         auto robot_model = interm_state.getRobotModel();
@@ -277,7 +293,8 @@ bool PlanManipulationTrajectory(
 
         // TODO: Why don't we require a feasible ik solution at all intermediate
         // waypoints? This could be worse, if we weren't using consistency
-        // limits, but it's still pretty bad.
+        // limits, but it's still pretty bad...we should definitely bail and report what
+        // percentage of the motion we accomplished
 
         if (interm_state.setFromIK(group, contact_pose, tool_link_name, consistency_limits)) {
             visualization_msgs::MarkerArray ma;
@@ -334,7 +351,10 @@ bool WritePlan(
 {
     // TODO: configurate filename
     auto* f = fopen("manipulation.csv", "w");
-    if (f == NULL) return false;
+    if (f == NULL) {
+        ROS_INFO("could not open the file ");
+        return false;
+    }
 
     // TODO: configurate...grabbed from door_demonstrator.launch
     auto variables = std::vector<const char*>{
@@ -411,6 +431,7 @@ bool WritePlan(
 
 bool ManipulateObject(
     const cmu_manipulation_msgs::ManipulateObjectGoal* goal,
+    const ros::NodeHandle& nh,
     moveit::planning_interface::MoveGroupInterface* move_group,
     const std::string* group_name,
     GripperCommandActionClient* gripper_client,
@@ -470,6 +491,7 @@ bool ManipulateObject(
                     goal->object_pose.orientation.y,
                     goal->object_pose.orientation.z));
 
+    // setting up crate variables
     auto* lid_var = GetVariable(object_model, "lid_joint");
     auto* handle_var = GetVariable(object_model, "handle_joint");
     auto* root_joint = GetRootJoint(object_model);
@@ -479,6 +501,7 @@ bool ManipulateObject(
         return false;
     }
 
+    // getting the range for crate lid opening
     auto* lid_limits = GetVariableLimits(lid_var);
     if (lid_limits == NULL) return false;
 
@@ -492,16 +515,19 @@ bool ManipulateObject(
     SetVariablePosition(&object_state, handle_var, 0.0);
     SetJointPositions(&object_state, root_joint, &object_pose);
 
+    // robot visualization 
     UpdateVisualBodyTransforms(&object_state);
     SV_SHOW_INFO_NAMED("object_state", MakeRobotVisualization(&object_state, smpl::visual::Color{ 1.0f, 0.5f, 0.5f, 1.0f }, "map", "object_state"));
 
+    // getting the contact link for the crate 
     auto* contact_link = GetLink(object_model, "tool");
     if (contact_link == NULL) {
         ROS_ERROR("No 'tool' link");
         return false;
     }
 
-    auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
+    // getting the contact pose for the crate
+    auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link); 
 
     // move up in the world frame a little bit to avoid jamming the fingers
     // on the lid
@@ -521,9 +547,13 @@ bool ManipulateObject(
 
     print_pose("contact link pose", contact_pose);
 
+    // transform to get the desired pose of the gripper with respect to the contact link on the object
+    auto contact_pose_offset = smpl::Affine3(
+            smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX()) *
+            smpl::AngleAxis(-0.15 * M_PI, smpl::Vector3::UnitZ()));
+
     // rotate so that the end effector is correct
-    contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
-    contact_pose *= smpl::AngleAxis(-smpl::to_radians(10.0), smpl::Vector3::UnitZ());
+    contact_pose = contact_pose * contact_pose_offset;
 
     print_pose("grasp pose", contact_pose);
 
@@ -555,6 +585,7 @@ bool ManipulateObject(
     // open the gripper //
     //////////////////////
 
+    // TODO: REPLACE ME WITH PARTIAL OPEN STATE
     if (!OpenGripper(gripper_client)) {
         ROS_ERROR("Failed to open gripper");
         return false;
@@ -595,6 +626,8 @@ bool ManipulateObject(
             }
 
             SetVariablePosition(&object_state, lid_var, lid_limits->max_position);
+            
+            // starting pose of the contact link on the object
             auto default_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
 
             auto s = interp(
@@ -607,8 +640,7 @@ bool ManipulateObject(
             auto contact_pose = *GetUpdatedLinkTransform(&object_state, contact_link);
             contact_pose = smpl::Translation3(contact_pose.translation()) *
                     smpl::Quaternion(default_pose.rotation());
-            contact_pose *= smpl::AngleAxis(0.5 * M_PI, smpl::Vector3::UnitX());
-            contact_pose *= smpl::AngleAxis(-smpl::to_radians(10.0), smpl::Vector3::UnitZ());
+            contact_pose = contact_pose * contact_pose_offset; //frame matching
             return contact_pose;
         };
 
@@ -651,6 +683,54 @@ bool ManipulateObject(
         }
     }
 
+    ///////////////////////////////////////////
+    // manipulate the object - crate release //
+    ///////////////////////////////////////////
+
+    {
+        auto release_manifold = [&](double alpha) -> Eigen::Affine3d
+        {
+
+            auto s = interp(
+                    0.0,
+                    -0.15*M_PI,
+                    alpha);
+
+            Eigen::Vector3d rot2(0,0,1); 
+            double mag = rot2.norm();
+            Eigen::AngleAxisd rot(s , rot2/mag);
+            // Eigen::AngleAxisd rot(- 0.5 * M_PI, Eigen::Vector3d::UnitZ());
+            auto curr_state = *move_group->getCurrentState();
+            auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
+            auto rotate_gripper_pose =
+                    tool_transform*rot;
+            
+            std::cout << "tool transform is - " << tool_transform.matrix() << std::endl;
+            
+            return rotate_gripper_pose;
+        };
+
+        auto samples = 20; //std::max(2, (int)std::round(arc / res));
+        
+        auto plan = moveit::planning_interface::MoveGroupInterface::Plan();
+        if (!PlanManipulationTrajectory(
+                move_group,
+                *group_name, tool_link_name,
+                samples, release_manifold,
+                &plan))
+        {
+            return false;
+        }
+
+        std::cout << plan.trajectory_ << std::endl;
+
+        auto err = move_group->execute(plan);
+        if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+            ROS_ERROR("Failed to execute manip trajectory");
+            return false;
+        }
+    }
+
     ////////////////////////////
     // open the gripper again //
     ////////////////////////////
@@ -660,18 +740,17 @@ bool ManipulateObject(
         return false;
     }
 
-    //////////////////////////////
-    // move to pre-release pose //
-    //////////////////////////////
+    ///////////////////////////
+    // move the gripper back //
+    ///////////////////////////
 
     {
         auto curr_state = *move_group->getCurrentState();
         auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
-        auto prerelease_pose =
+        auto withdraw_pose =
                 tool_transform *
-                Eigen::Translation3d(release_offset, 0.0, 0.0);
-//        MoveCartesian(move_group, prerelease_pose, *group_name, tool_link_name, 0.0);
-        MoveToPose(move_group, prerelease_pose, tool_link_name, 1.0);
+                Eigen::Translation3d(-0.1, 0.0, 0.0);
+        MoveToPose(move_group, withdraw_pose, tool_link_name);
     }
 
     //////////////////////////////////
@@ -767,7 +846,7 @@ int main(int argc, char* argv[])
     auto pregrasp_offset = -0.1;
     auto release_offset = -0.1;
     if (!GetParam(ph, "pregrasp_offset", pregrasp_offset)) return 1;
-    if (!GetParam(ph, "release_offset", pregrasp_offset)) return 1;
+    if (!GetParam(ph, "release_offset", release_offset)) return 1;
 
     auto write_manip_trajectory = true;
 
@@ -778,6 +857,7 @@ int main(int argc, char* argv[])
             {
                 if (!ManipulateObject(
                         msg.get(),
+                        nh,
                         &move_group,
                         &group_name,
                         &gripper_client,

@@ -458,6 +458,7 @@ bool PlanPath(
     timing.type = smpl::ARAStar::TimeParameters::TIME;
     timing.max_allowed_time_init = smpl::to_duration(allowed_time);
     timing.max_allowed_time = smpl::to_duration(allowed_time);
+    
     bool res = planner->search.replan(timing, &solution, &solution_cost);
 #else
     auto plan_start = std::chrono::high_resolution_clock::now();

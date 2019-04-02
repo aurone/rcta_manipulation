@@ -23,7 +23,9 @@ void Execute(
     // hardcoded maximum width for the robotiq c-model gripper
     if (goal->command.position == 0.0841) {
         command.data = { 0.0495, 0.0495, 0.0495 };
-    } else {
+    } 
+    
+    else {
         command.data = { 1.2218, 1.2218, 1.2218 };
     }
 
