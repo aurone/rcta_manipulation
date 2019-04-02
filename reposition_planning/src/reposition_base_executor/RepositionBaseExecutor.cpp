@@ -899,7 +899,7 @@ bool RepositionBaseExecutor::downloadGraspingParameters(ros::NodeHandle& nh)
 
 auto RepositionBaseExecutor::currentRobotState() const -> moveit::core::RobotState
 {
-    assert(m_state_monitor && m_state_monitor->getPlanningScene());
+    assert(m_state_monitor && m_state_monitor->getCurrentState());
     auto current_state = m_state_monitor->getCurrentState();
     if (!current_state) {
         ROS_WARN("FAILED TO GET CURRENT STATE");

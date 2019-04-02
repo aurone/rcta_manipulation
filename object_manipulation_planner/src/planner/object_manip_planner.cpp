@@ -244,6 +244,55 @@ int GetClosestZIndex(RomanObjectManipLattice* graph, double z)
     return closest_z_index;
 }
 
+enum MotionType
+{
+    MT_NORMAL = 0,
+    MT_OBJECT,
+    MT_GRASP,
+};
+
+// determine the transition type
+static
+auto reduce_type(
+    const smpl::RobotState& from,
+    const smpl::RobotState& to,
+    TransitionType::Type type)
+    -> MotionType
+{
+    switch (type) {
+    // actions that do not move the object
+    case TransitionType::OrigStateOrigSucc:
+    case TransitionType::OrigStateBridgeSucc:
+    case TransitionType::EGraphStateBridgeSucc:
+    case TransitionType::PreGraspAmpSucc:
+    case TransitionType::SnapSucc:
+        return MT_NORMAL;
+    // actions that definitely move the object
+    case TransitionType::OrigStateZSucc:
+    case TransitionType::EGraphStateZSucc:
+        return MT_OBJECT;
+    // actions that might move the object
+    case TransitionType::EGraphStateAdjSucc:
+    case TransitionType::ShortcutSucc:
+        return MT_OBJECT; // TODO: check motion of object between the two waypoints
+    // grasp actions
+    case TransitionType::GraspSucc:
+    case TransitionType::PreGraspSucc:
+        return MT_GRASP;
+    }
+}
+
+static
+auto to_cstring(MotionType type) -> const char*
+{
+    switch (type) {
+    case MT_NORMAL: return "MT_NORMAL";
+    case MT_OBJECT: return "MT_OBJECT";
+    case MT_GRASP: return "MT_GRASP";
+    default: return "<UNKNOWN>";
+    }
+}
+
 bool PlanPath(
     ObjectManipPlanner* planner,
     const moveit::core::RobotState& start_state,
@@ -322,10 +371,10 @@ bool PlanPath(
             point[WORLD_JOINT_Y] = T_world_robot.translation().y();
             point[WORLD_JOINT_Z] = T_world_robot.translation().z();
             smpl::get_euler_zyx(
-                T_world_robot.rotation(),
-                point[WORLD_JOINT_YAW],
-                point[WORLD_JOINT_PITCH],
-                point[WORLD_JOINT_ROLL]);
+                    T_world_robot.rotation(),
+                    point[WORLD_JOINT_YAW],
+                    point[WORLD_JOINT_PITCH],
+                    point[WORLD_JOINT_ROLL]);
 #else
             point[WORLD_JOINT_X] = round(1000.0 * T_world_robot.translation().x()) / 1000.0;
             point[WORLD_JOINT_Y] = round(1000.0 * T_world_robot.translation().y()) / 1000.0;
@@ -426,7 +475,11 @@ bool PlanPath(
     // Prepare return path //
     /////////////////////////
 
-    ROS_INFO("Found path through %zu states with cost %d in %d expansions (%f seconds)", solution.size(), solution_cost, planner->search.get_n_expands(), planner->search.get_final_eps_planning_time());
+    ROS_INFO("Found path through %zu states with cost %d in %d expansions (%f seconds)",
+            solution.size(),
+            solution_cost,
+            planner->search.get_n_expands(),
+            planner->search.get_final_eps_planning_time());
 
     using RobotPath = std::vector<smpl::RobotState>;
     auto path = RobotPath{ };
@@ -435,34 +488,76 @@ bool PlanPath(
         return false;
     }
 
-    // partition the path into several path segments based on the action
-    // type
+    if (path.size() < 2) {
+        // Trivial path?
+        return false;
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Partition the path into several path segments based on the (reduced) //
+    // action type                                                          //
+    //////////////////////////////////////////////////////////////////////////
+
     auto segments = std::vector<RobotPath>();
-    auto segment_types = std::vector<TransitionType::Type>();
-    auto segment_type = TransitionType::Type(path.front().back());
+    auto segment_types = std::vector<MotionType>();
+
     auto segment = RobotPath();
-    for (auto i = 0; i < path.size(); ++i) {
+
+    // Initialize the first segment with the first two waypoint and the type
+    // of action between them
+    auto& first_waypoint = path[0];
+    auto& second_waypoint = path[1];
+    auto segment_type = reduce_type(
+            first_waypoint,
+            second_waypoint,
+            (TransitionType::Type)path[1].back());
+
+    segment.push_back(first_waypoint);
+    segment.back().pop_back();
+    segment.push_back(second_waypoint);
+    segment.back().pop_back();
+
+    auto recorded_last = false;
+    for (auto i = 2; i < (int)path.size(); ++i) {
+        auto& prev_point = path[i - 1];
         auto& point = path[i];
-        auto type = TransitionType::Type(point.back());
-        if (type != segment_type) {
-            // record this segment
+
+        auto type = reduce_type(prev_point, point, (TransitionType::Type)point.back());
+
+        if (type == segment_type) {
+            // This waypoint is part of the segment, add it and remove its type
+            // information
+            segment.push_back(point);
+            segment.back().pop_back();
+        } else {
+            // This waypoint is not part of the segment, record the previously
+            // constructed segment and initialize the current segment with the
+            // previous waypoint, this waypoint, and the type of action between
+            // them.
             segments.push_back(segment);
             segment_types.push_back(segment_type);
+//            if (i == path.size() - 1) {
+//                recorded_last = true;
+//            }
 
-            // begin a new segment
             segment.clear();
-
-            segment.push_back(segments.back().back());
-            // add the final point of the previous segment as the first waypoint
-            // on this segment
-
+            segment.push_back(prev_point);
+            segment.back().pop_back();
+            segment.push_back(point);
+            segment.back().pop_back();
             segment_type = type;
         }
-        segment.push_back(point);
-        segment.back().pop_back(); // remove the type information
     }
-    segments.push_back(segment);
-    segment_types.push_back(segment_type);
+
+    if (!recorded_last) {
+        segments.push_back(segment);
+        segment_types.push_back(segment_type);
+    }
+
+    ROS_INFO("Initial segments:");
+    for (auto i = 0; i < segments.size(); ++i) {
+        ROS_INFO("  %s: %zu waypoints", to_cstring(segment_types[i]), segments[i].size());
+    }
 
     // Action-specific things to do:
     // * Before a grasp action, open the gripper
@@ -481,7 +576,7 @@ bool PlanPath(
         auto& segment = segments[i];
         auto type = segment_types[i];
 
-        ROS_INFO("Smooth path of type %s", to_cstring(type));
+        ROS_DEBUG("Smooth path of type %s", to_cstring(type));
 
         if (!smpl::InterpolatePath(*planner->checker, segment)) {
             ROS_ERROR("Failed to interpolate path");
@@ -489,70 +584,127 @@ bool PlanPath(
         }
 
         switch (type) {
-        case TransitionType::OrigStateOrigSucc:     // yes
-        case TransitionType::OrigStateBridgeSucc:   // yes
-        case TransitionType::EGraphStateBridgeSucc: // yes
-        case TransitionType::PreGraspAmpSucc:       // yes
-        case TransitionType::SnapSucc:              // yes
+        case MT_NORMAL:
         {
-            ROS_INFO("Shortcut path with %zu waypoints", segment.size());
-            auto shortcut = std::vector<smpl::RobotState>();
+            ROS_DEBUG("Shortcut path with %zu waypoints", segment.size());
+            auto shortcut = RobotPath();
             auto type = smpl::ShortcutType::JOINT_POSITION_VELOCITY_SPACE;
             smpl::ShortcutPath(planner->model, planner->checker, segment, shortcut, type);
             (void)smpl::InterpolatePath(*planner->checker, shortcut);
             segment = std::move(shortcut);
             break;
         }
-        case TransitionType::OrigStateZSucc:        // no
-        case TransitionType::EGraphStateAdjSucc:    // no
-        case TransitionType::EGraphStateZSucc:      // no
-        case TransitionType::GraspSucc:             // no
-        case TransitionType::PreGraspSucc:          // no
-        case TransitionType::ShortcutSucc:          // no
-        {
-            if (!smpl::InterpolatePath(*planner->checker, segment)) {
-                ROS_ERROR("Failed to interpolate path");
-                return false;
-            }
+        case MT_OBJECT:
+        case MT_GRASP:
             break;
-        }
+//        {
+//            if (!smpl::InterpolatePath(*planner->checker, segment)) {
+//                ROS_ERROR("Failed to interpolate path");
+//                return false;
+//            }
+//            break;
+//        }
         }
     }
+
+    ROS_INFO("Smoothed segments:");
+    for (auto i = 0; i < segments.size(); ++i) {
+        ROS_INFO("  %s: %zu waypoints", to_cstring(segment_types[i]), segments[i].size());
+    }
+
+    // Combine sequences of normal and object manipulation trajectories
+
+    {
+        auto combined_segments = std::vector<RobotPath>();
+        auto combined_segment_types = std::vector<MotionType>();
+        auto segment = segments.front();
+        auto segment_type = segment_types.front();
+        auto finished_last = false;
+        for (auto i = 1; i < segments.size(); ++i) {
+            auto& seg = segments[i];
+            auto type = segment_types[i];
+
+            auto equiv = false;
+            switch (segment_type) {
+            case MT_NORMAL:
+            case MT_OBJECT:
+                equiv = (bool)((type == MT_NORMAL) | (type == MT_OBJECT));
+                break;
+            case MT_GRASP:
+                equiv = type == MT_GRASP;
+                break;
+            }
+
+            if (equiv) {
+                segment.pop_back();
+                segment.insert(end(segment), begin(seg), end(seg));
+            } else {
+                // finish this segment
+                combined_segments.push_back(segment);
+                combined_segment_types.push_back(segment_type);
+
+                // initialize the next segment with this segment
+                segment = seg;
+                segment_type = type;
+            }
+        }
+        combined_segments.push_back(segment);
+        combined_segment_types.push_back(segment_type);
+
+        segments = std::move(combined_segments);
+        segment_types = std::move(combined_segment_types);
+    }
+
+    ROS_INFO("Combined segments:");
+    for (auto i = 0; i < segments.size(); ++i) {
+        ROS_INFO("  %s: %zu waypoints", to_cstring(segment_types[i]), segments[i].size());
+    }
+
 
     //////////////////////////////////////////////////////////////////////
     // Convert to a sequence of interleaved trajectory/gripper commands //
     //////////////////////////////////////////////////////////////////////
 
-    auto MakeRobotTrajectory = [&](const std::vector<smpl::RobotState>& path)
+    auto MakeRobotTrajectory = [&](const RobotPath& path)
     {
         robot_trajectory::RobotTrajectory traj(
                 start_state.getRobotModel(),
                 "right_arm_torso_base");
         for (auto& point : path) {
-            moveit::core::RobotState state(start_state);
+            auto state = moveit::core::RobotState(start_state);
             UpdateRobotState(state, point, planner->model);
             traj.addSuffixWayPoint(state, 1.0);
         }
 
         trajectory_processing::IterativeParabolicTimeParameterization profiler;
         profiler.computeTimeStamps(traj);
+
+        ROS_INFO("durations:");
+        for (auto i = 0; i < traj.getWayPointCount(); ++i) {
+            ROS_INFO("  %3d: %f, %f", i, traj.getWayPointDurations()[i], traj.getWayPointDurationFromStart(i));
+        }
+
         return traj;
     };
 
     // create robot trajectory for the first segment
-    auto& first_segment = segments.front();
-    commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));
+//    auto& first_segment = segments.front();
+//    commands->push_back(smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(first_segment)));
 
-    for (auto i = 1; i < segments.size(); ++i) {
-        if (segment_types[i] == TransitionType::GraspSucc) {
+
+    for (auto i = 0; i < segments.size(); ++i) {
+        ROS_INFO("Add open gripper command!");
+        if (segment_types[i] == MT_GRASP) {
             commands->push_back(smpl::make_unique<GripperCommand>(true));
         }
 
-        auto cmd = smpl::make_unique<TrajectoryCommand>(
-                MakeRobotTrajectory(segments[i]));
+
+        ROS_INFO("Add trajectory of length %zu", segments[i].size());
+        auto cmd = smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(segments[i]));
         commands->push_back(std::move(cmd));
 
-        if (segment_types[i] == TransitionType::GraspSucc) {
+        ROS_INFO("Add close gripper command!");
+        if (segment_types[i] == MT_GRASP) {
             commands->push_back(smpl::make_unique<GripperCommand>(false));
         }
     }
