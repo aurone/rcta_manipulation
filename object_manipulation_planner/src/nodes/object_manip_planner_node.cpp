@@ -169,13 +169,13 @@ bool AdjustGripper()
 bool CheckGripperGrip()
 {
 
-    // subscribe to the /roman1/joint_space topic
+    // subscribe to the joint_space topic
     // read the gripper's current position
     // return feedback
 
     auto nh = ros::NodeHandle();
 
-    auto msg = ros::topic::waitForMessage<sensor_msgs::JointState>("/roman1/joint_states", nh, ros::Duration(10.0));
+    auto msg = ros::topic::waitForMessage<sensor_msgs::JointState>("joint_states", nh, ros::Duration(10.0));
 
     int size_msg = msg->position.size();
 
@@ -231,7 +231,7 @@ bool ExecuteTrajectory(
     // move the arm to the post-grasp configuration
 
     auto nh1 = ros::NodeHandle();
-    ros::Publisher gripper_command_pub = nh1.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1000);
+    ros::Publisher gripper_command_pub = nh1.advertise<std_msgs::Float64MultiArray>("rcta_right_robotiq_controller/command", 1000);
 
     for (auto& command : commands) {
         if (command->type == Command::Type::Gripper) {
@@ -786,7 +786,7 @@ bool OpenGripper(GripperCommandActionClient* gripper_client)
 bool OpenGripperPartial()
 {
     auto nh2 = ros::NodeHandle();
-    ros::Publisher gripper_command_pub = nh2.advertise<std_msgs::Float64MultiArray>("/roman1/rcta_right_robotiq_controller/command", 1);
+    ros::Publisher gripper_command_pub = nh2.advertise<std_msgs::Float64MultiArray>("rcta_right_robotiq_controller/command", 1);
     ros::Duration(0.5).sleep();
     // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     // getchar();
