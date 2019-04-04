@@ -457,20 +457,27 @@ void RobotStateMsgToRobotState(
     }
 }
 
-// Plan and execute (or animate) a sequence of trajectory/gripper commands to
-// manipulate the state of an object.
-// \param robot_model
-// \param group_name needed to create final trajectory
-
+/// Plan and execute (or animate) a sequence of trajectory/gripper commands to
+/// manipulate the state of an object.
+///
+/// \param robot_model The model of the robot
+/// \param object_model The model of the object, used for debug visualization
+/// \param cspace The collision model of the robot and its environment
+/// \param planning_model The planning model of the robot. The reference state
+///     is updated to reflect the start state on each query.
+/// \param planner The object manipulation planner
+/// \param real_start_state The actual current start state, which may be overridden by the planning request
+/// \param traj_client Action client for executing joint trajectories
+/// \param gripper_client Action client for executing simple gripper clients
+/// \param gripper_command_pub Publisher for sending detailed gripper commands
+/// \param msg The planning request message
 bool ManipulateObject(
     const moveit::core::RobotModelConstPtr& robot_model,
-    const std::string& group_name,
     const smpl::urdf::RobotModel* object_model,
     smpl::collision::CollisionSpace* cspace,
     sbpl_interface::MoveItRobotModel* planning_model,
     ObjectManipPlanner* planner,
     const moveit::core::RobotState* real_start_state,
-    const ros::Publisher& display_publisher,
     FollowJointTrajectoryActionClient* traj_client,
     GripperCommandActionClient* gripper_client,
     ros::Publisher* gripper_command_pub,
@@ -591,29 +598,6 @@ bool ManipulateObject(
     }
 
     ProfilerStop();
-
-    //////////////////////////////
-    // display the planned path //
-    //////////////////////////////
-
-    if (false) {
-        auto trajectory = robot_trajectory::RobotTrajectory(robot_model, group_name);
-        MakeRobotTrajectory(&commands, &trajectory);
-
-        ROS_INFO("Display trajectory");
-        moveit_msgs::DisplayTrajectory display;
-
-        display.model_id = robot_model->getName();
-
-        display.trajectory.resize(1);
-        trajectory.getRobotTrajectoryMsg(display.trajectory[0]);
-
-        moveit::core::robotStateToRobotStateMsg(
-            trajectory.getFirstWayPoint(),
-            display.trajectory_start);
-
-        display_publisher.publish(display);
-    }
 
     /////////////////////////////////////////////
     // Execute (or animate) the resulting plan //
@@ -775,7 +759,6 @@ bool OpenGripper(GripperCommandActionClient* gripper_client)
     gripper_goal.command.position = 0.0841;
     auto res = gripper_client->sendGoalAndWait(gripper_goal);
     return res.state_ == res.SUCCEEDED;
-
 }
 
 bool OpenGripperPartial(ros::Publisher* gripper_command_pub)
@@ -802,15 +785,29 @@ bool CloseGripper(GripperCommandActionClient* gripper_client)
     return res.state_ == res.SUCCEEDED;
 }
 
+// Attempted to implement the crate release logic in such a way that the
+// trajectory and gripper commands are generated up-front before execution. This
+// way, we could substitute execution on the robot with an animation (that
+// also doesn't modify the simulation state). This is possible, but it's going
+// to be a bit of a pain since we need to track where the robot should end up
+// after each command, to generate the successive command, rather than simply
+// querying for the current state of the robot in between each command.
+#define DEV_ANIMATE_RELEASE 0
 
 bool ReleaseCrate(
     const moveit::core::RobotState* curr_start_state,
     const smpl::urdf::RobotModel* object_model,
     const std::string& group_name,
     moveit::planning_interface::MoveGroupInterface* move_group,
+    FollowJointTrajectoryActionClient* traj_client,
     GripperCommandActionClient* gripper_client,
-    ros::Publisher* gripper_command_pub)
+    ros::Publisher* gripper_command_pub,
+    bool plan_only)
 {
+    // we're not going to perform the crate release in plan-only mode. see note
+    // above
+    if (plan_only) return true;
+
     // Rotate the gripper in place
     // Open the gripper
     // While maintaining the same current orientation, move the gripper back by a certain distance
@@ -837,6 +834,8 @@ bool ReleaseCrate(
 
     ROS_INFO("finished waiting for the GripperCommand action server. out now");
 
+    auto commands = std::vector<std::unique_ptr<Command>>();
+
     auto start_state = *move_group->getCurrentState();
 
     //////////////////////
@@ -848,19 +847,14 @@ bool ReleaseCrate(
     {
         auto release_manifold = [&](double alpha) -> Eigen::Affine3d
         {
-
-            auto s = interp(
-                    0.0,
-                    -0.15*M_PI,
-                    alpha);
+            auto s = interp(0.0, -0.15 * M_PI, alpha);
 
             Eigen::Vector3d rot2(0,0,1);
             double mag = rot2.norm();
             Eigen::AngleAxisd rot(s , rot2/mag);
             auto curr_state = *move_group->getCurrentState();
             auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
-            auto rotate_gripper_pose =
-                    tool_transform*rot;
+            auto rotate_gripper_pose = tool_transform * rot;
 
             return rotate_gripper_pose;
         };
@@ -877,13 +871,35 @@ bool ReleaseCrate(
             return false;
         }
 
+#if DEV_ANIMATE_RELEASE
+//        plan.start_state_; // moveit_msgs::RobotState start_state_;
+//        plan.trajectory_; // moveit_msgs::RobotTrajectory
+        auto traj = robot_trajectory::RobotTrajectory(move_group->getRobotModel(), group_name);
+        traj.setRobotTrajectoryMsg(*curr_start_state, plan.trajectory_);
+
+        auto traj_command = smpl::make_unique<TrajectoryCommand>(std::move(traj));
+        commands.push_back(std::move(traj_command));
+#else
         auto err = move_group->execute(plan);
         if (err != moveit::planning_interface::MoveItErrorCode::SUCCESS) {
             ROS_ERROR("Failed to execute manip trajectory");
             return false;
         }
-
+#endif
     }
+
+#if DEV_ANIMATE_RELEASE
+    commands.push_back(smpl::make_unique<GripperCommand>(true));
+    if (plan_only) {
+        AnimateTrajectory(curr_start_state->getRobotModel(), commands, 5.0);
+    } else {
+        ExecuteTrajectory(traj_client, gripper_client, gripper_command_pub, commands);
+    }
+    // TODO: leftoff at this point after initial tests...for this to work we
+    // need to know what state the robot should be in after executing the crate
+    // opening segments, even in plan-only mode.
+    return true;
+#endif
 
     // if (!OpenGripper(gripper_client)) {
     //     ROS_ERROR("Failed to open gripper");
@@ -940,9 +956,6 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "object_manip_planner");
     auto nh = ros::NodeHandle();
     auto ph = ros::NodeHandle("~");
-
-    auto display_publisher =
-            ph.advertise<moveit_msgs::DisplayTrajectory>("planned_path", 1);
 
     auto visualizer = smpl::VisualizerROS();
     smpl::visual::set_visualizer(&visualizer);
@@ -1253,34 +1266,29 @@ int main(int argc, char* argv[])
             auto curr_state = GetCurrentState(&state_monitor);
             if (ManipulateObject(
                 robot_model,
-                group_name,
                 &object_model,
                 &cspace,
                 &planning_model,
                 &planner,
                 &curr_state,
-                display_publisher,
                 &traj_client,
                 &gripper_client,
                 &gripper_command_pub,
                 msg))
             {
-
-                if (!msg->plan_only) {
-                    auto fresh_state = GetCurrentState(&state_monitor);
-
-                    if (!ReleaseCrate(
-                            &curr_state,
-                            &object_model,
-                            move_group_name,
-                            &move_group,
-                            &gripper_client,
-                            &gripper_command_pub))
-                    {
-                        ROS_ERROR("Failed to release crate");
-                        server.setAborted();
-                        return;
-                    }
+                if (!ReleaseCrate(
+                        &curr_state,
+                        &object_model,
+                        move_group_name,
+                        &move_group,
+                        &traj_client,
+                        &gripper_client,
+                        &gripper_command_pub,
+                        msg->plan_only))
+                {
+                    ROS_ERROR("Failed to release crate");
+                    server.setAborted();
+                    return;
                 }
 
                 server.setSucceeded();
