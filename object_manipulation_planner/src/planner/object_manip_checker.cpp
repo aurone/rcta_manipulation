@@ -158,7 +158,7 @@ bool BroadphaseCallback(fcl::CollisionObject* o1, fcl::CollisionObject* o2, void
 // HAVING BEEN UPDATED BY A CALL TO IS_STATE_VALID
 bool CheckObjectGripperCollisions(ObjectManipChecker* checker)
 {
-    return true;
+//    return true;
 
     checker->parent->m_rcs->updateLinkTransform("limb_right_palm");
     checker->parent->m_rcs->updateLinkTransform("limb_right_finger_1_link_0");
