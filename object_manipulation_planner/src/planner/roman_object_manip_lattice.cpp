@@ -401,6 +401,24 @@ void CacheSuccs(
     (*cache)[state_id] = std::move(actions);
 }
 
+static
+void CacheSuccs(RomanObjectManipLattice::ActionCache* cache,
+    int state_id,
+    std::vector<int>* succs,
+    std::vector<int>* costs,
+    size_t from,
+    std::vector<RobotPath> motions)
+{
+    auto num_succs = succs->size() - from;
+    auto actions = std::vector<CachedActionData>(num_succs);
+    for (auto i = from; i < succs->size(); ++i) {
+        actions[i - from].succ_id   = (*succs)[i];
+        actions[i - from].cost      = (*costs)[i];
+        actions[i - from].motion = std::move(motions[i - from]);
+    }
+    (*cache)[state_id] = std::move(actions);
+}
+
 // Apply an adaptive motion to a state that moves the end effector to the
 // nearest pre-grasp pose of any state in the demonstration with the same
 // z-value.
@@ -564,6 +582,55 @@ auto operator<<(std::ostream& o, const Eigen::Affine3d& pose) -> std::ostream&
     return o;
 }
 
+static
+bool InterpCart(
+    const smpl::RobotState& state,
+    const smpl::Affine3& A,
+    const smpl::Affine3& B,
+    smpl::InverseKinematicsInterface* ik,
+    RobotPath* out)
+{
+    auto linres = 0.02;
+    auto angres = smpl::to_radians(2.0);
+
+    auto num_samples = 2;
+    auto pa = smpl::Vector3(A.translation());
+    auto pb = smpl::Vector3(B.translation());
+    auto dp = (double)smpl::Vector3(pa - pb).norm();
+    num_samples = std::max(num_samples, (int)std::round(dp / linres));
+
+    auto qa = smpl::Quaternion(A.rotation());
+    auto qb = smpl::Quaternion(B.rotation());
+    auto dq = 2.0 * std::acos(std::fabs(qa.dot(qb)));
+    num_samples = std::max(num_samples, (int)std::round(dq / angres));
+
+    auto prev_state = state;
+
+    auto motion = RobotPath();
+
+    motion.push_back(state);
+    for (auto i = 1; i < num_samples; ++i) {
+        auto alpha = (double)i / (double)(num_samples - 1);
+
+        auto ip = smpl::Vector3((1.0 - alpha) * pa + alpha * pb);
+        auto iq = qa.slerp(alpha, qb);
+
+        auto ipose = smpl::Affine3(smpl::Translation3(ip) * smpl::Quaternion(iq));
+
+        auto next_state = smpl::RobotState();
+
+        if (!ik->computeIK(ipose, prev_state, next_state)) {
+            return false;
+        }
+
+        motion.push_back(next_state);
+        prev_state = std::move(next_state);
+    }
+
+    *out = std::move(motion);
+    return true;
+}
+
 // For a state $s$, for all states $s_demo$ on the demonstration where
 // $z(s_demo) = z(s)$ and $phi(state) = pre-phi(s_demo)$, apply an adaptive
 // motion that uses IK to move from $s$ to a state $s'$ where $phi(s') =
@@ -589,6 +656,8 @@ void RomanObjectManipLattice::getGraspSuccs(
     if (GetSuccsFromCache(&m_grasp_action_cache, state_id, succs, costs)) return;
 #endif
 
+    auto motions = std::vector<RobotPath>();
+
     auto prev_succs = succs->size();
     for (auto node : pre_it->second) {
         if (m_egraph.state(node)[HINGE] != state->state[HINGE]) continue;
@@ -596,13 +665,28 @@ void RomanObjectManipLattice::getGraspSuccs(
         auto& grasp = m_egraph_node_grasps[node];
         auto seed = state->state;
         SMPL_DEBUG_STREAM_NAMED(G_SUCCESSORS_LOG, "Attempt grasp motion from " << seed << " to pose " << grasp);
-        auto final_robot_state = smpl::RobotState();
-        if (!m_ik_iface->computeIK(grasp, seed, final_robot_state)) {
+
+        auto cart_path = RobotPath();
+
+        auto seed_fk = m_fk_iface->computeFK(seed);
+        if (!InterpCart(seed, seed_fk, grasp, m_ik_iface, &cart_path)) {
             continue;
         }
-        if (!collisionChecker()->isStateToStateValid(state->state, final_robot_state)) {
-            continue;
+
+        auto invalid = false;
+
+        for (auto i = 1; i < cart_path.size(); ++i) {
+            auto& prev = cart_path[i - 1];
+            auto& curr = cart_path[i];
+            if (!collisionChecker()->isStateToStateValid(prev, curr)) {
+                invalid = true;
+                break;
+            }
         }
+
+        if (invalid) continue;
+
+        auto final_robot_state = cart_path.back();
 
         auto succ_workspace_state = smpl::WorkspaceState();
         stateRobotToWorkspace(final_robot_state, succ_workspace_state);
@@ -616,10 +700,11 @@ void RomanObjectManipLattice::getGraspSuccs(
         SMPL_DEBUG_STREAM_NAMED(G_SUCCESSORS_LOG, "Grasp motion succeeded to state " << succ_id << ": " << final_robot_state);
         succs->push_back(succ_id);
         costs->push_back(200);
+        motions.push_back(std::move(cart_path));
     }
 
 #if CACHE_ACTIONS
-    CacheSuccs(&m_grasp_action_cache, state_id, succs, costs, prev_succs);
+    CacheSuccs(&m_grasp_action_cache, state_id, succs, costs, prev_succs, std::move(motions));
 #endif
 }
 
