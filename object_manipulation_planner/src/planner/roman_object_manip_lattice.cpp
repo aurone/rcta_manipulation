@@ -1290,7 +1290,7 @@ void RomanObjectManipLattice::insertExperienceGraphPath(
         m_egraph_phi_coords[node] = getPhiCoord(grasp_pose);
         m_egraph_pre_phi_coords[node] = getPhiCoord(pregrasp_pose);
 
-        ROS_INFO_STREAM("phi(" << node << ") = " << m_egraph_phi_coords[node]);
+        ROS_DEBUG_STREAM_NAMED(G_LOG, "phi(" << node << ") = " << m_egraph_phi_coords[node]);
         // ROS_INFO_STREAM("phi'(" << node << ") = " << m_egraph_pre_phi_coords[node]);
     }
 
