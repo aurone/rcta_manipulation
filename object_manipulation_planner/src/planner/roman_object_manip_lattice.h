@@ -10,6 +10,8 @@ using PhiCoord = std::vector<int>;
 
 class ObjectManipHeuristic;
 
+using RobotPath = std::vector<smpl::RobotState>;
+
 namespace TransitionType
 {
 enum Type
@@ -34,8 +36,9 @@ auto to_cstring(Type) -> const char*;
 
 struct CachedActionData
 {
-    int                 succ_id;
-    int                 cost;
+    int         succ_id;
+    int         cost;
+    RobotPath   motion;
 };
 
 /// * Provides a mapping from phi coordinates to experience graph states
@@ -55,6 +58,11 @@ public:
 
     void getUniqueSuccs(
         int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs);
+
+    void getOrigStateOrigSuccs(
+        smpl::WorkspaceLatticeState* state,
         std::vector<int>* succs,
         std::vector<int>* costs);
 
@@ -98,67 +106,67 @@ public:
         std::vector<int>* succs,
         std::vector<int>* costs);
 
-    int getSnapMotion(int src_id, int dst_id, std::vector<smpl::RobotState>* path);
+    int getSnapMotion(int src_id, int dst_id, RobotPath* path);
 
     bool trySnap(int src_id, int dst_id, int& cost);
 
     bool isGoal(const smpl::WorkspaceLatticeState* state) const;
 
-    bool extractTransition(int src_id, int dst_id, std::vector<smpl::RobotState>& path);
+    bool extractTransition(int src_id, int dst_id, RobotPath& path);
 
     bool updateBestTransitionSimple(
         const std::vector<int>& succs,
         const std::vector<int>& costs,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path,
+        RobotPath& best_path,
         TransitionType::Type);
 
     void updateBestTransitionOrig(
         smpl::WorkspaceLatticeState* state,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionOrigBridge(
         smpl::WorkspaceLatticeState* state,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionOrigZ(
         smpl::WorkspaceLatticeState* state,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionOrigZ2(
         smpl::WorkspaceLatticeState* state,
         const PhiCoord& phi_coord,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionEGraphBridge(
         smpl::WorkspaceLatticeState* state,
         smpl::ExperienceGraph::node_id egraph_node,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionEGraphAdjacent(
         smpl::WorkspaceLatticeState* state,
         smpl::ExperienceGraph::node_id egraph_node,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionEGraphZ(
         smpl::WorkspaceLatticeState* state,
         smpl::ExperienceGraph::node_id egraph_node,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionGrasp(
         int state_id,
@@ -166,7 +174,7 @@ public:
         const PhiCoord& phi_coord,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionPreGrasp(
         int state_id,
@@ -174,7 +182,7 @@ public:
         const PhiCoord& phi_coord,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionPreGraspAmp(
         int state_id,
@@ -182,21 +190,21 @@ public:
         const PhiCoord& phi_coord,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionSnap(
         int state_id,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
     void updateBestTransitionShortcut(
         int state_id,
         int dst_id,
         int& best_cost,
-        std::vector<smpl::RobotState>& best_path);
+        RobotPath& best_path);
 
-    void insertExperienceGraphPath(const std::vector<smpl::RobotState>& path);
+    void insertExperienceGraphPath(const RobotPath& path);
     void clearExperienceGraph();
 
     /// \name ExperienceGraphExtension Interface
@@ -207,9 +215,7 @@ public:
 
     /// \name RobotPlanningSpace Interface
     ///@{
-    bool extractPath(
-        const std::vector<int>& ids,
-        std::vector<smpl::RobotState>& path) override;
+    bool extractPath(const std::vector<int>& ids, RobotPath& path) override;
     ///@}
 
     /// \name DiscreteSpaceInformation Interface

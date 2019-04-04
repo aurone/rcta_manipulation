@@ -73,6 +73,25 @@ auto label(std::vector<smpl::visual::Marker> markers, int& id)
     return markers;
 }
 
+constexpr auto g_ConsistencyThreshold = smpl::to_radians(45.0);
+
+static
+bool CheckConsistency(
+    const smpl::RobotState& from,
+    const smpl::RobotState& to,
+    double thresh)
+{
+    if (std::fabs(to[TORSO_JOINT1] - from[TORSO_JOINT1]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT1] - from[LIMB_JOINT1]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT2] - from[LIMB_JOINT2]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT3] - from[LIMB_JOINT3]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT4] - from[LIMB_JOINT4]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT5] - from[LIMB_JOINT5]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT6] - from[LIMB_JOINT6]) > thresh) return false;
+    if (std::fabs(to[LIMB_JOINT7] - from[LIMB_JOINT7]) > thresh) return false;
+    return true;
+}
+
 // Get successors of actions from E_z where u is an E-Graph state.
 void RomanObjectManipLattice::getEGraphStateZSuccs(
     smpl::WorkspaceLatticeState* state,
@@ -288,6 +307,8 @@ void RomanObjectManipLattice::getOrigStateZSuccs2(
                 continue;
             }
 #endif
+
+            if (!CheckConsistency(state->state, solution, g_ConsistencyThreshold)) continue;
 
             if (!collisionChecker()->isStateToStateValid(state->state, solution)) {
                 ++collision_count;
@@ -749,10 +770,37 @@ void RomanObjectManipLattice::getUniqueSuccs(
     }
 }
 
+void RomanObjectManipLattice::getOrigStateOrigSuccs(
+    smpl::WorkspaceLatticeState* state,
+    std::vector<int>* succs,
+    std::vector<int>* costs)
+{
+    auto prev_succs = succs->size();
+    WorkspaceLatticeEGraph::getOrigStateOrigSuccs(state, succs, costs);
+    auto end = succs->size();
+    auto i = prev_succs;
+    for (; i < end;) {
+        auto succ_id = (*succs)[i];
+        if (!CheckConsistency(state->state, m_states[succ_id]->state, g_ConsistencyThreshold)) {
+            ROS_INFO("Remove inconsistent state");
+            std::swap((*succs)[end - 1], (*succs)[i]);
+            std::swap((*costs)[end - 1], (*costs)[i]);
+            --end;
+        } else {
+            ++i;
+        }
+    }
+    auto to_remove = succs->size() - i;
+    for (auto i = 0; i < to_remove; ++i) {
+        succs->pop_back();
+        costs->pop_back();
+    }
+}
+
 bool RomanObjectManipLattice::extractTransition(
     int src_id,
     int dst_id,
-    std::vector<smpl::RobotState>& path)
+    RobotPath& path)
 {
     SMPL_DEBUG_NAMED(G_LOG, "Extract motion from state %d to state %d", src_id, dst_id);
     auto* state = getState(src_id);
@@ -766,7 +814,7 @@ bool RomanObjectManipLattice::extractTransition(
     SMPL_DEBUG_NAMED(G_LOG, "  egraph state: %s", is_egraph_node ? "true" : "false");
 
     auto best_cost = std::numeric_limits<int>::max();
-    auto best_path = std::vector<smpl::RobotState>();
+    auto best_path = RobotPath();
 
     auto phi_coord = getPhiCoord(state);
 
@@ -824,7 +872,7 @@ bool RomanObjectManipLattice::updateBestTransitionSimple(
     const std::vector<int>& costs,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path,
+    RobotPath& best_path,
     TransitionType::Type type)
 {
     for (auto i = 0; i < succs.size(); ++i) {
@@ -850,7 +898,7 @@ void RomanObjectManipLattice::updateBestTransitionOrig(
     smpl::WorkspaceLatticeState* state,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> succs, costs;
     getOrigStateOrigSuccs(state, &succs, &costs);
@@ -862,7 +910,7 @@ void RomanObjectManipLattice::updateBestTransitionOrigBridge(
     smpl::WorkspaceLatticeState* state,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> succs, costs;
     getOrigStateBridgeSuccs(state, &succs, &costs);
@@ -874,7 +922,7 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ(
     smpl::WorkspaceLatticeState* state,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
 #if 0
     std::vector<int> succs, costs;
@@ -889,7 +937,7 @@ void RomanObjectManipLattice::updateBestTransitionOrigZ2(
     const PhiCoord& phi_coord,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> succs, costs;
     getOrigStateZSuccs2(state, phi_coord, &succs, &costs);
@@ -902,7 +950,7 @@ void RomanObjectManipLattice::updateBestTransitionEGraphBridge(
     smpl::ExperienceGraph::node_id egraph_node,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> succs, costs;
     getEGraphStateBridgeSuccs(state, egraph_node, &succs, &costs);
@@ -915,7 +963,7 @@ void RomanObjectManipLattice::updateBestTransitionEGraphAdjacent(
     smpl::ExperienceGraph::node_id egraph_node,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> succs, costs;
     GetEGraphStateAdjacentSuccs(this, state, egraph_node, &succs, &costs);
@@ -928,7 +976,7 @@ void RomanObjectManipLattice::updateBestTransitionEGraphZ(
     smpl::ExperienceGraph::node_id egraph_node,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> succs, costs;
     getEGraphStateZSuccs(state, egraph_node, &succs, &costs);
@@ -941,7 +989,7 @@ void RomanObjectManipLattice::updateBestTransitionGrasp(
     const PhiCoord& phi_coord,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     // TODO: finer resolution
     std::vector<int> succs, costs;
@@ -961,7 +1009,7 @@ void RomanObjectManipLattice::updateBestTransitionPreGrasp(
     const PhiCoord& phi_coord,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     // TODO: finer resolution
     std::vector<int> succs, costs;
@@ -981,7 +1029,7 @@ void RomanObjectManipLattice::updateBestTransitionPreGraspAmp(
     const PhiCoord& phi_coord,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     // TODO: finer resolution
     std::vector<int> succs, costs;
@@ -999,7 +1047,7 @@ void RomanObjectManipLattice::updateBestTransitionSnap(
     int state_id,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     std::vector<int> snap_ids;
     m_heuristic->getEquivalentStates(state_id, snap_ids);
@@ -1009,7 +1057,7 @@ void RomanObjectManipLattice::updateBestTransitionSnap(
         if ((dst_id == getGoalStateID() && isGoal(snap_state)) ||
             dst_id == snap_id)
         {
-            auto snap_path = std::vector<smpl::RobotState>();
+            auto snap_path = RobotPath();
             auto cost = getSnapMotion(state_id, snap_id, &snap_path);
             if (cost > 0 && cost < best_cost) {
                 best_cost = cost;
@@ -1026,7 +1074,7 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
     int state_id,
     int dst_id,
     int& best_cost,
-    std::vector<smpl::RobotState>& best_path)
+    RobotPath& best_path)
 {
     // fixed cost used for shortcut successors in WorkspaceLatticeEGraph
     auto fixed_cost = 10;
@@ -1053,7 +1101,7 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
                     return;
                 }
 
-                auto shortcut_path = std::vector<smpl::RobotState>();
+                auto shortcut_path = RobotPath();
                 for (auto node : node_path) {
                     auto id = m_egraph_node_to_state[node];
                     auto* entry = getState(id);
@@ -1082,7 +1130,7 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
             return;
         }
 
-        auto shortcut_path = std::vector<smpl::RobotState>();
+        auto shortcut_path = RobotPath();
         for (auto node : node_path) {
             auto id = m_egraph_node_to_state[node];
             auto* entry = getState(id);
@@ -1096,8 +1144,7 @@ void RomanObjectManipLattice::updateBestTransitionShortcut(
     }
 }
 
-void RomanObjectManipLattice::insertExperienceGraphPath(
-    const std::vector<smpl::RobotState>& path)
+void RomanObjectManipLattice::insertExperienceGraphPath(const RobotPath& path)
 {
     ROS_INFO("Original Path Size: %zu", path.size());
 
@@ -1376,7 +1423,7 @@ void RomanObjectManipLattice::clearExperienceGraph()
 int RomanObjectManipLattice::getSnapMotion(
     int src_id,
     int dst_id,
-    std::vector<smpl::RobotState>* path)
+    RobotPath* path)
 {
     SMPL_DEBUG_NAMED(G_SNAP_LOG, "snap(%d, %d)", src_id, dst_id);
 
@@ -1740,7 +1787,7 @@ bool RomanObjectManipLattice::loadExperienceGraph(const std::string& path)
 
 bool RomanObjectManipLattice::extractPath(
     const std::vector<int>& ids,
-    std::vector<smpl::RobotState>& path)
+    RobotPath& path)
 {
     SMPL_DEBUG_STREAM_NAMED(G_LOG, "State ID Path: " << ids);
 
@@ -1771,7 +1818,7 @@ bool RomanObjectManipLattice::extractPath(
         return false;
     }
 
-    auto opath = std::vector<smpl::RobotState>();
+    auto opath = RobotPath();
 
     // grab the first point
     {
@@ -1792,7 +1839,7 @@ bool RomanObjectManipLattice::extractPath(
             return false;
         }
 
-        auto motion = std::vector<smpl::RobotState>();
+        auto motion = RobotPath();
         if (!extractTransition(prev_id, curr_id, motion)) {
             SMPL_WARN_NAMED(G_LOG, "Failed to find valid action to successor during path extraction");
         }
