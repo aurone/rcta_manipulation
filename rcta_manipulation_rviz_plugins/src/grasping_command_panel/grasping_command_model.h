@@ -149,6 +149,7 @@ public Q_SLOTS:
     void setAllowedPlanningTime(double val);
     void setObjectStart(double val);
     void setObjectGoal(double val);
+    void setPlanOnly(bool plan_only);
     void sendManipulateObjectCommand();
 
     void sendGraspObjectCommand();
@@ -179,6 +180,7 @@ Q_SIGNALS:
     void objectStartChanged(double val);
     void objectGoalChanged(double val);
     void allowedPlanningTimeChanged(double val);
+    void planOnlyChanged(bool val);
 
     void errorEncountered(const QString&);
 };

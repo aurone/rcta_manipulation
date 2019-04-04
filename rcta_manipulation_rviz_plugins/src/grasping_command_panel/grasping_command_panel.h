@@ -20,6 +20,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSpinBox;
+class QCheckBox;
 
 namespace rcta {
 
@@ -77,6 +78,9 @@ public Q_SLOTS:
 
     void displayErrorMessageBox(const QString& s);
 
+    void setPlanOnlyFromCheckbox(int state);
+    void updatePlanOnly(bool plan_only);
+
 Q_SIGNALS:
 
 private:
@@ -120,6 +124,7 @@ private:
     QLineEdit*      m_object_start_line_edit = NULL;
     QLineEdit*      m_object_goal_line_edit = NULL;
     QDoubleSpinBox* m_allowed_planning_time_spinbox = NULL;
+    QCheckBox*      m_plan_only_checkbox = NULL;
 
     // Grasp Object Command Widgets
     QPushButton*    m_send_grasp_object_command_button = NULL;

@@ -48,6 +48,7 @@ void GraspingCommandModel::load(const rviz::Config& config)
     auto allowed_planning_time = 0.0f;
     auto object_start = 0.0f;
     auto object_goal = 1.0f;
+    auto plan_only = false;
     config.mapGetString("robot_description", &robot_description);
     config.mapGetString("object_mesh_resource", &obj_mesh_resource);
     config.mapGetFloat("object_scale_x", &obj_scale_x);
@@ -65,7 +66,7 @@ void GraspingCommandModel::load(const rviz::Config& config)
     config.mapGetFloat("object_start", &object_start);
     config.mapGetFloat("object_goal", &object_goal);
     config.mapGetFloat("allowed_planning_time", &allowed_planning_time);
-    // @plan-only
+    config.mapGetBool("plan_only", &plan_only);
 
     ROS_INFO_NAMED(LOG, "Object Manipulation Panel Configuration:");
     ROS_INFO_NAMED(LOG, "  robot_description: %s", robot_description.toStdString().c_str());
@@ -140,6 +141,8 @@ void GraspingCommandModel::save(rviz::Config& config) const
     config.mapSetValue("object_goal", m_obj_goal);
 
     config.mapSetValue("allowed_planning_time", m_allowed_planning_time);
+
+    config.mapSetValue("plan_only", m_plan_only);
 }
 
 bool GraspingCommandModel::loadRobot(const std::string& urdf_param, std::string* why)
@@ -384,6 +387,14 @@ void GraspingCommandModel::setObjectGoal(double val)
     if (m_obj_goal != val) {
         m_obj_goal = val;
         Q_EMIT objectGoalChanged(val);
+    }
+}
+
+void GraspingCommandModel::setPlanOnly(bool plan_only)
+{
+    if (m_plan_only != plan_only) {
+        m_plan_only = plan_only;
+        Q_EMIT planOnlyChanged(plan_only);
     }
 }
 

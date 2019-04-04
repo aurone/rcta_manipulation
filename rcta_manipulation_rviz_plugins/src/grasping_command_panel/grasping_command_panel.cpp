@@ -9,6 +9,7 @@
 #include <sstream>
 
 // system includes
+#include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -279,6 +280,9 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     allowed_planning_time_layout->addWidget(new QLabel(tr("Allowed Planning Time:")));
     allowed_planning_time_layout->addWidget(m_allowed_planning_time_spinbox);
 
+    m_plan_only_checkbox = new QCheckBox(tr("Plan Only"));
+    m_plan_only_checkbox->setCheckState(m_model->m_plan_only ? Qt::Checked : Qt::Unchecked);
+
     auto* manip_object_settings_layout = new QHBoxLayout;
     m_object_start_line_edit = new QLineEdit;
     m_object_goal_line_edit = new QLineEdit;
@@ -289,6 +293,7 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
     manip_object_command_layout->addWidget(m_send_manipulate_object_button);
     manip_object_command_layout->addLayout(manip_object_settings_layout);
     manip_object_command_layout->addLayout(allowed_planning_time_layout);
+    manip_object_command_layout->addWidget(m_plan_only_checkbox);
 
     manip_object_command_group->setLayout(manip_object_command_layout);
 
@@ -411,6 +416,9 @@ GraspingCommandPanel::GraspingCommandPanel(QWidget *parent) :
 
     connect(pmodel, SIGNAL(errorEncountered(const QString&)),
             this, SLOT(displayErrorMessageBox(const QString&)));
+
+    connect(m_plan_only_checkbox, SIGNAL(stateChanged(int)), this, SLOT(setPlanOnlyFromCheckbox(int)));
+    connect(pmodel, SIGNAL(planOnlyChanged(bool)), this, SLOT(updatePlanOnly(bool)));
 
     m_marker_pub = m_nh.advertise<visualization_msgs::MarkerArray>(
             "visualization_markers", 1);
@@ -775,6 +783,16 @@ void GraspingCommandPanel::updateGUI()
 void GraspingCommandPanel::displayErrorMessageBox(const QString& s)
 {
     QMessageBox::warning(this, tr("Error"), s);
+}
+
+void GraspingCommandPanel::setPlanOnlyFromCheckbox(int state)
+{
+    m_model->setPlanOnly(state == Qt::Checked);
+}
+
+void GraspingCommandPanel::updatePlanOnly(bool plan_only)
+{
+    m_plan_only_checkbox->setCheckState(plan_only ? Qt::Checked : Qt::Unchecked);
 }
 
 } // namespace rcta
