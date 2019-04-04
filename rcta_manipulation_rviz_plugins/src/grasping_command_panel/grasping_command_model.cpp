@@ -86,6 +86,7 @@ void GraspingCommandModel::load(const rviz::Config& config)
     ROS_INFO_NAMED(LOG, "  object_start: %f", object_start);
     ROS_INFO_NAMED(LOG, "  object_goal: %f", object_goal);
     ROS_INFO_NAMED(LOG, "  allowed_planning_time: %f", allowed_planning_time);
+    ROS_INFO_NAMED(LOG, "  plan_only: %s", plan_only ? "true" : "false");
 
     if (!robot_description.isEmpty()) {
         // attempt to initalize the robot using this robot description
@@ -112,6 +113,7 @@ void GraspingCommandModel::load(const rviz::Config& config)
     setObjectStart(object_start);
     setObjectGoal(object_goal);
     setAllowedPlanningTime(allowed_planning_time);
+    setPlanOnly(plan_only);
 }
 
 void GraspingCommandModel::save(rviz::Config& config) const
