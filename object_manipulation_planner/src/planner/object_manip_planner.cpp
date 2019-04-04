@@ -637,6 +637,8 @@ bool PlanPath(
             }
 
             if (equiv) {
+                // remove the previously-last waypoint to avoid duplicate
+                // waypoints, which pisses off the trajectory follower
                 segment.pop_back();
                 segment.insert(end(segment), begin(seg), end(seg));
             } else {
