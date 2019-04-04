@@ -705,14 +705,14 @@ bool PlanManipulationTrajectory(
     manip_traj.addSuffixWayPoint(interm_state, 0.0);
     auto ids = (int32_t)0;
 
-    ROS_INFO("samples  = %d", samples);
+    ROS_DEBUG("samples = %d", samples);
     for (auto i = 1; i < samples; ++i) { // skip the first waypoint, assume we have at least two samples
         auto alpha = (double)i / (double)(samples - 1);
 
         // ROS_INFO("calling sample manifold fn now with alpa  = %f", alpha);
         auto contact_pose = sampler(alpha);
 
-        std::cout << "contact pose is " << contact_pose.matrix();
+        ROS_DEBUG_STREAM("contact pose is " << contact_pose.matrix());
 
         auto robot_model = interm_state.getRobotModel();
         auto* group = robot_model->getJointModelGroup(group_name);

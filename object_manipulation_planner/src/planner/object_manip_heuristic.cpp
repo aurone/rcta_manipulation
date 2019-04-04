@@ -373,13 +373,13 @@ void UpdateUserGoal(
         }
     }
 
-    ROS_INFO("phi heuristic: ");
+    ROS_DEBUG_NAMED(H_LOG, "phi heuristic: ");
     for (auto& e : heur->phi_heuristic) {
-        ROS_INFO_STREAM("h(" << e.first << ") = " << e.second);
+        ROS_DEBUG_STREAM_NAMED(H_LOG, "h(" << e.first << ") = " << e.second);
     }
-    ROS_INFO("pre phi heuristic: ");
+    ROS_DEBUG_NAMED(H_LOG, "pre phi heuristic: ");
     for (auto& e : heur->pre_phi_heuristic) {
-        ROS_INFO_STREAM("h(" << e.first << ") = " << e.second);
+        ROS_DEBUG_STREAM_NAMED(H_LOG, "h(" << e.first << ") = " << e.second);
     }
 
     SV_SHOW_INFO_NAMED("h_manipulate", MakeManipulateHeuristicVisualization(graph, heur->phi_heuristic));

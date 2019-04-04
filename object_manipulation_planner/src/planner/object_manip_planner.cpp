@@ -458,7 +458,7 @@ bool PlanPath(
     timing.type = smpl::ARAStar::TimeParameters::TIME;
     timing.max_allowed_time_init = smpl::to_duration(allowed_time);
     timing.max_allowed_time = smpl::to_duration(allowed_time);
-    
+
     bool res = planner->search.replan(timing, &solution, &solution_cost);
 #else
     auto plan_start = std::chrono::high_resolution_clock::now();
@@ -680,9 +680,9 @@ bool PlanPath(
         trajectory_processing::IterativeParabolicTimeParameterization profiler;
         profiler.computeTimeStamps(traj);
 
-        ROS_INFO("durations:");
+        ROS_DEBUG("durations:");
         for (auto i = 0; i < traj.getWayPointCount(); ++i) {
-            ROS_INFO("  %3d: %f, %f", i, traj.getWayPointDurations()[i], traj.getWayPointDurationFromStart(i));
+            ROS_DEBUG("  %3d: %f, %f", i, traj.getWayPointDurations()[i], traj.getWayPointDurationFromStart(i));
         }
 
         return traj;
@@ -694,17 +694,17 @@ bool PlanPath(
 
 
     for (auto i = 0; i < segments.size(); ++i) {
-        ROS_INFO("Add open gripper command!");
+        ROS_DEBUG("Add open gripper command!");
         if (segment_types[i] == MT_GRASP) {
             commands->push_back(smpl::make_unique<GripperCommand>(true));
         }
 
 
-        ROS_INFO("Add trajectory of length %zu", segments[i].size());
+        ROS_DEBUG("Add trajectory of length %zu", segments[i].size());
         auto cmd = smpl::make_unique<TrajectoryCommand>(MakeRobotTrajectory(segments[i]));
         commands->push_back(std::move(cmd));
 
-        ROS_INFO("Add close gripper command!");
+        ROS_DEBUG("Add close gripper command!");
         if (segment_types[i] == MT_GRASP) {
             commands->push_back(smpl::make_unique<GripperCommand>(false));
         }
