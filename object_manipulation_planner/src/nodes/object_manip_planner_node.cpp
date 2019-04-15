@@ -481,6 +481,7 @@ bool ManipulateObject(
     FollowJointTrajectoryActionClient* traj_client,
     GripperCommandActionClient* gripper_client,
     ros::Publisher* gripper_command_pub,
+    const std::string* stats_path,
     const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
 {
     ///////////////////////////////////////
@@ -582,6 +583,8 @@ bool ManipulateObject(
 
     auto commands = std::vector<std::unique_ptr<Command>>();
 
+    auto planning_start = std::chrono::high_resolution_clock::now();
+
     ProfilerStart("omp");
     if (!PlanPath(
         planner,
@@ -594,10 +597,22 @@ bool ManipulateObject(
     {
         ProfilerStop();
         ROS_ERROR("Failed to plan path");
+        auto planning_finish = std::chrono::high_resolution_clock::now();
+        auto planning_duration = std::chrono::duration<double>(planning_finish - planning_start).count();
+        if (!stats_path->empty()) {
+            auto* f = fopen(stats_path->c_str(), "a");
+            if (f != NULL) {
+                fprintf(f, "%f,fail\n", planning_duration);
+                fclose(f);
+            }
+        }
         return false;
     }
 
     ProfilerStop();
+
+    auto planning_finish = std::chrono::high_resolution_clock::now();
+    auto planning_duration = std::chrono::duration<double>(planning_finish - planning_start).count();
 
     /////////////////////////////////////////////
     // Execute (or animate) the resulting plan //
@@ -605,10 +620,23 @@ bool ManipulateObject(
 
     auto execute = !msg->plan_only;
 
+    auto execute_start = std::chrono::high_resolution_clock::now();
+
     if (execute) {
         ExecuteTrajectory(traj_client, gripper_client, gripper_command_pub, commands);
     } else {
         AnimateTrajectory(robot_model, commands, 5.0);
+    }
+
+    auto execute_finish = std::chrono::high_resolution_clock::now();
+    auto execution_duration = std::chrono::duration<double>(execute_finish - execute_start).count();
+
+    if (!stats_path->empty()) {
+        auto* f = fopen(stats_path->c_str(), "a");
+        if (f != NULL) {
+            fprintf(f, "%f,%f\n", planning_duration, execution_duration);
+            fclose(f);
+        }
     }
 
     ROS_INFO("Crate manipulation successful");
@@ -944,7 +972,6 @@ bool ReleaseCrate(
     return true;
 }
 
-
 // 1. Generate a trajectory using the model of the object
 // 2. Save the example trajectory as a demonstration
 // 3. Construct state space: (base/x, base/y, base/theta, torso, ee/x, ee/y,
@@ -1204,6 +1231,10 @@ int main(int argc, char* argv[])
         ph.param("w_heuristic", params.w_heuristic, 100.0);
     }
 
+    // File to store planning statistics in
+    auto stats_path = std::string();
+    ph.param<std::string>("stats_path", stats_path, "");
+
     ObjectManipPlanner planner;
     if (!Init(&planner, &omanip, &ochecker, &grid, &params)) {
         ROS_ERROR("Failed to initialize Object Manipulation Planner");
@@ -1274,6 +1305,7 @@ int main(int argc, char* argv[])
                 &traj_client,
                 &gripper_client,
                 &gripper_command_pub,
+                &stats_path,
                 msg))
             {
                 if (!ReleaseCrate(

@@ -64,5 +64,7 @@
 
         <param name="w_heuristic" value="100.0"/>
         <param name="w_egraph" value="5.0"/>
+
+        <!--param name="stats_path" value="crate_stats.txt"/-->
     </node>
 </launch>

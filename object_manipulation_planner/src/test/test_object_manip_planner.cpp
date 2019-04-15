@@ -3,17 +3,23 @@
 #include <boost/filesystem.hpp>
 #include <smpl/console/ansi.h>
 
-// we have:
+// We have:
+//
 // (1) a planning library
+//
 // (2) a runtime service that configures the planning library with a planning
 //     and collision model for the roman.
+//
 // (3) a test executable that sends a planning [and execution] request to the
 //     runtime service
 //
 // For the test harness, we could either:
+//
 // (1) Configure the planning library similarly to the runtime service and
 //     perform multiple planning queries
+//
 // (2) Send planning requests to the runtime service.
+//
 // (3) Automatically generate configuration and launch files for the test
 //     executable and run the test several times in succession
 //
@@ -28,7 +34,8 @@
 // Option (3) stresses the test executable and avoids writing common
 // configuration parsing code for a scenario. However, we'll end up working
 // around roslaunch to automatically generate test configurations.
-
+//
+// We're going with option 3 for now
 int main(int argc, char* argv[])
 {
     if (argc < 2) {
@@ -62,7 +69,7 @@ int main(int argc, char* argv[])
         std::stringstream ss;
         auto cmd = std::string();
 
-        auto allowed_time = 60.0;
+        auto allowed_time = 10.0;
 
         ss << "roslaunch";
         ss << " --disable-title";
