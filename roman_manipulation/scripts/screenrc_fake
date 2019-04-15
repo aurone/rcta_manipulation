@@ -21,7 +21,7 @@ screen -t obm
 stuff "roslaunch object_manipulation_planner object_manip_planner_node.launch --screen"
 
 screen -t manip
-stuff "roslaunch ../../object_manipulation_planner/launch/manipulate_object.launch --screen"
+stuff "roslaunch object_manipulation_planner manipulate_object.launch --screen"
 
 screen -t rviz
 stuff "rosrun rviz rviz -d $HOME/.rviz/rcta.rviz"
