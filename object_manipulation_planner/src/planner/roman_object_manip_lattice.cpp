@@ -894,7 +894,7 @@ void RomanObjectManipLattice::getOrigStateOrigSuccs(
     for (; i < end;) {
         auto succ_id = (*succs)[i];
         if (!CheckConsistency(state->state, m_states[succ_id]->state, g_ConsistencyThreshold)) {
-            ROS_INFO("Remove inconsistent state");
+            ROS_DEBUG("Remove inconsistent state");
             std::swap((*succs)[end - 1], (*succs)[i]);
             std::swap((*costs)[end - 1], (*costs)[i]);
             --end;
