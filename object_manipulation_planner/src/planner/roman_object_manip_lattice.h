@@ -97,7 +97,8 @@ public:
         smpl::WorkspaceLatticeState* state,
         const PhiCoord& phi_coord,
         std::vector<int>* succs,
-        std::vector<int>* costs);
+        std::vector<int>* costs,
+        std::vector<RobotPath>* motions = NULL);
 
     void getPreGraspSuccs(
         int state_id,

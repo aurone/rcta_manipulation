@@ -365,6 +365,7 @@ bool IsManipulating(
     return ((z > start_z) & (z < goal_z)) | ((z < start_z) & (z > goal_z));
 }
 
+#if 0
 static
 bool GetSuccsFromCache(
     const RomanObjectManipLattice::ActionCache* cache,
@@ -378,6 +379,28 @@ bool GetSuccsFromCache(
         for (auto& e : it->second) {
             succs->push_back(e.succ_id);
             costs->push_back(e.cost);
+        }
+        return true;
+    }
+    return false;
+}
+#endif
+
+static
+bool GetSuccsFromCache(
+    const RomanObjectManipLattice::ActionCache* cache,
+    int state_id,
+    std::vector<int>* succs,
+    std::vector<int>* costs,
+    std::vector<RobotPath>* motions = NULL)
+{
+    // have we previously generated actions for this grasp?
+    auto it = cache->find(state_id);
+    if (it != end(*cache)) {
+        for (auto& e : it->second) {
+            succs->push_back(e.succ_id);
+            costs->push_back(e.cost);
+            if (motions != NULL) motions->push_back(e.motion);
         }
         return true;
     }
@@ -640,7 +663,8 @@ void RomanObjectManipLattice::getGraspSuccs(
     smpl::WorkspaceLatticeState* state,
     const PhiCoord& phi_coord,
     std::vector<int>* succs,
-    std::vector<int>* costs)
+    std::vector<int>* costs,
+    std::vector<RobotPath>* out_motions)
 {
     if (IsManipulating(this, state->state)) return;
 
@@ -653,7 +677,7 @@ void RomanObjectManipLattice::getGraspSuccs(
     }
 
 #if CACHE_ACTIONS
-    if (GetSuccsFromCache(&m_grasp_action_cache, state_id, succs, costs)) return;
+    if (GetSuccsFromCache(&m_grasp_action_cache, state_id, succs, costs, out_motions)) return;
 #endif
 
     auto motions = std::vector<RobotPath>();
@@ -700,6 +724,9 @@ void RomanObjectManipLattice::getGraspSuccs(
         SMPL_DEBUG_STREAM_NAMED(G_SUCCESSORS_LOG, "Grasp motion succeeded to state " << succ_id << ": " << final_robot_state);
         succs->push_back(succ_id);
         costs->push_back(200);
+        if (out_motions != NULL) {
+            out_motions->push_back(cart_path);
+        }
         motions.push_back(std::move(cart_path));
     }
 
