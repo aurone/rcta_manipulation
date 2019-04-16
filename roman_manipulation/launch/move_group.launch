@@ -1,6 +1,7 @@
 <launch>
+    <arg name="robot" default="roman1"/>
     <arg name="debug" default="false"/>
-    <group ns="roman1">
+    <group ns="$(arg robot)">
         <include file="$(find roman_moveit_config)/launch/move_group.launch">
             <arg name="debug" value="$(arg debug)"/>
         </include>
