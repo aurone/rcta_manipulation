@@ -1285,8 +1285,7 @@ int main(int argc, char* argv[])
             "rcta_right_robotiq_controller/command", 10);
 
     auto move_group_name = std::string("right_arm_and_torso");
-    auto move_group =
-            moveit::planning_interface::MoveGroupInterface(move_group_name);
+    auto move_group = std::unique_ptr<moveit::planning_interface::MoveGroupInterface>();
 
     auto autostart = false;
 
@@ -1294,6 +1293,11 @@ int main(int argc, char* argv[])
         "manipulate_object",
         [&](const cmu_manipulation_msgs::ManipulateObjectGoal::ConstPtr& msg)
         {
+            if (!msg->plan_only && !move_group) {
+                ROS_INFO("Connecting to Move Group");
+                move_group = smpl::make_unique<moveit::planning_interface::MoveGroupInterface>(move_group_name);
+            }
+
             auto curr_state = GetCurrentState(&state_monitor);
             if (ManipulateObject(
                 robot_model,
@@ -1312,7 +1316,7 @@ int main(int argc, char* argv[])
                         &curr_state,
                         &object_model,
                         move_group_name,
-                        &move_group,
+                        move_group.get(),
                         &traj_client,
                         &gripper_client,
                         &gripper_command_pub,
