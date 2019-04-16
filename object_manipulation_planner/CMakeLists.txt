@@ -97,7 +97,7 @@ target_link_libraries(
         ${actionlib_LIBRARIES}
         ${cmu_manipulation_msgs_LIBRARIES}
         ${control_msgs_LIBRARIES}
-        ${moveit_ros_planning_interface_LIBRARIES}        
+        ${moveit_ros_planning_interface_LIBRARIES}
         ${eigen_conversions_LIBRARIES}
         ${tf_LIBRARIES}
         ${smpl_urdf_robot_model_LIBRARIES}
@@ -253,7 +253,14 @@ target_include_directories(make_cabinet_urdf SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR}
 
 # echo_display_traj
 add_executable(echo_display_traj src/tools/echo_display_traj.cpp)
-target_include_directories(echo_display_traj SYSTEM PRIVATE ${catkin_INCLUDE_DIRS})
+target_include_directories(
+    echo_display_traj
+    SYSTEM
+    PRIVATE
+        ${roscpp_INCLUDE_DIRS}
+        ${moveit_core_INCLUDE_DIRS}
+        ${moveit_ros_planning_INCLUDE_DIRS}
+        ${moveit_msgs_INCLUDE_DIRS})
 target_link_libraries(
     echo_display_traj
     PRIVATE
@@ -261,6 +268,11 @@ target_link_libraries(
         ${moveit_core_LIBRARIES}
         ${moveit_ros_planning_LIBRARIES})
 install(TARGETS echo_display_traj RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+add_executable(unprefixer src/tools/unprefixer.cpp)
+target_compile_options(unprefixer PRIVATE -std=c++11)
+target_include_directories(unprefixer SYSTEM PRIVATE ${roscpp_INCLUDE_DIRS} ${tf_INCLUDE_DIRS})
+target_link_libraries(unprefixer PRIVATE ${roscpp_LIBRARIES} ${tf_LIBRARIES})
 
 add_executable(rpy_to_quat src/tools/rpy_to_quat.cpp)
 target_include_directories(rpy_to_quat SYSTEM PRIVATE ${EIGEN3_INCLUDE_DIR})
