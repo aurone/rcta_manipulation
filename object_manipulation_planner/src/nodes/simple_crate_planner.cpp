@@ -749,7 +749,7 @@ bool ManipulateObject(
         auto& tool_transform = curr_state.getGlobalLinkTransform(tool_link_name);
         auto withdraw_pose =
                 tool_transform *
-                Eigen::Translation3d(-0.1, 0.0, 0.0);
+                Eigen::Translation3d(release_offset, 0.0, 0.0);
         MoveToPose(move_group, withdraw_pose, tool_link_name);
     }
 
